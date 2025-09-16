@@ -158,7 +158,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                     ref={inputRef}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Type a role and a setting (a king in medieval England, a partisan leader in World War II, etc.)"
+                    placeholder="Type a role and a setting (king in medieval England, partisan leader in World War II, etc.)"
                     className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
                   />
                 </div>

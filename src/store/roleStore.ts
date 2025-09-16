@@ -20,8 +20,14 @@ export type AnalysisResult = {
 export type Character = {
   gender: "male" | "female" | "any";
   name: string;
+  /** Physical description only (what the player edits) */
   description: string;
-  avatarUrl?: string; // <— new: persisted avatar across screens
+  /** Persisted avatar url if already generated */
+  avatarUrl?: string;
+  /** Full, combined prompt sent to image generation (built on Name screen) */
+  imagePrompt?: string;
+  /** AI-chosen background object (e.g., "red pagoda") */
+  bgObject?: string;
 };
 
 /* ---------- Store ---------- */
@@ -58,6 +64,8 @@ export const useRoleStore = create<RoleState>((set, get) => ({
       name: "",
       description: "",
       avatarUrl: undefined,
+      imagePrompt: undefined,
+      bgObject: undefined,
     };
     set({ character: { ...prev, ...patch } });
   },

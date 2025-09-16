@@ -19,5 +19,5 @@ export default function App() {
   if (route === "/compass") return <CompassIntro push={push} />;
 
   // default
-  return <SplashScreen onStart={() => push("/intro")} />;
+  return <SplashScreen onStart={() => push("/role")} />;
 }

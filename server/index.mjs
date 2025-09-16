@@ -1,186 +1,118 @@
 // server/index.mjs
 import "dotenv/config";
 import express from "express";
-import cors from "cors";
-import path from "path";
-import fs from "fs";
-import mammoth from "mammoth";
-import OpenAI from "openai";
+import bodyParser from "body-parser";
 
 const app = express();
-app.use(cors());
-app.use(express.json({ limit: "2mb" }));
+app.use(bodyParser.json());
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// -------------------- Model & API config --------------------
+const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
+const CHAT_URL = "https://api.openai.com/v1/chat/completions";
+const IMAGE_URL = "https://api.openai.com/v1/images/generations";
 
-/* -------------------------------------------------------
-   Load Authority Guide (docx) once at boot
-------------------------------------------------------- */
-const GUIDE_PATH = path.resolve(process.cwd(), "Authority_Instructions_E12_v6_4.docx");
-let AUTHORITY_GUIDE = "";
+// One default text model + per-task overrides from .env
+const CHAT_MODEL_DEFAULT = process.env.CHAT_MODEL || "gpt-4o-mini";
+const MODEL_VALIDATE = process.env.MODEL_VALIDATE || CHAT_MODEL_DEFAULT;
+const MODEL_NAMES    = process.env.MODEL_NAMES    || CHAT_MODEL_DEFAULT;
+const MODEL_ANALYZE  = process.env.MODEL_ANALYZE  || CHAT_MODEL_DEFAULT;
 
-async function loadGuide() {
+// Image model
+const IMAGE_MODEL = process.env.IMAGE_MODEL || "gpt-image-1";
+const IMAGE_SIZE = process.env.IMAGE_SIZE || "1024x1024";
+
+
+// Helper: call Chat Completions and try to parse JSON from the reply
+async function aiJSON({ system, user, model = CHAT_MODEL_DEFAULT, temperature = 0.6, fallback = null }) {
   try {
-    if (fs.existsSync(GUIDE_PATH)) {
-      const buf = fs.readFileSync(GUIDE_PATH);
-      const { value } = await mammoth.extractRawText({ buffer: buf });
-      AUTHORITY_GUIDE = String(value || "")
-        .replace(/\r/g, "")
-        .replace(/[ \t]+\n/g, "\n")
-        .trim();
-      console.log("[server] Authority guide loaded. chars:", AUTHORITY_GUIDE.length);
-    } else {
-      console.warn("[server] Guide file not found at:", GUIDE_PATH);
+    const resp = await fetch(CHAT_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENAI_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        temperature,
+      }),
+    });
+
+    if (!resp.ok) {
+      const t = await resp.text().catch(() => "");
+      throw new Error(`OpenAI chat error ${resp.status}: ${t}`);
     }
-  } catch (err) {
-    console.error("[server] Failed to load guide:", err);
+
+    const data = await resp.json();
+    const text = data?.choices?.[0]?.message?.content ?? "";
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      const m = text.match(/\{[\s\S]*\}/);
+      if (m) return JSON.parse(m[0]);
+      return fallback;
+    }
+  } catch (e) {
+    console.error("[server] aiJSON error:", e?.message || e);
+    return fallback;
   }
 }
-await loadGuide();
 
-/* -------------------------------------------------------
-   Health
-------------------------------------------------------- */
-app.get("/api/health", (_req, res) =>
-  res.json({ ok: true, guide: AUTHORITY_GUIDE ? "loaded" : "missing" })
-);
-
-/* -------------------------------------------------------
-   Analyze Role → Top-5 power holders
-------------------------------------------------------- */
-app.post("/api/analyze-role", async (req, res) => {
-  try {
-    const role = String(req.body?.role || "").slice(0, 400).trim();
-    if (!role) return res.status(400).json({ error: "Missing role" });
-
-    const systemMsg = [
-      "You are a political-systems analyst.",
-      "Use the framework text below (Authority Instructions — Ranking Seats, v6.4) as PRIMARY guidance.",
-      "It defines Exception-12 (E-12) domains, stop-rules, tie-breakers, and how to rank Seats of Authority.",
-      "Output a concise analysis as JSON matching this TypeScript type:",
-      "type PowerHolder = { name: string; percent: number; icon?: string; note?: string };",
-      "type AnalysisResult = { systemName: string; systemDesc: string; flavor: string; holders: PowerHolder[]; playerIndex: number | null };",
-      "",
-      "Rules:",
-      "- First decide if the setting is real/historic; if yes, use factual signals.",
-      "- If fictional, use common sense and be coherent.",
-      "- Pick the best-fitting system label (from monarchy/democracy/oligarchy families, etc.).",
-      "- Create EXACTLY five power holders with percentages adding to ~100.",
-      "- Include a short amusing description (note) for each holder.",
-      "- Include a small emoji-like icon for each holder (e.g., ⚖️, 🛡️, 💰, 📰).",
-      "- Identify which holder corresponds to the PLAYER role and set playerIndex to its index; else null.",
-      "",
-      "Framework excerpt (use it to reason, do not echo it):",
-      AUTHORITY_GUIDE || "(Guide missing at runtime.)",
-    ].join("\n");
-
-    const userMsg = [
-      `ROLE (player-selected): ${role}`,
-      "Return ONLY valid JSON (no markdown fences).",
-    ].join("\n");
-
-    const resp = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemMsg },
-        { role: "user", content: userMsg },
-      ],
-      temperature: 0.4,
-    });
-
-    const text = resp.choices[0]?.message?.content?.trim() || "{}";
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      const fix = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: "Fix this into strict JSON matching the specified TS type. Return only JSON." },
-          { role: "user", content: text },
-        ],
-        temperature: 0,
-      });
-      parsed = JSON.parse(fix.choices[0]?.message?.content || "{}");
-    }
-
-    if (!Array.isArray(parsed?.holders) || parsed.holders.length !== 5) {
-      return res.status(422).json({ error: "Invalid AI response (holders)" });
-    }
-
-    parsed.holders = parsed.holders.map((h) => ({
-      name: String(h?.name || "Unknown"),
-      percent: Math.max(0, Math.min(100, Math.round(Number(h?.percent || 0)))),
-      icon: h?.icon ? String(h.icon) : undefined,
-      note: h?.note ? String(h.note) : undefined,
-    }));
-
-    // normalize total to 100
-    const sum = parsed.holders.reduce((s, h) => s + h.percent, 0);
-    if (sum !== 100 && sum > 0) {
-      const diff = 100 - sum;
-      parsed.holders[0].percent = Math.max(0, Math.min(100, parsed.holders[0].percent + diff));
-    }
-
-    parsed.playerIndex =
-      Number.isInteger(parsed?.playerIndex) && parsed.playerIndex >= 0 && parsed.playerIndex < 5
-        ? parsed.playerIndex
-        : null;
-
-    return res.json(parsed);
-  } catch (err) {
-    console.error("[/api/analyze-role] error:", err);
-    return res.status(502).json({ error: "AI analysis failed" });
-  }
+// -------------------- Health check --------------------------
+app.get("/api/_ping", (_req, res) => {
+  res.json({
+    ok: true,
+    port: Number(process.env.PORT) || 3001,
+    models: {
+      default: CHAT_MODEL_DEFAULT,
+      validate: MODEL_VALIDATE,
+      names: MODEL_NAMES,
+      analyze: MODEL_ANALYZE,
+      image: IMAGE_MODEL,
+    },
+  });
 });
 
-/* -------------------------------------------------------
-   Name suggestions (male/female/any) + face prompts
-   Accepts { setting } or { role }
-------------------------------------------------------- */
+// -------------------- AI VALIDATE ROLE ----------------------
+// Replaces the heuristic: accepts real, historical, future, sci-fi, fantasy.
+// Must include a role (who) AND a setting (where and/or when).
+app.post("/api/validate-role", async (req, res) => {
+  const raw = (req.body?.text || req.body?.role || req.body?.input || "").toString().trim();
+
+  // Ask the model to judge strictly and return JSON only
+  const system =
+    "You validate a single short line describing a player's ROLE together with a SETTING.\n" +
+    "ACCEPT if it clearly has (1) a role (the 'who') and (2) a setting (place and/or time). " +
+    "Examples that SHOULD pass: 'a king in medieval England', 'a partisan leader during World War II', " +
+    "'a Mars colony governor in 2300', 'a unicorn king in a fantasy land'. " +
+    "Examples that SHOULD fail: 'a king' (no setting), 'in medieval England' (no role), 'freedom' (neither).\n" +
+    "Return STRICT JSON only as {\"valid\": true|false, \"reason\": \"short reason if invalid\"}. No extra keys, no prose.";
+
+  const user = `Input: ${raw || ""}`;
+
+  // If OpenAI is unreachable, respond 503 so the client shows connection error
+  const out = await aiJSON({ system, user, model: MODEL_VALIDATE, temperature: 0, fallback: null });
+  if (!out || typeof out.valid !== "boolean") {
+    return res.status(503).json({ error: "AI validator unavailable" });
+  }
+  return res.json({ valid: !!out.valid, reason: String(out.reason || "") });
+});
+
+// -------------------- Name suggestions ----------------------
 app.post("/api/name-suggestions", async (req, res) => {
   try {
-    const settingRaw =
-      (typeof req.body?.setting === "string" && req.body.setting) ||
-      (typeof req.body?.role === "string" && req.body.role) ||
-      "";
-
-    const setting = String(settingRaw).slice(0, 600).trim();
-    if (!setting) return res.status(400).json({ error: "Missing setting" });
-
-    const sys =
-      "Generate culturally/period-appropriate character names and a one-sentence avatar-face prompt for each.\n" +
-      "Return STRICT JSON with keys male, female, any; each is { name: string, prompt: string }.\n" +
-      "The prompt MUST begin with: 'a game avatar of the face of ' then include the role and setting, then a brief facial description.";
-
-    const user = `Setting: ${setting}\nReturn only JSON.`;
-
-    const resp = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: sys },
-        { role: "user", content: user },
-      ],
-      temperature: 0.6,
-    });
-
-    let text = resp.choices[0]?.message?.content?.trim() || "{}";
-    let parsed;
-
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      const fix = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: "Fix to strict JSON with keys male, female, any; each { name, prompt }. Return only JSON." },
-          { role: "user", content: text },
-        ],
-        temperature: 0,
-      });
-      text = fix.choices[0]?.message?.content?.trim() || "{}";
-      parsed = JSON.parse(text);
-    }
+    const { role } = req.body || {};
+    const system =
+      "Generate three name+prompt pairs for a game avatar. " +
+      "Return STRICT JSON {\"male\":{\"name\":\"\",\"prompt\":\"\"},\"female\":{...},\"any\":{...}}. " +
+      "The 'prompt' MUST start with a comma and include ONLY physical features (no role, no style). " +
+      "Keep neutral and respectful.";
+    const user = `Role: ${role || ""}`;
+    const parsed = await aiJSON({ system, user, model: MODEL_NAMES, temperature: 0.6, fallback: {} });
 
     const out = ["male", "female", "any"].reduce((acc, k) => {
       const v = parsed?.[k] || {};
@@ -193,34 +125,155 @@ app.post("/api/name-suggestions", async (req, res) => {
 
     return res.json(out);
   } catch (err) {
-    console.error("[/api/name-suggestions] error:", err);
-    return res.status(502).json({ error: "Name generation failed" });
+    console.error("Error in /api/name-suggestions:", err);
+    return res.status(500).json({ error: "Failed to generate name suggestions" });
   }
 });
 
-/* -------------------------------------------------------
-   Avatar generation (image)
-------------------------------------------------------- */
-app.post("/api/generate-avatar", async (req, res) => {
-  try {
-    const prompt = String(req.body?.prompt || "").slice(0, 2000).trim();
-    if (!prompt) return res.status(400).json({ error: "Missing prompt" });
+// -------------------- Background object suggestion ----------
+function backgroundHeuristic(role = "") {
+  const r = role.toLowerCase();
+  if (r.includes("china")) return "red pagoda";
+  if (r.includes("japan")) return "torii gate";
+  if (r.includes("german") || r.includes("germany") || r.includes("kanzler") || r.includes("chancellor"))
+    return "brandenburg gate";
+  if (r.includes("rome") || r.includes("roman")) return "colosseum";
+  if (r.includes("egypt")) return "pyramids of giza";
+  if (r.includes("viking")) return "drakkar longship";
+  if (r.includes("arab") || r.includes("caliph")) return "crescent-adorned minaret";
+  return "ornate palace backdrop";
+}
 
-    const image = await openai.images.generate({
-      model: "gpt-image-1",
-      prompt,
-      size: "1024x1024", // supported sizes: 1024x1024, 1024x1792, 1792x1024
+app.post("/api/bg-suggestion", async (req, res) => {
+  try {
+    const { role, gender } = req.body || {};
+    const system =
+      "Output a single JSON object with key 'object' naming one concise, iconic background object that visually matches the role. " +
+      "Max 3 words. Example: {\"object\":\"red pagoda\"}. No prose.";
+    const genderWord = gender === "female" ? "female" : gender === "male" ? "male" : "any gender";
+    const user = `Role: ${role || ""}. Gender: ${genderWord}. JSON ONLY.`;
+
+    const ai = await aiJSON({
+      system,
+      user,
+      model: MODEL_NAMES,
+      temperature: 0.2,
+      fallback: { object: backgroundHeuristic(role) },
     });
 
-    const b64 = image.data?.[0]?.b64_json;
-    if (!b64) return res.status(502).json({ error: "Image generation failed" });
-
-    return res.json({ dataUrl: `data:image/png;base64,${b64}` });
+    const object =
+      typeof ai?.object === "string" && ai.object.trim() ? ai.object.trim() : backgroundHeuristic(role);
+    return res.json({ object });
   } catch (err) {
-    console.error("[/api/generate-avatar] error:", err);
-    return res.status(502).json({ error: "Avatar generation failed" });
+    console.error("Error in /api/bg-suggestion:", err);
+    return res.status(500).json({ object: backgroundHeuristic(req?.body?.role) });
   }
 });
 
-const PORT = process.env.PORT || 8787;
-app.listen(PORT, () => console.log(`[server] listening on http://localhost:${PORT}`));
+// -------------------- Power analysis (uses AI) ---------------
+app.post("/api/analyze-role", async (req, res) => {
+  try {
+    const role = String(req.body?.role || "").trim();
+
+    const fallback = {
+      systemName: "Generic Mixed Republic",
+      systemDesc: "A plausible balance of powers for a mixed system.",
+      flavor: "A tenuous balance binds factions together.",
+      holders: [
+        { name: "Executive", percent: 30, icon: "👑", note: "Leads day-to-day rule" },
+        { name: "Legislature", percent: 35, icon: "🏛️", note: "Makes laws and budgets" },
+        { name: "Judiciary", percent: 15, icon: "⚖️", note: "Interprets and constrains" },
+        { name: "Elites & Factions", percent: 20, icon: "🦅", note: "Informal yet crucial power" },
+      ],
+      playerIndex: null,
+    };
+
+    const system =
+      "Analyze the player's ROLE+SETTING into a political power breakdown. " +
+      "Return STRICT JSON {systemName, systemDesc, flavor, holders:[{name,percent,icon?,note?}], playerIndex}. " +
+      "Percents sum ~100. Keep labels short and game-friendly.";
+    const user = `Role: ${role}. JSON ONLY.`;
+
+    const out = await aiJSON({ system, user, model: MODEL_ANALYZE, temperature: 0.4, fallback });
+    // Coerce & normalize
+    let sum = 0;
+    const holders = (Array.isArray(out?.holders) ? out.holders : fallback.holders)
+      .slice(0, 8)
+      .map((h) => {
+        const p = Math.max(0, Math.min(100, Number(h?.percent) || 0));
+        sum += p;
+        return {
+          name: String(h?.name || "").slice(0, 40) || "Group",
+          percent: p,
+          icon: String(h?.icon || "").slice(0, 2) || undefined,
+          note: String(h?.note || "").slice(0, 80) || undefined,
+        };
+      });
+
+    if (sum > 0 && Math.abs(100 - sum) > 1) {
+      holders.forEach((h) => (h.percent = Math.round((h.percent / sum) * 100)));
+      const diff = 100 - holders.reduce((a, b) => a + b.percent, 0);
+      if (diff) holders[0].percent += diff;
+    }
+
+    const result = {
+      systemName: String(out?.systemName || fallback.systemName),
+      systemDesc: String(out?.systemDesc || fallback.systemDesc),
+      flavor: String(out?.flavor || fallback.flavor),
+      holders,
+      playerIndex:
+        out?.playerIndex === null || out?.playerIndex === undefined
+          ? null
+          : Number(out.playerIndex),
+    };
+
+    res.json(result);
+  } catch (e) {
+    console.error("Error in /api/analyze-role:", e?.message || e);
+    res.status(500).json({ error: "analyze-role failed" });
+  }
+});
+
+// -------------------- Avatar generation ----------------------
+app.post("/api/generate-avatar", async (req, res) => {
+  try {
+    const prompt = String(req.body?.prompt || "").trim();
+    if (!prompt) return res.status(400).json({ error: "Missing prompt" });
+
+    const body = {
+      model: IMAGE_MODEL,
+      prompt,
+      size: IMAGE_SIZE,
+     // response_format: "b64_json",
+    };
+
+    const r = await fetch(IMAGE_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENAI_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!r.ok) {
+      const t = await r.text().catch(() => "");
+      throw new Error(`OpenAI image error ${r.status}: ${t}`);
+    }
+
+    const data = await r.json();
+    const b64 = data?.data?.[0]?.b64_json;
+    if (!b64) throw new Error("No image returned");
+    const dataUrl = `data:image/png;base64,${b64}`;
+    res.json({ dataUrl });
+  } catch (e) {
+    console.error("Error in /api/generate-avatar:", e?.message || e);
+    res.status(502).json({ error: "avatar generation failed" });
+  }
+});
+
+// -------------------- Start server ---------------------------
+const PORT = Number(process.env.PORT) || 3001;
+app.listen(PORT, () => {
+  console.log(`[server] listening on http://localhost:${PORT}`);
+});
