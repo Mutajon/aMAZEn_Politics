@@ -6,29 +6,7 @@ import type { PushFn } from "../lib/router";
 import { useRoleStore } from "../store/roleStore";
 import type { AnalysisResult, PowerHolder } from "../store/roleStore";
 import { AIConnectionError } from "../lib/validation";
-
-const AMUSEMENTS = [
-  "Power is like cake: everyone wants a slice, but someone always takes the fork too.",
-  "The best way to hold power is to pretend you don’t have it, while making sure no one else does either.",
-  "Power is never created or destroyed—it’s just redistributed at very inconvenient times.",
-  "Whoever said “sharing is caring” clearly never tried sharing power.",
-  "Holding power is like holding a balloon: the tighter you grip, the more likely it is to pop.",
-  "Power loves a vacuum—just not the kind you clean with.",
-  "If power corrupts, then unlimited power is basically a loyalty program for corruption.",
-  "The math of power: add allies, subtract enemies, multiply promises, divide the spoils.",
-  "The easiest way to measure power is by how many people laugh at your bad jokes.",
-  "Power is like coffee—best when concentrated, dangerous when spilled.",
-  "Nobody owns power; they just rent it until the lease runs out.",
-  "Balancing power is like juggling chainsaws—you only realize how hard it is when you drop one.",
-  "Power doesn’t sleep—it just takes coffee breaks and rebrands itself.",
-  "Whoever controls the agenda controls the outcome; the rest is just background music.",
-  "Power is like money: once you’ve counted it, someone already stole half.",
-  "The secret to holding power is looking busy while doing nothing.",
-  "Power is distributed like office cake: first to the boss, then to whoever grabbed a plate fastest.",
-  "Real power is deciding when the meeting ends.",
-  "The distribution of power is just a polite word for “who gets the remote.”",
-  "Power is like gravity: invisible, constant, and most noticeable when you fall.",
-];
+import LoadingOverlay from "../components/LoadingOverlay";
 
 // darkest → lightest per rank (1..5)
 const RANK_COLORS = ["#4C1D95", "#5B21B6", "#6D28D9", "#8B5CF6", "#A78BFA"];
@@ -94,18 +72,30 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
   const [state, setState] = useState<FetchState>(analysisStore ? "done" : "idle");
   const [holders, setHolders] = useState<PowerHolder[]>(analysisStore?.holders || []);
   const [errorMsg, setErrorMsg] = useState("");
-  const [quipIdx, setQuipIdx] = useState(0);
+
+  // Loading overlay control
+  const [loading, setLoading] = useState(false);
+
+  // Your new power quotes (used by the overlay)
+  const powerQuotes = [
+    "Power is just permission to hog the remote.",
+    "Everyone wants power—until it comes with paperwork.",
+    "Power is like Wi-Fi: unstable and password-protected.",
+    "Too much power turns meetings into monologues.",
+    "Power is borrowed, never owned.",
+    "The strongest grip on power leaves the deepest dents.",
+    "Power is the art of making others nod.",
+    "Hoarding power is the original group project fail.",
+    "Real power is skipping the line.",
+    "Power leaves quietly, but chaos throws a party.",
+  ];
+
   const initialHolders = useRef<PowerHolder[] | null>(analysisStore?.holders || null);
   const playerNameRef = useRef<string | null>(
     analysisStore?.playerIndex != null ? analysisStore.holders[analysisStore.playerIndex]?.name ?? null : null
   );
 
-  useEffect(() => {
-    // 3s cadence for quotes
-    const t = setInterval(() => setQuipIdx((i) => (i + 1) % AMUSEMENTS.length), 3000);
-    return () => clearInterval(t);
-  }, []);
-
+  // Kick off analysis once (or when re-trying)
   useEffect(() => {
     if (!role) {
       push("/role");
@@ -115,20 +105,26 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
 
     (async () => {
       try {
+        setLoading(true);            // show overlay
         setState("loading");
         setErrorMsg("");
+
         const result = await fetchAnalysis(role);
+
         setAnalysis(result);
         initialHolders.current = result.holders;
         setHolders(result.holders);
         playerNameRef.current =
           result.playerIndex != null ? result.holders[result.playerIndex]?.name ?? null : null;
+
         setState("done");
       } catch (e: any) {
         setErrorMsg(
           e instanceof AIConnectionError ? e.message || "AI analysis unavailable" : "Unexpected error during AI analysis"
         );
         setState("error");
+      } finally {
+        setLoading(false);           // hide overlay
       }
     })();
   }, [role, state, push, setAnalysis]);
@@ -137,37 +133,13 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
   const sortByPower = () =>
     setHolders((list) => {
       const withIndex = list.map((h, i) => ({ h, i }));
-      withIndex.sort((a, b) => (b.h.percent - a.h.percent) || (a.i - b.i));
+      withIndex.sort((a, b) => b.h.percent - a.h.percent || a.i - b.i);
       return withIndex.map((x) => x.h);
     });
 
   return (
     <div className="min-h-[100dvh] px-5 py-8" style={bgStyle}>
       <div className="w-full max-w-2xl mx-auto">
-        {/* Centered loading view: Title + quip */}
-        {state !== "done" && state !== "error" && (
-          <div className="min-h-[60vh] grid place-items-center">
-            <div className="text-center space-y-3">
-              <div className="text-4xl font-extrabold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
-                Splendid!
-              </div>
-              <AnimatePresence mode="popLayout">
-                <motion.div
-                  key={quipIdx}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.35 }}
-                  className="text-center text-white/90 italic"
-                  style={{ fontFamily: "Inter, ui-sans-serif, system-ui", fontSize: "20px" }}
-                >
-                  {AMUSEMENTS[quipIdx]}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-          </div>
-        )}
-
         {/* Error banner */}
         {state === "error" && (
           <div className="mt-4 rounded-xl border border-red-400/40 bg-red-500/10 text-red-200 px-3 py-2" role="alert">
@@ -210,12 +182,10 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
 
                     return (
                       <motion.div
-                        key={h.name}                   // stable key (avoid index)
-                        layout                          // opt-in to layout animations
-                        layoutId={h.name}               // stable id for smoother reflow
-                        transition={{
-                          layout: { type: "spring", stiffness: 140, damping: 28, mass: 1.1 }, // slower + smoother
-                        }}
+                        key={h.name}
+                        layout
+                        layoutId={h.name}
+                        transition={{ layout: { type: "spring", stiffness: 140, damping: 28, mass: 1.1 } }}
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="rounded-3xl bg-white/5 border border-white/10 px-4 py-4"
@@ -231,7 +201,6 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
 
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              {/* Icon (emoji) */}
                               <motion.div
                                 layout="position"
                                 className="w-7 h-7 rounded-lg grid place-items-center text-lg"
@@ -240,7 +209,6 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
                                 {h.icon || "🏷️"}
                               </motion.div>
 
-                              {/* Editable name + (That's you!) */}
                               <div className="flex flex-wrap items-baseline gap-x-2">
                                 <input
                                   value={h.name}
@@ -256,10 +224,8 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
                               </div>
                             </div>
 
-                            {/* Witty description */}
                             {h.note && <p className="mt-1 text-white/75 text-sm">{h.note}</p>}
 
-                            {/* Slider */}
                             <div className="mt-3">
                               <input
                                 type="range"
@@ -271,7 +237,6 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
                                   const val = parseInt(e.target.value, 10);
                                   setHolders((list) => rebalance(list, i, val));
                                 }}
-                                // On release → resort with a short microtask delay so the final value is applied first
                                 onPointerUp={() => setTimeout(sortByPower, 0)}
                                 onMouseUp={() => setTimeout(sortByPower, 0)}
                                 onTouchEnd={() => setTimeout(sortByPower, 0)}
@@ -320,6 +285,14 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Sleek overlay while analyzing — no more background loading view */}
+      <LoadingOverlay
+        visible={loading || state === "loading"}
+        title="Analyzing your world…"
+        quotes={powerQuotes}
+        periodMs={3000}
+      />
     </div>
   );
 }
