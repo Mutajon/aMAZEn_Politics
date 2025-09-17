@@ -1,23 +1,34 @@
 // src/App.tsx
 import { useHashRoute } from "./lib/router";
 import SplashScreen from "./screens/SplashScreen";
+// import CompassIntro from "./screens/CompassIntro"; // (legacy monolith – no longer used)
 import IntroScreen from "./screens/IntroScreen";
 import RoleSelectionScreen from "./screens/RoleSelectionScreen";
 import CampaignScreen from "./screens/CampaignScreen";
 import PowerDistributionScreen from "./screens/PowerDistributionScreen";
 import NameScreen from "./screens/NameScreen";
-import CompassIntro from "./screens/CompassIntro";
+import CompassVisScreen from "./screens/CompassVisScreen";
+
+import CompassIntroStart from "./screens/CompassIntroStart";
+import MirrorDialogueScreen from "./screens/MirrorDialogueScreen";
+import MirrorQuizScreen from "./screens/MirrorQuizScreen";
 
 export default function App() {
   const { route, push } = useHashRoute();
+  console.debug("[App] route =", route);
 
   if (route === "/intro") return <IntroScreen push={push} />;
   if (route === "/role") return <RoleSelectionScreen push={push} />;
   if (route === "/campaign") return <CampaignScreen />;
   if (route === "/power") return <PowerDistributionScreen push={push} />;
-  if (route === "/name") return <NameScreen push={push} />;
-  if (route === "/compass") return <CompassIntro push={push} />;
 
-  // default
+  // NEW split screens
+  if (route === "/compass-intro") return <CompassIntroStart push={push} />;
+  if (route === "/compass-mirror") return <MirrorDialogueScreen push={push} />;
+  if (route === "/compass-quiz") return <MirrorQuizScreen push={push} />;
+
+  if (route === "/name") return <NameScreen push={push} />;
+  if (route === "/compass-vis") return <CompassVisScreen push={push} />;
+
   return <SplashScreen onStart={() => push("/role")} />;
 }

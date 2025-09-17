@@ -1,18 +1,82 @@
 // src/screens/SplashScreen.tsx
 import { useEffect, useState } from "react";
-
 import { motion } from "framer-motion";
 import { bgStyle } from "../lib/ui";
+import { useSettingsStore } from "../store/settingsStore";
 
 export default function SplashScreen({ onStart }: { onStart: () => void }) {
   const [showButton, setShowButton] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // global setting (persisted via zustand)
+  const generateImages = useSettingsStore((s) => s.generateImages);
+  const setGenerateImages = useSettingsStore((s) => s.setGenerateImages);
+
   useEffect(() => {
     const t = setTimeout(() => setShowButton(true), 1000);
     return () => clearTimeout(t);
   }, []);
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center px-5" style={bgStyle}>
+    <div
+      className="relative min-h-[100dvh] flex items-center justify-center px-5"
+      style={bgStyle}
+    >
+      {/* Settings cog (top-right) */}
+      <div className="absolute top-4 right-4 z-50">
+        <button
+          onClick={() => setShowSettings((v) => !v)}
+          className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white/90 backdrop-blur shadow-sm"
+          aria-haspopup="dialog"
+          aria-expanded={showSettings}
+          aria-label="Settings"
+          title="Settings"
+        >
+          <span aria-hidden className="text-lg leading-none">⚙</span>
+        </button>
+
+        {showSettings && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 260, damping: 20 }}
+            className="mt-2 w-72 rounded-2xl border border-white/10 bg-neutral-900/80 backdrop-blur p-4 text-white/90"
+            role="dialog"
+            aria-label="Settings"
+          >
+            <div className="font-semibold mb-3">Settings</div>
+
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium">Image generation</div>
+                <div className="text-xs text-white/60">
+                  Generate AI images in-game (default off)
+                </div>
+              </div>
+
+              {/* Toggle switch */}
+              <button
+                onClick={() => setGenerateImages(!generateImages)}
+                role="switch"
+                aria-checked={generateImages}
+                className={[
+                  "w-12 h-7 rounded-full p-1 transition-colors",
+                  generateImages ? "bg-emerald-500/70" : "bg-white/20",
+                ].join(" ")}
+              >
+                <span
+                  className={[
+                    "block w-5 h-5 rounded-full bg-white transition-transform",
+                    generateImages ? "translate-x-5" : "translate-x-0",
+                  ].join(" ")}
+                />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </div>
+
+      {/* Center content */}
       <div className="w-full max-w-md text-center select-none space-y-5">
         <motion.h1
           initial={{ opacity: 0, y: 20, scale: 0.98 }}
@@ -20,7 +84,7 @@ export default function SplashScreen({ onStart }: { onStart: () => void }) {
           transition={{ type: "spring", stiffness: 200, damping: 18 }}
           className="text-4xl sm:text-5xl font-extrabold leading-tight tracking-tight bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]"
         >
-          aMAZE'n Politics
+          aMAZE&apos;n Politics
         </motion.h1>
 
         <motion.p

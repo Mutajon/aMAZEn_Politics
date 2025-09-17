@@ -165,7 +165,7 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
             >
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
                 <h1 className="text-3xl font-extrabold text-center bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
-                  Top 5 Power Holders In This Game
+                  Top Power Holders In This Game
                 </h1>
                 <p className="text-center text-white/75 mt-1">
                   Not satisfied with my power distribution? You can adjust influence percentages and edit names.
