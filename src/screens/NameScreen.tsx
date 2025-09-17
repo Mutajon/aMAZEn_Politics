@@ -1,14 +1,79 @@
 // src/screens/NameScreen.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { PushFn } from "../lib/router";
 import { bgStyle } from "../lib/ui";
 import { useRoleStore } from "../store/roleStore";
+import type { Character } from "../store/roleStore";
 
 type Trio = {
   male: { name: string; prompt: string };
   female: { name: string; prompt: string };
   any: { name: string; prompt: string };
 };
+
+function extractPhysical(input: string): string {
+  if (!input) return "";
+  const i = input.indexOf(",");
+  const trimmed = i >= 0 ? input.slice(i + 1) : input;
+  return trimmed.trim().replace(/^with\s+/i, "");
+}
+
+function genderizeRole(role: string, gender: "male" | "female" | "any"): string {
+  const r = (role || "").trim().toLowerCase();
+  const map: Record<string, { male: string; female: string }> = {
+    emperor: { male: "Emperor of", female: "Empress of" },
+    king: { male: "King of", female: "Queen of" },
+    prince: { male: "Prince of", female: "Princess of" },
+    hero: { male: "Hero of", female: "Heroine of" },
+    monk: { male: "Monk of", female: "Nun of" },
+    lord: { male: "Lord of", female: "Lady of" },
+    duke: { male: "Duke of", female: "Duchess of" },
+    tsar: { male: "Tsar of", female: "Tsarina of" },
+    pharaoh: { male: "Pharaoh of", female: "Pharaoh of" },
+    chancellor: { male: "Chancellor of", female: "Chancellor of" },
+    kanzler: { male: "Kanzler von", female: "Kanzlerin von" },
+  };
+  for (const key of Object.keys(map)) {
+    if (r.startsWith(key)) {
+      const rest = role.slice(key.length).trim();
+      const pair = map[key];
+      if (gender === "female") return `${pair.female} ${rest}`.trim();
+      return `${pair.male} ${rest}`.trim();
+    }
+  }
+  return role;
+}
+
+function suggestBackgroundObject(role = ""): string {
+  const r = role.toLowerCase();
+  if (r.includes("tang") || r.includes("china")) return "red pagoda";
+  if (r.includes("rome") || r.includes("roman")) return "colosseum";
+  if (r.includes("german") || r.includes("germany") || r.includes("chancellor") || r.includes("kanzler"))
+    return "brandenburg gate";
+  if (r.includes("egypt")) return "pyramids of giza";
+  if (r.includes("japan") || r.includes("shogun")) return "torii gate";
+  if (r.includes("viking")) return "drakkar longship";
+  if (r.includes("mongol")) return "golden ger";
+  return "ornate palace backdrop";
+}
+
+function buildFullPrompt(
+  role: string,
+  gender: "male" | "female" | "any",
+  physical: string,
+  bgObject: string
+): string {
+  const genderedRole = genderizeRole(role, gender);
+  const genderWord = gender === "male" ? "male " : gender === "female" ? "female " : "";
+  // include "left-facing" as requested
+  const subject = `a ${genderWord}${genderedRole}`.trim();
+  const head = ["a fictional left-facing game avatar portrait of the face of", subject].join(" ");
+  const physicalClean = physical.trim().replace(/^[,.\s]+/, "");
+  const withPhysical = physicalClean ? `${head}, ${physicalClean}` : head;
+  const bg = bgObject ? `, with a ${bgObject} in the background` : "";
+  const tail = ", colored cartoon with strong lines";
+  return `${withPhysical}${bg}${tail}`;
+}
 
 export default function NameScreen({ push }: { push: PushFn }) {
   const selectedRole = useRoleStore((s) => s.selectedRole);
@@ -17,35 +82,38 @@ export default function NameScreen({ push }: { push: PushFn }) {
 
   const [gender, setGender] = useState<"male" | "female" | "any">(character?.gender || "any");
   const [name, setName] = useState<string>(character?.name || "");
-  const [desc, setDesc] = useState<string>(character?.description || "");
+  const [physical, setPhysical] = useState<string>(character?.description || "");
   const [trio, setTrio] = useState<Trio | null>(null);
+  const [bgObject, setBgObject] = useState<string>(character?.bgObject || "");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // ---- Minimal, reliable fetcher (posts { role }, runs once) ----
+  const fullPrompt = useMemo(
+    () => buildFullPrompt(selectedRole || "", gender, physical, bgObject),
+    [selectedRole, gender, physical, bgObject]
+  );
+
   async function loadSuggestions() {
     if (!selectedRole) return;
     setLoading(true);
     setErrorMsg("");
     try {
-      console.log("[NameScreen] requesting name-suggestions for role:", selectedRole);
       const res = await fetch("/api/name-suggestions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: selectedRole }), // <- back to simple, proven payload
+        body: JSON.stringify({ role: selectedRole }),
       });
       if (!res.ok) {
         let j: any = null;
-        try {
-          j = await res.json();
-        } catch {}
+        try { j = await res.json(); } catch {}
         throw new Error(j?.error || `HTTP ${res.status}`);
       }
       const data: Trio = await res.json();
       setTrio(data);
       const pick = data[gender] || data.any;
       setName(pick?.name || "");
-      setDesc(pick?.prompt || "");
+      setPhysical(extractPhysical(pick?.prompt || ""));
+      setBgObject((prev) => prev || suggestBackgroundObject(selectedRole));
     } catch (e: any) {
       setErrorMsg(e?.message || "Name suggestion failed");
     } finally {
@@ -55,39 +123,39 @@ export default function NameScreen({ push }: { push: PushFn }) {
 
   useEffect(() => {
     if (!selectedRole) {
-      // if user somehow landed here without a role, send them back
       push("/role");
       return;
     }
-    // fetch once, reliably
     loadSuggestions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // <-- empty deps = no accidental skips due to memoization
+  }, []);
 
-  // Switch between the 3 pre-generated options (no re-fetch)
   useEffect(() => {
     if (!trio) return;
     const pick = trio[gender] || trio.any;
     setName(pick?.name || "");
-    setDesc(pick?.prompt || "");
+    setPhysical(extractPhysical(pick?.prompt || ""));
+    setBgObject((prev) => prev || suggestBackgroundObject(selectedRole || ""));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gender, trio]);
 
   const onContinue = () => {
-    setCharacter({
+    const fullChar: Character = {
       gender,
       name: name.trim(),
-      description: desc.trim(),
-      avatarUrl: character?.avatarUrl || "", // keep existing avatar if any
-    });
-    push("/compassIntro");
+      description: physical.trim(),
+      avatarUrl: character?.avatarUrl,
+      imagePrompt: fullPrompt,
+      bgObject,
+    };
+    setCharacter(fullChar);
+    push("/compass");
   };
 
   return (
     <div className="min-h-[100dvh] px-5 py-8" style={bgStyle}>
       <div className="w-full max-w-2xl mx-auto">
-        <h1 className="text-4xl font-extrabold text-center bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
-          Forge Your Character
-        </h1>
+        <h1 className="sr-only">Forge Your Character</h1>
 
         {errorMsg && (
           <div className="mt-5 rounded-xl border border-red-400/40 bg-red-500/10 text-red-200 px-3 py-2" role="alert">
@@ -98,26 +166,42 @@ export default function NameScreen({ push }: { push: PushFn }) {
           </div>
         )}
 
-        <div className="mt-6 rounded-3xl p-6 bg-white/5 border border-white/10 shadow-xl">
+        <div className="mt-2 rounded-3xl p-6 bg-white/5 border border-white/10 shadow-xl">
           {loading && <div className="mb-4 text-center text-white/70 text-sm">Fetching suggestions…</div>}
 
-          {/* Gender */}
           <div className="flex items-center gap-8 justify-center">
-            <label className="flex items-center gap-2">
-              <input type="radio" name="g" checked={gender === "male"} onChange={() => setGender("male")} />
+            <label className="flex items-center gap-2 text-white">
+              <input
+                type="radio"
+                name="g"
+                className="accent-amber-300 focus:ring-2 focus:ring-amber-300/60"
+                checked={gender === "male"}
+                onChange={() => setGender("male")}
+              />
               <span>Male</span>
             </label>
-            <label className="flex items-center gap-2">
-              <input type="radio" name="g" checked={gender === "female"} onChange={() => setGender("female")} />
+            <label className="flex items-center gap-2 text-white">
+              <input
+                type="radio"
+                name="g"
+                className="accent-amber-300 focus:ring-2 focus:ring-amber-300/60"
+                checked={gender === "female"}
+                onChange={() => setGender("female")}
+              />
               <span>Female</span>
             </label>
-            <label className="flex items-center gap-2">
-              <input type="radio" name="g" checked={gender === "any"} onChange={() => setGender("any")} />
+            <label className="flex items-center gap-2 text-white">
+              <input
+                type="radio"
+                name="g"
+                className="accent-amber-300 focus:ring-2 focus:ring-amber-300/60"
+                checked={gender === "any"}
+                onChange={() => setGender("any")}
+              />
               <span>Any</span>
             </label>
           </div>
 
-          {/* Name */}
           <div className="mt-6">
             <div className="text-white/90 mb-2">Name:</div>
             <input
@@ -128,21 +212,20 @@ export default function NameScreen({ push }: { push: PushFn }) {
             />
           </div>
 
-          {/* Description */}
           <div className="mt-6">
-            <div className="text-white/90 mb-2">Description:</div>
+            <div className="text-white/90 mb-2">Description (physical features only):</div>
             <textarea
               rows={6}
-              value={desc}
-              onChange={(e) => setDesc(e.target.value)}
-              placeholder="a game avatar of the face of …"
+              value={physical}
+              onChange={(e) => setPhysical(e.target.value)}
+              placeholder="with a dignified expression, long black hair tied in a topknot, a finely groomed beard…"
               className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
             />
+            <div className="mt-2 text-xs text-white/60">
+              We’ll combine this with the role and add an appropriate background automatically.
+            </div>
           </div>
 
-          <div className="mt-6 text-center text-white/60">Tip: you can edit name and description.</div>
-
-          {/* Continue */}
           <div className="mt-6 flex justify-center">
             <button
               disabled={loading}
