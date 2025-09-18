@@ -65,9 +65,8 @@ function buildFullPrompt(
 ): string {
   const genderedRole = genderizeRole(role, gender);
   const genderWord = gender === "male" ? "male " : gender === "female" ? "female " : "";
-  // include "left-facing" as requested
   const subject = `a ${genderWord}${genderedRole}`.trim();
-  const head = ["a fictional left-facing game avatar portrait of the face of", subject].join(" ");
+  const head = ["a fictional right-facing game avatar portrait of the face of", subject].join(" ");
   const physicalClean = physical.trim().replace(/^[,.\s]+/, "");
   const withPhysical = physicalClean ? `${head}, ${physicalClean}` : head;
   const bg = bgObject ? `, with a ${bgObject} in the background` : "";
@@ -149,7 +148,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
       bgObject,
     };
     setCharacter(fullChar);
-    push("/compass");
+    push("/compass-intro");
   };
 
   return (
@@ -213,7 +212,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
           </div>
 
           <div className="mt-6">
-            <div className="text-white/90 mb-2">Description (physical features only):</div>
+            <div className="text-white/90 mb-2">Description (facial features only!):</div>
             <textarea
               rows={6}
               value={physical}
@@ -222,7 +221,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
               className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
             />
             <div className="mt-2 text-xs text-white/60">
-              We’ll combine this with the role and add an appropriate background automatically.
+              Make sure to mention any facial details or accessories you would like present.
             </div>
           </div>
 
