@@ -16,6 +16,8 @@ const CHAT_MODEL_DEFAULT = process.env.CHAT_MODEL || "gpt-4o-mini";
 const MODEL_VALIDATE = process.env.MODEL_VALIDATE || CHAT_MODEL_DEFAULT;
 const MODEL_NAMES    = process.env.MODEL_NAMES    || CHAT_MODEL_DEFAULT;
 const MODEL_ANALYZE  = process.env.MODEL_ANALYZE  || CHAT_MODEL_DEFAULT;
+const MODEL_MIRROR  = process.env.MODEL_MIRROR  || CHAT_MODEL_DEFAULT;
+
 
 // Image model
 const IMAGE_MODEL = process.env.IMAGE_MODEL || "gpt-image-1";
@@ -61,6 +63,34 @@ async function aiJSON({ system, user, model = CHAT_MODEL_DEFAULT, temperature = 
     return fallback;
   }
 }
+async function aiText({ system, user, model = CHAT_MODEL_DEFAULT, temperature = 0.6 }) {
+  try {
+    const resp = await fetch(CHAT_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENAI_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        temperature,
+      }),
+    });
+    if (!resp.ok) {
+      const t = await resp.text().catch(() => "");
+      throw new Error(`OpenAI chat error ${resp.status}: ${t}`);
+    }
+    const data = await resp.json();
+    return (data?.choices?.[0]?.message?.content ?? "").trim();
+  } catch (e) {
+    console.error("[server] aiText error:", e?.message || e);
+    return "";
+  }
+}
 
 // -------------------- Health check --------------------------
 app.get("/api/_ping", (_req, res) => {
@@ -72,6 +102,7 @@ app.get("/api/_ping", (_req, res) => {
       validate: MODEL_VALIDATE,
       names: MODEL_NAMES,
       analyze: MODEL_ANALYZE,
+      mirror: MODEL_MIRROR,
       image: IMAGE_MODEL,
     },
   });
@@ -269,6 +300,38 @@ app.post("/api/generate-avatar", async (req, res) => {
   } catch (e) {
     console.error("Error in /api/generate-avatar:", e?.message || e);
     res.status(502).json({ error: "avatar generation failed" });
+  }
+});
+// -------------------- Mirror summary (uses AI) ---------------
+app.post("/api/mirror-summary", async (req, res) => {
+  try {
+    const topWhat    = Array.isArray(req.body?.topWhat)    ? req.body.topWhat    : [];
+    const topWhence  = Array.isArray(req.body?.topWhence)  ? req.body.topWhence  : [];
+    const topOverall = Array.isArray(req.body?.topOverall) ? req.body.topOverall : [];
+    // Each item expected as { label: string, score: number }
+
+    const system =
+      "You are a witty, magical mirror. Respond ONLY with 1–2 short sentences (max ~45 words). " +
+      "No lists, no headers, no labels. Avoid jargon and gamey terms. Natural, playful tone.";
+
+    // The prompt focuses on WHAT (drives) and WHENCE (justification)
+    const user =
+      "Given the player's value signals, craft an amusing 1–2 sentence appraisal. " +
+      "Tell them WHAT seems to drive them (their strongest 'what' signals) and HOW they mainly justify it (their strongest 'whence' signals). " +
+      "Avoid repeating exact labels; paraphrase into everyday language.\n\n" +
+      "Top WHAT signals (highest first):\n" +
+      JSON.stringify(topWhat, null, 2) + "\n\n" +
+      "Top WHENCE signals (highest first):\n" +
+      JSON.stringify(topWhence, null, 2) + "\n\n" +
+      "Overall strongest signals (context only):\n" +
+      JSON.stringify(topOverall, null, 2);
+
+    const text = await aiText({ system, user, model: MODEL_MIRROR, temperature: 0.7 });
+    const summary = (text || "").trim() || "The mirror squints… and offers a knowing smile.";
+    res.json({ summary });
+  } catch (e) {
+    console.error("Error in /api/mirror-summary:", e?.message || e);
+    res.status(500).json({ summary: "The mirror is foggy—try again in a moment." });
   }
 });
 

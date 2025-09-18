@@ -2,30 +2,10 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { COMPONENTS, PROPERTIES, PALETTE, type PropKey } from "../data/compass-data";
+import { useCompassStore } from "../store/compassStore";
 
 /* public image path (Vite serves /public at the root): put your file at public/assets/images/mirror.png */
 const MIRROR_SRC = "/assets/images/mirror.png";
-
-/* ------------------ demo values: 0..10 each (no normalization) ----------- */
-function generateValues(seed = Math.random()) {
-  const rand = mulberry32(Math.floor(seed * 1e9));
-  const values: Record<PropKey, number[]> = { what: [], whence: [], how: [], whither: [] };
-  (Object.keys(values) as PropKey[]).forEach((k) => {
-    for (let i = 0; i < 10; i++) {
-      const x = Math.pow(rand(), 1.3) * 10; // 0..10 with occasional spikes
-      values[k].push(Math.max(0, Math.min(10, x)));
-    }
-  });
-  return values;
-}
-function mulberry32(a: number) {
-  return function () {
-    let t = (a += 0x6D2B79F5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 /* --------------------------- SVG helpers --------------------------------- */
 const TAU = Math.PI * 2;
@@ -51,14 +31,15 @@ function petalPath(
 const SIZE = 320;
 const PADDING = 10;
 const R_MAX = SIZE / 2 - PADDING;
-const R_INNER = 36;       // invisible inner circle (donut anchor)
-const GAP_RADIAL = 6;
+const R_INNER = 36;
+const GAP_RADIAL = 10;   // extra breathing room so petals never kiss the mirror
+const INNER_SPACER = 4;  // additional inner spacer used for the image crop
 const QUAD_SWEEP = TAU / 4;
 const PETALS_PER_QUAD = 10;
 const GAP_ANG = (3 * Math.PI) / 180;
 
 /* scale down max petal length by ~50% */
-const LENGTH_SCALE = 0.5; // ⬅️ this halves the maximum extent
+const LENGTH_SCALE = 0.5;
 
 const propTitle = (k: PropKey) => PROPERTIES.find((p) => p.key === k)!.title;
 const propSubtitle = (k: PropKey) => PROPERTIES.find((p) => p.key === k)!.subtitle;
@@ -69,8 +50,10 @@ function generateExplanation(prop: PropKey, idx: number) {
 
 /* ------------------------------- Component ------------------------------- */
 export default function InnerCompass() {
-  const [values] = useState(generateValues(0.42)); // 0..10 demo values
-  const [activeProp, setActiveProp] = useState<PropKey | null>(null); // panel closed initially
+  // 🔴 use live store values instead of demo/random
+  const values = useCompassStore((s) => s.values);
+
+  const [activeProp, setActiveProp] = useState<PropKey | null>(null);
   const [activeComponent, setActiveComponent] = useState<number | null>(null);
   const center = SIZE / 2;
   const hasPanel = !!activeProp;
@@ -91,28 +74,27 @@ export default function InnerCompass() {
           {/* slowly rotating petals */}
           <motion.g
             animate={{ rotate: 360 }}
-            transition={{ repeat: Infinity, duration: 90, ease: "linear" }}
-            style={{ transformOrigin: "50% 50%" }}
+           transition={{ repeat: Infinity, duration: 90, ease: "linear" }}
+           // For SVG, make the transform origin unambiguous and stable.
+            style={{ transformOrigin: "50% 50%", transformBox: "fill-box" }}
           >
             {PROPERTIES.map((prop, qi) => (
               <g key={prop.key}>
                 {values[prop.key].map((rawVal, i) => {
-                  /* use the displayed integer (rounded) for both label and geometries
-                     so "10" truly fills the bar and reaches max petal length */
-                  const shown = Math.round(rawVal);           // 0..10 integer
-                  const weight01 = shown / 10;                // 0..1 normalized
+                  const shown = Math.round(Math.max(0, Math.min(10, rawVal)));
+                  const weight01 = shown / 10;
                   const aStart =
                     qi * QUAD_SWEEP + i * (QUAD_SWEEP / PETALS_PER_QUAD) + GAP_ANG / 2 - Math.PI / 2;
                   const aEnd = aStart + QUAD_SWEEP / PETALS_PER_QUAD - GAP_ANG;
-                  const baseInner = R_INNER + GAP_RADIAL;
+                   // petals start slightly farther from the mirror to avoid AA overlap
+                  const baseInner = R_INNER + GAP_RADIAL + INNER_SPACER;
                   const rInner = baseInner;
                   const rOuter =
                     baseInner +
-                    Math.max(3, (R_MAX - baseInner) * weight01 * LENGTH_SCALE); // ⬅️ half size
+                    Math.max(3, (R_MAX - baseInner) * weight01 * LENGTH_SCALE);
                   const path = petalPath(center, center, rInner, rOuter, aStart, aEnd);
                   const fill = `url(#grad-${prop.key}-${i})`;
                   const edge = (PALETTE as any)[prop.key].base;
-                  const isDimmed = !!activeProp && activeProp !== prop.key;
                   const isSelected = activeProp === prop.key && activeComponent === i;
 
                   return (
@@ -126,7 +108,7 @@ export default function InnerCompass() {
                       <motion.path
                         d={path}
                         initial={false}
-                        animate={{ d: path, opacity: isDimmed ? 0.35 : 0.95 }}
+                        animate={{ d: path }}
                         transition={{ type: "spring", stiffness: 140, damping: 22, mass: 0.6 }}
                         fill={fill}
                         stroke={edge}
@@ -145,40 +127,37 @@ export default function InnerCompass() {
             ))}
           </motion.g>
 
-       {/* center image: fill the entire inner hole (cropped to a circle) */}
-{MIRROR_SRC && (
-  (() => {
-    const holeR = R_INNER + GAP_RADIAL;         // full empty circle inside the petals
-    const imgR = holeR - 1;                     // slight padding so it doesn’t clip
-    const imgSize = imgR * 2;
-    const x = center - imgR;
-    const y = center - imgR;
-    const clipId = "centerClip";
-
-    return (
-      <>
-        <defs>
-          <clipPath id={clipId}>
-            <circle cx={center} cy={center} r={imgR} />
-          </clipPath>
-        </defs>
-        <image
-          href={MIRROR_SRC}
-          x={x}
-          y={y}
-          width={imgSize}
-          height={imgSize}
-          preserveAspectRatio="xMidYMid slice"
-          clipPath={`url(#${clipId})`}
-        />
-      </>
-    );
-  })()
-)}
-
+          {/* center image */}
+          {MIRROR_SRC && (
+            (() => {
+                const holeR = R_INNER + GAP_RADIAL;         // inner “hole” radius (fixed)
+                const imgR  = holeR - INNER_SPACER;         // pull image in a bit so it never touches petals
+              const imgSize = imgR * 2;
+              const x = center - imgR;
+              const y = center - imgR;
+              const clipId = "centerClip";
+              return (
+                <>
+                  <defs>
+                    <clipPath id={clipId}>
+                      <circle cx={center} cy={center} r={imgR} />
+                    </clipPath>
+                  </defs>
+                  <image
+                    href={MIRROR_SRC}
+                    x={x}
+                    y={y}
+                    width={imgSize}
+                    height={imgSize}
+                    preserveAspectRatio="xMidYMid slice"
+                    clipPath={`url(#${clipId})`}
+                  />
+                </>
+              );
+            })()
+          )}
         </svg>
 
-        {/* EXPLANATION BELOW the compass (no overlap) */}
         <AnimatePresence>
           {hasPanel && activeComponent !== null && (
             <motion.div
@@ -192,7 +171,7 @@ export default function InnerCompass() {
             >
               <div
                 className="text-xl font-semibold mb-1"
-                style={{ color: activeProp ? (PALETTE as any)[activeProp].base : "#fff" }}
+                style={{ color: hasPanel ? (PALETTE as any)[activeProp!].base : "#fff" }}
               >
                 {activeProp !== null && activeComponent !== null
                   ? COMPONENTS[activeProp][activeComponent]?.short
@@ -208,7 +187,7 @@ export default function InnerCompass() {
         </AnimatePresence>
       </div>
 
-      {/* RIGHT: subcomponents table (hidden until first interaction) */}
+      {/* RIGHT: table */}
       {hasPanel && (
         <div className="rounded-2xl bg-black/20 border border-white/10 p-4">
           <div className="flex items-center justify-between mb-1">
@@ -230,10 +209,9 @@ export default function InnerCompass() {
 
           <div className="mt-2 space-y-2">
             {COMPONENTS[activeProp!].map((c, i) => {
-              const raw = values[activeProp!][i] ?? 0;     // 0..10 (float)
-              const shown = Math.round(raw);               // ⬅️ integer we display
-              const selected = activeComponent === i;
-              const widthPct = (shown / 10) * 100;         // ⬅️ bar fills fully at 10
+              const raw = values[activeProp!][i] ?? 0;
+              const shown = Math.round(raw);
+              const widthPct = (shown / 10) * 100;
 
               return (
                 <button
@@ -241,7 +219,7 @@ export default function InnerCompass() {
                   onClick={() => setActiveComponent(i)}
                   className="w-full text-left rounded-xl p-2 bg-white/5 hover:bg-white/10 focus:outline-none"
                   style={{
-                    border: selected ? "1.5px solid rgba(255,255,255,0.9)" : "1px solid transparent",
+                    border: activeComponent === i ? "1.5px solid rgba(255,255,255,0.9)" : "1px solid transparent",
                   }}
                 >
                   <div className="flex items-center justify-between text-xs">
@@ -266,7 +244,7 @@ export default function InnerCompass() {
         </div>
       )}
 
-      {/* BOTTOM: property pills (selected pill = solid quadrant color) */}
+      {/* BOTTOM: property pills */}
       <div className={`md:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-3 ${hasPanel ? "mt-1" : "mt-4"}`}>
         {PROPERTIES.map((p) => {
           const selected = activeProp === p.key;
