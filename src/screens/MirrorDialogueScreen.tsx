@@ -1,11 +1,12 @@
 // src/screens/MirrorDialogueScreen.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PushFn } from "../lib/router";
 import { bgStyle } from "../lib/ui";
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
 import { useSettingsStore } from "../store/settingsStore";
 import MiniCompass from "../components/MiniCompass";
+import MirrorBubble from "../components/MirrorBubble";
 import { motion, AnimatePresence } from "framer-motion";
 
 /** Built-in placeholder (no file asset needed) */
@@ -25,52 +26,34 @@ const DEFAULT_AVATAR_DATA_URL =
     </svg>`
   );
 
-/** ultra-simple typewriter bubble */
-function Bubble({
-  side,
-  text,
-  italic,
-  onDone,
-}: {
-  side: "mirror" | "player";
-  text: string;
-  italic?: boolean;
-  onDone?: () => void;
-}) {
+/** Player bubble kept local (white style) */
+function PlayerBubble({ text, onDone }: { text: string; onDone?: () => void }) {
   const [shown, setShown] = useState("");
+  const cbRef = useRef(onDone);
+  useEffect(() => void (cbRef.current = onDone), [onDone]);
   useEffect(() => {
     let i = 0;
-    const id = setInterval(() => {
+    const id = window.setInterval(() => {
       i++;
       setShown(text.slice(0, i));
       if (i >= text.length) {
-        clearInterval(id);
-        // small pause before advancing
-        setTimeout(() => onDone?.(), 700);
+        window.clearInterval(id);
+        window.setTimeout(() => cbRef.current?.(), 700);
       }
     }, 18);
-    return () => clearInterval(id);
-  }, [text, onDone]);
+    return () => window.clearInterval(id);
+  }, [text]);
 
-  const isMirror = side === "mirror";
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 260, damping: 20 }}
-      className={`w-full flex ${isMirror ? "justify-start" : "justify-end"} my-2`}
+      className="w-full flex justify-end my-2"
     >
-      <div
-        className={[
-          "max-w-[85%] rounded-2xl px-4 py-3 shadow-lg",
-          isMirror ? "bg-black/40 text-teal-300 italic" : "bg-white text-black",
-        ].join(" ")}
-        style={{
-          borderTopLeftRadius: isMirror ? 6 : 18,
-          borderTopRightRadius: isMirror ? 18 : 6,
-        }}
-      >
-        <span className={italic ? "italic" : ""}>{shown}</span>
+      <div className="max-w-[85%] rounded-2xl px-4 py-3 shadow-lg bg-white text-black"
+           style={{ borderTopLeftRadius: 18, borderTopRightRadius: 6 }}>
+        {shown}
       </div>
     </motion.div>
   );
@@ -82,47 +65,43 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
   const resetCompass = useCompassStore((s) => s.reset);
   const values = useCompassStore((s) => s.values);
 
-  // align with your current script; keep short & readable
+  // script
   const playerName = character?.name || "Player";
   const script: Array<{ side: "mirror" | "player"; text: string; italic?: boolean }> = [
     { side: "mirror", text: "Finally... I found you!", italic: true },
     { side: "player", text: "Who are you?" },
-    {
-      side: "mirror",
-      text: `Wrong question, my friend. What you should be asking is who are you, ${playerName}?`,
-      italic: true,
-    },
+    { side: "mirror", text: `Wrong question, my friend. What you should be asking is who are you, ${playerName}?`, italic: true },
     { side: "mirror", text: "Look at yourself, a hollow avatar with no desires or values.", italic: true },
     { side: "mirror", text: "Come, humor me for a moment, and let us uncover your soul — together.", italic: true },
   ];
 
   const [chatIndex, setChatIndex] = useState(0);
+
+  // start fresh
   useEffect(() => {
     resetCompass();
-    // kick off chat after a small delay
-    const t = setTimeout(() => setChatIndex(1), 300);
-    return () => clearTimeout(t);
+    const t = window.setTimeout(() => setChatIndex(1), 300);
+    return () => window.clearTimeout(t);
   }, [resetCompass]);
 
   const showCTA = chatIndex === script.length;
 
-  /** Choose avatar or placeholder based on settings + saved avatar */
+  /** Choose avatar or placeholder */
   const displayAvatar = useMemo(() => {
     if (character?.avatarUrl) return character.avatarUrl;
     if (!generateImages) return DEFAULT_AVATAR_DATA_URL;
-    return ""; // if images ON but not yet generated (rare here), show "Preparing…"
+    return "";
   }, [character?.avatarUrl, generateImages]);
 
-  // layout knobs
-  const AVATAR = 180; // slightly smaller than before
+  // layout
+  const AVATAR = 180;
   const MIRROR = 180;
 
   return (
     <div className="min-h-[100dvh] px-5 py-5" style={bgStyle}>
       <div className="w-full max-w-xl mx-auto">
-        {/* TOP ROW: mirror (left) and avatar (right), aligned at TOP */}
+        {/* TOP ROW: aligned at TOP */}
         <div className="flex items-start justify-between gap-4 mt-2">
-          {/* Mirror + petal ring */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -134,17 +113,10 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
               <MiniCompass size={MIRROR + 120} innerRadius={MIRROR / 2 + 10} values={values} lengthScale={0.45} />
             </div>
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-              <img
-                src="/assets/images/mirror.png"
-                alt="Mystic mirror"
-                width={MIRROR}
-                height={MIRROR}
-                className="rounded-full object-cover"
-              />
+              <img src="/assets/images/mirror.png" alt="Mystic mirror" width={MIRROR} height={MIRROR} className="rounded-full object-cover" />
             </div>
           </motion.div>
 
-          {/* Player avatar card */}
           <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -159,20 +131,28 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
           </motion.div>
         </div>
 
-        {/* CHAT THREAD — moved up */}
+        {/* CHAT THREAD */}
         <div className="mt-4">
           <AnimatePresence>
             {chatIndex > 0 && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mx-auto max-w-xl">
-                {script.slice(0, chatIndex).map((m, idx) => (
-                  <Bubble
-                    key={idx}
-                    side={m.side}
-                    text={m.text}
-                    italic={m.italic}
-                    onDone={idx === chatIndex - 1 && chatIndex < script.length ? () => setChatIndex(chatIndex + 1) : undefined}
-                  />
-                ))}
+                {script.slice(0, chatIndex).map((m, idx) =>
+                  m.side === "mirror" ? (
+                    <MirrorBubble
+                      key={`msg-${idx}`}
+                      text={m.text}
+                      italic={m.italic}
+                      typing={true}
+                      onDone={idx === chatIndex - 1 && chatIndex < script.length ? () => setChatIndex(chatIndex + 1) : undefined}
+                    />
+                  ) : (
+                    <PlayerBubble
+                      key={`msg-${idx}`}
+                      text={m.text}
+                      onDone={idx === chatIndex - 1 && chatIndex < script.length ? () => setChatIndex(chatIndex + 1) : undefined}
+                    />
+                  )
+                )}
                 {showCTA && (
                   <div className="flex justify-center mt-3">
                     <motion.button
