@@ -1,5 +1,5 @@
 // src/components/PetalRing.tsx
-import React, { useId } from "react";
+import { useId } from "react";
 import { motion } from "framer-motion";
 import type { PropKey } from "../data/compass-data";
 
@@ -12,6 +12,8 @@ type Props = {
   lengthScale?: number;         // scales max radial length (0..1), default 0.5
   rotate?: boolean | number;    // false=no, true=90s, number=seconds per revolution
   className?: string;
+  /** NEW: minimum visible petal length (px) beyond innerRadius; default 4 */
+  minLen?: number;
 };
 
 const ORDER: PropKey[] = ["what", "whence", "how", "whither"]; // draw order
@@ -46,13 +48,12 @@ export default function PetalRing({
   lengthScale = 0.5,
   rotate = false,
   className,
+  minLen = 4,                 // ⬅️ default as before
 }: Props) {
   const uid = useId();
   const center = size / 2;
   const QUAD = TAU / 4;
   const R_MAX = size / 2 - 8;
-  const rInner = innerRadius;
-  const rMinLen = 4;
 
   const rotateDuration =
     rotate === true ? 90 : typeof rotate === "number" ? Math.max(1, rotate) : 0;
@@ -71,8 +72,11 @@ export default function PetalRing({
               const t = shown / 10; // 0..1
               const a1 = qi * QUAD + i * (QUAD / PETALS_PER_QUAD) + GAP_ANG / 2 - Math.PI / 2;
               const a2 = a1 + QUAD / PETALS_PER_QUAD - GAP_ANG;
-              const rOut = rInner + Math.max(rMinLen, (R_MAX - rInner) * t * lengthScale);
-              const d = petalPath(center, center, rInner, rOut, a1, a2);
+
+              // use caller-provided minLen to avoid clamping-away small growth
+              const rOut = innerRadius + Math.max(minLen, (R_MAX - innerRadius) * t * lengthScale);
+
+              const d = petalPath(center, center, innerRadius, rOut, a1, a2);
               const cols = (PALETTE as any)[propKey];
               const gradId = `ring-grad-${propKey}-${i}-${uid}`;
               return (

@@ -5,7 +5,7 @@ import { bgStyle } from "../lib/ui";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCompassStore, VALUE_RULES } from "../store/compassStore";
 import { resolveLabel } from "../data/compass-data";
-import { pickQuiz, type MirrorQA } from "../data/mirror-quiz-pool";
+import { pickQuiz } from "../data/mirror-quiz-pool";
 import { useRoleStore } from "../store/roleStore";
 import { useSettingsStore } from "../store/settingsStore";
 import MiniCompass from "../components/MiniCompass";
@@ -13,7 +13,11 @@ import { useCompassFX } from "../hooks/useCompassFX";
 import { generateMirrorSummary } from "../lib/mirrorSummary";
 import { useMirrorQuizStore } from "../store/mirrorQuizStore";
 import MirrorBubble from "../components/MirrorBubble";
+import { mirrorBubbleTheme as T } from "../theme/mirrorBubbleTheme";
+import MirrorBubbleTyping from "../components/MirrorBubbleTyping";
 
+
+/** placeholder avatar for images OFF */
 const DEFAULT_AVATAR_DATA_URL =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(
@@ -31,18 +35,20 @@ const DEFAULT_AVATAR_DATA_URL =
   );
 
 const MIRROR_SRC = "/assets/images/mirror.png";
+
+/** fixed epilogue */
 const MIRROR_EPILOGUE =
   "Well, that was unexpectedly insightful. We’ve sketched the first lines of your inner portrait; from here, every choice you make will add color and contour—and I’ll be here to show you what the mirror sees. Rest now. Tomorrow your new role begins.";
 
 export default function MirrorQuizScreen({ push }: { push: PushFn }) {
-  // compass
+  // compass values + reset
   const values = useCompassStore((s) => s.values);
   const resetCompass = useCompassStore((s) => s.reset);
 
-  // FX
+  // FX (petal growth + pills)
   const { pings, applyWithPings } = useCompassFX();
 
-  // avatar
+  // avatar selection (uses flipped avatar if your hook already saved it)
   const character = useRoleStore((s) => s.character);
   const generateImages = useSettingsStore((s) => s.generateImages);
   const displayAvatar = useMemo(() => {
@@ -51,11 +57,11 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
     return "";
   }, [character?.avatarUrl, generateImages]);
 
-  // quiz store
+  // quiz state (persists across routes)
   const { quiz, idx, done, summary, epilogueShown, init, advance, setDone, setSummary, markEpilogueShown } =
     useMirrorQuizStore();
 
-  // mount: start quiz if needed
+  // on first mount, start quiz and clear compass
   useEffect(() => {
     if (quiz.length === 0) {
       resetCompass();
@@ -63,7 +69,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
     }
   }, [quiz.length, init, resetCompass]);
 
-  // get summary once done
+  // once done, fetch a one-shot summary (GPT)
   useEffect(() => {
     (async () => {
       if (done && !summary) {
@@ -73,14 +79,10 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
     })();
   }, [done, summary, setSummary, values]);
 
-  // local progression for epilogue timing
+  /** STRICT sequencing flags for verdict → 2s delay → epilogue. */
   const [showEpilogue, setShowEpilogue] = useState(false);
-  useEffect(() => {
-    if (done && summary && !epilogueShown) {
-      const t = window.setTimeout(() => setShowEpilogue(true), 2000);
-      return () => window.clearTimeout(t);
-    }
-  }, [done, summary, epilogueShown]);
+  // NOTE: we intentionally DO NOT use an effect tied to `summary`.
+  // The epilogue is enabled *only* by the verdict bubble's onDone (after 2s).
 
   function answer(opt: { a: string; mappings: string[] }) {
     if (done) return;
@@ -101,6 +103,18 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   const MIRROR_SIZE = 120;
   const INNER_RADIUS = MIRROR_SIZE / 2 + 10;
   const CARD = 154;
+
+  // Mirror-bubble-like options
+  const optionStyle: React.CSSProperties = {
+    background: T.bg,
+    color: T.textColor,
+    fontFamily: T.fontFamily,
+    fontSize: `${T.fontSizePx}px`,
+    padding: `${T.paddingY - 2}px ${T.paddingX}px`,
+    border: "1px solid rgba(255,255,255,0.18)",
+    borderRadius: 16,
+    boxShadow: T.shadow,
+  };
 
   return (
     <div className="min-h-[100dvh] px-5 py-5" style={bgStyle}>
@@ -167,25 +181,27 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -16 }}
                     transition={{ duration: 0.25, ease: "easeInOut" }}
-                    className="rounded-3xl p-4 border shadow-2xl backdrop-blur-md bg-white/10 border-white/20"
+                    className="rounded-3xl p-4 border shadow-2xl backdrop-blur-md bg-transparent border-white/20"
                   >
-                    <div className="text-[17px] font-semibold text-white drop-shadow">
+                    {/* QUESTION — styled like mirror bubble text */}
+                    <div
+                      className="text-[16px] font-semibold italic drop-shadow"
+                      style={{ color: T.textColor, fontFamily: T.fontFamily }}
+                    >
                       {quiz[idx].q}
                     </div>
 
+                    {/* OPTIONS — mirror bubble style buttons */}
                     <div className="mt-3 grid gap-2">
                       {quiz[idx].options.map((opt, i) => (
                         <motion.button
                           key={i}
                           onClick={() => answer(opt)}
                           whileTap={{ scale: 0.985 }}
-                          className={[
-                            "w-full text-left px-4 py-2 rounded-2xl transition",
-                            "border bg-gradient-to-br",
-                            "from-white/15 to-white/5 border-white/15 text-white",
-                            "hover:from-white/25 hover:to-white/10 hover:border-white/30 hover:shadow-lg",
-                            "focus:outline-none focus:ring-2 focus:ring-amber-300/60",
-                          ].join(" ")}
+                          className="w-full text-left transition focus:outline-none focus:ring-2 focus:ring-amber-300/60"
+                          style={optionStyle}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0,0,0,0.55)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = T.bg)}
                         >
                           {opt.a}
                         </motion.button>
@@ -198,46 +214,56 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
           </div>
         )}
 
-        {/* DONE: show summary bubble (typewriter once), then epilogue bubble (typewriter after 2s), then buttons.
-           When returning from CompassVis, both render fully with no animation. */}
+        {/* DONE: verdict bubble (type), then after 2s epilogue bubble (type), then buttons.
+           Returning from CompassVis renders fully (no typing). */}
         {done && (
-          <div className="mt-6 mx-auto max-w-xl">
-            {summary && (
-              <MirrorBubble
-                text={summary}
-                typing={!epilogueShown}             // type only on first reveal
-                onDone={() => { /* nothing here — delay handled in parent state */ }}
-              />
-            )}
+  <div className="mt-6 mx-auto max-w-xl">
+    {/* ⬇️ while AI is working, show animated typing bubble */}
+    {!summary && <MirrorBubbleTyping text="Peering into your soul" />}
 
-            {(epilogueShown || showEpilogue) && (
-              <MirrorBubble
-                text={MIRROR_EPILOGUE}
-                typing={!epilogueShown}             // type only once
-                onDone={() => {
-                  if (!epilogueShown) markEpilogueShown();
-                }}
-              />
-            )}
+    {/* verdict bubble (types once) */}
+    {summary && (
+      <MirrorBubble
+        text={summary}
+        typing={!epilogueShown}
+        onDone={() => {
+          if (!epilogueShown) {
+            window.setTimeout(() => setShowEpilogue(true), 2000);
+          }
+        }}
+      />
+    )}
 
-            {(epilogueShown) && (
-              <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
-                <button
-                  onClick={() => push("/background-intro")}
-                  className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/90 text-[#0b1335] hover:bg-white"
-                >
-                  Go to sleep
-                </button>
-                <button
-                  onClick={() => push("/compass-vis")}
-                  className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/15 text-white hover:bg-white/25 border border-white/30"
-                >
-                  See your compass
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+    {/* epilogue bubble (appears 2s after verdict finishes) */}
+    {(epilogueShown || showEpilogue) && (
+      <MirrorBubble
+        text={MIRROR_EPILOGUE}
+        typing={!epilogueShown}
+        onDone={() => {
+          if (!epilogueShown) markEpilogueShown();
+        }}
+      />
+    )}
+
+    {epilogueShown && (
+      <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
+        <button
+          onClick={() => push("/background-intro")}
+          className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/90 text-[#0b1335] hover:bg-white"
+        >
+          Go to sleep
+        </button>
+        <button
+          onClick={() => push("/compass-vis")}
+          className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/15 text-white hover:bg-white/25 border border-white/30"
+        >
+          See your compass
+        </button>
+      </div>
+    )}
+  </div>
+)}
+
       </div>
     </div>
   );

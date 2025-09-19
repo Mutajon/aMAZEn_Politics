@@ -19,6 +19,7 @@
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "framer-motion": "^12.23.12",
+    "lucide-react": "^0.544.0",
     "mammoth": "^1.10.0",
     "openai": "^5.20.2",
     "react": "^19.1.1",

@@ -14,11 +14,16 @@ import CompassIntroStart from "./screens/CompassIntroStart";
 import MirrorDialogueScreen from "./screens/MirrorDialogueScreen";
 import MirrorQuizScreen from "./screens/MirrorQuizScreen";
 import BackgroundIntroScreen from "./screens/BackgroundIntroScreen";
-
+import { useEnsureMirroredAvatarOnce } from "./hooks/useEnsureMirroredAvatarOnce";
+import EventScreen from "./screens/EventScreen";
+if (import.meta.env.DEV) {
+  import("./dev/storesDebug").then(m => m.attachStoresDebug());
+}
 
 export default function App() {
   const { route, push } = useHashRoute();
   console.debug("[App] route =", route);
+  useEnsureMirroredAvatarOnce();
 
   if (route === "/intro") return <IntroScreen push={push} />;
   if (route === "/role") return <RoleSelectionScreen push={push} />;
@@ -34,7 +39,9 @@ export default function App() {
   if (route === "/compass-vis") return <CompassVisScreen push={push} />;
   if (route === "/debug-mini") return <MiniCompassDebugScreen push={push} />;
   if (route === "/background-intro") return <BackgroundIntroScreen push={push} />;
+  if (route === "/event") return <EventScreen push={push} />;
 
+  
 
   return <SplashScreen onStart={() => push("/role")} />;
 }

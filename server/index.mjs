@@ -16,12 +16,20 @@ const CHAT_MODEL_DEFAULT = process.env.CHAT_MODEL || "gpt-4o-mini";
 const MODEL_VALIDATE = process.env.MODEL_VALIDATE || CHAT_MODEL_DEFAULT;
 const MODEL_NAMES    = process.env.MODEL_NAMES    || CHAT_MODEL_DEFAULT;
 const MODEL_ANALYZE  = process.env.MODEL_ANALYZE  || CHAT_MODEL_DEFAULT;
-const MODEL_MIRROR  = process.env.MODEL_MIRROR  || CHAT_MODEL_DEFAULT;
-
+const MODEL_MIRROR   = process.env.MODEL_MIRROR   || CHAT_MODEL_DEFAULT;
 
 // Image model
 const IMAGE_MODEL = process.env.IMAGE_MODEL || "gpt-image-1";
 const IMAGE_SIZE = process.env.IMAGE_SIZE || "1024x1024";
+
+// --- NEW: TTS model/voice (OpenAI Text-to-Speech) --------------------------
+// Note: "Cove" is not currently available in the public TTS API. If OpenAI
+// exposes it in the future, change TTS_VOICE to "cove".
+const TTS_URL = "https://api.openai.com/v1/audio/speech";
+const TTS_MODEL = process.env.TTS_MODEL || "tts-1";       // or "tts-1-hd"
+const TTS_VOICE = process.env.TTS_VOICE || "alloy";     // alloy|echo|fable|onyx|nova|shimmer
+const TTS_FORMAT = process.env.TTS_FORMAT || "mp3";       // mp3|opus|aac|flac
+// ---------------------------------------------------------------------------
 
 
 // Helper: call Chat Completions and try to parse JSON from the reply
@@ -63,22 +71,27 @@ async function aiJSON({ system, user, model = CHAT_MODEL_DEFAULT, temperature = 
     return fallback;
   }
 }
-async function aiText({ system, user, model = CHAT_MODEL_DEFAULT, temperature = 0.6 }) {
+
+async function aiText({ system, user, model = CHAT_MODEL_DEFAULT, temperature }) {
   try {
+    const body = {
+      model,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    };
+    if (typeof temperature === "number" && temperature !== 1) {
+      body.temperature = temperature;
+    }
+
     const resp = await fetch(CHAT_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        temperature,
-      }),
+      body: JSON.stringify(body),
     });
     if (!resp.ok) {
       const t = await resp.text().catch(() => "");
@@ -104,17 +117,79 @@ app.get("/api/_ping", (_req, res) => {
       analyze: MODEL_ANALYZE,
       mirror: MODEL_MIRROR,
       image: IMAGE_MODEL,
+      tts: TTS_MODEL,
+      ttsVoice: TTS_VOICE,
     },
   });
 });
+// -------------------- Intro paragraph (role-based) -------------------------
+app.post("/api/intro-paragraph", async (req, res) => {
+  try {
+    const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
+    if (!OPENAI_KEY) return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
+
+    const CHAT_URL = "https://api.openai.com/v1/chat/completions";
+    const CHAT_MODEL_DEFAULT = process.env.CHAT_MODEL || "gpt-4o-mini";
+
+    const { role, gender } = req.body || {};
+    const roleText = String(role || "").slice(0, 200);
+    const genderText = ["male", "female", "any"].includes((gender || "").toLowerCase())
+      ? gender.toLowerCase()
+      : "any";
+
+    // Guardrail: role must exist
+    if (!roleText) {
+      return res.status(400).json({ error: "Missing role" });
+    }
+
+    const system =
+      "You write vivid, historically aware, second-person micro-intros for a role-playing game.\n" +
+      "Tone: welcoming, intriguing, not florid. 2–3 sentences, 45–75 words total.\n" +
+      "Speak to the player as 'you'. Avoid lists, avoid anachronisms. Keep names generic unless iconic to the role.\n" +
+      "If gender is male/female, you may subtly reflect it (titles, forms of address); otherwise keep it neutral.";
+
+    const user =
+      `ROLE: ${roleText}\n` +
+      `GENDER: ${genderText}\n` +
+      "TASK: Write one short paragraph that sets the scene on the player's **first day** in this role. " +
+      "Welcome them, mention immediate tensions and ambient details. Present tense. No bullet points. No headings.";
+
+    const r = await fetch(CHAT_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_KEY}`,
+      },
+      body: JSON.stringify({
+        model: CHAT_MODEL_DEFAULT,
+        temperature: 0.9,
+        max_tokens: 220,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+
+    if (!r.ok) {
+      const detail = await r.text().catch(() => "");
+      return res.status(502).json({ error: "OpenAI error", detail });
+    }
+    const data = await r.json();
+    const paragraph = (data?.choices?.[0]?.message?.content || "").trim();
+
+    if (!paragraph) return res.status(503).json({ error: "No content returned" });
+    return res.json({ paragraph });
+  } catch (e) {
+    console.error("Error in /api/intro-paragraph:", e?.message || e);
+    return res.status(500).json({ error: "Intro generation failed" });
+  }
+});
 
 // -------------------- AI VALIDATE ROLE ----------------------
-// Replaces the heuristic: accepts real, historical, future, sci-fi, fantasy.
-// Must include a role (who) AND a setting (where and/or when).
 app.post("/api/validate-role", async (req, res) => {
   const raw = (req.body?.text || req.body?.role || req.body?.input || "").toString().trim();
 
-  // Ask the model to judge strictly and return JSON only
   const system =
     "You validate a single short line describing a player's ROLE together with a SETTING.\n" +
     "ACCEPT if it clearly has (1) a role (the 'who') and (2) a setting (place and/or time). " +
@@ -125,7 +200,6 @@ app.post("/api/validate-role", async (req, res) => {
 
   const user = `Input: ${raw || ""}`;
 
-  // If OpenAI is unreachable, respond 503 so the client shows connection error
   const out = await aiJSON({ system, user, model: MODEL_VALIDATE, temperature: 0, fallback: null });
   if (!out || typeof out.valid !== "boolean") {
     return res.status(503).json({ error: "AI validator unavailable" });
@@ -275,7 +349,6 @@ app.post("/api/generate-avatar", async (req, res) => {
       model: IMAGE_MODEL,
       prompt,
       size: IMAGE_SIZE,
-     // response_format: "b64_json",
     };
 
     const r = await fetch(IMAGE_URL, {
@@ -302,36 +375,83 @@ app.post("/api/generate-avatar", async (req, res) => {
     res.status(502).json({ error: "avatar generation failed" });
   }
 });
+
 // -------------------- Mirror summary (uses AI) ---------------
 app.post("/api/mirror-summary", async (req, res) => {
   try {
     const topWhat    = Array.isArray(req.body?.topWhat)    ? req.body.topWhat    : [];
     const topWhence  = Array.isArray(req.body?.topWhence)  ? req.body.topWhence  : [];
     const topOverall = Array.isArray(req.body?.topOverall) ? req.body.topOverall : [];
-    // Each item expected as { label: string, score: number }
 
     const system =
       "You are a witty, magical mirror. Respond ONLY with 1–2 short sentences (max ~45 words). " +
       "No lists, no headers, no labels. Avoid jargon and gamey terms. Natural, playful tone.";
 
-    // The prompt focuses on WHAT (drives) and WHENCE (justification)
     const user =
       "Given the player's value signals, craft an amusing 1–2 sentence appraisal. " +
-      "Tell them WHAT seems to drive them (their strongest 'what' signals) and HOW they mainly justify it (their strongest 'whence' signals). " +
-      "Avoid repeating exact labels; paraphrase into everyday language.\n\n" +
-      "Top WHAT signals (highest first):\n" +
-      JSON.stringify(topWhat, null, 2) + "\n\n" +
-      "Top WHENCE signals (highest first):\n" +
-      JSON.stringify(topWhence, null, 2) + "\n\n" +
-      "Overall strongest signals (context only):\n" +
-      JSON.stringify(topOverall, null, 2);
+      "Tell them WHAT seems to drive them and HOW they mainly justify it (paraphrase labels). " +
+      "Top WHAT: " + JSON.stringify(topWhat) + "\n" +
+      "Top WHENCE: " + JSON.stringify(topWhence) + "\n" +
+      "Overall: " + JSON.stringify(topOverall);
 
-    const text = await aiText({ system, user, model: MODEL_MIRROR, temperature: 0.7 });
+    const text = await aiText({ system, user, model: MODEL_MIRROR });
     const summary = (text || "").trim() || "The mirror squints… and offers a knowing smile.";
     res.json({ summary });
   } catch (e) {
     console.error("Error in /api/mirror-summary:", e?.message || e);
     res.status(500).json({ summary: "The mirror is foggy—try again in a moment." });
+  }
+});
+
+// -------------------- NEW: Text-to-Speech endpoint -----------
+// POST /api/tts { text: string, voice?: string, format?: "mp3"|"opus"|"aac"|"flac" }
+// Returns raw audio bytes with appropriate Content-Type.
+app.post("/api/tts", async (req, res) => {
+  try {
+    const text = String(req.body?.text || "").trim();
+    if (!text) return res.status(400).json({ error: "Missing 'text'." });
+
+    // If someone passes "cove", we transparently fall back to shimmer (not in API today).
+    let voiceRequested = String(req.body?.voice || TTS_VOICE || "shimmer").trim().toLowerCase();
+    if (voiceRequested === "cove") {
+      console.warn("[server] 'cove' requested but not available in TTS API. Falling back to 'shimmer'.");
+      voiceRequested = "shimmer";
+    }
+    const format = String(req.body?.format || TTS_FORMAT || "mp3").trim().toLowerCase();
+
+    const r = await fetch(TTS_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENAI_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: TTS_MODEL,
+        voice: voiceRequested,
+        input: text,
+        response_format: format, // mp3|opus|aac|flac
+      }),
+    });
+
+    if (!r.ok) {
+      const t = await r.text().catch(() => "");
+      throw new Error(`OpenAI TTS error ${r.status}: ${t}`);
+    }
+
+    const buf = Buffer.from(await r.arrayBuffer());
+    const type =
+      format === "wav"  ? "audio/wav"  :
+      format === "aac"  ? "audio/aac"  :
+      format === "flac" ? "audio/flac" :
+      format === "opus" ? "audio/ogg"  :
+                          "audio/mpeg";
+
+    res.setHeader("Content-Type", type);
+    res.setHeader("Cache-Control", "no-store");
+    res.send(buf);
+  } catch (e) {
+    console.error("Error in /api/tts:", e?.message || e);
+    res.status(502).json({ error: "tts failed" });
   }
 });
 

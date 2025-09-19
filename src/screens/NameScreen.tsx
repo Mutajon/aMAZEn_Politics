@@ -4,6 +4,22 @@ import type { PushFn } from "../lib/router";
 import { bgStyle } from "../lib/ui";
 import { useRoleStore } from "../store/roleStore";
 import type { Character } from "../store/roleStore";
+import LoadingOverlay from "../components/LoadingOverlay";
+
+// Loading overlay content (edit here later if you want)
+const OVERLAY_TITLE = "Generating a character you can edit…";
+const LOADING_QUOTES = [
+  "Deciding whether your name should strike fear… or just mild confusion.",
+  "Polishing your future autobiography’s opening line.",
+  "Rolling dice to determine how photogenic your campaign portraits will be.",
+  "Giving you a name history teachers will definitely mispronounce.",
+  "Assigning you a birthplace that looks great on bumper stickers.",
+  "Checking if your haircut is constitutionally appropriate.",
+  "Balancing your charisma score against your ability to remember names.",
+  "Selecting the font your name will appear in on scandalous headlines.",
+  "Installing the dramatic pause before your full title is announced.",
+  "Making sure your initials don’t spell something embarrassing.",
+];
 
 type Trio = {
   male: { name: string; prompt: string };
@@ -153,6 +169,13 @@ export default function NameScreen({ push }: { push: PushFn }) {
 
   return (
     <div className="min-h-[100dvh] px-5 py-8" style={bgStyle}>
+      <LoadingOverlay
+  visible={loading}          // uses your existing loading state
+  title={OVERLAY_TITLE}
+  quotes={LOADING_QUOTES}
+  periodMs={3000}
+/>
+
       <div className="w-full max-w-2xl mx-auto">
         <h1 className="sr-only">Forge Your Character</h1>
 
@@ -166,7 +189,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
         )}
 
         <div className="mt-2 rounded-3xl p-6 bg-white/5 border border-white/10 shadow-xl">
-          {loading && <div className="mb-4 text-center text-white/70 text-sm">Fetching suggestions…</div>}
+         
 
           <div className="flex items-center gap-8 justify-center">
             <label className="flex items-center gap-2 text-white">
@@ -212,7 +235,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
           </div>
 
           <div className="mt-6">
-            <div className="text-white/90 mb-2">Description (facial features only!):</div>
+            <div className="text-white/90 mb-2">Description (mention any facial features and accessories you want present):</div>
             <textarea
               rows={6}
               value={physical}
@@ -220,9 +243,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
               placeholder="with a dignified expression, long black hair tied in a topknot, a finely groomed beard…"
               className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
             />
-            <div className="mt-2 text-xs text-white/60">
-              Make sure to mention any facial details or accessories you would like present.
-            </div>
+    
           </div>
 
           <div className="mt-6 flex justify-center">
