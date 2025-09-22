@@ -3,14 +3,25 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { bgStyle } from "../lib/ui";
 import { useSettingsStore } from "../store/settingsStore";
+import { useNarrator } from "../hooks/useNarrator";
 
 export default function SplashScreen({ onStart }: { onStart: () => void }) {
   const [showButton, setShowButton] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
-  // global setting (persisted via zustand)
+  // Instantiate the OpenAI-backed narrator.
+  // We call narrator.prime() on the Start button to unlock audio policies.
+  const narrator = useNarrator();
+
+  // --- Global settings (persisted via zustand) -----------------------------
+  // Image generation
   const generateImages = useSettingsStore((s) => s.generateImages);
   const setGenerateImages = useSettingsStore((s) => s.setGenerateImages);
+
+  // Narration (voiceover)
+  const narrationEnabled = useSettingsStore((s) => s.narrationEnabled);
+  const setNarrationEnabled = useSettingsStore((s) => s.setNarrationEnabled);
+  // -------------------------------------------------------------------------
 
   useEffect(() => {
     const t = setTimeout(() => setShowButton(true), 1000);
@@ -46,6 +57,7 @@ export default function SplashScreen({ onStart }: { onStart: () => void }) {
           >
             <div className="font-semibold mb-3">Settings</div>
 
+            {/* Row: Image generation ------------------------------------------------ */}
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-medium">Image generation</div>
@@ -72,6 +84,35 @@ export default function SplashScreen({ onStart }: { onStart: () => void }) {
                 />
               </button>
             </div>
+
+            {/* Row: Narration (voiceover) ------------------------------------------ */}
+            <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-white/10">
+              <div>
+                <div className="text-sm font-medium">Narration (voiceover)</div>
+                <div className="text-xs text-white/60">
+                  Read story text aloud (default on)
+                </div>
+              </div>
+
+              {/* Toggle switch */}
+              <button
+                onClick={() => setNarrationEnabled(!narrationEnabled)}
+                role="switch"
+                aria-checked={narrationEnabled}
+                className={[
+                  "w-12 h-7 rounded-full p-1 transition-colors",
+                  narrationEnabled ? "bg-emerald-500/70" : "bg-white/20",
+                ].join(" ")}
+              >
+                <span
+                  className={[
+                    "block w-5 h-5 rounded-full bg-white transition-transform",
+                    narrationEnabled ? "translate-x-5" : "translate-x-0",
+                  ].join(" ")}
+                />
+              </button>
+            </div>
+            {/* --------------------------------------------------------------------- */}
           </motion.div>
         )}
       </div>
@@ -102,7 +143,14 @@ export default function SplashScreen({ onStart }: { onStart: () => void }) {
             animate={{ opacity: showButton ? 1 : 0 }}
             transition={{ type: "spring", stiffness: 250, damping: 22 }}
             style={{ visibility: showButton ? "visible" : "hidden" }}
-            onClick={onStart}
+            // IMPORTANT: Prime the audio engine before navigating so OpenAI TTS
+            // can play on the next screen without being blocked by autoplay policies.
+            onClick={() => {
+              narrator.prime(); // unlock audio on mobile (plays/pauses a silent buffer)
+              console.log("[Splash] prime() invoked, starting app");
+              onStart();        // your existing navigation callback
+              setShowSettings(false); // optional: close settings if open
+            }}
             className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
           >
             Start!

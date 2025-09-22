@@ -1,6 +1,6 @@
 // src/store/compassStore.ts
 import { create } from "zustand";
-import { COMPONENTS, PROPERTIES, type PropKey } from "../data/compass-data";
+import { PROPERTIES, type PropKey } from "../data/compass-data";
 
 /** Values are integers 0..10 per component, per property */
 export type CompassValues = Record<PropKey, number[]>;
@@ -32,7 +32,7 @@ type CompassStore = {
   applyEffects: (effects: Effect[]) => Effect[];
 };
 
-export const useCompassStore = create<CompassStore>((set, get) => ({
+export const useCompassStore = create<CompassStore>((set) => ({
   values: emptyValues(),
   reset: () => set({ values: emptyValues() }),
   setValue: (prop, idx, value) =>
