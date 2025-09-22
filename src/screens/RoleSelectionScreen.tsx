@@ -6,6 +6,18 @@ import { bgStyle } from "../lib/ui";
 import type { PushFn } from "../lib/router";
 import { validateRoleStrict, AIConnectionError } from "../lib/validation";
 import { useRoleStore } from "../store/roleStore";
+import { POLITICAL_SYSTEMS } from "../data/politicalSystems";
+
+// Map display names in the roles list to our canonical political systems.
+const SYSTEM_ALIAS: Record<string, string> = {
+  "Early Republicanism": "Unitary Republic", // <- one-time mapping you asked for
+};
+
+function findPoliticalSystemByName(name: string | undefined) {
+  if (!name) return undefined;
+  const canonical = SYSTEM_ALIAS[name] ?? name;
+  return POLITICAL_SYSTEMS.find(ps => ps.name.toLowerCase() === canonical.toLowerCase());
+}
 
 type RoleItem = { 
   icon: string; 
@@ -18,6 +30,20 @@ type RoleItem = {
 
 export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const setRole = useRoleStore((s) => s.setRole);
+  const setAnalysis = useRoleStore(s => s.setAnalysis);
+
+// Prime the political system in the store for pre-defined roles.
+// (Power screen will still fetch/analyze holders; this just sets systemName/Desc/Flavor.)
+const primeSystemFromRole = (systemName?: string) => {
+  const ps = findPoliticalSystemByName(systemName);
+  setAnalysis({
+    systemName: ps?.name ?? "",
+    systemDesc: ps?.description ?? "",
+    flavor: ps?.flavor ?? "",
+    holders: [],          // holders are determined on the Power screen
+    playerIndex: null,
+  });
+};
 
   // Roles with political system + flavor text
   const roles: RoleItem[] = [
@@ -278,6 +304,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                   <button
                     onClick={() => {
                       setRole(selectedRole.label);
+                      primeSystemFromRole(selectedRole.system);
                       push("/power");
                     }}
                     className="rounded-xl px-4 py-2 text-sm font-semibold shadow bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335]"
