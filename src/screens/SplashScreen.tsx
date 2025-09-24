@@ -5,6 +5,7 @@ import { bgStyle } from "../lib/ui";
 import { useSettingsStore } from "../store/settingsStore";
 import { useNarrator } from "../hooks/useNarrator";
 
+
 export default function SplashScreen({
   onStart,
   onHighscores,
@@ -28,6 +29,21 @@ export default function SplashScreen({
   // Narration (voiceover)
   const narrationEnabled = useSettingsStore((s) => s.narrationEnabled);
   const setNarrationEnabled = useSettingsStore((s) => s.setNarrationEnabled);
+  
+  //budget
+  const showBudget = useSettingsStore((s) => s.showBudget);
+  const setShowBudget = useSettingsStore((s) => s.setShowBudget);
+  // Debug mode
+const debugMode = useSettingsStore((s) => s.debugMode);
+const setDebugMode = useSettingsStore((s) => s.setDebugMode);
+
+// Dilemmas subject
+const dilemmasSubjectEnabled = useSettingsStore((s) => s.dilemmasSubjectEnabled);
+const setDilemmasSubjectEnabled = useSettingsStore((s) => s.setDilemmasSubjectEnabled);
+const dilemmasSubject = useSettingsStore((s) => s.dilemmasSubject);
+const setDilemmasSubject = useSettingsStore((s) => s.setDilemmasSubject);
+
+
   // -------------------------------------------------------------------------
 
   useEffect(() => {
@@ -41,88 +57,196 @@ export default function SplashScreen({
       style={bgStyle}
     >
       {/* Settings cog (top-right) */}
-      <div className="absolute top-4 right-4 z-50">
-        <button
-          onClick={() => setShowSettings((v) => !v)}
-          className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white/90 backdrop-blur shadow-sm"
-          aria-haspopup="dialog"
-          aria-expanded={showSettings}
-          aria-label="Settings"
-          title="Settings"
-        >
-          <span aria-hidden className="text-lg leading-none">⚙</span>
-        </button>
+    {/* Settings cog (top-right) */}
+<div className="absolute top-4 right-4 z-[40] pointer-events-auto">
+  <button
+    onClick={() => setShowSettings((v) => !v)}
+    className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white/90 backdrop-blur shadow-sm"
+    aria-haspopup="dialog"
+    aria-expanded={showSettings}
+    aria-label="Settings"
+    title="Settings"
+  >
+    <span aria-hidden className="text-lg leading-none">⚙</span>
+  </button>
+</div>
 
-        {showSettings && (
-          <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: "spring", stiffness: 260, damping: 20 }}
-            className="mt-2 w-72 rounded-2xl border border-white/10 bg-neutral-900/80 backdrop-blur p-4 text-white/90"
-            role="dialog"
-            aria-label="Settings"
-          >
-            <div className="font-semibold mb-3">Settings</div>
+{/* Settings panel (fixed, above gear, outside its wrapper) */}
+{showSettings && (
+  <motion.div
+    initial={{ opacity: 0, y: -6, scale: 0.98 }}
+    animate={{ opacity: 1, y: 0, scale: 1 }}
+    transition={{ type: "spring", stiffness: 260, damping: 20 }}
+    // KEY: fixed + higher z + stop propagation so clicks never bubble to the gear
+    className="fixed top-16 right-6 z-[90] w-80 rounded-2xl border border-white/10 bg-neutral-900/90 backdrop-blur p-5 text-white/90 shadow-2xl"
+    role="dialog"
+    aria-label="Settings"
+    onClick={(e) => e.stopPropagation()}
+  >
+    <div className="font-semibold mb-3">Settings</div>
 
-            {/* Row: Image generation ------------------------------------------------ */}
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-medium">Image generation</div>
-                <div className="text-xs text-white/60">
-                  Generate AI images in-game (default off)
-                </div>
-              </div>
-
-              {/* Toggle switch */}
-              <button
-                onClick={() => setGenerateImages(!generateImages)}
-                role="switch"
-                aria-checked={generateImages}
-                className={[
-                  "w-12 h-7 rounded-full p-1 transition-colors",
-                  generateImages ? "bg-emerald-500/70" : "bg-white/20",
-                ].join(" ")}
-              >
-                <span
-                  className={[
-                    "block w-5 h-5 rounded-full bg-white transition-transform",
-                    generateImages ? "translate-x-5" : "translate-x-0",
-                  ].join(" ")}
-                />
-              </button>
-            </div>
-
-            {/* Row: Narration (voiceover) ------------------------------------------ */}
-            <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-white/10">
-              <div>
-                <div className="text-sm font-medium">Narration (voiceover)</div>
-                <div className="text-xs text-white/60">
-                  Read story text aloud (default on)
-                </div>
-              </div>
-
-              {/* Toggle switch */}
-              <button
-                onClick={() => setNarrationEnabled(!narrationEnabled)}
-                role="switch"
-                aria-checked={narrationEnabled}
-                className={[
-                  "w-12 h-7 rounded-full p-1 transition-colors",
-                  narrationEnabled ? "bg-emerald-500/70" : "bg-white/20",
-                ].join(" ")}
-              >
-                <span
-                  className={[
-                    "block w-5 h-5 rounded-full bg-white transition-transform",
-                    narrationEnabled ? "translate-x-5" : "translate-x-0",
-                  ].join(" ")}
-                />
-              </button>
-            </div>
-            {/* --------------------------------------------------------------------- */}
-          </motion.div>
-        )}
+    {/* --- Budget system toggle (same pattern as others) --- */}
+    <div className="flex items-center justify-between gap-3 py-2">
+      <div>
+        <div className="text-sm font-medium">Budget system</div>
+        <div className="text-xs text-white/60">
+          Show budget UI and apply costs to decisions.
+        </div>
       </div>
+      <button
+        onClick={() => {
+          console.log("[Settings] Budget toggle click, prev =", showBudget);
+          setShowBudget(!showBudget);
+        }}
+        role="switch"
+        aria-checked={showBudget}
+        className={[
+          "w-12 h-7 rounded-full p-1 transition-colors",
+          showBudget ? "bg-emerald-500/70" : "bg-white/20",
+        ].join(" ")}
+      >
+        <span
+          className={[
+            "block w-5 h-5 rounded-full bg-white transition-transform",
+            showBudget ? "translate-x-5" : "translate-x-0",
+          ].join(" ")}
+        />
+      </button>
+    </div>
+
+    {/* Image generation ----------------------------------------------------- */}
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <div className="text-sm font-medium">Image generation</div>
+        <div className="text-xs text-white/60">
+          Generate AI images in-game (default off)
+        </div>
+      </div>
+      <button
+        onClick={() => {
+          console.log("[Settings] Images toggle click, prev =", generateImages);
+          setGenerateImages(!generateImages);
+        }}
+        role="switch"
+        aria-checked={generateImages}
+        className={[
+          "w-12 h-7 rounded-full p-1 transition-colors",
+          generateImages ? "bg-emerald-500/70" : "bg-white/20",
+        ].join(" ")}
+      >
+        <span
+          className={[
+            "block w-5 h-5 rounded-full bg-white transition-transform",
+            generateImages ? "translate-x-5" : "translate-x-0",
+          ].join(" ")}
+        />
+      </button>
+    </div>
+
+    <div className="my-4 border-t border-white/10" />
+
+    {/* Narration (voiceover) ----------------------------------------------- */}
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <div className="text-sm font-medium">Narration (voiceover)</div>
+        <div className="text-xs text-white/60">
+          Read story text aloud (default on)
+        </div>
+      </div>
+      <button
+        onClick={() => {
+          console.log("[Settings] Narration toggle click, prev =", narrationEnabled);
+          setNarrationEnabled(!narrationEnabled);
+        }}
+        role="switch"
+        aria-checked={narrationEnabled}
+        className={[
+          "w-12 h-7 rounded-full p-1 transition-colors",
+          narrationEnabled ? "bg-emerald-500/70" : "bg-white/20",
+        ].join(" ")}
+      >
+        <span
+          className={[
+            "block w-5 h-5 rounded-full bg-white transition-transform",
+            narrationEnabled ? "translate-x-5" : "translate-x-0",
+          ].join(" ")}
+        />
+      </button>
+    </div>
+    {/* Divider */}
+<div className="my-4 border-t border-white/10" />
+
+{/* Debug mode ------------------------------------------------------------- */}
+<div className="flex items-center justify-between gap-3">
+  <div>
+    <div className="text-sm font-medium">Debug mode</div>
+    <div className="text-xs text-white/60">
+      Show extra UI & logs (default off).
+    </div>
+  </div>
+  <button
+    onClick={() => setDebugMode(!debugMode)}
+    role="switch"
+    aria-checked={debugMode}
+    className={[
+      "w-12 h-7 rounded-full p-1 transition-colors",
+      debugMode ? "bg-emerald-500/70" : "bg-white/20",
+    ].join(" ")}
+  >
+    <span
+      className={[
+        "block w-5 h-5 rounded-full bg-white transition-transform",
+        debugMode ? "translate-x-5" : "translate-x-0",
+      ].join(" ")}
+    />
+  </button>
+</div>
+
+{/* Dilemmas subject ------------------------------------------------------- */}
+<div className="mt-3">
+  <div className="flex items-center justify-between gap-3">
+    <div>
+      <div className="text-sm font-medium">Dilemmas subject</div>
+      <div className="text-xs text-white/60">
+        Gate events to a theme (default off).
+      </div>
+    </div>
+    <button
+      onClick={() => setDilemmasSubjectEnabled(!dilemmasSubjectEnabled)}
+      role="switch"
+      aria-checked={dilemmasSubjectEnabled}
+      className={[
+        "w-12 h-7 rounded-full p-1 transition-colors",
+        dilemmasSubjectEnabled ? "bg-emerald-500/70" : "bg-white/20",
+      ].join(" ")}
+    >
+      <span
+        className={[
+          "block w-5 h-5 rounded-full bg-white transition-transform",
+          dilemmasSubjectEnabled ? "translate-x-5" : "translate-x-0",
+        ].join(" ")}
+    />
+    </button>
+  </div>
+
+  {/* Subject input: enabled only when toggle is on */}
+  <input
+    type="text"
+    value={dilemmasSubject}
+    onChange={(e) => setDilemmasSubject(e.currentTarget.value)}
+    placeholder="Subject (e.g., Personal freedom)"
+    className={[
+      "mt-2 w-full rounded-lg px-3 py-2 bg-white/10 text-white/90 placeholder-white/40 outline-none border",
+      dilemmasSubjectEnabled
+        ? "border-white/20"
+        : "border-white/10 opacity-50 pointer-events-none",
+    ].join(" ")}
+  />
+</div>
+
+  </motion.div>
+)}
+
 
       {/* Center content */}
       <div className="w-full max-w-md text-center select-none space-y-5">

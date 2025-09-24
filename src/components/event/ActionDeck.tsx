@@ -100,7 +100,7 @@ export default function ActionDeck({
       {/* Cards row */}
       <motion.div
         className="grid grid-cols-3 gap-3"
-        initial="hidden"
+        initial={false}
         animate="show"
         variants={{ hidden: {}, show: { transition: { staggerChildren: ENTER_STAGGER } } }}
       >
@@ -125,15 +125,16 @@ export default function ActionDeck({
                 CARD_PAD,
                 c.cardGradientClass, // ← DARK opaque gradient
                 "text-left relative transition-transform",
-                disabled ? "opacity-55 saturate-75 cursor-not-allowed" : "cursor-pointer hover:brightness-[1.03]",
+                disabled ? "opacity-50 saturate-75 cursor-not-allowed" : "cursor-pointer hover:brightness-[1.03]",
                 isSelected ? "ring-2 ring-white/30" : "",
               ].join(" ")}
+              initial={false}
               variants={{
                 hidden: { opacity: 0, y: ENTER_Y, scale: 0.97, rotate: -1.2 },
                 show:   { opacity: 1, y: 0,       scale: 1.0,  rotate: 0, transition: { type: "tween", duration: ENTER_DURATION, ease: [0.16, 1, 0.3, 1] } },
               }}
               whileHover={!disabled && !isSelected ? { y: -3 } : undefined}
-              animate={{ y: isSelected ? -6 : 0 }} // snaps back on cancel
+              animate={{ opacity: 1, y: isSelected ? -6 : 0 }} // snaps back on cancel
             >
               {/* top row: icon (left), cost (right) */}
               <div className="flex items-center justify-between">

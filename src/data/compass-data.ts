@@ -84,7 +84,63 @@ export const VALUE_ALIASES: Record<string, { prop: PropKey; short: string }> = {
     // how
     Contract: { prop: "how", short: "Law/Std." },
   };
-  
+  // --- CUES for LLM-assisted mapping -----------------------------
+
+/**
+ * Training-style cues for each component.
+ * Helps the AI know what "counts as" support for the component.
+ */
+export const COMPONENT_CUES: Record<PropKey, { short: string; example: string }[]> = {
+  what: [
+    { short: "Truth/Trust", example: "Because it aligns with the facts and we can rely on the source." },
+    { short: "Liberty/Agency", example: "Because people should be free to choose their own path." },
+    { short: "Equality/Equity", example: "Because everyone deserves a fair chance and redress where needed." },
+    { short: "Care/Solidarity", example: "Because we look after one another; no one left behind." },
+    { short: "Create/Courage", example: "Because bold making and risk-taking move us forward." },
+    { short: "Wellbeing", example: "Because it improves health, happiness, and daily life." },
+    { short: "Security/Safety", example: "Because people must be safe from harm and chaos." },
+    { short: "Freedom/Responsibility", example: "Because choice matters — and owning the consequences does too." },
+    { short: "Honor/Sacrifice", example: "Because doing the right thing is worth the cost." },
+    { short: "Sacred/Awe", example: "Because it points to what is wondrous, worthy of reverence." },
+  ],
+  whence: [
+    { short: "Evidence", example: "Because the evidence shows so." },
+    { short: "Public Reason", example: "Because any fair-minded equal could accept this." },
+    { short: "Personal", example: "Because I must — I’ll own the cost." },
+    { short: "Tradition", example: "Because our text/ancestors say so." },
+    { short: "Revelation", example: "Because God wills it / cosmic decree." },
+    { short: "Nature", example: "Because it fits the nature/purpose of the thing." },
+    { short: "Pragmatism", example: "Because it works and averts worse harms." },
+    { short: "Aesthesis", example: "Because it is fitting/beautiful (or ugly/degrading)." },
+    { short: "Fidelity", example: "Because these are ours; we owe them / I promised." },
+    { short: "Law (Office)", example: "Because that’s the law / authority of office." },
+  ],
+  how: [
+    { short: "Law/Std.", example: "Follow the rulebook: regulations, standards, courts." },
+    { short: "Deliberation", example: "Talk it through till we reach a reasoned compromise." },
+    { short: "Mobilize", example: "Rally people — organize, march, make it visible." },
+    { short: "Markets", example: "Use prices/incentives; let supply–demand allocate." },
+    { short: "Mutual Aid", example: "Direct help — neighbors supporting neighbors." },
+    { short: "Ritual", example: "Use ceremony/tradition to bind and guide action." },
+    { short: "Design/UX", example: "Nudge the behavior through design and defaults." },
+    { short: "Enforce", example: "Apply legitimate force to keep the peace." },
+    { short: "Civic Culture", example: "Shape norms via schools, media, shared stories." },
+    { short: "Philanthropy", example: "Fund it: donate resources to meet needs." },
+  ],
+  whither: [
+    { short: "Self", example: "Because it benefits me / personal thriving." },
+    { short: "Family", example: "Because it protects and provides for my family." },
+    { short: "Friends", example: "Because my close circle depends on it." },
+    { short: "In-Group", example: "Because it helps our team/tribe/us." },
+    { short: "Nation", example: "Because it serves our country." },
+    { short: "Civiliz.", example: "Because it supports our broader culture." },
+    { short: "Humanity", example: "Because it helps all people." },
+    { short: "Earth", example: "Because the planet and creatures matter." },
+    { short: "Cosmos", example: "Because sentient life beyond us counts." },
+    { short: "God", example: "Because it serves the divine." },
+  ],
+};
+
   /**
    * Resolve a display label (canonical or alias) to a compass component index.
    * Returns { prop, idx } or null if not found.
@@ -108,4 +164,5 @@ export const VALUE_ALIASES: Record<string, { prop: PropKey; short: string }> = {
   
     return null;
   }
+  
   

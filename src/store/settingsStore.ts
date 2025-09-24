@@ -3,40 +3,80 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 type SettingsState = {
-  // --- Existing ---
-  generateImages: boolean;                          // default OFF
+  // --- Image generation ---
+  generateImages: boolean;
   setGenerateImages: (v: boolean) => void;
   toggleGenerateImages: () => void;
 
-  // --- New: Narration ---
-  narrationEnabled: boolean;                        // default ON
-  narrationVoice: string | null;                    // voice name (from Web Speech), null/"" = auto
+  // --- Narration ---
+  narrationEnabled: boolean;
+  narrationVoice: string | null;
   setNarrationEnabled: (v: boolean) => void;
   toggleNarrationEnabled: () => void;
-  setNarrationVoice: (name?: string) => void;       // persist a specific voice by name
+  setNarrationVoice: (name?: string | null) => void;
+
+  // --- Budget flag ---
+  showBudget: boolean;
+  setShowBudget: (v: boolean) => void;
+  toggleShowBudget: () => void;
+
+  // --- NEW: Debug mode (default OFF) ---
+  debugMode: boolean;
+  setDebugMode: (v: boolean) => void;
+  toggleDebugMode: () => void;
+
+  // --- NEW: Dilemmas subject (default OFF + value) ---
+  dilemmasSubjectEnabled: boolean;
+  setDilemmasSubjectEnabled: (v: boolean) => void;
+  toggleDilemmasSubjectEnabled: () => void;
+  dilemmasSubject: string;                 // the chosen theme
+  setDilemmasSubject: (s: string) => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set, get) => ({
-      // --- Existing ---
+      // Image generation
       generateImages: false,
       setGenerateImages: (v) => set({ generateImages: v }),
       toggleGenerateImages: () => set({ generateImages: !get().generateImages }),
 
-      // --- New: Narration ---
+      // Narration
       narrationEnabled: true,
       narrationVoice: null,
       setNarrationEnabled: (v) => set({ narrationEnabled: v }),
       toggleNarrationEnabled: () => set({ narrationEnabled: !get().narrationEnabled }),
       setNarrationVoice: (name) => set({ narrationVoice: name ?? null }),
+
+      // Budget
+      showBudget: true, // default ON
+      setShowBudget: (v) => set({ showBudget: v }),
+      toggleShowBudget: () => set({ showBudget: !get().showBudget }),
+
+      // NEW: Debug
+      debugMode: false,
+      setDebugMode: (v) => set({ debugMode: v }),
+      toggleDebugMode: () => set({ debugMode: !get().debugMode }),
+
+      // NEW: Dilemmas subject
+      dilemmasSubjectEnabled: false,
+      setDilemmasSubjectEnabled: (v) => set({ dilemmasSubjectEnabled: v }),
+      toggleDilemmasSubjectEnabled: () =>
+        set({ dilemmasSubjectEnabled: !get().dilemmasSubjectEnabled }),
+      dilemmasSubject: "Personal freedom",
+      setDilemmasSubject: (s) => set({ dilemmasSubject: s }),
     }),
     {
-      name: "settings-v2", // bump key because we added fields
+      // Bump key so no stale objects hide the new fields
+      name: "settings-v4",
       partialize: (s) => ({
         generateImages: s.generateImages,
         narrationEnabled: s.narrationEnabled,
         narrationVoice: s.narrationVoice,
+        showBudget: s.showBudget,
+        debugMode: s.debugMode,
+        dilemmasSubjectEnabled: s.dilemmasSubjectEnabled,
+        dilemmasSubject: s.dilemmasSubject,
       }),
     }
   )
