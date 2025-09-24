@@ -31,7 +31,34 @@ const TTS_VOICE = process.env.TTS_VOICE || "alloy";     // alloy|echo|fable|onyx
 const TTS_FORMAT = process.env.TTS_FORMAT || "mp3";       // mp3|opus|aac|flac
 // ---------------------------------------------------------------------------
 
-
+// Canonical political systems (must match the client table)
+const ALLOWED_SYSTEMS = [
+  "Absolute Monarchy",
+  "Constitutional Monarchy",
+  "Elective Monarchy",
+  "Direct Democracy",
+  "Representative Democracy",
+  "Parliamentary Democracy",
+  "Presidential Democracy",
+  "Federal Republic",
+  "Unitary Republic",
+  "People’s Republic",
+  "Banana Republic",
+  "Dictatorship",
+  "Military Junta",
+  "One-Party State",
+  "Clerical Theocracy",
+  "Divine Right Monarchy",
+  "Anarchy",
+  "Oligarchy",
+  "Plutocracy",
+  "Technocracy",
+  "Timocracy",
+  "Kleptocracy",
+  "Stratocracy",
+  "Gerontocracy",
+  "Kakistocracy",
+];
 // Helper: call Chat Completions and try to parse JSON from the reply
 async function aiJSON({ system, user, model = CHAT_MODEL_DEFAULT, temperature = 0.6, fallback = null }) {
   try {
@@ -294,10 +321,25 @@ app.post("/api/analyze-role", async (req, res) => {
     };
 
     const system =
-      "Analyze the player's ROLE+SETTING into a political power breakdown. " +
-      "Return STRICT JSON {systemName, systemDesc, flavor, holders:[{name,percent,icon?,note?}], playerIndex}. " +
-      "Percents sum ~100. Keep labels short and game-friendly.";
-    const user = `Role: ${role}. JSON ONLY.`;
+  "You analyze a player's ROLE+SETTING into a political power breakdown **and** choose a canonical political system.\n" +
+  "Return STRICT JSON only as:\n" +
+  "{\n" +
+  '  "systemName": "<one of ALLOWED>",\n' +
+  '  "systemDesc": "<short, neutral explanation>",\n' +
+  '  "flavor": "<short flavor> ",\n' +
+  '  "holders": [{"name":"", "percent":0, "icon":"", "note":""}],\n' +
+  '  "playerIndex": null|number\n' +
+  "}\n" +
+  "- IMPORTANT: systemName MUST be exactly one of the supplied ALLOWED names. Do NOT invent new names.\n" +
+  "- holders: 4–5 concise entities whose percents sum to 100 (±1 rounding).\n" +
+  "- Keep labels short and game-friendly; avoid country-specific system names.";
+
+const user =
+  `ROLE: ${role}\n` +
+  `ALLOWED SYSTEMS: ${JSON.stringify(ALLOWED_SYSTEMS)}\n` +
+  "Pick the closest political system from ALLOWED (exact string). If borderline, choose the most broadly recognized match from ALLOWED.\n" +
+  "JSON ONLY.";
+
 
     const out = await aiJSON({ system, user, model: MODEL_ANALYZE, temperature: 0.4, fallback });
     // Coerce & normalize
@@ -331,13 +373,44 @@ app.post("/api/analyze-role", async (req, res) => {
           ? null
           : Number(out.playerIndex),
     };
-
+    result.systemName = coerceSystemName(result.systemName, role + " " + (result.systemDesc || ""));
+    if (!ALLOWED_SYSTEMS.includes(result.systemName)) {
+      // fallback description/flavor from the canonical list
+      const canon = ALLOWED_SYSTEMS.find(n => n === result.systemName);
+    }
     res.json(result);
   } catch (e) {
     console.error("Error in /api/analyze-role:", e?.message || e);
     res.status(500).json({ error: "analyze-role failed" });
   }
 });
+// Ensure systemName is in the canonical list; if not, coerce with a light heuristic
+function coerceSystemName(name, text) {
+  if (ALLOWED_SYSTEMS.includes(name)) return name;
+  const t = (name + " " + (text || "")).toLowerCase();
+  if (/(king|queen|monarch|emperor|sultan|tsar)/.test(t)) return "Absolute Monarchy";
+  if (/(divine|holy|god)/.test(t)) return "Divine Right Monarchy";
+  if (/(priest|temple|church|cleric|theocrat)/.test(t)) return "Clerical Theocracy";
+  if (/(army|general|legion|junta|military)/.test(t)) return "Military Junta";
+  if (/(parliament|pm|coalition)/.test(t)) return "Parliamentary Democracy";
+  if (/(president).*(congress|legislature)/.test(t)) return "Presidential Democracy";
+  if (/(referendum|plebiscite|vote directly)/.test(t)) return "Direct Democracy";
+  if (/(representative|senate|assembly|congress|consul)/.test(t)) return "Representative Democracy";
+  if (/(federal|province|state|regional)/.test(t)) return "Federal Republic";
+  if (/(unitary|central)/.test(t)) return "Unitary Republic";
+  if (/(party).*(only|single|sole|one)/.test(t)) return "One-Party State";
+  if (/(oligarch|elite|patrician)/.test(t)) return "Oligarchy";
+  if (/(wealth|merchant|bank|commerce)/.test(t)) return "Plutocracy";
+  if (/(technocrat|engineer|scientist|expert)/.test(t)) return "Technocracy";
+  if (/(elder|old)/.test(t)) return "Gerontocracy";
+  if (/(anarchy|no government)/.test(t)) return "Anarchy";
+  if (/(steal|corrupt|klepto|graft)/.test(t)) return "Kleptocracy";
+  if (/(banana|puppet)/.test(t)) return "Banana Republic";
+  return "Representative Democracy";
+}
+
+
+
 
 // -------------------- Avatar generation ----------------------
 app.post("/api/generate-avatar", async (req, res) => {

@@ -16,6 +16,7 @@ import MirrorQuizScreen from "./screens/MirrorQuizScreen";
 import BackgroundIntroScreen from "./screens/BackgroundIntroScreen";
 import { useEnsureMirroredAvatarOnce } from "./hooks/useEnsureMirroredAvatarOnce";
 import EventScreen from "./screens/EventScreen";
+import HighscoreScreen from "./screens/HighscoreScreen";
 if (import.meta.env.DEV) {
   import("./dev/storesDebug").then(m => m.attachStoresDebug());
 }
@@ -40,8 +41,15 @@ export default function App() {
   if (route === "/debug-mini") return <MiniCompassDebugScreen push={push} />;
   if (route === "/background-intro") return <BackgroundIntroScreen push={push} />;
   if (route === "/event") return <EventScreen push={push} />;
+  if (route === "/highscores") return <HighscoreScreen push={push} />;
 
   
 
-  return <SplashScreen onStart={() => push("/role")} />;
+  return (
+    <SplashScreen
+      onStart={() => push("/role")}
+      onHighscores={() => push("/highscores")} // ← new
+    />
+  );
+  
 }

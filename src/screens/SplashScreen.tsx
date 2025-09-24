@@ -5,7 +5,14 @@ import { bgStyle } from "../lib/ui";
 import { useSettingsStore } from "../store/settingsStore";
 import { useNarrator } from "../hooks/useNarrator";
 
-export default function SplashScreen({ onStart }: { onStart: () => void }) {
+export default function SplashScreen({
+  onStart,
+  onHighscores,
+}: {
+  onStart: () => void;
+  onHighscores?: () => void; // optional, so we don't break existing callers
+}) {
+
   const [showButton, setShowButton] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -137,25 +144,41 @@ export default function SplashScreen({ onStart }: { onStart: () => void }) {
           Discover yourself — and your best!
         </motion.p>
 
-        <div className="mt-8 flex justify-center min-h-[52px]">
-          <motion.button
-            initial={{ opacity: 0 }}
-            animate={{ opacity: showButton ? 1 : 0 }}
-            transition={{ type: "spring", stiffness: 250, damping: 22 }}
-            style={{ visibility: showButton ? "visible" : "hidden" }}
-            // IMPORTANT: Prime the audio engine before navigating so OpenAI TTS
-            // can play on the next screen without being blocked by autoplay policies.
-            onClick={() => {
-              narrator.prime(); // unlock audio on mobile (plays/pauses a silent buffer)
-              console.log("[Splash] prime() invoked, starting app");
-              onStart();        // your existing navigation callback
-              setShowSettings(false); // optional: close settings if open
-            }}
-            className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
-          >
-            Start!
-          </motion.button>
-        </div>
+        <div className="mt-8 flex flex-col items-center gap-3 min-h-[52px]">
+  {/* Primary: Start */}
+  <motion.button
+    initial={{ opacity: 0 }}
+    animate={{ opacity: showButton ? 1 : 0 }}
+    transition={{ type: "spring", stiffness: 250, damping: 22 }}
+    style={{ visibility: showButton ? "visible" : "hidden" }}
+    onClick={() => {
+      narrator.prime();
+      onStart();
+      setShowSettings(false);
+    }}
+    className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
+  >
+    Start!
+  </motion.button>
+
+  {/* Secondary: High Scores (subtle/glass) */}
+  <motion.button
+    initial={{ opacity: 0 }}
+    animate={{ opacity: showButton ? 1 : 0 }}
+    transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
+    style={{ visibility: showButton ? "visible" : "hidden" }}
+    onClick={() => {
+      onHighscores?.(); // no-op if not wired yet
+      setShowSettings(false);
+    }}
+    className="w-[14rem] rounded-2xl px-4 py-2.5 text-sm font-semibold
+               bg-white/10 hover:bg-white/15 text-white/90 border border-white/15
+               shadow-sm active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-white/20"
+  >
+    High Scores
+  </motion.button>
+</div>
+
       </div>
     </div>
   );
