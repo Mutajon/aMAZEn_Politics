@@ -1,8 +1,8 @@
 // src/screens/EventScreen.tsx
-// Event Screen scaffold + TEMP test controls, using shared bgStyle.
-// This version feeds ActionDeck ONLY the AI-generated actions (no demo cards).
+// Event Screen: generates a daily dilemma, narrates it, and shows action cards
+// with dynamic Lucide icons + dark gradients (topic-aware, non-repeating).
 
-import React, { useState, useEffect, useMemo, Suspense } from "react";
+import React, { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import { bgStyle } from "../lib/ui";
 import ResourceBar from "../components/event/ResourceBar";
 import SupportList, { type SupportItem, DefaultSupportIcons } from "../components/event/SupportList";
@@ -18,87 +18,201 @@ import type { DilemmaAction } from "../lib/dilemma";
 import { requestMirrorDilemmaLine } from "../lib/mirrorDilemma";
 import EventLoadingOverlay from "../components/event/EventLoadingOverlay";
 import { dynamicIconImports } from "lucide-react/dynamic";
+import { useNarrator } from "../hooks/useNarrator";
 
-
+// ---------------------------------------------------------------------------
+// Local types
+// ---------------------------------------------------------------------------
 type Props = { push?: (route: string) => void };
 type Trio = { people: number; middle: number; mom: number };
-// Card shape expected by ActionDeck (structural typing; no module export needed)
+
+// Card shape that ActionDeck expects (structural typing).
 type ActionDeckCard = {
   id: "a" | "b" | "c";
   title: string;
   summary: string;
   cost: number;
-  icon?: React.ReactNode;          // JSX for the Lucide icon (we supply <DynamicLucide />)
-  iconBgClass?: string;            // small chip behind the icon
-  iconTextClass?: string;          // icon color
-  cardGradientClass?: string;      // dark gradient background for the card
+  icon?: React.ReactNode;
+  iconBgClass?: string;
+  iconTextClass?: string;
+  cardGradientClass?: string;
 };
 
-
-/**
- * Renders any Lucide icon by *string* name (kebab-case), code-split via dynamic import.
- * Example: <DynamicLucide name="factory" className="w-4 h-4" />
- * If the name is unknown, shows a small placeholder square.
- */
+// ---------------------------------------------------------------------------
+// Dynamic Lucide icon by name (lazy-loaded per icon to keep bundle small)
+// ---------------------------------------------------------------------------
 function DynamicLucide({ name, className }: { name: string; className?: string }) {
-  // `dynamicIconImports` has keys in kebab-case, e.g. "graduation-cap", "shield-alert"
   const importFn = (dynamicIconImports as Record<string, () => Promise<{ default: React.ComponentType<any> }>>)[name];
-
-  // Memoize the lazy component per icon name
   const Lazy = React.useMemo(() => (importFn ? React.lazy(importFn) : null), [importFn]);
 
   if (!Lazy) {
-    return <span className={className ? `${className} inline-block rounded-sm bg-white/20` : "inline-block w-4 h-4 rounded-sm bg-white/20"} />;
+    // Small placeholder if the icon name isn't found
+    return (
+      <span
+        className={
+          className ? `${className} inline-block rounded-sm bg-white/20` : "inline-block w-4 h-4 rounded-sm bg-white/20"
+        }
+      />
+    );
   }
 
   return (
-    <Suspense fallback={<span className={className ? `${className} inline-block rounded-sm bg-white/20` : "inline-block w-4 h-4 rounded-sm bg-white/20"} />}>
+    <Suspense
+      fallback={
+        <span
+          className={
+            className ? `${className} inline-block rounded-sm bg-white/20` : "inline-block w-4 h-4 rounded-sm bg-white/20"
+          }
+        />
+      }
+    >
       <Lazy className={className} />
     </Suspense>
   );
 }
 
-/**
- * Pick a Lucide icon *name* and a dark gradient based on:
- *  1) server-provided iconHint ("security" | "speech" | "diplomacy" | "money" | "tech" | "heart" | "scale")
- *  2) keyword heuristics on title+summary (many categories, easily extendable)
- *
- * Returns { iconName, iconBgClass, iconTextClass, cardGradientClass }.
- */
+// ---------------------------------------------------------------------------
+// Visual mapping: choose icon + dark gradient per action
+// * uses server-provided iconHint when available
+// * otherwise keyword rules choose an icon + color family
+// * color families have multiple variants so repeated topics don't look identical
+// ---------------------------------------------------------------------------
 function visualForAction(x: DilemmaAction) {
-  type V = { iconName: string; iconBgClass: string; iconTextClass: string; cardGradientClass: string };
-
-  const families: Record<string, Omit<V, "iconName">> = {
-    security:   { iconBgClass: "bg-rose-400/20",     iconTextClass: "text-rose-100",     cardGradientClass: "bg-gradient-to-br from-rose-950 via-rose-900 to-rose-950" },
-    speech:     { iconBgClass: "bg-sky-400/20",      iconTextClass: "text-sky-100",      cardGradientClass: "bg-gradient-to-br from-sky-950 via-sky-900 to-sky-950"   },
-    diplomacy:  { iconBgClass: "bg-emerald-400/20",  iconTextClass: "text-emerald-100",  cardGradientClass: "bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950" },
-    money:      { iconBgClass: "bg-amber-400/20",    iconTextClass: "text-amber-100",    cardGradientClass: "bg-gradient-to-br from-amber-950 via-amber-900 to-amber-950" },
-    tech:       { iconBgClass: "bg-violet-400/20",   iconTextClass: "text-violet-100",   cardGradientClass: "bg-gradient-to-br from-violet-950 via-violet-900 to-violet-950" },
-    heart:      { iconBgClass: "bg-pink-400/20",     iconTextClass: "text-pink-100",     cardGradientClass: "bg-gradient-to-br from-pink-950 via-pink-900 to-pink-950" },
-    scale:      { iconBgClass: "bg-indigo-400/20",   iconTextClass: "text-indigo-100",   cardGradientClass: "bg-gradient-to-br from-indigo-950 via-indigo-900 to-indigo-950" },
-    build:      { iconBgClass: "bg-stone-400/20",    iconTextClass: "text-stone-100",    cardGradientClass: "bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950" },
-    civic:      { iconBgClass: "bg-teal-400/20",     iconTextClass: "text-teal-100",     cardGradientClass: "bg-gradient-to-br from-teal-950 via-teal-900 to-teal-950" },
-    nature:     { iconBgClass: "bg-green-400/20",    iconTextClass: "text-green-100",    cardGradientClass: "bg-gradient-to-br from-green-950 via-green-900 to-green-950" },
-    energy:     { iconBgClass: "bg-yellow-400/20",   iconTextClass: "text-yellow-100",   cardGradientClass: "bg-gradient-to-br from-yellow-950 via-yellow-900 to-yellow-950" },
+  type V = {
+    iconName: string;
+    familyKey: keyof typeof families;
+    iconBgClass: string;
+    iconTextClass: string;
+    cardGradientClass: string;
   };
 
-  // 1) Prefer server hint → choose family + a representative iconName within that family.
-  const hint = String(x?.iconHint || "").toLowerCase();
-  const hintChoice: Record<string, string> = {
-    security:  "shield-alert",
-    speech:    "megaphone",
-    diplomacy: "handshake",
-    money:     "coins",
-    tech:      "cpu",
-    heart:     "heart",
-    scale:     "scale",
+  const families = {
+    security: {
+      iconBgClass: "bg-rose-400/20",
+      iconTextClass: "text-rose-100",
+      variants: [
+        "bg-gradient-to-br from-rose-950 via-rose-900 to-rose-950",
+        "bg-gradient-to-br from-red-950 via-red-900 to-red-950",
+        "bg-gradient-to-br from-rose-950 via-rose-800 to-rose-950",
+      ],
+      defaultIcon: "shield-alert",
+    },
+    speech: {
+      iconBgClass: "bg-sky-400/20",
+      iconTextClass: "text-sky-100",
+      variants: [
+        "bg-gradient-to-br from-sky-950 via-sky-900 to-sky-950",
+        "bg-gradient-to-br from-blue-950 via-blue-900 to-blue-950",
+        "bg-gradient-to-br from-cyan-950 via-cyan-900 to-cyan-950",
+      ],
+      defaultIcon: "megaphone",
+    },
+    diplomacy: {
+      iconBgClass: "bg-emerald-400/20",
+      iconTextClass: "text-emerald-100",
+      variants: [
+        "bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950",
+        "bg-gradient-to-br from-teal-950 via-teal-900 to-teal-950",
+        "bg-gradient-to-br from-green-950 via-green-900 to-green-950",
+      ],
+      defaultIcon: "handshake",
+    },
+    money: {
+      iconBgClass: "bg-amber-400/20",
+      iconTextClass: "text-amber-100",
+      variants: [
+        "bg-gradient-to-br from-amber-950 via-amber-900 to-amber-950",
+        "bg-gradient-to-br from-yellow-950 via-yellow-900 to-yellow-950",
+        "bg-gradient-to-br from-orange-950 via-orange-900 to-orange-950",
+      ],
+      defaultIcon: "coins",
+    },
+    tech: {
+      iconBgClass: "bg-violet-400/20",
+      iconTextClass: "text-violet-100",
+      variants: [
+        "bg-gradient-to-br from-violet-950 via-violet-900 to-violet-950",
+        "bg-gradient-to-br from-purple-950 via-purple-900 to-purple-950",
+        "bg-gradient-to-br from-fuchsia-950 via-fuchsia-900 to-fuchsia-950",
+      ],
+      defaultIcon: "cpu",
+    },
+    heart: {
+      iconBgClass: "bg-pink-400/20",
+      iconTextClass: "text-pink-100",
+      variants: [
+        "bg-gradient-to-br from-pink-950 via-pink-900 to-pink-950",
+        "bg-gradient-to-br from-rose-950 via-rose-900 to-rose-950",
+        "bg-gradient-to-br from-fuchsia-950 via-fuchsia-900 to-fuchsia-950",
+      ],
+      defaultIcon: "heart",
+    },
+    scale: {
+      iconBgClass: "bg-indigo-400/20",
+      iconTextClass: "text-indigo-100",
+      variants: [
+        "bg-gradient-to-br from-indigo-950 via-indigo-900 to-indigo-950",
+        "bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950",
+        "bg-gradient-to-br from-blue-950 via-blue-900 to-blue-950",
+      ],
+      defaultIcon: "scale",
+    },
+    build: {
+      iconBgClass: "bg-stone-400/20",
+      iconTextClass: "text-stone-100",
+      variants: [
+        "bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950",
+        "bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950",
+        "bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950",
+      ],
+      defaultIcon: "hammer",
+    },
+    nature: {
+      iconBgClass: "bg-green-400/20",
+      iconTextClass: "text-green-100",
+      variants: [
+        "bg-gradient-to-br from-green-950 via-green-900 to-green-950",
+        "bg-gradient-to-br from-lime-950 via-lime-900 to-lime-950",
+        "bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950",
+      ],
+      defaultIcon: "leaf",
+    },
+    energy: {
+      iconBgClass: "bg-yellow-400/20",
+      iconTextClass: "text-yellow-100",
+      variants: [
+        "bg-gradient-to-br from-yellow-950 via-yellow-900 to-yellow-950",
+        "bg-gradient-to-br from-amber-950 via-amber-900 to-amber-950",
+        "bg-gradient-to-br from-orange-950 via-orange-900 to-orange-950",
+      ],
+      defaultIcon: "zap",
+    },
+    civic: {
+      iconBgClass: "bg-teal-400/20",
+      iconTextClass: "text-teal-100",
+      variants: [
+        "bg-gradient-to-br from-teal-950 via-teal-900 to-teal-950",
+        "bg-gradient-to-br from-cyan-950 via-cyan-900 to-cyan-950",
+        "bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950",
+      ],
+      defaultIcon: "graduation-cap",
+    },
   };
 
+  // Prefer server-provided hint first
+  const hint = String((x as any)?.iconHint || "").toLowerCase() as keyof typeof families;
   if (hint && families[hint]) {
-    return { iconName: hintChoice[hint] || "megaphone", ...families[hint] } as V;
+    const f = families[hint];
+    return {
+      iconName: f.defaultIcon,
+      familyKey: hint,
+      iconBgClass: f.iconBgClass,
+      iconTextClass: f.iconTextClass,
+      cardGradientClass: f.variants[0],
+    } as V;
   }
 
-  // 2) Rich keyword → specific icon (kebab-case names straight from Lucide).
+  // Keyword rules → icon + family
   const text = `${x?.title ?? ""} ${x?.summary ?? ""}`.toLowerCase();
   const rules: Array<[RegExp, string, keyof typeof families]> = [
     [/(tax|budget|fund|grant|loan|bond|treasury|fee|fine|subsid)/, "coins", "money"],
@@ -122,16 +236,32 @@ function visualForAction(x: DilemmaAction) {
     [/(border|immigration|refugee|asylum|citizen|visa)/, "globe", "diplomacy"],
   ];
   for (const [re, iconName, fam] of rules) {
-    if (re.test(text)) return { iconName, ...families[fam] } as V;
+    if (re.test(text)) {
+      const f = families[fam];
+      return {
+        iconName,
+        familyKey: fam,
+        iconBgClass: f.iconBgClass,
+        iconTextClass: f.iconTextClass,
+        cardGradientClass: f.variants[0],
+      } as V;
+    }
   }
 
-  // 3) Default
-  return { iconName: "megaphone", ...families.speech } as V;
+  // Default → speech/blue
+  const f = families.speech;
+  return {
+    iconName: f.defaultIcon,
+    familyKey: "speech",
+    iconBgClass: f.iconBgClass,
+    iconTextClass: f.iconTextClass,
+    cardGradientClass: f.variants[0],
+  } as V;
 }
 
-/** Map AI actions → full ActionDeck cards (with icon + gradient). */
+// Build full deck cards and de-duplicate gradients when families repeat.
 function actionsToDeckCards(a: DilemmaAction[]): ActionDeckCard[] {
-  return a.slice(0, 3).map((x, i) => {
+  const mapped = a.slice(0, 3).map((x, i) => {
     const id = (["a", "b", "c"][i] || `a${i}`) as "a" | "b" | "c";
     const v = visualForAction(x);
     return {
@@ -139,25 +269,107 @@ function actionsToDeckCards(a: DilemmaAction[]): ActionDeckCard[] {
       title: x.title,
       summary: x.summary,
       cost: x.cost,
-      icon: <DynamicLucide name={v.iconName} className="w-4 h-4" />, // ← any Lucide icon by name
+      icon: <DynamicLucide name={v.iconName} className="w-4 h-4" />,
       iconBgClass: v.iconBgClass,
       iconTextClass: v.iconTextClass,
       cardGradientClass: v.cardGradientClass,
-    };
+      __family: v.familyKey as string, // internal marker for second pass
+    } as ActionDeckCard & { __family: string };
   });
+
+  // family → gradient variants (same sets as in visualForAction)
+  const variantsByFamily: Record<string, string[]> = {
+    security: [
+      "bg-gradient-to-br from-rose-950 via-rose-900 to-rose-950",
+      "bg-gradient-to-br from-red-950 via-red-900 to-red-950",
+      "bg-gradient-to-br from-rose-950 via-rose-800 to-rose-950",
+    ],
+    speech: [
+      "bg-gradient-to-br from-sky-950 via-sky-900 to-sky-950",
+      "bg-gradient-to-br from-blue-950 via-blue-900 to-blue-950",
+      "bg-gradient-to-br from-cyan-950 via-cyan-900 to-cyan-950",
+    ],
+    diplomacy: [
+      "bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950",
+      "bg-gradient-to-br from-teal-950 via-teal-900 to-teal-950",
+      "bg-gradient-to-br from-green-950 via-green-900 to-green-950",
+    ],
+    money: [
+      "bg-gradient-to-br from-amber-950 via-amber-900 to-amber-950",
+      "bg-gradient-to-br from-yellow-950 via-yellow-900 to-yellow-950",
+      "bg-gradient-to-br from-orange-950 via-orange-900 to-orange-950",
+    ],
+    tech: [
+      "bg-gradient-to-br from-violet-950 via-violet-900 to-violet-950",
+      "bg-gradient-to-br from-purple-950 via-purple-900 to-purple-950",
+      "bg-gradient-to-br from-fuchsia-950 via-fuchsia-900 to-fuchsia-950",
+    ],
+    heart: [
+      "bg-gradient-to-br from-pink-950 via-pink-900 to-pink-950",
+      "bg-gradient-to-br from-rose-950 via-rose-900 to-rose-950",
+      "bg-gradient-to-br from-fuchsia-950 via-fuchsia-900 to-fuchsia-950",
+    ],
+    scale: [
+      "bg-gradient-to-br from-indigo-950 via-indigo-900 to-indigo-950",
+      "bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950",
+      "bg-gradient-to-br from-blue-950 via-blue-900 to-blue-950",
+    ],
+    build: [
+      "bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950",
+      "bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950",
+      "bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950",
+    ],
+    nature: [
+      "bg-gradient-to-br from-green-950 via-green-900 to-green-950",
+      "bg-gradient-to-br from-lime-950 via-lime-900 to-lime-950",
+      "bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950",
+    ],
+    energy: [
+      "bg-gradient-to-br from-yellow-950 via-yellow-900 to-yellow-950",
+      "bg-gradient-to-br from-amber-950 via-amber-900 to-amber-950",
+      "bg-gradient-to-br from-orange-950 via-orange-900 to-orange-950",
+    ],
+    civic: [
+      "bg-gradient-to-br from-teal-950 via-teal-900 to-teal-950",
+      "bg-gradient-to-br from-cyan-950 via-cyan-900 to-cyan-950",
+      "bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950",
+    ],
+  };
+
+  // assign different variants for repeated families
+  const idxByFamily: Record<string, number> = {};
+  mapped.forEach((c) => {
+    const fam = c.__family;
+    const variants = variantsByFamily[fam] || [c.cardGradientClass || ""];
+    const idx = (idxByFamily[fam] = (idxByFamily[fam] || 0));
+    c.cardGradientClass = variants[idx % variants.length] || c.cardGradientClass;
+    idxByFamily[fam] = idx + 1;
+    delete (c as any).__family;
+  });
+
+  return mapped;
 }
 
+// ---------------------------------------------------------------------------
+// TTS helpers
+// ---------------------------------------------------------------------------
+function narrationTextForDilemma(d: { title?: string; description?: string }) {
+  const t = (d?.title || "").trim();
+  const p = (d?.description || "").trim();
+  return t && p ? `${t}. ${p}` : t || p || "";
+}
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 export default function EventScreen(_props: Props) {
   // Stores
   const debugMode = useSettingsStore((s) => s.debugMode);
   const { current, loadNext, loading, error, day, totalDays } = useDilemmaStore();
 
-  // Auto-load a dilemma when the screen mounts (or when returning to it)
+  // Auto-load a dilemma when the screen mounts
   useEffect(() => {
-    if (!current && !loading && !error) {
-      loadNext();
-    }
+    if (!current && !loading && !error) loadNext();
   }, [current, loading, error, loadNext]);
 
   const daysLeft = Math.max(0, totalDays - day + 1);
@@ -170,25 +382,82 @@ export default function EventScreen(_props: Props) {
     (async () => {
       if (!current) return;
       setMirrorLoading(true);
-      // show an in-character placeholder immediately
       setMirrorText("…the mirror squints, light pooling in the glass…");
-
-      const text = await requestMirrorDilemmaLine({
-        // NEXT: we’ll pass real “top” values from the compass store
-        topWhat: [], topWhence: [], topOverall: [],
-      });
-
+      const text = await requestMirrorDilemmaLine({ topWhat: [], topWhence: [], topOverall: [] });
       if (alive) {
         setMirrorText(text);
         setMirrorLoading(false);
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [current]);
+
+  // ---- Narration for the current dilemma ----
+  const narrationEnabled = useSettingsStore((s) => s.narrationEnabled !== false);
+
+  const narrator = useNarrator();
+
+  type PreparedTTSHandle = { start: () => Promise<void>; dispose: () => void } | null;
+  const preparedDilemmaRef = useRef<PreparedTTSHandle>(null);
+  const dilemmaPlayedRef = useRef(false);
+  const [canShowDilemma, setCanShowDilemma] = useState(false);
+
+  // Prepare narration whenever the dilemma changes
+  useEffect(() => {
+    const d = current;
+    setCanShowDilemma(false);
+    dilemmaPlayedRef.current = false;
+
+    // cleanup previous audio
+    preparedDilemmaRef.current?.dispose?.();
+    preparedDilemmaRef.current = null;
+
+    if (!d) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const speech = narrationTextForDilemma(d);
+        if (!speech) {
+          setCanShowDilemma(true);
+          return;
+        }
+        const p = await narrator.prepare(speech, { voiceName: "alloy", format: "mp3" });
+        if (cancelled) {
+          p.dispose();
+          return;
+        }
+        preparedDilemmaRef.current = p;
+        setCanShowDilemma(true);
+      } catch (e) {
+        console.warn("[Event] TTS prepare failed; showing without audio:", e);
+        setCanShowDilemma(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      preparedDilemmaRef.current?.dispose?.();
+      preparedDilemmaRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.title, current?.description]);
+
+  // Start narration when we reveal the dilemma (once)
+  useEffect(() => {
+    if (!canShowDilemma) return;
+    const p = preparedDilemmaRef.current;
+    if (narrationEnabled && p && !dilemmaPlayedRef.current) {
+      dilemmaPlayedRef.current = true;
+      p.start().catch((e) => console.warn("[Event] TTS start blocked:", e));
+    }
+  }, [canShowDilemma, narrationEnabled]);
 
   // Budget + avatar
   const showBudget = useSettingsStore((s) => s.showBudget);
-  const [budget, setBudget] = useState(1500); // demo budget, replace later with a store if needed
+  const [budget, setBudget] = useState(1500); // demo value
   const avatarUrl = useRoleStore((s) => s.character?.avatarUrl ?? null);
 
   // Support trio local demo state
@@ -209,7 +478,7 @@ export default function EventScreen(_props: Props) {
     },
     {
       id: "middle",
-      name: "Congress", // will be dynamic later
+      name: "Congress",
       percent: vals.middle,
       accentClass: "bg-amber-600",
       icon: <DefaultSupportIcons.BuildingIcon className="w-4 h-4" />,
@@ -229,11 +498,13 @@ export default function EventScreen(_props: Props) {
     },
   ];
 
-  // Build the deck ONLY from AI data
+  // Build the action deck from the current dilemma
   const actionsForDeck = useMemo<ActionDeckCard[]>(
     () => (current ? actionsToDeckCards(current.actions) : []),
     [current]
   );
+
+  const overlayPreparing = !!current && !canShowDilemma; // hide dilemma until narration is ready
 
   return (
     <div className="min-h-[100dvh] px-5 py-5" style={bgStyle}>
@@ -247,13 +518,11 @@ export default function EventScreen(_props: Props) {
         <NewsTickerDemo />
 
         {/* Player status strip: dynamic params (left) + portrait (right) */}
-        <PlayerStatusStrip
-          avatarSrc={avatarUrl || undefined}
-          params={demoParams()}               // three demo items for now
-        />
+        <PlayerStatusStrip avatarSrc={avatarUrl || undefined} params={demoParams()} />
 
+        {/* Dilemma + Actions (gated until narration is ready) */}
         <div className="mt-4">
-          {current ? (
+          {canShowDilemma && current ? (
             <DilemmaCard title={current.title} description={current.description} />
           ) : (
             <DilemmaCard {...demoDilemma()} />
@@ -278,27 +547,31 @@ export default function EventScreen(_props: Props) {
           </div>
         </div>
 
-        <ActionDeck
-          actions={actionsForDeck}
-          showBudget={showBudget}
-          budget={budget}
-          onConfirm={(id: "a" | "b" | "c") => {
-            const a = actionsForDeck.find((x) => x.id === id);
-            const delta = (a?.cost ?? 0);
-            if (showBudget) setBudget((b) => b + delta);
-          }}
-          onSuggest={(_text?: string) => {
-            if (showBudget) setBudget((b) => b - 300);
-          }}
-        />
+        {canShowDilemma && current && (
+          <ActionDeck
+            actions={actionsForDeck}
+            showBudget={showBudget}
+            budget={budget}
+            onConfirm={(id: "a" | "b" | "c") => {
+              const a = actionsForDeck.find((x) => x.id === id);
+              const delta = a?.cost ?? 0;
+              if (showBudget) setBudget((b) => b + delta);
+            }}
+            onSuggest={(_text?: string) => {
+              if (showBudget) setBudget((b) => b - 300);
+            }}
+          />
+        )}
 
-        <EventLoadingOverlay show={loading} />
+        <EventLoadingOverlay show={loading || overlayPreparing} />
       </div>
     </div>
   );
 }
 
+// ---------------------------------------------------------------------------
 // utils
+// ---------------------------------------------------------------------------
 function clampPercent(n: number) {
   return Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
 }

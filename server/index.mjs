@@ -592,22 +592,50 @@ app.post("/api/dilemma", async (req, res) => {
         ? `Focus topic: ${String(settings.dilemmasSubject)}.`
         : "";
 
-    const system =
-      "You write **short, punchy political situations** for a choice-based mobile game.\n" +
-      "- Do NOT use the word 'dilemma'.\n" +
-      "- Title ≤ 60 chars; description 2–3 sentences, mature and engaging.\n" +
-      '- Return STRICT JSON ONLY: {"title":"","description":"","actions":[{...},{...},{...}]}\n' +
-      '- Each action: {"id":"a|b|c","title":"","summary":"","cost":int,"iconHint":"security|speech|diplomacy|money|tech|heart|scale"}\n' +
-      "- Costs are integers in [-250..500]. Keep choices comparable. Use +200..+500 only when broadly generous (e.g., taxes/windfalls).";
+    
+  const system =
+    "You write **short, punchy political situations** for a choice-based mobile game.\n" +
+    "\n" +
+    "STYLE & TONE\n" +
+    "- Do NOT use the word 'dilemma'.\n" +
+    "- Keep title ≤ 60 chars; description 2–3 sentences, mature and engaging.\n" +
+    "- Natural language (no bullet points), feels like in-world events, demands, questions or follow-ups from real actors.\n" +
+    "\n" +
+    "WORLD FIT & CONTEXT\n" +
+    "- Reflect the CURRENT POLITICAL SYSTEM’s feel. If Absolute Monarchy: decisions are swift and intimidating; if Citizens' Assembly: the player casts a vote and must live with the aggregate outcome.\n" +
+    "- If a focus topic is provided, center the situation on it.\n" +
+    "- If DAY is first, prefer a challenge that arises immediately from the leadership change. If DAY is last, create an especially high-stakes climax that pays off recent tensions.\n" +
+    "- When the setting is real (historic/current), prefer tensions that actually characterize it; when fictional, invent plausible tensions consistent with it.\n" +
+    "- Consider the player’s **top Compass components** (list provided) and, when elegant, expose tensions between them (e.g., high freedom vs. high law/order).\n" +
+    "- When power-holders beyond the player are relevant, let them be the source of pressure.\n" +
+    "- Broadly, many situations can live along autonomy↔heteronomy and liberalism↔totalism axes.\n" +
+    "\n" +
+    "OUTPUT SHAPE (STRICT JSON)\n" +
+    '{"title":"","description":"","actions":[{"id":"a","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale"},' +
+    '{"id":"b","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale"},' +
+    '{"id":"c","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale"}]}\n' +
+    "\n" +
+    "ACTIONS\n" +
+    "- Each action should be a distinct approach (e.g., assertive/security, conciliatory/diplomacy, communicative/speech, fiscal/money, technical/tech, humanitarian/heart, legal/scale).\n" +
+    "- **iconHint** must be one of: security|speech|diplomacy|money|tech|heart|scale (choose the best single fit).\n" +
+    "\n" +
+    "COSTS (SIGN & MAGNITUDE)\n" +
+    "- **SIGN RULE:** Negative = spending/outflow. Positive = revenue/inflow (e.g., taxes/fees/fines, profitable trade, asset sale/privatization, grants/aid/donations, bribe income, bond/loan proceeds).\n" +
+    "- Default to **negative** unless the action clearly creates new inflow.\n" +
+    "- Use whole integers with these magnitudes: 0, ±50, ±100, ±150, ±200, ±250.\n" +
+    "- Reserve +300..+500 ONLY for broad system-wide inflows (tax hikes, grants/aid, windfalls), used sparingly.\n" +
+    "- Keep the three choices **comparable** overall; if one should be cheaper in reality, its cost should reflect that.\n";
+  
 
     const user =
-      `ROLE: ${role}\n` +
-      `POLITICAL SYSTEM: ${systemName}\n` +
-      `${focusLine}\n` +
-      `DAY: ${day} of ${totalDays} (${isFirst ? "first" : isLast ? "last" : "mid-campaign"})\n` +
-      `TOP COMPASS COMPONENTS (0..10): ${topCompass.join(", ") || "n/a"}\n` +
-      "TASK: Write one short situation with exactly three conflicting ways to respond.\n" +
-      "JSON ONLY.";
+    `ROLE: ${role}\n` +
+    `POLITICAL SYSTEM: ${systemName}\n` +
+    `${focusLine}\n` +
+    `DAY: ${day} of ${totalDays} (${isFirst ? "first" : isLast ? "last" : "mid-campaign"})\n` +
+    `TOP COMPASS COMPONENTS (0..10): ${topCompass.join(", ") || "n/a"}\n` +
+    "TASK: Produce exactly one short situation with exactly three conflicting ways to respond.\n" +
+    "Return STRICT JSON ONLY in the shape specified.";
+  
 
     // Call model (uses aiJSON guard + fallback)
     const out = await aiJSON({
@@ -628,6 +656,50 @@ app.post("/api/dilemma", async (req, res) => {
         ],
       },
     });
+// Snap an arbitrary integer cost to our game bands.
+// - Default ladder: 0, 50, 100, 150, 200, 250 (negatives mirrored).
+// - Allow +300..+500 only for broad “money windfall / tax raise” type actions.
+//   We infer that by keywords in the action’s text.
+const MONEY_RE = /(tax|levy|tariff|duty|raise|grant|stipend|subsid|windfall|donation|aid|surplus|treasury|budget|bond|fee|fine|privatiz|sale)/i;
+
+function snapCost(raw, text) {
+  const sign = raw >= 0 ? 1 : -1;
+  const abs  = Math.abs(Math.round(Number(raw) || 0));
+
+  // Default ladder steps
+  const ladder = [0, 50, 100, 150, 200, 250];
+
+  // pick closest from ladder
+  const nearest = ladder.reduce((best, v) => (
+    Math.abs(abs - v) < Math.abs(abs - best) ? v : best
+  ), 0);
+
+  let snapped = sign * nearest;
+
+  // Optionally allow bigger positive gains when it *looks* like a windfall/tax move.
+  if (sign > 0 && MONEY_RE.test(text || "")) {
+    // If model tried to go big, let it; otherwise bump modestly above 250.
+    // (Choose from 300, 400, 500.)
+    if (abs >= 480) snapped = 500;
+    else if (abs >= 380) snapped = 400;
+    else if (abs >= 260) snapped = 300;
+    // If it was smaller, keep snapped as-is (≤ 250) to avoid abuse.
+  }
+
+  // Clamp absolute bounds we support overall.
+  return clampInt(snapped, -250, 500);
+}
+// Heuristics to decide if an action text implies *revenue/inflow* or *spending/outflow*.
+const REVENUE_RE = /(tax|levy|raise|tariff|duty|fee|fine|toll|bribe|payoff|donation|grant|aid|bailout|surplus|windfall|royalt|dividend|profit|revenue|sale|auction|privatiz|license|concession|permit fee|export|trade|loan|bond issue|issue bonds)/i;
+const OUTLAY_RE  = /(build|construct|hire|wage|salary|subsid|invest|fund|spend|pay|purchase|buy|equip|deploy|expand program|contract|maintenance|relief|stipend|campaign|patrol|station|send troops|guard|operate)/i;
+
+function expectedSignFor(text = "", iconHint = "") {
+  const t = String(text).toLowerCase();
+  if (OUTLAY_RE.test(t)) return -1;     // clear spend
+  if (REVENUE_RE.test(t)) return 1;     // clear inflow
+  if (String(iconHint).toLowerCase() === "money") return 1; // bias money → inflow when unsure
+  return 0; // unknown
+}
 
     // Normalize + guard shape
     const clampInt = (n, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(n) || 0)));
@@ -640,13 +712,54 @@ app.post("/api/dilemma", async (req, res) => {
     ]);
 
     let actions = Array.isArray(out?.actions) ? out.actions.slice(0, 3) : [];
-    actions = actions.map((a, idx) => ({
-      id: (["a","b","c"][idx] || "a"),
-      title: String(a?.title || `Option ${idx + 1}`).slice(0, 80),
-      summary: String(a?.summary || "").slice(0, 180),
-      cost: clampInt(a?.cost, -250, 500),
-      iconHint: allowedHints.has(String(a?.iconHint)) ? String(a?.iconHint) : "speech",
-    }));
+    actions = actions.map((a, idx) => {
+      const id = (["a","b","c"][idx] || "a");
+      const title = String(a?.title || `Option ${idx + 1}`).slice(0, 80);
+      const summary = String(a?.summary || "").slice(0, 180);
+      const iconHint = allowedHints.has(String(a?.iconHint)) ? String(a?.iconHint) : "speech";
+    
+      // 1) snap magnitude
+      const raw = clampInt(a?.cost, -250, 500);
+      let cost = snapCost(raw, `${title} ${summary}`);
+    
+      // 2) correct sign based on text/icon when the intent is clear
+      const expected = expectedSignFor(`${title} ${summary}`, iconHint);
+      if (expected === 1 && cost < 0) cost = Math.abs(cost);       // revenue should be +
+      if (expected === -1 && cost > 0) cost = -Math.abs(cost);     // outlay should be -
+    
+      return { id, title, summary, cost, iconHint };
+    });
+    
+    // Ensure we don't end up with all-positive costs.
+    // Prefer to flip the least "revenue-like" option (or the smallest magnitude).
+    {
+      const posCount = actions.filter(a => a.cost > 0).length;
+      if (posCount === actions.length) {
+        let idx = actions.findIndex(a =>
+          a.iconHint !== "money" && !REVENUE_RE.test(`${a.title} ${a.summary}`)
+        );
+        if (idx === -1) {
+          idx = actions.reduce((best, a, i, arr) =>
+            Math.abs(a.cost) < Math.abs(arr[best].cost) ? i : best, 0);
+        }
+        actions[idx].cost = -Math.max(50, Math.abs(actions[idx].cost)); // make it a modest spend
+      }
+    }
+    
+    // If magnitudes all coincide, spread to 50/150/250 while preserving each action’s sign.
+    {
+      const mags = actions.map(a => Math.abs(a.cost));
+      const uniq = new Set(mags);
+      if (uniq.size <= 1) {
+        const targets = [50, 150, 250];
+        actions = actions.map((a, i) => {
+          const sign = a.cost >= 0 ? 1 : -1;
+          return { ...a, cost: sign * targets[i] };
+        });
+      }
+    }
+    
+
 
     while (actions.length < 3) {
       const i = actions.length;
