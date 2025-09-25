@@ -19,6 +19,8 @@ import { requestMirrorDilemmaLine } from "../lib/mirrorDilemma";
 import EventLoadingOverlay from "../components/event/EventLoadingOverlay";
 import { dynamicIconImports } from "lucide-react/dynamic";
 import { useNarrator } from "../hooks/useNarrator";
+import type { ActionCard } from "../components/event/ActionDeck";
+
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -27,16 +29,7 @@ type Props = { push?: (route: string) => void };
 type Trio = { people: number; middle: number; mom: number };
 
 // Card shape that ActionDeck expects (structural typing).
-type ActionDeckCard = {
-  id: "a" | "b" | "c";
-  title: string;
-  summary: string;
-  cost: number;
-  icon?: React.ReactNode;
-  iconBgClass?: string;
-  iconTextClass?: string;
-  cardGradientClass?: string;
-};
+
 
 // ---------------------------------------------------------------------------
 // Dynamic Lucide icon by name (lazy-loaded per icon to keep bundle small)
@@ -260,25 +253,9 @@ function visualForAction(x: DilemmaAction) {
 }
 
 // Build full deck cards and de-duplicate gradients when families repeat.
-function actionsToDeckCards(a: DilemmaAction[]): ActionDeckCard[] {
-  const mapped = a.slice(0, 3).map((x, i) => {
-    const id = (["a", "b", "c"][i] || `a${i}`) as "a" | "b" | "c";
-    const v = visualForAction(x);
-    return {
-      id,
-      title: x.title,
-      summary: x.summary,
-      cost: x.cost,
-      icon: <DynamicLucide name={v.iconName} className="w-4 h-4" />,
-      iconBgClass: v.iconBgClass,
-      iconTextClass: v.iconTextClass,
-      cardGradientClass: v.cardGradientClass,
-      __family: v.familyKey as string, // internal marker for second pass
-    } as ActionDeckCard & { __family: string };
-  });
-
-  // family → gradient variants (same sets as in visualForAction)
-  const variantsByFamily: Record<string, string[]> = {
+function actionsToDeckCards(a: DilemmaAction[]): ActionCard[] {
+  // 1) Dark gradient variants per family (same sets you had)
+  const variantsByFamily = {
     security: [
       "bg-gradient-to-br from-rose-950 via-rose-900 to-rose-950",
       "bg-gradient-to-br from-red-950 via-red-900 to-red-950",
@@ -334,21 +311,83 @@ function actionsToDeckCards(a: DilemmaAction[]): ActionDeckCard[] {
       "bg-gradient-to-br from-cyan-950 via-cyan-900 to-cyan-950",
       "bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950",
     ],
+  } as const;
+
+  type Family = keyof typeof variantsByFamily;
+
+  // Derive a family from the chosen icon name
+  const familyOfIcon = (iconName: string): Family => {
+    switch (iconName) {
+      case "shield-alert":
+      case "eye":
+        return "security";
+      case "megaphone":
+        return "speech";
+      case "handshake":
+      case "globe":
+        return "diplomacy";
+      case "coins":
+        return "money";
+      case "cpu":
+      case "flask-conical":
+        return "tech";
+      case "heart":
+      case "hospital":
+        return "heart";
+      case "scale":
+        return "scale";
+      case "hammer":
+      case "factory":
+      case "home":
+        return "build";
+      case "graduation-cap":
+      case "palette":
+        return "civic";
+      case "leaf":
+      case "wheat":
+      case "droplets":
+        return "nature";
+      case "zap":
+        return "energy";
+      default:
+        return "speech";
+    }
   };
 
-  // assign different variants for repeated families
-  const idxByFamily: Record<string, number> = {};
-  mapped.forEach((c) => {
-    const fam = c.__family;
-    const variants = variantsByFamily[fam] || [c.cardGradientClass || ""];
-    const idx = (idxByFamily[fam] = (idxByFamily[fam] || 0));
-    c.cardGradientClass = variants[idx % variants.length] || c.cardGradientClass;
-    idxByFamily[fam] = idx + 1;
-    delete (c as any).__family;
+  type Tmp = ActionCard & { __fam: Family };
+
+  // 2) First pass: map AI → cards, capture family
+  const tmp: Tmp[] = a.slice(0, 3).map((x, i) => {
+    const id = (["a", "b", "c"][i] || `a${i}`) as string;
+    const v = visualForAction(x);
+    const fam = familyOfIcon(v.iconName);
+
+    return {
+      id,
+      title: x.title,
+      summary: x.summary,
+      cost: x.cost,
+      icon: <DynamicLucide name={v.iconName} className="w-4 h-4" />,
+      iconBgClass: v.iconBgClass,
+      iconTextClass: v.iconTextClass,
+      cardGradientClass: v.cardGradientClass, // will be overridden in pass 2
+      __fam: fam,
+    };
   });
 
-  return mapped;
+  // 3) Second pass: rotate gradient variants for repeated families
+  const idxByFamily: Partial<Record<Family, number>> = {};
+  tmp.forEach((c) => {
+    const list = variantsByFamily[c.__fam];
+    const idx = idxByFamily[c.__fam] ?? 0;
+    c.cardGradientClass = list[idx % list.length] || c.cardGradientClass;
+    idxByFamily[c.__fam] = idx + 1;
+  });
+
+  // 4) Strip helper and return
+  return tmp.map(({ __fam, ...rest }) => rest);
 }
+
 
 // ---------------------------------------------------------------------------
 // TTS helpers
@@ -499,7 +538,7 @@ export default function EventScreen(_props: Props) {
   ];
 
   // Build the action deck from the current dilemma
-  const actionsForDeck = useMemo<ActionDeckCard[]>(
+  const actionsForDeck = useMemo<ActionCard[]>(
     () => (current ? actionsToDeckCards(current.actions) : []),
     [current]
   );
@@ -552,11 +591,12 @@ export default function EventScreen(_props: Props) {
             actions={actionsForDeck}
             showBudget={showBudget}
             budget={budget}
-            onConfirm={(id: "a" | "b" | "c") => {
+            onConfirm={(id) => {
               const a = actionsForDeck.find((x) => x.id === id);
               const delta = a?.cost ?? 0;
               if (showBudget) setBudget((b) => b + delta);
             }}
+            
             onSuggest={(_text?: string) => {
               if (showBudget) setBudget((b) => b - 300);
             }}
