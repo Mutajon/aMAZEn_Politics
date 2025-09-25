@@ -66,22 +66,28 @@ const ALLOWED_SYSTEMS = [
   "Kakistocracy",
 ];
 // Helper: call Chat Completions and try to parse JSON from the reply
-async function aiJSON({ system, user, model = CHAT_MODEL_DEFAULT, temperature = 0.6, fallback = null }) {
+async function aiJSON({ system, user, model = CHAT_MODEL_DEFAULT, temperature = undefined, fallback = null }) {
   try {
+    // Build payload WITHOUT temperature by default.
+    const payload = {
+      model,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    };
+    // Only include temperature if it is exactly 1 (some models accept only default).
+    if (typeof temperature === "number" && temperature === 1) {
+      payload.temperature = 1;
+    }
+
     const resp = await fetch(CHAT_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-        temperature,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!resp.ok) {
@@ -105,6 +111,7 @@ async function aiJSON({ system, user, model = CHAT_MODEL_DEFAULT, temperature = 
   }
 }
 
+
 async function aiText({ system, user, model = CHAT_MODEL_DEFAULT, temperature }) {
   try {
     const body = {
@@ -114,9 +121,10 @@ async function aiText({ system, user, model = CHAT_MODEL_DEFAULT, temperature })
         { role: "user", content: user },
       ],
     };
-    if (typeof temperature === "number" && temperature !== 1) {
-      body.temperature = temperature;
-    }
+  // Only include temperature if it is exactly 1; otherwise omit entirely.
+if (typeof temperature === "number" && temperature === 1) {
+  body.temperature = 1;
+}
 
     const resp = await fetch(CHAT_URL, {
       method: "POST",
@@ -161,16 +169,13 @@ app.get("/api/_ping", (_req, res) => {
 // -------------------- Intro paragraph (role-based) -------------------------
 app.post("/api/intro-paragraph", async (req, res) => {
   try {
-    const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
     if (!OPENAI_KEY) return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
-
-    const CHAT_URL = "https://api.openai.com/v1/chat/completions";
-    const CHAT_MODEL_DEFAULT = process.env.CHAT_MODEL || "gpt-4o-mini";
 
     const { role, gender } = req.body || {};
     const roleText = String(role || "").slice(0, 200);
-    const genderText = ["male", "female", "any"].includes((gender || "").toLowerCase())
-      ? gender.toLowerCase()
+
+    const genderText = ["male", "female", "any"].includes(String(gender || "").toLowerCase())
+      ? String(gender).toLowerCase()
       : "any";
 
     // Guardrail: role must exist
@@ -190,29 +195,8 @@ app.post("/api/intro-paragraph", async (req, res) => {
       "TASK: Write one short paragraph that sets the scene on the player's **first day** in this role. " +
       "Welcome them, mention immediate tensions and ambient details. Present tense. No bullet points. No headings.";
 
-    const r = await fetch(CHAT_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_KEY}`,
-      },
-      body: JSON.stringify({
-        model: CHAT_MODEL_DEFAULT,
-        temperature: 0.9,
-        max_tokens: 220,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
-      }),
-    });
-
-    if (!r.ok) {
-      const detail = await r.text().catch(() => "");
-      return res.status(502).json({ error: "OpenAI error", detail });
-    }
-    const data = await r.json();
-    const paragraph = (data?.choices?.[0]?.message?.content || "").trim();
+    // Use shared helper (unified behavior with other endpoints; no model-specific params)
+    const paragraph = (await aiText({ system, user, model: CHAT_MODEL_DEFAULT }))?.trim();
 
     if (!paragraph) return res.status(503).json({ error: "No content returned" });
     return res.json({ paragraph });
@@ -221,6 +205,7 @@ app.post("/api/intro-paragraph", async (req, res) => {
     return res.status(500).json({ error: "Intro generation failed" });
   }
 });
+
 
 // -------------------- AI VALIDATE ROLE ----------------------
 app.post("/api/validate-role", async (req, res) => {

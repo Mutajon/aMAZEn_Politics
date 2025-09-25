@@ -1,6 +1,8 @@
+// src/screens/EventScreen.tsx
 // Event Screen scaffold + TEMP test controls, using shared bgStyle.
+// This version feeds ActionDeck ONLY the AI-generated actions (no demo cards).
 
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, Suspense } from "react";
 import { bgStyle } from "../lib/ui";
 import ResourceBar from "../components/event/ResourceBar";
 import SupportList, { type SupportItem, DefaultSupportIcons } from "../components/event/SupportList";
@@ -9,144 +11,196 @@ import PlayerStatusStrip, { demoParams } from "../components/event/PlayerStatusS
 import { useRoleStore } from "../store/roleStore";
 import DilemmaCard, { demoDilemma } from "../components/event/DilemmaCard";
 import MirrorCard, { demoMirrorLine } from "../components/event/MirrorCard";
-import ActionDeck, { demoActions } from "../components/event/ActionDeck";
+import ActionDeck from "../components/event/ActionDeck";
 import { useSettingsStore } from "../store/settingsStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import type { DilemmaAction } from "../lib/dilemma";
 import { requestMirrorDilemmaLine } from "../lib/mirrorDilemma";
-import { Coins, ShieldAlert, Megaphone, Handshake, Cpu, Heart, Scale } from "lucide-react";
+import EventLoadingOverlay from "../components/event/EventLoadingOverlay";
+import { dynamicIconImports } from "lucide-react/dynamic";
 
 
 type Props = { push?: (route: string) => void };
 type Trio = { people: number; middle: number; mom: number };
+// Card shape expected by ActionDeck (structural typing; no module export needed)
+type ActionDeckCard = {
+  id: "a" | "b" | "c";
+  title: string;
+  summary: string;
+  cost: number;
+  icon?: React.ReactNode;          // JSX for the Lucide icon (we supply <DynamicLucide />)
+  iconBgClass?: string;            // small chip behind the icon
+  iconTextClass?: string;          // icon color
+  cardGradientClass?: string;      // dark gradient background for the card
+};
 
-// Replace your current mapActionsToCards with this content-only version:
-function mapActionsToCards(a: DilemmaAction[]) {
+
+/**
+ * Renders any Lucide icon by *string* name (kebab-case), code-split via dynamic import.
+ * Example: <DynamicLucide name="factory" className="w-4 h-4" />
+ * If the name is unknown, shows a small placeholder square.
+ */
+function DynamicLucide({ name, className }: { name: string; className?: string }) {
+  // `dynamicIconImports` has keys in kebab-case, e.g. "graduation-cap", "shield-alert"
+  const importFn = (dynamicIconImports as Record<string, () => Promise<{ default: React.ComponentType<any> }>>)[name];
+
+  // Memoize the lazy component per icon name
+  const Lazy = React.useMemo(() => (importFn ? React.lazy(importFn) : null), [importFn]);
+
+  if (!Lazy) {
+    return <span className={className ? `${className} inline-block rounded-sm bg-white/20` : "inline-block w-4 h-4 rounded-sm bg-white/20"} />;
+  }
+
+  return (
+    <Suspense fallback={<span className={className ? `${className} inline-block rounded-sm bg-white/20` : "inline-block w-4 h-4 rounded-sm bg-white/20"} />}>
+      <Lazy className={className} />
+    </Suspense>
+  );
+}
+
+/**
+ * Pick a Lucide icon *name* and a dark gradient based on:
+ *  1) server-provided iconHint ("security" | "speech" | "diplomacy" | "money" | "tech" | "heart" | "scale")
+ *  2) keyword heuristics on title+summary (many categories, easily extendable)
+ *
+ * Returns { iconName, iconBgClass, iconTextClass, cardGradientClass }.
+ */
+function visualForAction(x: DilemmaAction) {
+  type V = { iconName: string; iconBgClass: string; iconTextClass: string; cardGradientClass: string };
+
+  const families: Record<string, Omit<V, "iconName">> = {
+    security:   { iconBgClass: "bg-rose-400/20",     iconTextClass: "text-rose-100",     cardGradientClass: "bg-gradient-to-br from-rose-950 via-rose-900 to-rose-950" },
+    speech:     { iconBgClass: "bg-sky-400/20",      iconTextClass: "text-sky-100",      cardGradientClass: "bg-gradient-to-br from-sky-950 via-sky-900 to-sky-950"   },
+    diplomacy:  { iconBgClass: "bg-emerald-400/20",  iconTextClass: "text-emerald-100",  cardGradientClass: "bg-gradient-to-br from-emerald-950 via-emerald-900 to-emerald-950" },
+    money:      { iconBgClass: "bg-amber-400/20",    iconTextClass: "text-amber-100",    cardGradientClass: "bg-gradient-to-br from-amber-950 via-amber-900 to-amber-950" },
+    tech:       { iconBgClass: "bg-violet-400/20",   iconTextClass: "text-violet-100",   cardGradientClass: "bg-gradient-to-br from-violet-950 via-violet-900 to-violet-950" },
+    heart:      { iconBgClass: "bg-pink-400/20",     iconTextClass: "text-pink-100",     cardGradientClass: "bg-gradient-to-br from-pink-950 via-pink-900 to-pink-950" },
+    scale:      { iconBgClass: "bg-indigo-400/20",   iconTextClass: "text-indigo-100",   cardGradientClass: "bg-gradient-to-br from-indigo-950 via-indigo-900 to-indigo-950" },
+    build:      { iconBgClass: "bg-stone-400/20",    iconTextClass: "text-stone-100",    cardGradientClass: "bg-gradient-to-br from-stone-950 via-stone-900 to-stone-950" },
+    civic:      { iconBgClass: "bg-teal-400/20",     iconTextClass: "text-teal-100",     cardGradientClass: "bg-gradient-to-br from-teal-950 via-teal-900 to-teal-950" },
+    nature:     { iconBgClass: "bg-green-400/20",    iconTextClass: "text-green-100",    cardGradientClass: "bg-gradient-to-br from-green-950 via-green-900 to-green-950" },
+    energy:     { iconBgClass: "bg-yellow-400/20",   iconTextClass: "text-yellow-100",   cardGradientClass: "bg-gradient-to-br from-yellow-950 via-yellow-900 to-yellow-950" },
+  };
+
+  // 1) Prefer server hint → choose family + a representative iconName within that family.
+  const hint = String(x?.iconHint || "").toLowerCase();
+  const hintChoice: Record<string, string> = {
+    security:  "shield-alert",
+    speech:    "megaphone",
+    diplomacy: "handshake",
+    money:     "coins",
+    tech:      "cpu",
+    heart:     "heart",
+    scale:     "scale",
+  };
+
+  if (hint && families[hint]) {
+    return { iconName: hintChoice[hint] || "megaphone", ...families[hint] } as V;
+  }
+
+  // 2) Rich keyword → specific icon (kebab-case names straight from Lucide).
+  const text = `${x?.title ?? ""} ${x?.summary ?? ""}`.toLowerCase();
+  const rules: Array<[RegExp, string, keyof typeof families]> = [
+    [/(tax|budget|fund|grant|loan|bond|treasury|fee|fine|subsid)/, "coins", "money"],
+    [/(build|construct|infrastructure|bridge|road|rail|port|airport|housing|renovat)/, "hammer", "build"],
+    [/(factory|industrial|manufact|plant|refinery)/, "factory", "build"],
+    [/(school|education|teacher|university|college|curriculum)/, "graduation-cap", "civic"],
+    [/(hospital|clinic|health|vaccine|medicine|pandemic|epidemic)/, "hospital", "heart"],
+    [/(police|curfew|security|military|army|guard|jail|ban|crackdown)/, "shield-alert", "security"],
+    [/(speech|address|broadcast|press|media|announce|campaign)/, "megaphone", "speech"],
+    [/(negotia|treaty|accord|ceasefire|dialogue|mediate)/, "handshake", "diplomacy"],
+    [/(law|court|legal|judic|regulat|ethic|oversight)/, "scale", "scale"],
+    [/(research|science|lab|experiment|study)/, "flask-conical", "tech"],
+    [/(technology|ai\b|data|digital|software|network|server|cloud)/, "cpu", "tech"],
+    [/(environment|climate|forest|tree|green|conservation|wildlife)/, "leaf", "nature"],
+    [/(energy|electric|grid|power plant|renewable|solar|wind)/, "zap", "energy"],
+    [/(housing|home|shelter|homeless)/, "home", "build"],
+    [/(agriculture|farmer|crop|harvest)/, "wheat", "nature"],
+    [/(water|drought|flood|river|dam)/, "droplets", "nature"],
+    [/(culture|heritage|museum|art)/, "palette", "civic"],
+    [/(privacy|surveillance|monitor|cctv)/, "eye", "security"],
+    [/(border|immigration|refugee|asylum|citizen|visa)/, "globe", "diplomacy"],
+  ];
+  for (const [re, iconName, fam] of rules) {
+    if (re.test(text)) return { iconName, ...families[fam] } as V;
+  }
+
+  // 3) Default
+  return { iconName: "megaphone", ...families.speech } as V;
+}
+
+/** Map AI actions → full ActionDeck cards (with icon + gradient). */
+function actionsToDeckCards(a: DilemmaAction[]): ActionDeckCard[] {
   return a.slice(0, 3).map((x, i) => {
     const id = (["a", "b", "c"][i] || `a${i}`) as "a" | "b" | "c";
+    const v = visualForAction(x);
     return {
       id,
       title: x.title,
       summary: x.summary,
       cost: x.cost,
+      icon: <DynamicLucide name={v.iconName} className="w-4 h-4" />, // ← any Lucide icon by name
+      iconBgClass: v.iconBgClass,
+      iconTextClass: v.iconTextClass,
+      cardGradientClass: v.cardGradientClass,
     };
   });
 }
 
-// Replace your mergeDeckActions with this safe overlay:
-function mergeDeckActions(actions: DilemmaAction[]) {
-  const base = demoActions();                 // deck’s native shape (has all the right keys)
-  const mapped = mapActionsToCards(actions);  // our content (title/summary/cost only)
-  const shape = base[0] || {};
-
-  // Determine which keys the deck uses for title/text/cost
-  const TITLE_KEY =
-    ("title" in shape && "title") ||
-    ("label" in shape && "label") ||
-    ("heading" in shape && "heading") ||
-    "title";
-
-  const TEXT_KEY =
-    ("summary" in shape && "summary") ||
-    ("text" in shape && "text") ||
-    ("body" in shape && "body") ||
-    ("desc" in shape && "desc") ||
-    "summary";
-
-  const COST_KEYS = ["cost", "price", "budgetDelta"]; // write to all common options
-
-  return base.slice(0, 3).map((b: any, i: number) => {
-    const m = mapped[i];
-    const id = (["a", "b", "c"][i] as "a" | "b" | "c");
-    const out: any = { ...b, id }; // keep all deck visuals (icon/bg/flags/etc.)
-
-    // Overwrite ONLY the content fields
-    out[TITLE_KEY] = m?.title ?? b[TITLE_KEY];
-    out[TEXT_KEY]  = m?.summary ?? b[TEXT_KEY];
-    COST_KEYS.forEach(k => (out[k] = m?.cost));
-
-    return out;
-  });
-}
-
-
 
 export default function EventScreen(_props: Props) {
-  //read the store
+  // Stores
   const debugMode = useSettingsStore((s) => s.debugMode);
-  const { current, loadNext, loading, day, totalDays, nextDay } = useDilemmaStore();
-const daysLeft = Math.max(0, totalDays - day + 1);
-const [mirrorText, setMirrorText] = useState(demoMirrorLine());
-const [mirrorLoading, setMirrorLoading] = useState(false);
-useEffect(() => {
-  let alive = true;
-  (async () => {
-    if (!current) return;
-    setMirrorLoading(true);
-    // show an in-character placeholder immediately
-    setMirrorText("…the mirror squints, light pooling in the glass…");
+  const { current, loadNext, loading, error, day, totalDays } = useDilemmaStore();
 
-    const text = await requestMirrorDilemmaLine({
-      // NEXT: we’ll pass real “top” values from the compass store
-      topWhat: [], topWhence: [], topOverall: [],
-    });
-
-    if (alive) {
-      setMirrorText(text);
-      setMirrorLoading(false);
+  // Auto-load a dilemma when the screen mounts (or when returning to it)
+  useEffect(() => {
+    if (!current && !loading && !error) {
+      loadNext();
     }
-  })();
-  return () => { alive = false; };
-}, [current]);
+  }, [current, loading, error, loadNext]);
 
+  const daysLeft = Math.max(0, totalDays - day + 1);
 
+  // Mirror line
+  const [mirrorText, setMirrorText] = useState(demoMirrorLine());
+  const [mirrorLoading, setMirrorLoading] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!current) return;
+      setMirrorLoading(true);
+      // show an in-character placeholder immediately
+      setMirrorText("…the mirror squints, light pooling in the glass…");
 
+      const text = await requestMirrorDilemmaLine({
+        // NEXT: we’ll pass real “top” values from the compass store
+        topWhat: [], topWhence: [], topOverall: [],
+      });
 
+      if (alive) {
+        setMirrorText(text);
+        setMirrorLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [current]);
 
-  // ✅ Hooks must be inside the component:
+  // Budget + avatar
   const showBudget = useSettingsStore((s) => s.showBudget);
-        // ← set to false to hide budget everywhere
-const [budget, setBudget] = useState(1500); // demo budget
+  const [budget, setBudget] = useState(1500); // demo budget, replace later with a store if needed
   const avatarUrl = useRoleStore((s) => s.character?.avatarUrl ?? null);
 
-  // Base values for the 3 supports
+  // Support trio local demo state
   const [vals, setVals] = useState<Trio>({ people: 50, middle: 50, mom: 50 });
-
-  // Persisted change indicators; replaced whenever a new change happens
   const [delta, setDelta] = useState<number | null>(null);
   const [trend, setTrend] = useState<"up" | "down" | null>(null);
-  useEffect(() => {
-    if (!debugMode) return;
-    // One sample object from each shape so we can compare keys in DevTools
-    const demo = demoActions();
-    console.log("[ActionDeck demoActions()[0]]", demo?.[0]);
-    if (current) {
-      console.log("[ActionDeck merged[0]]", mergeDeckActions(current.actions)[0]);
-    }
-  }, [debugMode, current]);
-
-  const actionsForDeck = useMemo(
-    () => (current ? mergeDeckActions(current.actions) : demoActions()),
-    [current]
-  );
-  
-  // Helper to apply +/- n to all, clamped 0..100
-  function adjustAll(n: number) {
-    setVals((prev) => ({
-      people: clampPercent(prev.people + n),
-      middle: clampPercent(prev.middle + n),
-      mom: clampPercent(prev.mom + n),
-    }));
-    setDelta(n);                   // persists until next click
-    setTrend(n > 0 ? "up" : n < 0 ? "down" : null);
-  }
 
   const items: SupportItem[] = [
     {
       id: "people",
       name: "The People",
       percent: vals.people,
-      // accentClass kept for compatibility with SupportList; color now comes from its tunables
       accentClass: "bg-emerald-600",
       icon: <DefaultSupportIcons.PeopleIcon className="w-4 h-4" />,
       moodVariant: "civic",
@@ -175,10 +229,16 @@ const [budget, setBudget] = useState(1500); // demo budget
     },
   ];
 
+  // Build the deck ONLY from AI data
+  const actionsForDeck = useMemo<ActionDeckCard[]>(
+    () => (current ? actionsToDeckCards(current.actions) : []),
+    [current]
+  );
+
   return (
     <div className="min-h-[100dvh] px-5 py-5" style={bgStyle}>
       <div className="w-full max-w-xl mx-auto">
-      <ResourceBar daysLeft={daysLeft} budget={budget} showBudget={showBudget} />
+        <ResourceBar daysLeft={daysLeft} budget={budget} showBudget={showBudget} />
 
         {/* Support values (3 entities), animated */}
         <SupportList items={items} animatePercent={true} animateDurationMs={1000} />
@@ -188,52 +248,51 @@ const [budget, setBudget] = useState(1500); // demo budget
 
         {/* Player status strip: dynamic params (left) + portrait (right) */}
         <PlayerStatusStrip
-          avatarSrc={avatarUrl || undefined} // if empty string/null, show fallback icon
+          avatarSrc={avatarUrl || undefined}
           params={demoParams()}               // three demo items for now
         />
-    <div className="mt-4">
-  {current ? (
-    <DilemmaCard title={current.title} description={current.description} />
-  ) : (
-    <DilemmaCard {...demoDilemma()} />
-  )}
-</div>
-{debugMode && (
-  <div className="mt-2">
-    <button
-      onClick={() => loadNext()}
-      className="rounded-xl px-3 py-2 bg-white/10 ring-1 ring-white/15 text-white text-[12px]"
-      disabled={loading}
-    >
-      {loading ? "Generating…" : "Generate (dev)"}
-    </button>
-  </div>
-)}
 
-<div className="mt-3">
-<div className={mirrorLoading ? "animate-pulse" : ""}>
-<MirrorCard text={mirrorText} />
-</div>
-</div>
+        <div className="mt-4">
+          {current ? (
+            <DilemmaCard title={current.title} description={current.description} />
+          ) : (
+            <DilemmaCard {...demoDilemma()} />
+          )}
+        </div>
 
+        {debugMode && (
+          <div className="mt-2">
+            <button
+              onClick={() => loadNext()}
+              className="rounded-xl px-3 py-2 bg-white/10 ring-1 ring-white/15 text-white text-[12px]"
+              disabled={loading}
+            >
+              {loading ? "Generating…" : "Generate (dev)"}
+            </button>
+          </div>
+        )}
 
-<ActionDeck
-  actions={actionsForDeck}
-  showBudget={showBudget}
-  budget={budget}
-  onConfirm={(id) => {
-    const a: any = actionsForDeck.find((x: any) => x.id === id);
-    const delta =
-      (a?.cost ?? a?.price ?? a?.budgetDelta ?? 0) as number;
-    if (showBudget) setBudget((b) => b + delta);
-  }}
-  onSuggest={(_text) => {
-    if (showBudget) setBudget((b) => b - 300);
-  }}
-/>
+        <div className="mt-3">
+          <div className={mirrorLoading ? "animate-pulse" : ""}>
+            <MirrorCard text={mirrorText} />
+          </div>
+        </div>
 
+        <ActionDeck
+          actions={actionsForDeck}
+          showBudget={showBudget}
+          budget={budget}
+          onConfirm={(id: "a" | "b" | "c") => {
+            const a = actionsForDeck.find((x) => x.id === id);
+            const delta = (a?.cost ?? 0);
+            if (showBudget) setBudget((b) => b + delta);
+          }}
+          onSuggest={(_text?: string) => {
+            if (showBudget) setBudget((b) => b - 300);
+          }}
+        />
 
-
+        <EventLoadingOverlay show={loading} />
       </div>
     </div>
   );

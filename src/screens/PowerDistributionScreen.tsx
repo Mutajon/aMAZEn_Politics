@@ -23,7 +23,7 @@ type FetchState = "idle" | "loading" | "error" | "done";
 /* ------------------------------ AI Fetcher ------------------------------ */
 async function fetchAnalysis(role: string): Promise<AnalysisResult> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timer = setTimeout(() => controller.abort(), 25000);
 
   try {
     const res = await fetch("/api/analyze-role", {

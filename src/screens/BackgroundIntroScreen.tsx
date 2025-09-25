@@ -42,6 +42,11 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
   const [para, setPara] = useState<string>("");
   const preparedDefaultRef = useRef<PreparedTTS | null>(null);
   const preparedIntroRef = useRef<PreparedTTS | null>(null);
+  // prevent double-plays & track background readiness
+const defaultPlayedRef = useRef(false);
+const introPlayedRef = useRef(false);
+const bgReadyRef = useRef(false);
+
 
   // 1) On mount, PREPARE default line audio; show nothing until ready
   useEffect(() => {
@@ -65,11 +70,58 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+// Prefetch the generated paragraph + prepare its TTS while the default line plays
+useEffect(() => {
+  if (phase !== "idle" || bgReadyRef.current) return;
+
+  let cancelled = false;
+  const controller = new AbortController();
+
+  (async () => {
+    try {
+      const payload = { role: roleText || "Unknown role", gender };
+      const r = await fetch("/api/intro-paragraph", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      if (!r.ok) return; // stay silent; the click flow will try again
+      const data = await r.json();
+      const paragraph = (data?.paragraph || "").trim();
+      if (!paragraph) return;
+
+      if (cancelled) return;
+      setPara(paragraph); // so UI has the text when we transition
+
+      // Prepare the TTS for the paragraph ahead of time
+      const p = await narrator.prepare(paragraph, { voiceName: "alloy", format: "mp3" });
+      if (cancelled) { p.dispose(); return; }
+      preparedIntroRef.current = p;
+      bgReadyRef.current = true;
+    } catch (e: any) {
+      if (e?.name === "AbortError") return;
+      // silent fail; foreground flow will handle errors
+    }
+  })();
+
+  return () => {
+    cancelled = true;
+    controller.abort();
+  };
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [phase, roleText, gender]);
 
   // 2) Wake up → fade out, then load paragraph
   const onWake = () => {
-    setPhase("loading");
+    // If background prefetch finished, jump straight to ready; else do the normal loading flow
+    if (bgReadyRef.current && preparedIntroRef.current && para.trim()) {
+      setPhase("ready");
+    } else {
+      setPhase("loading");
+    }
   };
+  
 
   // 3) When loading, call the server for the paragraph
   useEffect(() => {
@@ -146,10 +198,12 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
               // Start the default narration exactly with the fade-in
               onAnimationStart={async () => {
                 const p = preparedDefaultRef.current;
-                if (p && narrationEnabled) {
+                if (p && narrationEnabled && !defaultPlayedRef.current) {
+                  defaultPlayedRef.current = true;
                   try { await p.start(); } catch (e) { console.warn("default play blocked:", e); }
                 }
               }}
+              
             >
               <h1 className="text-3xl sm:text-4xl font-extrabold leading-tight tracking-tight bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]">
                 Night Falls
@@ -207,10 +261,12 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
             onAnimationStart={async () => {
               if (phase !== "ready") return;
               const p = preparedIntroRef.current;
-              if (p && narrationEnabled) {
+              if (p && narrationEnabled && !introPlayedRef.current) {
+                introPlayedRef.current = true;
                 try { await p.start(); } catch (e) { console.warn("intro play blocked:", e); }
               }
             }}
+            
           >
             <h1 className="text-3xl sm:text-4xl font-extrabold leading-tight tracking-tight bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]">
               First Light
@@ -223,7 +279,8 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
                 className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
                 onClick={() => {
                   console.log("[BackgroundIntro] Begin clicked");
-                  // TODO: wire next step (push("/...")) when you’re ready
+            
+                  push("/event");
                 }}
               >
                 Begin

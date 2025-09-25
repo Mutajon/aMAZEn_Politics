@@ -20,7 +20,7 @@ export type ValidationResult = {
    */
   export async function validateRoleStrict(text: string): Promise<ValidationResult> {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
   
     try {
       const res = await fetch("/api/validate-role", {
