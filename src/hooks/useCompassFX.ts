@@ -3,6 +3,8 @@ import { useCallback, useRef, useState } from "react";
 import { useCompassStore } from "../store/compassStore";
 import type { PropKey } from "../data/compass-data";
 import type { CompassEffectPing } from "../components/MiniCompass";
+import { playPillsChime } from "../lib/sfx";
+
 
 export type FXEffect = { prop: PropKey; idx: number; delta: number };
 
@@ -27,15 +29,28 @@ export function useCompassFX(ttlMs: number = 1200) {
   }, []);
 
   /** Just show pills (no store write). */
-  const flashPings = useCallback(
+   /** Just show pills (no store write). */
+   const flashPings = useCallback(
     (effects: FXEffect[]) => {
       clear();
+
+      // Build pill batch for visual feedback
       const batch: CompassEffectPing[] = effects
         .filter((e) => e.delta !== 0)
-        .map((e, i) => ({ id: `${Date.now()}-${i}`, prop: e.prop, idx: e.idx, delta: e.delta }));
+        .map((e, i) => ({
+          id: `${Date.now()}-${i}`,
+          prop: e.prop,
+          idx: e.idx,
+          delta: e.delta,
+        }));
+
       if (batch.length) {
-        setPings(batch);
-        timerRef.current = window.setTimeout(() => setPings([]), ttlMs) as unknown as number;
+        setPings(batch);                // pills appear
+        void playPillsChime();          // play ONCE per batch
+        timerRef.current = window.setTimeout(
+          () => setPings([]),
+          ttlMs
+        ) as unknown as number;
       }
     },
     [clear, ttlMs]

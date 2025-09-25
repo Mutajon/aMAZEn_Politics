@@ -12,15 +12,21 @@ const CHAT_URL = "https://api.openai.com/v1/chat/completions";
 const IMAGE_URL = "https://api.openai.com/v1/images/generations";
 
 // One default text model + per-task overrides from .env
-const CHAT_MODEL_DEFAULT = process.env.CHAT_MODEL || "gpt-4o-mini";
+const CHAT_MODEL_DEFAULT = process.env.CHAT_MODEL || "gpt-5-mini";
 const MODEL_VALIDATE = process.env.MODEL_VALIDATE || CHAT_MODEL_DEFAULT;
 const MODEL_NAMES    = process.env.MODEL_NAMES    || CHAT_MODEL_DEFAULT;
 const MODEL_ANALYZE  = process.env.MODEL_ANALYZE  || CHAT_MODEL_DEFAULT;
 const MODEL_MIRROR   = process.env.MODEL_MIRROR   || CHAT_MODEL_DEFAULT;
+// Dilemma models (no generation here yet — just configuration)
+// Cheap default now; premium can be used later on demand.
+const MODEL_DILEMMA = process.env.MODEL_DILEMMA || CHAT_MODEL_DEFAULT;
+const MODEL_DILEMMA_PREMIUM = process.env.MODEL_DILEMMA_PREMIUM || "gpt-5";
+
 
 // Image model
 const IMAGE_MODEL = process.env.IMAGE_MODEL || "gpt-image-1";
 const IMAGE_SIZE = process.env.IMAGE_SIZE || "1024x1024";
+const IMAGE_QUALITY = process.env.IMAGE_QUALITY || "low"; // low|medium|high
 
 // --- NEW: TTS model/voice (OpenAI Text-to-Speech) --------------------------
 // Note: "Cove" is not currently available in the public TTS API. If OpenAI
@@ -146,6 +152,9 @@ app.get("/api/_ping", (_req, res) => {
       image: IMAGE_MODEL,
       tts: TTS_MODEL,
       ttsVoice: TTS_VOICE,
+      dilemma: MODEL_DILEMMA,
+      dilemmaPremium: MODEL_DILEMMA_PREMIUM,
+ 
     },
   });
 });
@@ -422,6 +431,7 @@ app.post("/api/generate-avatar", async (req, res) => {
       model: IMAGE_MODEL,
       prompt,
       size: IMAGE_SIZE,
+      quality: IMAGE_QUALITY,
     };
 
     const r = await fetch(IMAGE_URL, {
@@ -527,6 +537,152 @@ app.post("/api/tts", async (req, res) => {
     res.status(502).json({ error: "tts failed" });
   }
 });
+// -------------------- Compass text analysis (LLM) ------------
+app.post("/api/compass-analyze", async (req, res) => {
+  try {
+    const text = String(req.body?.text || "").trim();
+    const cues = String(req.body?.cues || "").slice(0, 20000);
+    if (!text) return res.status(400).json({ error: "Missing 'text'." });
+
+    const system =
+      "You map sentences to a moral–political compass.\n" +
+      "Return STRICT JSON ONLY: an array of items like " +
+      '[{"prop":"whence","idx":0,"polarity":"positive","strength":"mild"}].\n' +
+      "- prop: one of what|whence|how|whither.\n" +
+      "- idx: 0..9 component index for that prop.\n" +
+      "- polarity: positive|negative.\n" +
+      "- strength: mild|strong.\n" +
+      "- Max 6 items. No extra prose.";
+
+    const user =
+      `TEXT: """${text}"""\n\n` +
+      `COMPONENTS & CUES:\n${cues}\n\n` +
+      "TASK:\n" +
+      "- Identify components supported/opposed by the text.\n" +
+      "- Multi-component hits allowed.\n" +
+      "- JSON ARRAY ONLY.";
+
+    const items = await aiJSON({
+      system,
+      user,
+      model: MODEL_ANALYZE,   // cheapest analysis model from your .env
+      temperature: 0.2,
+      fallback: [],
+    });
+
+    return res.json({ items: Array.isArray(items) ? items : [] });
+  } catch (e) {
+    console.error("Error in /api/compass-analyze:", e?.message || e);
+    return res.status(502).json({ items: [] });
+  }
+});
+
+// -------------------- Dilemma (AI, minimal prompt) ---------------------------
+app.post("/api/dilemma", async (req, res) => {
+  try {
+    const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
+    if (!OPENAI_KEY) return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
+
+    const debug = !!req.body?.debug;
+    if (debug) console.log("[/api/dilemma] snapshot:", req.body);
+
+    // Snapshot fields (all optional-safe)
+    const role        = String(req.body?.role || "Unicorn King");
+    const systemName  = String(req.body?.systemName || "Divine Right Monarchy");
+    const settings    = req.body?.settings || {};
+    const day         = Number(req.body?.day || 1);
+    const totalDays   = Number(req.body?.totalDays || 7);
+    const isFirst     = !!req.body?.previous?.isFirst;
+    const isLast      = !!req.body?.previous?.isLast;
+    const compassFlat = req.body?.compassValues || {};
+
+    // Best-effort nudge only
+    const topCompass = Object.entries(compassFlat)
+      .sort((a, b) => Number(b[1]) - Number(a[1]))
+      .slice(0, 3)
+      .map(([k]) => k);
+
+    const focusLine =
+      settings?.dilemmasSubjectEnabled && settings?.dilemmasSubject
+        ? `Focus topic: ${String(settings.dilemmasSubject)}.`
+        : "";
+
+    const system =
+      "You write **short, punchy political situations** for a choice-based mobile game.\n" +
+      "- Do NOT use the word 'dilemma'.\n" +
+      "- Title ≤ 60 chars; description 2–3 sentences, mature and engaging.\n" +
+      '- Return STRICT JSON ONLY: {"title":"","description":"","actions":[{...},{...},{...}]}\n' +
+      '- Each action: {"id":"a|b|c","title":"","summary":"","cost":int,"iconHint":"security|speech|diplomacy|money|tech|heart|scale"}\n' +
+      "- Costs are integers in [-250..500]. Keep choices comparable. Use +200..+500 only when broadly generous (e.g., taxes/windfalls).";
+
+    const user =
+      `ROLE: ${role}\n` +
+      `POLITICAL SYSTEM: ${systemName}\n` +
+      `${focusLine}\n` +
+      `DAY: ${day} of ${totalDays} (${isFirst ? "first" : isLast ? "last" : "mid-campaign"})\n` +
+      `TOP COMPASS COMPONENTS (0..10): ${topCompass.join(", ") || "n/a"}\n` +
+      "TASK: Write one short situation with exactly three conflicting ways to respond.\n" +
+      "JSON ONLY.";
+
+    // Call model (uses aiJSON guard + fallback)
+    const out = await aiJSON({
+      system,
+      user,
+      model: MODEL_DILEMMA,   // from .env (we'll set to gpt-5-mini)
+      temperature: 0.9,
+      fallback: {
+        title: day === 1 ? "First Night in the Palace" : "Crowds Swell Outside the Palace",
+        description:
+          day === 1
+            ? "As the seals change hands, a restless city watches. Advisors split: display resolve now, or earn trust with patience."
+            : "Rumors spiral as barricades appear along the market roads. Decide whether to project strength or show empathy before things harden.",
+        actions: [
+          { id: "a", title: "Impose Curfew",      summary: "Restrict movement after dusk with visible patrols.", cost: -150, iconHint: "security"  },
+          { id: "b", title: "Address the Nation", summary: "Speak live tonight to calm fears and set the tone.", cost:  -50, iconHint: "speech"    },
+          { id: "c", title: "Open Negotiations",  summary: "Invite opposition figures for mediated talks.",      cost:   50, iconHint: "diplomacy" },
+        ],
+      },
+    });
+
+    // Normalize + guard shape
+    const clampInt = (n, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(n) || 0)));
+
+    const title = String(out?.title || "").slice(0, 120) || "A Difficult Choice";
+    const description = String(out?.description || "").slice(0, 500);
+
+    const allowedHints = new Set([
+      "security","speech","diplomacy","money","tech","heart","scale",
+    ]);
+
+    let actions = Array.isArray(out?.actions) ? out.actions.slice(0, 3) : [];
+    actions = actions.map((a, idx) => ({
+      id: (["a","b","c"][idx] || "a"),
+      title: String(a?.title || `Option ${idx + 1}`).slice(0, 80),
+      summary: String(a?.summary || "").slice(0, 180),
+      cost: clampInt(a?.cost, -250, 500),
+      iconHint: allowedHints.has(String(a?.iconHint)) ? String(a?.iconHint) : "speech",
+    }));
+
+    while (actions.length < 3) {
+      const i = actions.length;
+      actions.push({
+        id: ["a","b","c"][i] || "a",
+        title: `Option ${i + 1}`,
+        summary: "A reasonable alternative.",
+        cost: 0,
+        iconHint: "speech",
+      });
+    }
+
+    const result = { title, description, actions };
+    if (debug) console.log("[/api/dilemma] result:", result);
+    return res.json(result);
+  } catch (e) {
+    console.error("Error in /api/dilemma:", e?.message || e);
+    return res.status(502).json({ error: "dilemma failed" });
+  }
+});
+
 
 // -------------------- Start server ---------------------------
 const PORT = Number(process.env.PORT) || 3001;
