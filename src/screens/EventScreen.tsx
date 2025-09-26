@@ -25,6 +25,25 @@ import { analyzeTextToCompass } from "../lib/compassMapping";
 import useCompassFX from "../hooks/useCompassFX";
 import type { CompassEffectPing } from "../components/MiniCompass";
 import { COMPONENTS, PALETTE } from "../data/compass-data";
+import { runConfirmPipeline } from "../lib/eventConfirm";
+import type { PowerHolder } from "../store/roleStore";
+
+
+import {
+  Shield,
+  Sword,
+  Briefcase,
+  Banknote,
+  Megaphone,
+  Newspaper,
+  Gavel,
+  Scale,
+  Cpu,
+  Leaf,
+  Zap,
+  GraduationCap,
+  Building2,
+} from "lucide-react";
 
 
 
@@ -40,6 +59,37 @@ type Trio = { people: number; middle: number; mom: number };
 // ---------------------------------------------------------------------------
 // Dynamic Lucide icon by name (lazy-loaded per icon to keep bundle small)
 // ---------------------------------------------------------------------------
+function pickIconForHolder(name: string): React.ReactNode {
+  const n = name.toLowerCase();
+
+  // Security / military / police
+  if (/(military|army|defense|security|police|generals?)/.test(n)) return <Shield className="w-4 h-4" />;
+  if (/(war|soldier|troops|force)/.test(n)) return <Sword className="w-4 h-4" />;
+
+  // Business / banks / oligarchs
+  if (/(business|corporate|oligarch|industry|commerce)/.test(n)) return <Briefcase className="w-4 h-4" />;
+  if (/(bank|finance|money|treasury)/.test(n)) return <Banknote className="w-4 h-4" />;
+
+  // Media / press
+  if (/(media|press|newspaper|tv|journalists?)/.test(n)) return <Newspaper className="w-4 h-4" />;
+  if (/(propaganda|broadcast|speech|communication)/.test(n)) return <Megaphone className="w-4 h-4" />;
+
+  // Judiciary / courts
+  if (/(court|judge|judiciary|justice)/.test(n)) return <Gavel className="w-4 h-4" />;
+  if (/(law|rights|constitution|balance)/.test(n)) return <Scale className="w-4 h-4" />;
+
+  // Tech / science / academia
+  if (/(tech|technology|it|software|platform)/.test(n)) return <Cpu className="w-4 h-4" />;
+  if (/(university|academia|education|students?)/.test(n)) return <GraduationCap className="w-4 h-4" />;
+
+  // Environment / energy
+  if (/(environment|green|climate|ecology|forest|nature)/.test(n)) return <Leaf className="w-4 h-4" />;
+  if (/(energy|oil|gas|power grid|electric)/.test(n)) return <Zap className="w-4 h-4" />;
+
+  // Default civic institution / legislature / generic group
+  return <Building2 className="w-4 h-4" />;
+}
+
 function DynamicLucide({ name, className }: { name: string; className?: string }) {
   const importFn = (dynamicIconImports as Record<string, () => Promise<{ default: React.ComponentType<any> }>>)[name];
   const Lazy = React.useMemo(() => (importFn ? React.lazy(importFn) : null), [importFn]);
@@ -403,6 +453,7 @@ function narrationTextForDilemma(d: { title?: string; description?: string }) {
   const p = (d?.description || "").trim();
   return t && p ? `${t}. ${p}` : t || p || "";
 }
+const EMPTY_HOLDERS: Readonly<PowerHolder[]> = Object.freeze([]);
 
 // ---------------------------------------------------------------------------
 // Component
@@ -411,8 +462,52 @@ export default function EventScreen(_props: Props) {
   // Stores
   const debugMode = useSettingsStore((s) => s.debugMode);
   const { current, loadNext, loading, error, day, totalDays } = useDilemmaStore();
-  
+    // Support trio local demo state
+    const [vals, setVals] = useState<Trio>({ people: 50, middle: 50, mom: 50 });
+    const [delta, setDelta] = useState<number | null>(null);
+    const [trend, setTrend] = useState<"up" | "down" | null>(null);
+    // --- Middle support entity dynamic label/icon (once per screen mount) ---
+const [middleLabel, setMiddleLabel] = useState<string>("Congress");
+const [middleIcon, setMiddleIcon] = useState<React.ReactNode>(
+  <DefaultSupportIcons.BuildingIcon className="w-4 h-4" />
+);
+const didInitMiddleRef = useRef(false);
 
+// Pull holders & playerIndex from role analysis
+const holdersSnap = useRoleStore(
+  (s) => s.analysis?.holders as PowerHolder[] | undefined
+);
+const playerIndex = useRoleStore((s) => s.analysis?.playerIndex ?? null);
+
+useEffect(() => {
+  // Narrow to a stable, typed array
+  const holders: ReadonlyArray<PowerHolder> = holdersSnap ?? EMPTY_HOLDERS;
+
+
+  if (didInitMiddleRef.current) return;
+  if (holders.length === 0) return;
+
+  // Map with explicit types, then exclude the player (if any)
+  const withIndex: Array<PowerHolder & { i: number }> = holders.map(
+    (h: PowerHolder, i: number) => ({ ...h, i })
+  );
+  const candidates: Array<PowerHolder & { i: number }> =
+    playerIndex == null ? withIndex : withIndex.filter((h) => h.i !== playerIndex);
+
+  if (candidates.length === 0) return;
+
+  // Pick the highest percent among the rest
+  const top = candidates.reduce(
+    (a, b) => (b.percent > a.percent ? b : a),
+    candidates[0]
+  );
+
+  setMiddleLabel(top.name || "Congress");
+  setMiddleIcon(pickIconForHolder(top.name || ""));
+  didInitMiddleRef.current = true;
+}, [holdersSnap, playerIndex]);
+
+  
   // Auto-load a dilemma when the screen mounts
   useEffect(() => {
     if (!current && !loading && !error) loadNext();
@@ -506,6 +601,10 @@ const { applyWithPings, pings } = useCompassFX(60 * 60 * 1000);
 
 // Show spinner while we wait for the /api/compass-analyze response
 const [compassLoading, setCompassLoading] = useState(false);
+// Adapter for the pipeline: call analyzer and resolve
+const analyzeText = (t: string) =>
+  analyzeTextToCompass(t, applyWithPings).then(() => undefined);
+
 
 // Read Mirror text color so spinner matches it exactly
 const mirrorWrapRef = useRef<HTMLDivElement | null>(null);
@@ -522,12 +621,6 @@ useLayoutEffect(() => {
   const showBudget = useSettingsStore((s) => s.showBudget);
   const [budget, setBudget] = useState(1500); // demo value
   const avatarUrl = useRoleStore((s) => s.character?.avatarUrl ?? null);
-
-  // Support trio local demo state
-  const [vals, setVals] = useState<Trio>({ people: 50, middle: 50, mom: 50 });
-  const [delta, setDelta] = useState<number | null>(null);
-  const [trend, setTrend] = useState<"up" | "down" | null>(null);
-
   const items: SupportItem[] = [
     {
       id: "people",
@@ -541,10 +634,10 @@ useLayoutEffect(() => {
     },
     {
       id: "middle",
-      name: "Congress",
+      name: middleLabel,
       percent: vals.middle,
       accentClass: "bg-amber-600",
-      icon: <DefaultSupportIcons.BuildingIcon className="w-4 h-4" />,
+      icon: middleIcon,
       moodVariant: "civic",
       delta,
       trend,
@@ -638,28 +731,43 @@ useLayoutEffect(() => {
             actions={actionsForDeck}
             showBudget={showBudget}
             budget={budget}
-            onConfirm={(id) => {
+            onConfirm={async (id) => {
               const a = actionsForDeck.find((x) => x.id === id);
-              const delta = a?.cost ?? 0;
-              if (showBudget) setBudget((b) => b + delta);
-    // NEW: analyze the chosen action (non-blocking)
-if (a) {
-  const text = `${a.title}. ${a.summary}`;
-  setCompassLoading(true);
-  void analyzeTextToCompass(text, applyWithPings).finally(() => setCompassLoading(false));
-}
-
+              if (!a) return;
+            
+              void runConfirmPipeline(
+                {
+                  kind: "action",
+                  action: { title: a.title, summary: a.summary, cost: a.cost },
+                },
+                {
+                  showBudget,
+                  setBudget,
+                  analyzeText,
+                  onAnalyzeStart: () => setCompassLoading(true),
+                  onAnalyzeDone: () => setCompassLoading(false),
+                }
+              );
             }}
             
+            
             onSuggest={(text?: string) => {
-              if (showBudget) setBudget((b) => b - 300);
- // NEW: analyze the suggestion (non-blocking)
-if (text && text.trim()) {
-  setCompassLoading(true);
-  void analyzeTextToCompass(text.trim(), applyWithPings).finally(() => setCompassLoading(false));
-}
-
+              void runConfirmPipeline(
+                {
+                  kind: "suggest",
+                  text: text,
+                  cost: -300, // keep in sync with ActionDeck's suggestCost
+                },
+                {
+                  showBudget,
+                  setBudget,
+                  analyzeText,
+                  onAnalyzeStart: () => setCompassLoading(true),
+                  onAnalyzeDone: () => setCompassLoading(false),
+                }
+              );
             }}
+            
             dilemma={{ title: current.title, description: current.description }}
           />
         )}

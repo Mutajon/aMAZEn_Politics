@@ -27,6 +27,12 @@ export const POLITICS_QUOTES: RichQuote[] = [
   { author: "Alan Mooe", text: "People shouldn't be afraid of their government. Governments should be afraid of their people." },
   { author: "Unknown", text: "Politicians and diapers must be changed often, and for the same reason." },
   { author: "James Bovard", text: "Democracy must be something more than two wolves and a sheep voting on what to have for dinner." },
+  { author: "Otto von Bismarck", text: "People never lie so much as after a hunt, during a war, or before an election." },
+  { author: "George Bernard Shaw", text: "Democracy is a device that ensures we shall be governed no better than we deserve." },
+  { author: "Winston Churchill", text: "Some men change their party for the sake of their principles; others their principles for the sake of their party." },
+  { author: "Abraham Lincoln", text: "Democracy is the rule of the people, by the people and for the people." },
+  { author: "Charles De Gaulle", text: "Since a politician never believes what he says, he is surprised when others believe him." },
+  { author: "Plato", text: "One of the penalties for refusing to participate in politics is that you end up being governed by your inferiors." },
 ];
 
 type Props = {

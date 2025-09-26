@@ -82,13 +82,14 @@ function buildFullPrompt(
   const genderedRole = genderizeRole(role, gender);
   const genderWord = gender === "male" ? "male " : gender === "female" ? "female " : "";
   const subject = `a ${genderWord}${genderedRole}`.trim();
-  const head = ["a fictional right-facing game avatar caricature portrait of the face of", subject].join(" ");
+  const head = ["a fictional right-facing game avatar portrait of the face of", subject].join(" ");
   const physicalClean = physical.trim().replace(/^[,.\s]+/, "");
   const withPhysical = physicalClean ? `${head}, ${physicalClean}` : head;
   const bg = bgObject ? `, with a ${bgObject} in the background` : "";
-  const tail = ", colored funny caricature with strong lines";
+  const tail = ", colored cartoon with strong lines";
   return `${withPhysical}${bg}${tail}`;
 }
+
 
 export default function NameScreen({ push }: { push: PushFn }) {
   const selectedRole = useRoleStore((s) => s.selectedRole);
@@ -173,7 +174,6 @@ export default function NameScreen({ push }: { push: PushFn }) {
   visible={loading}          // uses your existing loading state
   title={OVERLAY_TITLE}
   quotes={LOADING_QUOTES}
-  periodMs={5500}
 />
 
       <div className="w-full max-w-2xl mx-auto">
