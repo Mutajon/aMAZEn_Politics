@@ -1,51 +1,21 @@
 // src/components/event/ActionDeck.tsx
-// Old visuals preserved (dark gradient cards, coin badge, suggest pill/modal)
-// + New confirm animation: collapse → others slide down → chosen card floats centered.
+// ActionDeck with: confirm flow (collapse → others fly down), "Suggest your own" validation,
+// height-lock to prevent scroll gap, and coin flight overlay synced with budget counter.
 
-import React, { useMemo, useState, useRef, useLayoutEffect } from "react";
-import { validateSuggestionStrict, AIConnectionError } from "../../lib/validation";
-import { useSettingsStore } from "../../store/settingsStore";
-import { useDilemmaStore } from "../../store/dilemmaStore";
-
-
-
+import React, { useMemo, useRef, useState, useLayoutEffect } from "react";
 import {
   AnimatePresence,
   LayoutGroup,
   motion,
   useAnimationControls,
   type Transition,
-  type TargetAndTransition,
 } from "framer-motion";
 import { Coins, CheckCircle2 } from "lucide-react";
-// Utility: await N requestAnimationFrame ticks to let shared-layout collapse commit
-async function waitNextFrame(times = 2) {
-  for (let i = 0; i < times; i++) {
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-  }
-}
-// gated debug logger (uses Settings → Debug mode)
-function dlog(...args: any[]) {
-  if (useSettingsStore.getState().debugMode) {
-    // eslint-disable-next-line no-console
-    console.log("[ActionDeck]", ...args);
-  }
-}
-// Build a safe dilemma context for validation (props → store → empty)
-function getDilemmaCtx(
-  d?: { title: string; description: string }
-): { title: string; description: string } {
-  if (d && typeof d.title === "string" && typeof d.description === "string") {
-    return d;
-  }
-  const curr: any = useDilemmaStore.getState().current;
-  const title = typeof curr?.title === "string" ? curr.title : "";
-  const description = typeof curr?.description === "string" ? curr.description : "";
-  return { title, description };
-}
+import { createPortal } from "react-dom";
 
-
-
+import { validateSuggestionStrict, AIConnectionError } from "../../lib/validation";
+import { useSettingsStore } from "../../store/settingsStore";
+import { useDilemmaStore } from "../../store/dilemmaStore";
 
 /* ================== TUNABLES (VISUALS) ================== */
 const ENTER_STAGGER = 0.12;
@@ -55,7 +25,6 @@ const ENTER_Y = 24;
 const CARD_TITLE_CLASS = "text-[14px] font-semibold text-white";
 const CARD_DESC_CLASS  = "text-[12.5px] leading-snug text-white/95";
 const CARD_PAD = "p-3";
-
 const CARD_BASE = "rounded-2xl ring-1 ring-white/20 shadow-sm";
 
 const CONFIRM_BTN_CLASS =
@@ -67,17 +36,39 @@ const OVERLAY_BACKDROP = "absolute inset-0 bg-black/70";
 
 const SUGGEST_PLACEHOLDER = "Type your suggestion…";
 const SUGGEST_PREFILL     = "";
-/* ========================================================= */
 
-/* ================== TYPED MOTION PRESETS ================= */
+/* ================== MOTION PRESETS ================== */
 const springJuice: Transition = { type: "spring", stiffness: 520, damping: 46, mass: 0.7 };
 const springDown: Transition = { type: "spring", stiffness: 380, damping: 32 };
 const fade: Transition = { duration: 0.18 };
 
-const othersDownTarget: TargetAndTransition = { y: 320, opacity: 0, transition: springDown };
-const suggestDownTarget: TargetAndTransition = { y: 360, opacity: 0, transition: springDown };
-/* ========================================================= */
+/* ================== Utils ================== */
+async function waitNextFrame(times = 2) {
+  for (let i = 0; i < times; i++) {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  }
+}
 
+// gated debug logger (Settings → Debug mode)
+function dlog(...args: any[]) {
+  if (useSettingsStore.getState().debugMode) {
+    // eslint-disable-next-line no-console
+    console.log("[ActionDeck]", ...args);
+  }
+}
+
+// Build a safe dilemma context for validation (props → store → empty)
+function getDilemmaCtx(d?: { title: string; description: string }): { title: string; description: string } {
+  if (d && typeof d.title === "string" && typeof d.description === "string") {
+    return d;
+  }
+  const curr: any = useDilemmaStore.getState().current;
+  const title = typeof curr?.title === "string" ? curr.title : "";
+  const description = typeof curr?.description === "string" ? curr.description : "";
+  return { title, description };
+}
+
+/* ================== Types ================== */
 export type ActionCard = {
   id: string;                        // "a" | "b" | "c" is fine too
   title: string;
@@ -99,24 +90,61 @@ type Props = {
   dilemma: { title: string; description: string };
 };
 
-/* ------------------------- Small helpers ------------------------- */
-function CostPill({ cost, affordable }: { cost: number; affordable: boolean }) {
-  return (
-    <div className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-black/35 ring-1 ring-white/25">
-      <Coins className="w-3.5 h-3.5 text-amber-300" />
-      <span
-        className={[
-          "text-[11px] font-semibold",
-          !affordable && cost < 0 ? "text-rose-100" : cost >= 0 ? "text-emerald-100" : "text-white",
-        ].join(" ")}
-      >
-        {cost >= 0 ? `+${cost}` : `${cost}`}
-      </span>
-    </div>
+/* ================== CoinFlight overlay ================== */
+type Point = { x: number; y: number };
+type CoinFlight = { id: number; start: Point; end: Point; count?: number; duration?: number };
+
+function CoinFlightOverlay({ flights, onAllDone }: { flights: CoinFlight[]; onAllDone: () => void }) {
+  // Compute total max duration for auto-dispose
+  const maxDuration = Math.max(
+    0,
+    ...flights.map((f) => (f.duration ?? 0.9) + 0.2) // +max stagger
+  );
+  React.useEffect(() => {
+    const t = setTimeout(onAllDone, (maxDuration + 0.1) * 1000);
+    return () => clearTimeout(t);
+  }, [flights, onAllDone, maxDuration]);
+
+  return createPortal(
+    <div className="pointer-events-none fixed inset-0 z-[9999]">
+      {flights.map((f) => {
+        const count = f.count ?? 9;
+        const baseDur = f.duration ?? 0.9;
+        return Array.from({ length: count }).map((_, i) => {
+          const id = `${f.id}-${i}`;
+          const dx = f.end.x - f.start.x;
+          const dy = f.end.y - f.start.y;
+          // Midpoint arc offset
+          const midX = f.start.x + dx * 0.5 + (Math.random() * 40 - 20);
+          const midY = f.start.y + dy * 0.5 - (Math.random() * 60 + 20);
+          const delay = Math.random() * 0.2;
+          const dur = baseDur + Math.random() * 0.2;
+
+          return (
+            <motion.div
+              key={id}
+              className="fixed"
+              initial={{ x: f.start.x, y: f.start.y, rotate: 0, scale: 0.9, opacity: 0.9 }}
+              animate={{
+                x: [f.start.x, midX, f.end.x],
+                y: [f.start.y, midY, f.end.y],
+                rotate: [0, Math.random() * 90 - 45, Math.random() * 30],
+                scale: [0.9, 1, 0.9],
+                opacity: [0.9, 1, 0.0],
+              }}
+              transition={{ duration: dur, ease: "easeOut", times: [0, 0.5, 1], delay }}
+            >
+              <Coins className="w-4 h-4 text-amber-300 drop-shadow-[0_0_6px_rgba(255,200,0,0.35)]" />
+            </motion.div>
+          );
+        });
+      })}
+    </div>,
+    document.body
   );
 }
 
-/* --------------------------- Component --------------------------- */
+/* ================== Component ================== */
 export default function ActionDeck({
   actions,
   showBudget,
@@ -133,13 +161,83 @@ export default function ActionDeck({
   const [suggestText, setSuggestText] = useState<string>(SUGGEST_PREFILL);
   const [validatingSuggest, setValidatingSuggest] = useState(false);
   const [suggestError, setSuggestError] = useState<string | null>(null);
-  // New confirm flow state
+
+  // Confirm flow state
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [othersDown, setOthersDown] = useState(false);
-  
 
   const othersCtrl = useAnimationControls();
   const suggestCtrl = useAnimationControls();
+
+  // Height lock to avoid white scroll gap
+  const deckRef = useRef<HTMLDivElement | null>(null);
+  const [deckHeight, setDeckHeight] = useState<number | null>(null);
+  const [lockHeight, setLockHeight] = useState(false);
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      if (deckRef.current) {
+        setDeckHeight(deckRef.current.getBoundingClientRect().height);
+      }
+    };
+    measure();
+    requestAnimationFrame(measure);
+    setLockHeight(false);
+  }, [actions]);
+
+  // DOM refs for measuring
+  const cardRefs = useRef<Record<string, HTMLElement | null>>({});
+  const attachCardRef = (id: string) => (el: HTMLElement | null) => {
+    cardRefs.current[id] = el;
+  };
+  const suggestRef = useRef<HTMLButtonElement | null>(null);
+
+  // Coin flights
+  const [flights, setFlights] = useState<CoinFlight[]>([]);
+  const flightSeq = useRef(1);
+
+  function getCenterRect(el: Element | null): { x: number; y: number } | null {
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }
+
+  function getBudgetAnchorRect(): { x: number; y: number } | null {
+    const anchor = document.querySelector('[data-budget-anchor="true"]') as HTMLElement | null;
+    return getCenterRect(anchor);
+  }
+
+  function triggerCoinFlight(from: { x: number; y: number } | null, to: { x: number; y: number } | null) {
+    if (!from || !to) {
+      dlog("coinFlight: skipped (missing points)", { from, to });
+      return;
+    }
+    const id = flightSeq.current++;
+    setFlights((prev) => [...prev, { id, start: from, end: to }]);
+  }
+  // Launch coins + budget update together at the first moment both endpoints are measurable.
+// If points aren't ready this frame, retry once on the next frame; otherwise proceed without coins.
+function syncCoinAndBudget(
+  getFrom: () => { x: number; y: number } | null,
+  getTo: () => { x: number; y: number } | null,
+  launchBudgetUpdate: () => void
+) {
+  const attempt = (retries: number) => {
+    const from = getFrom();
+    const to = getTo();
+    if (from && to) {
+      triggerCoinFlight(from, to);
+      launchBudgetUpdate();
+    } else if (retries > 0) {
+      requestAnimationFrame(() => attempt(retries - 1));
+    } else {
+      dlog("coinFlight: skipped (missing points)", { from, to });
+      launchBudgetUpdate();
+    }
+  };
+  attempt(1); // try now, then once more next frame if needed
+}
+
 
   // Derive affordability + normalized costs
   const cards = useMemo(() => {
@@ -151,25 +249,7 @@ export default function ActionDeck({
   }, [actions, showBudget, budget]);
 
   const selectedCard = cards.find((c) => c.id === selected) || null;
-// --- Height lock so downward fly-out doesn't extend the page ---
-const deckRef = useRef<HTMLDivElement | null>(null);
-const [deckHeight, setDeckHeight] = useState<number | null>(null);
-const [lockHeight, setLockHeight] = useState(false);
 
-// Measure once per dilemma (and after first layout)
-useLayoutEffect(() => {
-  // measure after layout
-  const m = () => {
-    if (deckRef.current) {
-      setDeckHeight(deckRef.current.getBoundingClientRect().height);
-    }
-  };
-  m();
-  // also schedule one more read on next frame for safety
-  requestAnimationFrame(m);
-  // releasing any previous locks on new dilemma
-  setLockHeight(false);
-}, [actions]);
   function openSuggest() {
     if (showBudget && budget < Math.abs(suggestCost)) {
       dlog("openSuggest: blocked (budget)", { budget, suggestCost });
@@ -180,12 +260,11 @@ useLayoutEffect(() => {
     setSuggestError(null);
     setSuggestOpen(true);
   }
-  
 
   async function confirmSuggest() {
     const text = (suggestText || "").trim();
     dlog("confirmSuggest: click", { textLength: text.length });
-  
+
     if (!text) {
       dlog("confirmSuggest: early return (empty text)");
       return;
@@ -194,7 +273,7 @@ useLayoutEffect(() => {
       dlog("confirmSuggest: early return (budget lock)", { budget, suggestCost });
       return;
     }
-  
+
     try {
       setSuggestError(null);
       setValidatingSuggest(true);
@@ -204,49 +283,52 @@ useLayoutEffect(() => {
         titleLen: ctx.title.length,
         descriptionLen: ctx.description.length,
       });
-      
+
       const result = await validateSuggestionStrict(text, ctx);
-      
       dlog("validateSuggestionStrict -> response", result);
-  
+
       if (!result.valid) {
         dlog("validateSuggestionStrict -> invalid", result.reason || "(no reason)");
         setSuggestError(result.reason || "Please refine your suggestion so it clearly relates to the dilemma.");
         setValidatingSuggest(false);
         return;
       }
-  
-      // Valid path
-      dlog("confirmSuggest: valid → close modal & animate cards");
-      setSuggestOpen(false);
-  
-      // Disable interactions, animate ALL THREE pre-available cards down
-      setConfirmingId("suggest");
-      // Freeze current deck height and clip overflow during exit
-if (!deckHeight && deckRef.current) {
-  setDeckHeight(deckRef.current.getBoundingClientRect().height);
-}
-setLockHeight(true);
 
+      // Close modal (pill shrinks back)
+      setSuggestOpen(false);
+
+      // Ensure we know sizes and lock height before animations
+      if (!deckHeight && deckRef.current) {
+        setDeckHeight(deckRef.current.getBoundingClientRect().height);
+      }
+      setLockHeight(true);
+
+      // Disable interactions, animate THREE cards down (suggest stays)
+      setConfirmingId("suggest");
       setOthersDown(true);
       await waitNextFrame(2);
-  
-      void othersCtrl.start({
-        y: 320,
-        opacity: 0,
-        transition: {
-          type: "spring",
-          stiffness: 260,
-          damping: 28,
-          mass: 0.7,
-          duration: 0.36,
-        },
-      });
-      dlog("othersCtrl.start → queued");
-  
-      onSuggest?.(text);
-      dlog("onSuggest callback invoked");
-  
+
+      void othersCtrl.start({ y: 320, opacity: 0, transition: springDown });
+
+     // Coins + budget counter should start at the same time for suggestions as well.
+if (suggestCost < 0) {
+  // from budget → to pill
+  syncCoinAndBudget(
+    () => getBudgetAnchorRect(),
+    () => getCenterRect(suggestRef.current),
+    () => onSuggest?.(text)
+  );
+} else {
+  // from pill → to budget
+  syncCoinAndBudget(
+    () => getCenterRect(suggestRef.current),
+    () => getBudgetAnchorRect(),
+    () => onSuggest?.(text)
+  );
+}
+dlog("onSuggest scheduled (synced with coins)");
+
+
       setValidatingSuggest(false);
     } catch (err: any) {
       const msg = err instanceof AIConnectionError ? err.message : "Cannot reach validator";
@@ -255,82 +337,84 @@ setLockHeight(true);
       setValidatingSuggest(false);
     }
   }
-  
 
+  // Called when user clicks "Confirm" on the expanded card
+  const handleConfirm = async (id: string) => {
+    // 1) Mark which card is confirming; this disables all interactions
+    setConfirmingId(id);
 
-// Called when user clicks "Confirm" on the expanded card
-const handleConfirm = async (id: string) => {
-  // 1) Mark which card is confirming; this disables all interactions
-  setConfirmingId(id);
+    // 2) Close the expanded view so the chosen card shrinks back to its grid slot
+    setSelected(null);
 
-  // 2) Close the expanded view so the chosen card shrinks back to its grid slot
-  setSelected(null);
-// Freeze current deck height and clip overflow during exit
-if (!deckHeight && deckRef.current) {
-  setDeckHeight(deckRef.current.getBoundingClientRect().height);
+    // 3) Ensure all target elements subscribe to animation controls & lock height
+    if (!deckHeight && deckRef.current) {
+      setDeckHeight(deckRef.current.getBoundingClientRect().height);
+    }
+    setLockHeight(true);
+    setOthersDown(true);
+
+    // 4) Wait two frames so the collapse fully commits
+    await waitNextFrame(2);
+
+    // 5) Animate the two non-chosen cards + suggest pill downward + fade
+    void othersCtrl.start({ y: 320, opacity: 0, transition: springDown });
+    void suggestCtrl.start({ y: 360, opacity: 0, transition: springDown });
+
+  // 6) Coins + budget counter should start at the same time.
+// Decide direction by cost: + => card → budget, - => budget → card.
+// If an endpoint isn't ready, retry next frame; otherwise proceed without coins.
+const card = cards.find((c) => c.id === id);
+const targetEl = cardRefs.current[id];
+
+if (!card || !targetEl) {
+  dlog("handleConfirm: missing card/element for coin flight", { id, hasCard: !!card, hasEl: !!targetEl });
+  onConfirm(id); // proceed without coins
+} else {
+  const cost = card.cost ?? 0;
+  if (cost >= 0) {
+    // from card → to budget
+    syncCoinAndBudget(
+      () => getCenterRect(targetEl),
+      () => getBudgetAnchorRect(),
+      () => onConfirm(id)
+    );
+  } else {
+    // from budget → to card
+    syncCoinAndBudget(
+      () => getBudgetAnchorRect(),
+      () => getCenterRect(targetEl),
+      () => onConfirm(id)
+    );
+  }
 }
-setLockHeight(true);
 
-  // 3) Ensure all target elements SUBSCRIBE to the animation controls
-  //    (cards/suggest wire their `animate={...}` only when othersDown === true)
-  setOthersDown(true);
-
-  // 4) Wait two frames so the shared-layout collapse fully commits and
-  //    the new animate props (controls) are attached to the DOM
-  await waitNextFrame(2);
-
-  // 5) Animate the two non-chosen cards downward + fade
-  void othersCtrl.start({
-    y: 320,
-    opacity: 0,
-    transition: {
-      type: "spring",
-      stiffness: 260,
-      damping: 28,
-      mass: 0.7,
-      duration: 0.36,
-    },
-  });
-
-  // 6) Animate the "Suggest your own" pill downward + fade
-  void suggestCtrl.start({
-    y: 360,
-    opacity: 0,
-    transition: {
-      type: "spring",
-      stiffness: 260,
-      damping: 28,
-      mass: 0.7,
-      duration: 0.36,
-      delay: 0.02,
-    },
-  });
-
-  // 7) Notify parent (budget update, etc.) — we don't await animations
-  onConfirm(id);
-};
-
-
+  };
 
   // Reset visuals when the actions (dilemma) change
   React.useEffect(() => {
     setSelected(null);
     setConfirmingId(null);
     setOthersDown(false);
+    setFlights([]);
   }, [actions]);
 
   return (
     <LayoutGroup id="action-deck">
-      <div
-  className="mt-4 relative"
-  ref={deckRef}
-  style={
-    lockHeight && deckHeight != null
-      ? { height: deckHeight, overflow: "hidden" }
-      : undefined
-  }
->
+      {/* Coin overlay */}
+      <AnimatePresence>
+        {flights.length > 0 && (
+          <CoinFlightOverlay
+            flights={flights}
+            onAllDone={() => setFlights([])}
+          />
+        )}
+      </AnimatePresence>
 
+      <div
+        className="mt-4 relative"
+        ref={deckRef}
+        style={lockHeight && deckHeight != null ? { height: deckHeight, overflow: "hidden" } : undefined}
+      >
         {/* Cards row (3 columns, as before) */}
         <motion.div
           className="grid grid-cols-3 gap-3"
@@ -340,19 +424,21 @@ setLockHeight(true);
         >
           {cards.map((c) => {
             const isSelected = selected === c.id;
-            const disabled = !c.affordable || Boolean(confirmingId && confirmingId !== c.id);
+            const disabled = Boolean(confirmingId) || !c.affordable;
+
 
             return (
               <motion.div
                 key={c.id}
                 layout
-                layoutId={`card-${c.id}`} // shared layout for float-to-center
+                layoutId={`card-${c.id}`} // layout for smooth expand/collapse (no float)
+                ref={attachCardRef(c.id)}
                 animate={othersDown && c.id !== confirmingId ? othersCtrl : undefined}
                 transition={springJuice}
                 className={[
                   CARD_BASE,
                   CARD_PAD,
-                  c.cardGradientClass, // DARK opaque gradient
+                  c.cardGradientClass,
                   "text-left relative transition-transform",
                   disabled ? "opacity-50 saturate-75 cursor-not-allowed" : "cursor-pointer hover:brightness-[1.03]",
                   isSelected ? "ring-2 ring-white/30" : "",
@@ -376,7 +462,19 @@ setLockHeight(true);
                   <div className={`inline-flex items-center justify-center rounded-lg p-1.5 ${c.iconBgClass}`}>
                     <span className={c.iconTextClass}>{c.icon}</span>
                   </div>
-                  {showBudget && <CostPill cost={c.cost!} affordable={c.affordable} />}
+                  {showBudget && (
+                    <div className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-black/35 ring-1 ring-white/25">
+                      <Coins className="w-3.5 h-3.5 text-amber-300" />
+                      <span
+                        className={[
+                          "text-[11px] font-semibold",
+                          !c.affordable && (c.cost ?? 0) < 0 ? "text-rose-100" : (c.cost ?? 0) >= 0 ? "text-emerald-100" : "text-white",
+                        ].join(" ")}
+                      >
+                        {(c.cost ?? 0) >= 0 ? `+${c.cost}` : `${c.cost}`}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* body: title + summary (clamped) */}
@@ -396,7 +494,7 @@ setLockHeight(true);
           })}
         </motion.div>
 
-        {/* Expanded overlay (same visuals as before) */}
+        {/* Expanded overlay */}
         <AnimatePresence>
           {selectedCard && (
             <motion.div
@@ -424,7 +522,19 @@ setLockHeight(true);
                   <div className={`inline-flex items-center justify-center rounded-lg p-1.5 ${selectedCard.iconBgClass}`}>
                     <span className={selectedCard.iconTextClass}>{selectedCard.icon}</span>
                   </div>
-                  {showBudget && <CostPill cost={selectedCard.cost!} affordable={selectedCard.affordable} />}
+                  {showBudget && (
+                    <div className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-black/35 ring-1 ring-white/25">
+                      <Coins className="w-3.5 h-3.5 text-amber-300" />
+                      <span
+                        className={[
+                          "text-[11px] font-semibold",
+                          !selectedCard.affordable && (selectedCard.cost ?? 0) < 0 ? "text-rose-100" : (selectedCard.cost ?? 0) >= 0 ? "text-emerald-100" : "text-white",
+                        ].join(" ")}
+                      >
+                        {(selectedCard.cost ?? 0) >= 0 ? `+${selectedCard.cost}` : `${selectedCard.cost}`}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-2">
@@ -454,7 +564,7 @@ setLockHeight(true);
           )}
         </AnimatePresence>
 
-        {/* Suggest modal (unchanged visuals) */}
+        {/* Suggest modal */}
         <AnimatePresence>
           {isSuggestOpen && (
             <motion.div
@@ -483,27 +593,25 @@ setLockHeight(true);
                 </div>
 
                 <div className="mt-3">
-                <input
-  type="text"
-  autoFocus
-  value={suggestText}
-  onChange={(e) => setSuggestText(e.target.value)}
-  placeholder={SUGGEST_PLACEHOLDER}
-  className="w-full rounded-xl bg-black/35 ring-1 ring-white/25 text-white placeholder-white/70 px-3 py-2 outline-none focus:ring-white/35"
-  onKeyDown={(e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      confirmSuggest();
-    }
-  }}
-/>
-
-{suggestError && (
-  <div className="mt-2 text-[12px] text-rose-200">
-    {suggestError}
-  </div>
-)}
-
+                  <input
+                    type="text"
+                    autoFocus
+                    value={suggestText}
+                    onChange={(e) => setSuggestText(e.target.value)}
+                    placeholder="Type your suggestion…"
+                    className="w-full rounded-xl bg-black/35 ring-1 ring-white/25 text-white placeholder-white/70 px-3 py-2 outline-none focus:ring-white/35"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        confirmSuggest();
+                      }
+                    }}
+                  />
+                  {suggestError && (
+                    <div className="mt-2 text-[12px] text-rose-200">
+                      {suggestError}
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-3 flex items-center justify-end gap-2">
@@ -511,22 +619,22 @@ setLockHeight(true);
                     type="button"
                     className="px-3 py-1.5 rounded-full bg-white/10 ring-1 ring-white/15 text-white text-[12px]"
                     onClick={() => setSuggestOpen(false)}
+                    disabled={validatingSuggest}
                   >
                     Cancel
                   </button>
                   <button
-  type="button"
-  className={CONFIRM_BTN_CLASS}
-  disabled={
-    validatingSuggest ||
-    (showBudget && budget < Math.abs(suggestCost)) ||
-    (suggestText.trim().length < 4)
-  }
-  onClick={confirmSuggest}
->
-  {validatingSuggest ? "Validating..." : "Confirm"}
-</button>
-
+                    type="button"
+                    className={CONFIRM_BTN_CLASS}
+                    disabled={
+                      validatingSuggest ||
+                      (showBudget && budget < Math.abs(suggestCost)) ||
+                      (suggestText.trim().length < 4)
+                    }
+                    onClick={confirmSuggest}
+                  >
+                    {validatingSuggest ? "Validating..." : "Confirm"}
+                  </button>
                 </div>
               </motion.div>
             </motion.div>
@@ -538,16 +646,15 @@ setLockHeight(true);
           <motion.button
             type="button"
             layout
+            ref={suggestRef}
             animate={othersDown ? suggestCtrl : undefined}
             className={SUGGEST_BTN_CLASS}
             onClick={openSuggest}
-              disabled={
-    Boolean(confirmingId) ||
-    validatingSuggest ||
-    (showBudget && budget < Math.abs(suggestCost))
-  }
-
-
+            disabled={
+              Boolean(confirmingId) ||
+              validatingSuggest ||
+              (showBudget && budget < Math.abs(suggestCost))
+            }
           >
             <span className="text-[12.5px] font-semibold">Suggest your own</span>
             {showBudget && (
