@@ -548,7 +548,22 @@ export default function EventScreen(_props: Props) {
   return (
     <div className="min-h-[100dvh] px-5 py-5" style={bgStyle}>
       <div className="w-full max-w-xl mx-auto">
-        <ResourceBar daysLeft={daysLeft} budget={budget} showBudget={showBudget} />
+      <div
+  className="
+    sticky top-0 z-40
+    -mx-5 px-5   /* stretch to page gutters, then restore padding */
+    py-2
+    bg-[#0b1335]/80 backdrop-blur-md
+    border-b border-white/10
+  "
+  style={{ WebkitBackdropFilter: "blur(8px)" }} // improves Safari
+>
+  <ResourceBar
+    daysLeft={daysLeft}
+    budget={budget}
+    showBudget={showBudget}
+  />
+</div>
 
         {/* Support values (3 entities), animated */}
         <SupportList items={items} animatePercent={true} animateDurationMs={1000} />

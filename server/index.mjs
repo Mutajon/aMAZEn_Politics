@@ -172,16 +172,12 @@ app.post("/api/intro-paragraph", async (req, res) => {
     if (!OPENAI_KEY) return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
 
     const { role, gender } = req.body || {};
-    const roleText = String(role || "").slice(0, 200);
-
+    const roleText = String(role || "").slice(0, 200).trim();
     const genderText = ["male", "female", "any"].includes(String(gender || "").toLowerCase())
       ? String(gender).toLowerCase()
       : "any";
 
-    // Guardrail: role must exist
-    if (!roleText) {
-      return res.status(400).json({ error: "Missing role" });
-    }
+    if (!roleText) return res.status(400).json({ error: "Missing role" });
 
     const system =
       "You write vivid, historically aware, second-person micro-intros for a role-playing game.\n" +
@@ -195,8 +191,22 @@ app.post("/api/intro-paragraph", async (req, res) => {
       "TASK: Write one short paragraph that sets the scene on the player's **first day** in this role. " +
       "Welcome them, mention immediate tensions and ambient details. Present tense. No bullet points. No headings.";
 
-    // Use shared helper (unified behavior with other endpoints; no model-specific params)
-    const paragraph = (await aiText({ system, user, model: CHAT_MODEL_DEFAULT }))?.trim();
+    // tiny retry wrapper (handles occasional upstream 503s)
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    async function getParagraphOnce() {
+      return (await aiText({ system, user, model: CHAT_MODEL_DEFAULT }))?.trim() || "";
+    }
+
+    let paragraph = "";
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        paragraph = await getParagraphOnce();
+        if (paragraph) break;
+      } catch (err) {
+        console.warn(`[server] intro-paragraph attempt ${attempt} failed:`, err?.message || err);
+      }
+      if (attempt === 1) await sleep(600); // simple backoff before the second try
+    }
 
     if (!paragraph) return res.status(503).json({ error: "No content returned" });
     return res.json({ paragraph });
@@ -205,6 +215,7 @@ app.post("/api/intro-paragraph", async (req, res) => {
     return res.status(500).json({ error: "Intro generation failed" });
   }
 });
+
 
 
 // -------------------- AI VALIDATE ROLE ----------------------
@@ -571,9 +582,16 @@ app.post("/api/dilemma", async (req, res) => {
     const debug = !!req.body?.debug;
     if (debug) console.log("[/api/dilemma] snapshot:", req.body);
 
-    // Snapshot fields (all optional-safe)
-    const role        = String(req.body?.role || "Unicorn King");
-    const systemName  = String(req.body?.systemName || "Divine Right Monarchy");
+    const roleRaw = req.body?.role;
+    const systemRaw = req.body?.systemName;
+    
+    const role = (typeof roleRaw === "string" && roleRaw.trim())
+      ? roleRaw.trim()
+      : "Unicorn King";
+    
+    const systemName = (typeof systemRaw === "string" && systemRaw.trim())
+      ? systemRaw.trim()
+      : "Divine Right Monarchy";
     const settings    = req.body?.settings || {};
     const day         = Number(req.body?.day || 1);
     const totalDays   = Number(req.body?.totalDays || 7);
@@ -778,6 +796,67 @@ function expectedSignFor(text = "", iconHint = "") {
   } catch (e) {
     console.error("Error in /api/dilemma:", e?.message || e);
     return res.status(502).json({ error: "dilemma failed" });
+  }
+});
+// --- Validate "Suggest your own" (relevance to the current dilemma) ---
+app.post("/api/validate-suggestion", async (req, res) => {
+  try {
+    const { text, title, description } = req.body || {};
+    if (typeof text !== "string" || typeof title !== "string" || typeof description !== "string") {
+      return res.status(400).json({ error: "Missing text/title/description" });
+    }
+
+    // Use the same chat helper you already have in this server
+    // Falls back to CHAT_MODEL / MODEL_VALIDATE envs
+    const model =
+      process.env.MODEL_VALIDATE ||
+      process.env.CHAT_MODEL ||
+      "gpt-5-mini";
+
+    const system = [
+      "You are a strict validator for a strategy game.",
+      "Given a DILEMMA (title + description) and a SUGGESTION, decide if the suggestion is:",
+      "- meaningful (not gibberish),",
+      "- relevant/connected to the dilemma’s situation, and",
+      "- actionable in spirit (a plausible policy or action, not random text).",
+      "Only return compact JSON: { \"valid\": boolean, \"reason\": string }.",
+      "Be conservative: if in doubt, mark valid=false with a short reason.",
+    ].join("\n");
+
+    const user = JSON.stringify(
+      {
+        dilemma: { title, description },
+        suggestion: text,
+      },
+      null,
+      2
+    );
+
+    // aiText is assumed to exist in this file per your current API layer
+    const raw = await aiText({ system, user, model, temperature: 0 });
+
+    // Extract JSON payload safely
+    let json = null;
+    try {
+      // try as-is
+      json = JSON.parse(raw.trim());
+    } catch {
+      // try to pull first {...} block
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (m) {
+        json = JSON.parse(m[0]);
+      }
+    }
+
+    if (!json || typeof json.valid !== "boolean") {
+      return res.status(200).json({ valid: false, reason: "Malformed validator output" });
+    }
+    const reason = typeof json.reason === "string" ? json.reason : "";
+    return res.json({ valid: !!json.valid, reason });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("validate-suggestion error:", err?.message || err);
+    return res.status(500).json({ error: "Validator failed" });
   }
 });
 

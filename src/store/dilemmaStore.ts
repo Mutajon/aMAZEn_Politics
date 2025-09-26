@@ -5,6 +5,9 @@ import { useSettingsStore } from "./settingsStore";
 import { useRoleStore } from "./roleStore";
 import { useCompassStore } from "./compassStore"; // <-- A) use compass values (0..10)
 
+// Prevent duplicate fetches (React StrictMode or fast double click)
+let loadNextInFlight = false;
+
 // gated debug logger
 function dlog(...args: any[]) {
   if (useSettingsStore.getState().debugMode) {
@@ -39,12 +42,19 @@ export const useDilemmaStore = create<DilemmaState>((set, get) => ({
   error: null,
 
   async loadNext() {
+    // If something is already loading, bail early
+    if (get().loading || loadNextInFlight) {
+      dlog("loadNext: skipped (already in flight)");
+      return;
+    }
+  
+    loadNextInFlight = true;
+    set({ loading: true, error: null });
+  
     try {
-      set({ loading: true, error: null });
-      const snapshot = buildSnapshot();
-      dlog("snapshot ->", snapshot);
-
-      // POST to server (will be a real AI in step C; for now the stub returns a mock)
+      const snapshot = buildSnapshot(); // buildSnapshot already logs
+      // dlog("snapshot ->", snapshot); // ← remove this to avoid duplicate logs
+  
       let d: Dilemma | null = null;
       try {
         const r = await fetch("/api/dilemma", {
@@ -62,13 +72,12 @@ export const useDilemmaStore = create<DilemmaState>((set, get) => ({
       } catch (e: any) {
         dlog("server /api/dilemma network error:", e?.message || e);
       }
-
-      // Fallback to local mock if server failed (keeps dev flow unblocked)
+  
       if (!d) {
         d = localMock(snapshot.day);
         dlog("fallback mock ->", d);
       }
-
+  
       const prev = get().current;
       set((s) => ({
         current: d!,
@@ -79,8 +88,11 @@ export const useDilemmaStore = create<DilemmaState>((set, get) => ({
       const msg = err?.message || "Failed to load dilemma";
       set({ loading: false, error: msg });
       dlog("ERROR:", msg);
+    } finally {
+      loadNextInFlight = false;
     }
   },
+  
 
   nextDay() {
     const { day, totalDays } = get();
@@ -121,54 +133,65 @@ function flattenCompass(vals: any): Record<string, number> {
 }
 
 function buildSnapshot(): DilemmaRequest {
-  const { debugMode, dilemmasSubjectEnabled, dilemmasSubject } =
-    useSettingsStore.getState();
-  const day = useDilemmaStore.getState().day;
-  const totalDays = useDilemmaStore.getState().totalDays;
-
-  // role/system (with your requested fallback)
-  const roleState: any = useRoleStore.getState();
-  const systemName =
-    roleState?.analysis?.systemName ||
-    "Divine Right Monarchy (fairytale dictatorship)";
-  const role =
-    roleState?.role?.title ||
-    roleState?.character?.title ||
-    "Unicorn King";
-
-  const holders = Array.isArray(roleState?.analysis?.holders)
-    ? roleState.analysis.holders.map((h: any) => ({
-        name: String(h?.name || "Group"),
-        weight: Number(h?.percent || h?.weight || 0),
-      }))
-    : [];
-
-  const playerIndex =
-    typeof roleState?.analysis?.playerIndex === "number"
-      ? roleState.analysis.playerIndex
-      : null;
-
-  // A) pull compass values (0..10 per component) and flatten
-  const compassRaw = useCompassStore.getState().values;
-  const compassValues = flattenCompass(compassRaw);
-
-  const snap: DilemmaRequest = {
-    role,
-    systemName,
-    holders,
-    playerIndex,
-    compassValues, // now filled
-    settings: { dilemmasSubjectEnabled, dilemmasSubject },
-    day,
-    totalDays,
-    previous: { isFirst: day === 1, isLast: day === totalDays },
-    supports: {}, // optional; wire later if you expose it
-    debug: debugMode, // server logs only if Debug mode is ON
-  };
-
-  dlog("buildSnapshot ->", snap);
-  return snap;
-}
+    const { debugMode, dilemmasSubjectEnabled, dilemmasSubject } =
+      useSettingsStore.getState();
+    const { day, totalDays } = useDilemmaStore.getState();
+  
+    // --- role/system from the role store (trimmed) ---
+    const roleState = useRoleStore.getState();
+  
+    const roleText =
+      typeof roleState.selectedRole === "string"
+        ? roleState.selectedRole.trim()
+        : "";
+  
+    const systemText =
+      typeof roleState.analysis?.systemName === "string"
+        ? roleState.analysis.systemName.trim()
+        : "";
+  
+    // holders: map store's {name, percent} -> API snapshot {name, weight}
+    const holders = Array.isArray(roleState.analysis?.holders)
+      ? roleState.analysis!.holders.map((h) => ({
+          name: String(h?.name ?? "Group"),
+          // map percent -> weight; default to 0 when missing
+          weight: Number((h as any)?.percent ?? 0),
+        }))
+      : [];
+  
+    const playerIndex =
+      typeof roleState.analysis?.playerIndex === "number"
+        ? roleState.analysis!.playerIndex
+        : null;
+  
+    // Compass values (flattened 0..10 map)
+    const compassRaw = useCompassStore.getState().values;
+    const compassValues = flattenCompass(compassRaw);
+  
+    const snap: DilemmaRequest = {
+      // DilemmaRequest expects string, so never undefined.
+      // The server will treat "" as “no value” and apply its own fallback.
+      role: roleText,
+      systemName: systemText,
+  
+      holders,
+      playerIndex,
+      compassValues,
+  
+      settings: { dilemmasSubjectEnabled, dilemmasSubject },
+      day,
+      totalDays,
+      previous: { isFirst: day === 1, isLast: day === totalDays },
+  
+      supports: {}, // unchanged
+      debug: debugMode,
+    };
+  
+    
+    return snap;
+  }
+  
+  
 
 function localMock(day: number): Dilemma {
   return {

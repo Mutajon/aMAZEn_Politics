@@ -2,7 +2,13 @@
 // Old visuals preserved (dark gradient cards, coin badge, suggest pill/modal)
 // + New confirm animation: collapse → others slide down → chosen card floats centered.
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef, useLayoutEffect } from "react";
+import { validateSuggestionStrict, AIConnectionError } from "../../lib/validation";
+import { useSettingsStore } from "../../store/settingsStore";
+import { useDilemmaStore } from "../../store/dilemmaStore";
+
+
+
 import {
   AnimatePresence,
   LayoutGroup,
@@ -12,6 +18,34 @@ import {
   type TargetAndTransition,
 } from "framer-motion";
 import { Coins, CheckCircle2 } from "lucide-react";
+// Utility: await N requestAnimationFrame ticks to let shared-layout collapse commit
+async function waitNextFrame(times = 2) {
+  for (let i = 0; i < times; i++) {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  }
+}
+// gated debug logger (uses Settings → Debug mode)
+function dlog(...args: any[]) {
+  if (useSettingsStore.getState().debugMode) {
+    // eslint-disable-next-line no-console
+    console.log("[ActionDeck]", ...args);
+  }
+}
+// Build a safe dilemma context for validation (props → store → empty)
+function getDilemmaCtx(
+  d?: { title: string; description: string }
+): { title: string; description: string } {
+  if (d && typeof d.title === "string" && typeof d.description === "string") {
+    return d;
+  }
+  const curr: any = useDilemmaStore.getState().current;
+  const title = typeof curr?.title === "string" ? curr.title : "";
+  const description = typeof curr?.description === "string" ? curr.description : "";
+  return { title, description };
+}
+
+
+
 
 /* ================== TUNABLES (VISUALS) ================== */
 const ENTER_STAGGER = 0.12;
@@ -62,6 +96,7 @@ type Props = {
   onConfirm: (id: string) => void;
   onSuggest?: (text?: string) => void;
   suggestCost?: number;              // default -300
+  dilemma: { title: string; description: string };
 };
 
 /* ------------------------- Small helpers ------------------------- */
@@ -89,17 +124,19 @@ export default function ActionDeck({
   onConfirm,
   onSuggest,
   suggestCost = -300,
+  dilemma,
 }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
 
   // Suggest modal
   const [isSuggestOpen, setSuggestOpen] = useState(false);
   const [suggestText, setSuggestText] = useState<string>(SUGGEST_PREFILL);
-
+  const [validatingSuggest, setValidatingSuggest] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
   // New confirm flow state
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [othersDown, setOthersDown] = useState(false);
-  const [floatingId, setFloatingId] = useState<string | null>(null);
+  
 
   const othersCtrl = useAnimationControls();
   const suggestCtrl = useAnimationControls();
@@ -114,50 +151,186 @@ export default function ActionDeck({
   }, [actions, showBudget, budget]);
 
   const selectedCard = cards.find((c) => c.id === selected) || null;
+// --- Height lock so downward fly-out doesn't extend the page ---
+const deckRef = useRef<HTMLDivElement | null>(null);
+const [deckHeight, setDeckHeight] = useState<number | null>(null);
+const [lockHeight, setLockHeight] = useState(false);
 
+// Measure once per dilemma (and after first layout)
+useLayoutEffect(() => {
+  // measure after layout
+  const m = () => {
+    if (deckRef.current) {
+      setDeckHeight(deckRef.current.getBoundingClientRect().height);
+    }
+  };
+  m();
+  // also schedule one more read on next frame for safety
+  requestAnimationFrame(m);
+  // releasing any previous locks on new dilemma
+  setLockHeight(false);
+}, [actions]);
   function openSuggest() {
-    if (showBudget && budget < Math.abs(suggestCost)) return;
+    if (showBudget && budget < Math.abs(suggestCost)) {
+      dlog("openSuggest: blocked (budget)", { budget, suggestCost });
+      return;
+    }
+    dlog("openSuggest: opened");
     setSuggestText(SUGGEST_PREFILL);
+    setSuggestError(null);
     setSuggestOpen(true);
   }
-  function confirmSuggest() {
-    onSuggest?.(suggestText.trim() || undefined);
-    setSuggestOpen(false);
+  
+
+  async function confirmSuggest() {
+    const text = (suggestText || "").trim();
+    dlog("confirmSuggest: click", { textLength: text.length });
+  
+    if (!text) {
+      dlog("confirmSuggest: early return (empty text)");
+      return;
+    }
+    if (showBudget && budget < Math.abs(suggestCost)) {
+      dlog("confirmSuggest: early return (budget lock)", { budget, suggestCost });
+      return;
+    }
+  
+    try {
+      setSuggestError(null);
+      setValidatingSuggest(true);
+      const ctx = getDilemmaCtx(dilemma);
+      dlog("validateSuggestionStrict -> request", {
+        hasProp: Boolean(dilemma),
+        titleLen: ctx.title.length,
+        descriptionLen: ctx.description.length,
+      });
+      
+      const result = await validateSuggestionStrict(text, ctx);
+      
+      dlog("validateSuggestionStrict -> response", result);
+  
+      if (!result.valid) {
+        dlog("validateSuggestionStrict -> invalid", result.reason || "(no reason)");
+        setSuggestError(result.reason || "Please refine your suggestion so it clearly relates to the dilemma.");
+        setValidatingSuggest(false);
+        return;
+      }
+  
+      // Valid path
+      dlog("confirmSuggest: valid → close modal & animate cards");
+      setSuggestOpen(false);
+  
+      // Disable interactions, animate ALL THREE pre-available cards down
+      setConfirmingId("suggest");
+      // Freeze current deck height and clip overflow during exit
+if (!deckHeight && deckRef.current) {
+  setDeckHeight(deckRef.current.getBoundingClientRect().height);
+}
+setLockHeight(true);
+
+      setOthersDown(true);
+      await waitNextFrame(2);
+  
+      void othersCtrl.start({
+        y: 320,
+        opacity: 0,
+        transition: {
+          type: "spring",
+          stiffness: 260,
+          damping: 28,
+          mass: 0.7,
+          duration: 0.36,
+        },
+      });
+      dlog("othersCtrl.start → queued");
+  
+      onSuggest?.(text);
+      dlog("onSuggest callback invoked");
+  
+      setValidatingSuggest(false);
+    } catch (err: any) {
+      const msg = err instanceof AIConnectionError ? err.message : "Cannot reach validator";
+      dlog("confirmSuggest: error", msg, err);
+      setSuggestError(msg);
+      setValidatingSuggest(false);
+    }
   }
+  
 
-  // ----- Confirm flow -----
-  const handleConfirm = async (id: string) => {
-    setConfirmingId(id);
 
-    // 1) Close expanded overlay (visual "shrink" back to compact)
-    setSelected(null);
-    await new Promise((r) => setTimeout(r, 220));
+// Called when user clicks "Confirm" on the expanded card
+const handleConfirm = async (id: string) => {
+  // 1) Mark which card is confirming; this disables all interactions
+  setConfirmingId(id);
 
-    // 2) Others down (non-selected cards + suggest pill)
-    setOthersDown(true);
-    othersCtrl.start(othersDownTarget).catch(() => {});
-    suggestCtrl.start(suggestDownTarget).catch(() => {});
-    await new Promise((r) => setTimeout(r, 80));
+  // 2) Close the expanded view so the chosen card shrinks back to its grid slot
+  setSelected(null);
+// Freeze current deck height and clip overflow during exit
+if (!deckHeight && deckRef.current) {
+  setDeckHeight(deckRef.current.getBoundingClientRect().height);
+}
+setLockHeight(true);
 
-    // 3) Float chosen card to center via shared layout
-    setFloatingId(id);
-    await new Promise((r) => setTimeout(r, 320));
+  // 3) Ensure all target elements SUBSCRIBE to the animation controls
+  //    (cards/suggest wire their `animate={...}` only when othersDown === true)
+  setOthersDown(true);
 
-    // 4) Notify parent
-    onConfirm(id);
-  };
+  // 4) Wait two frames so the shared-layout collapse fully commits and
+  //    the new animate props (controls) are attached to the DOM
+  await waitNextFrame(2);
+
+  // 5) Animate the two non-chosen cards downward + fade
+  void othersCtrl.start({
+    y: 320,
+    opacity: 0,
+    transition: {
+      type: "spring",
+      stiffness: 260,
+      damping: 28,
+      mass: 0.7,
+      duration: 0.36,
+    },
+  });
+
+  // 6) Animate the "Suggest your own" pill downward + fade
+  void suggestCtrl.start({
+    y: 360,
+    opacity: 0,
+    transition: {
+      type: "spring",
+      stiffness: 260,
+      damping: 28,
+      mass: 0.7,
+      duration: 0.36,
+      delay: 0.02,
+    },
+  });
+
+  // 7) Notify parent (budget update, etc.) — we don't await animations
+  onConfirm(id);
+};
+
+
 
   // Reset visuals when the actions (dilemma) change
   React.useEffect(() => {
     setSelected(null);
     setConfirmingId(null);
     setOthersDown(false);
-    setFloatingId(null);
   }, [actions]);
 
   return (
     <LayoutGroup id="action-deck">
-      <div className="mt-4 relative">
+      <div
+  className="mt-4 relative"
+  ref={deckRef}
+  style={
+    lockHeight && deckHeight != null
+      ? { height: deckHeight, overflow: "hidden" }
+      : undefined
+  }
+>
+
         {/* Cards row (3 columns, as before) */}
         <motion.div
           className="grid grid-cols-3 gap-3"
@@ -310,20 +483,27 @@ export default function ActionDeck({
                 </div>
 
                 <div className="mt-3">
-                  <input
-                    type="text"
-                    autoFocus
-                    value={suggestText}
-                    onChange={(e) => setSuggestText(e.target.value)}
-                    placeholder={SUGGEST_PLACEHOLDER}
-                    className="w-full rounded-xl bg-black/35 ring-1 ring-white/25 text-white placeholder-white/70 px-3 py-2 outline-none focus:ring-white/35"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        confirmSuggest();
-                      }
-                    }}
-                  />
+                <input
+  type="text"
+  autoFocus
+  value={suggestText}
+  onChange={(e) => setSuggestText(e.target.value)}
+  placeholder={SUGGEST_PLACEHOLDER}
+  className="w-full rounded-xl bg-black/35 ring-1 ring-white/25 text-white placeholder-white/70 px-3 py-2 outline-none focus:ring-white/35"
+  onKeyDown={(e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      confirmSuggest();
+    }
+  }}
+/>
+
+{suggestError && (
+  <div className="mt-2 text-[12px] text-rose-200">
+    {suggestError}
+  </div>
+)}
+
                 </div>
 
                 <div className="mt-3 flex items-center justify-end gap-2">
@@ -335,13 +515,18 @@ export default function ActionDeck({
                     Cancel
                   </button>
                   <button
-                    type="button"
-                    className={CONFIRM_BTN_CLASS}
-                    disabled={showBudget && budget < Math.abs(suggestCost)}
-                    onClick={confirmSuggest}
-                  >
-                    Confirm
-                  </button>
+  type="button"
+  className={CONFIRM_BTN_CLASS}
+  disabled={
+    validatingSuggest ||
+    (showBudget && budget < Math.abs(suggestCost)) ||
+    (suggestText.trim().length < 4)
+  }
+  onClick={confirmSuggest}
+>
+  {validatingSuggest ? "Validating..." : "Confirm"}
+</button>
+
                 </div>
               </motion.div>
             </motion.div>
@@ -356,7 +541,13 @@ export default function ActionDeck({
             animate={othersDown ? suggestCtrl : undefined}
             className={SUGGEST_BTN_CLASS}
             onClick={openSuggest}
-            disabled={showBudget && budget < Math.abs(suggestCost)}
+              disabled={
+    Boolean(confirmingId) ||
+    validatingSuggest ||
+    (showBudget && budget < Math.abs(suggestCost))
+  }
+
+
           >
             <span className="text-[12.5px] font-semibold">Suggest your own</span>
             {showBudget && (
@@ -370,49 +561,6 @@ export default function ActionDeck({
           </motion.button>
         </motion.div>
       </div>
-
-      {/* Floating layer: chosen compact card animates to center */}
-      <AnimatePresence>
-        {floatingId && cards.find(c => c.id === floatingId) && (
-          <motion.div
-            key="floating-layer"
-            className="pointer-events-none fixed inset-0 z-40 flex items-start justify-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1, transition: fade }}
-            exit={{ opacity: 0, transition: fade }}
-          >
-            <div className="relative w-full max-w-xl" style={{ top: "22vh" }}>
-              <motion.div layout layoutId={`card-${floatingId}`}>
-                {/* Compact card face reused for the float (no handlers, disabled) */}
-                {(() => {
-                  const c = cards.find(k => k.id === floatingId)!;
-                  return (
-                    <div
-                      className={[
-                        CARD_BASE,
-                        CARD_PAD,
-                        c.cardGradientClass,
-                        "text-left relative",
-                      ].join(" ")}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className={`inline-flex items-center justify-center rounded-lg p-1.5 ${c.iconBgClass}`}>
-                          <span className={c.iconTextClass}>{c.icon}</span>
-                        </div>
-                        {showBudget && <CostPill cost={c.cost!} affordable={c.affordable} />}
-                      </div>
-                      <div className="mt-2">
-                        <div className={CARD_TITLE_CLASS}>{c.title}</div>
-                        <div className={`${CARD_DESC_CLASS} mt-0.5 line-clamp-3`}>{c.summary}</div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </motion.div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </LayoutGroup>
   );
 }
