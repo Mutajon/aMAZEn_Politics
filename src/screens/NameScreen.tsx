@@ -90,6 +90,7 @@ function buildFullPrompt(
   return `${withPhysical}${bg}${tail}`;
 }
 
+
 export default function NameScreen({ push }: { push: PushFn }) {
   const selectedRole = useRoleStore((s) => s.selectedRole);
   const character = useRoleStore((s) => s.character);
@@ -173,7 +174,6 @@ export default function NameScreen({ push }: { push: PushFn }) {
   visible={loading}          // uses your existing loading state
   title={OVERLAY_TITLE}
   quotes={LOADING_QUOTES}
-  periodMs={3000}
 />
 
       <div className="w-full max-w-2xl mx-auto">

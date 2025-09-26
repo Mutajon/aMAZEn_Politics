@@ -23,7 +23,7 @@ type FetchState = "idle" | "loading" | "error" | "done";
 /* ------------------------------ AI Fetcher ------------------------------ */
 async function fetchAnalysis(role: string): Promise<AnalysisResult> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timer = setTimeout(() => controller.abort(), 25000);
 
   try {
     const res = await fetch("/api/analyze-role", {
@@ -403,7 +403,7 @@ if (!name) {
 
   return (
     <div className="min-h-dvh w-full" style={bgStyle}>
-      <LoadingOverlay visible={state === "loading"} title="Analyzing your world…" quotes={QUOTES} periodMs={3000} />
+      <LoadingOverlay visible={state === "loading"} title="Analyzing your world…" quotes={QUOTES} periodMs={5500} />
 
       <div className="max-w-2xl mx-auto px-4 py-6">
         {/* Top bar with Back */}

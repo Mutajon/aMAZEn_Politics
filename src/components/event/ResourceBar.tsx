@@ -1,29 +1,69 @@
-// ResourceBar.tsx — lucide-react icons version with optional budget pill
+// src/components/event/ResourceBar.tsx
+// Restored visuals + animated budget counter + anchor for coin flights.
+
+import React from "react";
 import { Hourglass, Coins } from "lucide-react";
 
 type Props = {
   daysLeft: number;
   budget: number;
-  showBudget?: boolean; // ← NEW: defaults to true
+  showBudget?: boolean; // defaults to true
 };
 
 export default function ResourceBar({ daysLeft, budget, showBudget = true }: Props) {
+  // --- Animated counter: prev -> budget over 2s (ease-out) ---
+  const [displayBudget, setDisplayBudget] = React.useState(budget);
+  const prevRef = React.useRef(budget);
+  const rafRef = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    const start = performance.now();
+    const from = prevRef.current;
+    const to = budget;
+    const DURATION = 2000; // ms
+
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+
+    const tick = (t: number) => {
+      const p = Math.max(0, Math.min(1, (t - start) / DURATION));
+      const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
+      setDisplayBudget(Math.round(from + (to - from) * eased));
+      if (p < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        prevRef.current = budget;
+        rafRef.current = null;
+      }
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    };
+  }, [budget]);
+
   return (
     <div className="w-full flex items-center justify-between gap-3">
       <ResourcePill
         icon={<Hourglass className="w-4 h-4" />}
         label="Days Left"
         value={String(daysLeft)}
-        iconBgClass="bg-sky-500/20"
-        iconTextClass="text-sky-200"
+        iconBgClass="bg-sky-500/20"   // ← original: dark blue chip
+        iconTextClass="text-sky-200"  // ← original: light blue icon
       />
       {showBudget && (
         <ResourcePill
-          icon={<Coins className="w-4 h-4" />}
+          // Wrap icon with an anchor span so coins can locate it
+          icon={
+            <span data-budget-anchor="true" id="budget-anchor" className="inline-flex">
+              <Coins className="w-4 h-4" />
+            </span>
+          }
           label="Budget"
-          value={formatMoney(budget)}
-          iconBgClass="bg-amber-500/25"
-          iconTextClass="text-amber-200"
+          value={formatMoney(displayBudget)}
+          iconBgClass="bg-amber-500/25"  // ← original: dark gold chip
+          iconTextClass="text-amber-200" // ← original: light gold icon
         />
       )}
     </div>
