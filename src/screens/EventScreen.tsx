@@ -2,7 +2,7 @@
 // Event Screen: generates a daily dilemma, narrates it, and shows action cards
 // with dynamic Lucide icons + dark gradients (topic-aware, non-repeating).
 
-import React, { useState, useEffect, useMemo, useRef, Suspense } from "react";
+import React, { useState, useEffect, useMemo, useRef, Suspense, useLayoutEffect } from "react";
 import { bgStyle } from "../lib/ui";
 import ResourceBar from "../components/event/ResourceBar";
 import SupportList, { type SupportItem, DefaultSupportIcons } from "../components/event/SupportList";
@@ -20,6 +20,12 @@ import EventLoadingOverlay from "../components/event/EventLoadingOverlay";
 import { dynamicIconImports } from "lucide-react/dynamic";
 import { useNarrator } from "../hooks/useNarrator";
 import type { ActionCard } from "../components/event/ActionDeck";
+import { motion, AnimatePresence } from "framer-motion";
+import { analyzeTextToCompass } from "../lib/compassMapping";
+import useCompassFX from "../hooks/useCompassFX";
+import type { CompassEffectPing } from "../components/MiniCompass";
+import { COMPONENTS, PALETTE } from "../data/compass-data";
+
 
 
 // ---------------------------------------------------------------------------
@@ -405,6 +411,7 @@ export default function EventScreen(_props: Props) {
   // Stores
   const debugMode = useSettingsStore((s) => s.debugMode);
   const { current, loadNext, loading, error, day, totalDays } = useDilemmaStore();
+  
 
   // Auto-load a dilemma when the screen mounts
   useEffect(() => {
@@ -493,6 +500,23 @@ export default function EventScreen(_props: Props) {
       p.start().catch((e) => console.warn("[Event] TTS start blocked:", e));
     }
   }, [canShowDilemma, narrationEnabled]);
+
+// Compass FX: keep pills until manual dismiss later (TTL 1h for now)
+const { applyWithPings, pings } = useCompassFX(60 * 60 * 1000);
+
+// Show spinner while we wait for the /api/compass-analyze response
+const [compassLoading, setCompassLoading] = useState(false);
+
+// Read Mirror text color so spinner matches it exactly
+const mirrorWrapRef = useRef<HTMLDivElement | null>(null);
+const [mirrorTextColor, setMirrorTextColor] = useState<string>("#7de8ff");
+useLayoutEffect(() => {
+  if (!mirrorWrapRef.current) return;
+  const root = mirrorWrapRef.current.firstElementChild as HTMLElement | null;
+  if (!root) return;
+  const c = getComputedStyle(root).color;
+  if (c) setMirrorTextColor(c);
+}, [mirrorText]);
 
   // Budget + avatar
   const showBudget = useSettingsStore((s) => s.showBudget);
@@ -595,11 +619,19 @@ export default function EventScreen(_props: Props) {
           </div>
         )}
 
-        <div className="mt-3">
-          <div className={mirrorLoading ? "animate-pulse" : ""}>
-            <MirrorCard text={mirrorText} />
-          </div>
-        </div>
+<div className="mt-3 relative" ref={mirrorWrapRef}>
+  <div className={mirrorLoading ? "animate-pulse" : ""}>
+    <MirrorCard text={mirrorText} />
+  </div>
+  {/* Spinner + stacked pills ABOVE the mirror card; no interaction */}
+  <CompassPillsOverlay
+    effectPills={pings}
+    loading={compassLoading}
+    color={mirrorTextColor}
+  />
+</div>
+
+
 
         {canShowDilemma && current && (
           <ActionDeck
@@ -610,11 +642,25 @@ export default function EventScreen(_props: Props) {
               const a = actionsForDeck.find((x) => x.id === id);
               const delta = a?.cost ?? 0;
               if (showBudget) setBudget((b) => b + delta);
+    // NEW: analyze the chosen action (non-blocking)
+if (a) {
+  const text = `${a.title}. ${a.summary}`;
+  setCompassLoading(true);
+  void analyzeTextToCompass(text, applyWithPings).finally(() => setCompassLoading(false));
+}
+
             }}
             
-            onSuggest={(_text?: string) => {
+            onSuggest={(text?: string) => {
               if (showBudget) setBudget((b) => b - 300);
+ // NEW: analyze the suggestion (non-blocking)
+if (text && text.trim()) {
+  setCompassLoading(true);
+  void analyzeTextToCompass(text.trim(), applyWithPings).finally(() => setCompassLoading(false));
+}
+
             }}
+            dilemma={{ title: current.title, description: current.description }}
           />
         )}
 
@@ -630,3 +676,50 @@ export default function EventScreen(_props: Props) {
 function clampPercent(n: number) {
   return Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
 }
+function CompassPillsOverlay({
+  effectPills,
+  loading,
+  color,
+}: {
+  effectPills: CompassEffectPing[];
+  loading: boolean;
+  color?: string;
+}) {
+  // Full overlay centered above the MirrorCard wrapper
+  return (
+    <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
+      {loading && (
+        // Spinner uses currentColor; we set style.color to the mirror text color
+        <div className="flex items-center justify-center" style={{ color }}>
+          <span className="inline-block w-5 h-5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+        </div>
+      )}
+
+      {!loading && effectPills.length > 0 && (
+        // Vertical stack of pills; persistent (we set long TTL in useCompassFX)
+        <div className="flex flex-col items-center gap-2">
+          {effectPills.map((p) => {
+            const label = COMPONENTS[p.prop][p.idx]?.short ?? "";
+            const bg = (PALETTE as any)[p.prop]?.base ?? "#fff";
+            return (
+              <div
+                key={p.id}
+                className="rounded-full px-2 py-1 text-xs font-semibold"
+                style={{
+                  background: bg,
+                  color: "#0b1335",
+                  border: "1.5px solid rgba(255,255,255,0.9)",
+                  boxShadow: "0 6px 18px rgba(0,0,0,0.25)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {`${p.delta > 0 ? "+" : ""}${p.delta} ${label}`}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+

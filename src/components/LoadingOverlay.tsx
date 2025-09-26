@@ -25,7 +25,8 @@ export const POLITICS_QUOTES: RichQuote[] = [
   { author: "Margaret Thatcher", text: "Being powerful is like being a lady. If you have to tell people you are, you aren’t." },
   { author: "Napoleon Bonaparte", text: "In politics, stupidity is not a handicap." },
   { author: "Alan Mooe", text: "People shouldn't be afraid of their government. Governments should be afraid of their people." },
-  { author: "Unknown", text: "Suppose you were an idiot, and suppose you were a member of Congress; but I repeat myself." },
+  { author: "Unknown", text: "Politicians and diapers must be changed often, and for the same reason." },
+  { author: "James Bovard", text: "Democracy must be something more than two wolves and a sheep voting on what to have for dinner." },
 ];
 
 type Props = {
