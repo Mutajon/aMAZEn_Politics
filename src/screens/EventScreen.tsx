@@ -154,10 +154,18 @@ const [supportNotes, setSupportNotes] = useState<{ people: string; middle: strin
     }
   }, [current, day, selectedRole, analysis?.systemName]);
   
-  // Auto-load a dilemma when the screen mounts
-  useEffect(() => {
-    if (!current && !loading && !error) loadNext();
-  }, [current, loading, error, loadNext]);
+  
+ // Auto-load a dilemma once role/system are ready (prevents default fallback)
+const selectedRoleForLoad = useRoleStore(s => s.selectedRole || "");
+const systemNameForLoad  = useRoleStore(s => s.analysis?.systemName || "");
+
+useEffect(() => {
+  const ready = Boolean(selectedRoleForLoad || systemNameForLoad);
+  if (!current && !loading && !error && ready) {
+    loadNext();
+  }
+}, [current, loading, error, loadNext, selectedRoleForLoad, systemNameForLoad]);
+
 
   const daysLeft = Math.max(0, totalDays - day + 1);
 
@@ -170,7 +178,7 @@ const [supportNotes, setSupportNotes] = useState<{ people: string; middle: strin
       if (!current) return;
       setMirrorLoading(true);
       setMirrorText("…the mirror squints, light pooling in the glass…");
-      const text = await requestMirrorDilemmaLine({ topWhat: [], topWhence: [], topOverall: [] });
+      const text = await requestMirrorDilemmaLine();
       if (alive) {
         setMirrorText(text);
         setMirrorLoading(false);
@@ -369,7 +377,15 @@ function applySupportEffects(effects: SupportEffect[]) {
     [current]
   );
 
-  const overlayPreparing = !!current && !canShowDilemma; // hide dilemma until narration is ready
+  const overlayPreparing =
+  (!!current && !canShowDilemma) || (!!(current as any)?._isFallback === true);
+ // hide dilemma until narration is ready
+ useEffect(() => {
+  const c = current as any;
+  if (!c || !c._isFallback) return;
+  const t = setTimeout(() => loadNext(), 800);
+  return () => clearTimeout(t);
+}, [current, loadNext]);
 
   return (
     <div className="min-h-[100dvh] px-5 py-5" style={bgStyle}>

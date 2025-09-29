@@ -63,9 +63,14 @@ export const useDilemmaStore = create<DilemmaState>((set, get) => ({
           body: JSON.stringify(snapshot),
         });
         if (r.ok) {
-          d = (await r.json()) as Dilemma;
-          dlog("server /api/dilemma ->", d);
-        } else {
+            const raw = await r.json();
+            // Keep the public fields the component expects:
+            d = { title: raw.title, description: raw.description, actions: raw.actions } as Dilemma;
+            // Carry a private marker for UI gating (no type change required):
+            (d as any)._isFallback = !!raw.isFallback;
+            dlog("server /api/dilemma ->", raw);
+          } else {
+          
           const t = await r.text();
           dlog("server /api/dilemma FAILED:", r.status, t);
         }
