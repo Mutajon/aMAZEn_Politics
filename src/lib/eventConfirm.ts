@@ -1,7 +1,7 @@
 // src/lib/eventConfirm.ts
 // Centralized confirm pipeline used by EventScreen.
 // - Applies budget delta immediately (so coin+counter stay in sync).
-// - Triggers compass analysis with start/stop callbacks for a spinner.
+// - Triggers compass analysis and support analysis IN PARALLEL.
 // - Keeps UI concerns out of EventScreen. No design changes here.
 
 import type { Dispatch, SetStateAction } from "react";
@@ -17,13 +17,23 @@ export type ConfirmInput =
       cost?: number; // pass -300 (or whatever you set in ActionDeck) from the caller
     };
 
+export type SupportEffectId = "people" | "middle" | "mom";
+export type SupportEffect = { id: SupportEffectId; delta: number; explain: string };
+
 export type ConfirmContext = {
   showBudget: boolean;
   setBudget: Dispatch<SetStateAction<number>>;
-  // analyzeText should call analyzeTextToCompass(text, applyWithPings) and return a Promise.
-  analyzeText: (text: string) => Promise<unknown>;
+
+  // Compass analysis
+  analyzeText?: (text: string) => Promise<unknown>;
   onAnalyzeStart?: () => void;
   onAnalyzeDone?: () => void;
+
+  // Support analysis
+  analyzeSupport?: (text: string) => Promise<SupportEffect[]>;
+  applySupportEffects?: (effects: SupportEffect[]) => void;
+  onSupportStart?: () => void;
+  onSupportDone?: () => void;
 };
 
 export async function runConfirmPipeline(
@@ -48,14 +58,38 @@ export async function runConfirmPipeline(
     ctx.setBudget((b) => b + delta);
   }
 
-  // --- 3) Compass analysis (async; spinner hooks optional) ---
-  if (text) {
-    try {
-      ctx.onAnalyzeStart?.();
-      await ctx.analyzeText(text);
-    } finally {
-      ctx.onAnalyzeDone?.();
-    }
+  // --- 3) Fire analyses in PARALLEL (if available) ---
+  const tasks: Promise<unknown>[] = [];
+
+  if (text && ctx.analyzeText) {
+    tasks.push(
+      (async () => {
+        try {
+          ctx.onAnalyzeStart?.();
+          await ctx.analyzeText!(text);
+        } finally {
+          ctx.onAnalyzeDone?.();
+        }
+      })()
+    );
+  }
+
+  if (text && ctx.analyzeSupport && ctx.applySupportEffects) {
+    tasks.push(
+      (async () => {
+        try {
+          ctx.onSupportStart?.();
+          const effects = await ctx.analyzeSupport!(text);
+          ctx.applySupportEffects!(effects);
+        } finally {
+          ctx.onSupportDone?.();
+        }
+      })()
+    );
+  }
+
+  if (tasks.length) {
+    await Promise.allSettled(tasks); // do not block on either specifically
   }
 
   return { delta };

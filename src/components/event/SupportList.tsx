@@ -134,7 +134,8 @@ function SupportCard({
   const showDelta = typeof delta === "number" && delta !== 0;
   const showTrend = trend === "up" || trend === "down";
   const showNote = !!note;
-
+ // 25% threshold rule (reversible)
+ const isLow = pctDisplay < 25;
   // Colored badge bg + white strokes
   const badgeBg = ICON_BADGE_BG[id] ?? "bg-white/20";
 
@@ -156,10 +157,18 @@ function SupportCard({
             {/* mood emoji (left of percent), tween-pop when bucket changes */}
             <MoodEmojiTween percent={pctDisplay} variant={moodVariant} />
 
-            {/* percent pill (animated) – size controlled by PERCENT_FONT_CLASS */}
-            <span className={`${PERCENT_FONT_CLASS} leading-none px-2 py-1 rounded-full bg-white/10 border border-white/15`}>
-              {pctDisplay}%
-            </span>
+           {/* percent pill (animated) – size controlled by PERCENT_FONT_CLASS */}
+<span
+  className={[
+    PERCENT_FONT_CLASS,
+    "leading-none px-2 py-1 rounded-full bg-white/10 border border-white/15",
+    isLow ? "text-rose-300" : "text-white", // 25% rule
+  ].join(" ")}
+>
+  {pctDisplay}%
+</span>
+{isLow && <span className="ml-1 text-yellow-300">!</span>}
+
 
             {/* delta pill (tween-pop, persists) – size controlled by DELTA_FONT_CLASS */}
             {showDelta && (

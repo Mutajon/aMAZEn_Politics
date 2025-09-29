@@ -16,7 +16,11 @@ import React, {
 import { bgStyle } from "../lib/ui";
 import ResourceBar from "../components/event/ResourceBar";
 import SupportList, { type SupportItem, DefaultSupportIcons } from "../components/event/SupportList";
-import { NewsTickerDemo } from "../components/event/NewsTicker";
+// replace the demo import:
+import { NewsTicker} from "../components/event/NewsTicker";
+import type { TickerItem } from "../components/event/NewsTicker";
+import { fetchNewsTickerItems } from "../lib/newsTicker";
+
 import PlayerStatusStrip, { demoParams } from "../components/event/PlayerStatusStrip";
 import DilemmaCard, { demoDilemma } from "../components/event/DilemmaCard";
 import MirrorCard, { demoMirrorLine } from "../components/event/MirrorCard";
@@ -42,6 +46,8 @@ import { runConfirmPipeline } from "../lib/eventConfirm";
 import { actionsToDeckCards } from "../components/event/actionVisuals";
 import { pickIconForHolder } from "../lib/powerHolderIcon";
 import { narrationTextForDilemma } from "../lib/narration";
+import { analyzeSupport, type SupportEffect } from "../lib/supportAnalysis";
+import type { SupportEffectId } from "../lib/eventConfirm";
 
 //
 // Local types
@@ -53,6 +59,10 @@ type Trio = { people: number; middle: number; mom: number };
 // Constants
 //
 const EMPTY_HOLDERS: Readonly<PowerHolder[]> = Object.freeze([]);
+// Keep support % in [0,100] and round to int
+const clampPercent = (n: number): number =>
+  Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
+
 
 // ---------------------------------------------------------------------------
 // Component
@@ -66,6 +76,27 @@ export default function EventScreen(_props: Props) {
   const [vals, setVals] = useState<Trio>({ people: 50, middle: 50, mom: 50 });
   const [delta, setDelta] = useState<number | null>(null);
   const [trend, setTrend] = useState<"up" | "down" | null>(null);
+  
+  // Per-entity delta/trend for SupportList (so bars can show independent changes)
+const [supportDeltas, setSupportDeltas] = useState<{ people: number | null; middle: number | null; mom: number | null }>({
+  people: null,
+  middle: null,
+  mom: null,
+});
+const [supportTrends, setSupportTrends] = useState<{ people: "up" | "down" | null; middle: "up" | "down" | null; mom: "up" | "down" | null }>({
+  people: null,
+  middle: null,
+  mom: null,
+});
+// Short witty reason per entity (wired into SupportList "note")
+const [supportNotes, setSupportNotes] = useState<{ people: string; middle: string; mom: string }>({
+  people: "",
+  middle: "",
+  mom: "",
+});
+
+
+  
 
   // --- Middle support entity dynamic label/icon (once per screen mount) ---
   const [middleLabel, setMiddleLabel] = useState<string>("Congress");
@@ -101,11 +132,40 @@ export default function EventScreen(_props: Props) {
     setMiddleIcon(pickIconForHolder(top.name || ""));
     didInitMiddleRef.current = true;
   }, [holdersSnap, playerIndex]);
-
-  // Auto-load a dilemma when the screen mounts
+  const selectedRole = useRoleStore((s) => s.selectedRole);
+  const analysis = useRoleStore((s) => s.analysis);
+  const [newsItems, setNewsItems] = useState<TickerItem[]>([]);
+  const didInitNewsRef = useRef(false);
+  
+  // First day: generate 3 items about the player's entry
   useEffect(() => {
-    if (!current && !loading && !error) loadNext();
-  }, [current, loading, error, loadNext]);
+    if (!current) return;
+    if (didInitNewsRef.current) return;
+  
+    if (day <= 1) {
+      didInitNewsRef.current = true;
+      fetchNewsTickerItems({
+        day,
+        role: selectedRole,
+        systemName: analysis?.systemName,
+        // epoch: optional; server will infer if omitted
+        last: null,
+      }).then((items) => setNewsItems(items));
+    }
+  }, [current, day, selectedRole, analysis?.systemName]);
+  
+  
+ // Auto-load a dilemma once role/system are ready (prevents default fallback)
+const selectedRoleForLoad = useRoleStore(s => s.selectedRole || "");
+const systemNameForLoad  = useRoleStore(s => s.analysis?.systemName || "");
+
+useEffect(() => {
+  const ready = Boolean(selectedRoleForLoad || systemNameForLoad);
+  if (!current && !loading && !error && ready) {
+    loadNext();
+  }
+}, [current, loading, error, loadNext, selectedRoleForLoad, systemNameForLoad]);
+
 
   const daysLeft = Math.max(0, totalDays - day + 1);
 
@@ -118,7 +178,7 @@ export default function EventScreen(_props: Props) {
       if (!current) return;
       setMirrorLoading(true);
       setMirrorText("…the mirror squints, light pooling in the glass…");
-      const text = await requestMirrorDilemmaLine({ topWhat: [], topWhence: [], topOverall: [] });
+      const text = await requestMirrorDilemmaLine();
       if (alive) {
         setMirrorText(text);
         setMirrorLoading(false);
@@ -189,6 +249,67 @@ export default function EventScreen(_props: Props) {
     }
   }, [canShowDilemma, narrationEnabled]);
 
+
+// 1) Fire AI to compute support effects (people/middle/mom)
+function analyzeSupportWrapper(text: string) {
+  const ctx = {
+    systemName: analysis?.systemName || "",
+    holders: Array.isArray(analysis?.holders)
+      ? analysis!.holders.map((h) => ({ name: h.name, percent: h.percent }))
+      : [],
+    playerIndex: typeof analysis?.playerIndex === "number" ? analysis!.playerIndex : null,
+    day: day || 1,
+  };
+  return analyzeSupport(text, ctx);
+}
+
+
+// 2) Apply effects locally: update percents, per-entity delta/trend
+function applySupportEffects(effects: SupportEffect[]) {
+  if (!effects?.length) return;
+
+  // 1) Update percents + per-entity delta/trend
+  setVals((prev) => {
+    const next = { ...prev };
+    const newDeltas: { people: number | null; middle: number | null; mom: number | null } = {
+      people: null,
+      middle: null,
+      mom: null,
+    };
+    const newTrends: { people: "up" | "down" | null; middle: "up" | "down" | null; mom: "up" | "down" | null } = {
+      people: null,
+      middle: null,
+      mom: null,
+    };
+
+    for (const e of effects) {
+      const id = e.id as SupportEffectId;
+      const before = next[id as keyof typeof next] as unknown as number;
+      const after = clampPercent(before + e.delta);
+      next[id as keyof typeof next] = after as any;
+
+      newDeltas[id] = e.delta;
+      newTrends[id] = e.delta > 0 ? "up" : e.delta < 0 ? "down" : null;
+    }
+
+    setSupportDeltas(newDeltas);
+    setSupportTrends(newTrends);
+    return next;
+  });
+
+  // 2) Store witty reason lines to display as SupportList "note"
+  setSupportNotes((prev) => {
+    const out = { ...prev };
+    for (const e of effects) {
+      if (e.id === "people" && e.explain) out.people = e.explain;
+      if (e.id === "middle" && e.explain) out.middle = e.explain;
+      if (e.id === "mom" && e.explain)    out.mom    = e.explain;
+    }
+    return out;
+  });
+}
+
+
   // Compass FX: keep pills until manual dismiss later (TTL 1h for now)
   const { applyWithPings, pings } = useCompassFX(60 * 60 * 1000);
 
@@ -222,8 +343,9 @@ export default function EventScreen(_props: Props) {
       accentClass: "bg-emerald-600",
       icon: <DefaultSupportIcons.PeopleIcon className="w-4 h-4" />,
       moodVariant: "civic",
-      delta,
-      trend,
+      delta: supportDeltas.people,     
+    trend: supportTrends.people,
+    note: supportNotes.people,
     },
     {
       id: "middle",
@@ -232,8 +354,9 @@ export default function EventScreen(_props: Props) {
       accentClass: "bg-amber-600",
       icon: middleIcon,
       moodVariant: "civic",
-      delta,
-      trend,
+      delta: supportDeltas.middle,
+    trend: supportTrends.middle,
+    note: supportNotes.middle,
     },
     {
       id: "mom",
@@ -242,8 +365,9 @@ export default function EventScreen(_props: Props) {
       accentClass: "bg-rose-600",
       icon: <DefaultSupportIcons.HeartIcon className="w-4 h-4" />,
       moodVariant: "empathetic",
-      delta,
-      trend,
+      delta: supportDeltas.mom,
+      trend: supportTrends.mom,
+      note: supportNotes.mom,
     },
   ];
 
@@ -253,7 +377,15 @@ export default function EventScreen(_props: Props) {
     [current]
   );
 
-  const overlayPreparing = !!current && !canShowDilemma; // hide dilemma until narration is ready
+  const overlayPreparing =
+  (!!current && !canShowDilemma) || (!!(current as any)?._isFallback === true);
+ // hide dilemma until narration is ready
+ useEffect(() => {
+  const c = current as any;
+  if (!c || !c._isFallback) return;
+  const t = setTimeout(() => loadNext(), 800);
+  return () => clearTimeout(t);
+}, [current, loadNext]);
 
   return (
     <div className="min-h-[100dvh] px-5 py-5" style={bgStyle}>
@@ -274,8 +406,10 @@ export default function EventScreen(_props: Props) {
         {/* Support values (3 entities), animated */}
         <SupportList items={items} animatePercent={true} animateDurationMs={1000} />
 
+        
         {/* News ticker */}
-        <NewsTickerDemo />
+        <NewsTicker items={newsItems} />
+
 
         {/* Player status strip: dynamic params (left) + portrait (right) */}
         <PlayerStatusStrip avatarSrc={avatarUrl || undefined} params={demoParams()} />
@@ -329,8 +463,18 @@ export default function EventScreen(_props: Props) {
                   analyzeText,
                   onAnalyzeStart: () => setCompassLoading(true),
                   onAnalyzeDone: () => setCompassLoading(false),
+                  analyzeSupport: analyzeSupportWrapper,
+                  applySupportEffects,
                 }
               );
+              // AFTER runConfirmPipeline(...) (keep your existing code above intact)
+void fetchNewsTickerItems({
+  day: day + 0, // reacts to the just-made choice
+  role: selectedRole,
+  systemName: analysis?.systemName,
+  last: { title: a.title, summary: a.summary, cost: a.cost },
+}).then((items) => setNewsItems(items));
+
             }}
             onSuggest={(text?: string) => {
               void runConfirmPipeline(
@@ -345,8 +489,17 @@ export default function EventScreen(_props: Props) {
                   analyzeText,
                   onAnalyzeStart: () => setCompassLoading(true),
                   onAnalyzeDone: () => setCompassLoading(false),
+                  analyzeSupport: analyzeSupportWrapper,
+                  applySupportEffects,
                 }
               );
+              void fetchNewsTickerItems({
+                day: day + 0,
+                role: selectedRole,
+                systemName: analysis?.systemName,
+                last: { title: "Player suggestion", summary: String(text || "").slice(0, 140), cost: -300 },
+              }).then((items) => setNewsItems(items));
+              
             }}
             dilemma={{ title: current.title, description: current.description }}
           />
