@@ -572,6 +572,86 @@ app.post("/api/compass-analyze", async (req, res) => {
     return res.status(502).json({ items: [] });
   }
 });
+/// -------------------- News ticker (LLM) ----------------------------
+app.post("/api/news-ticker", async (req, res) => {
+  try {
+    const day = Number(req.body?.day || 1);
+    const role = String(req.body?.role || "").trim();
+    const systemName = String(req.body?.systemName || "").trim();
+    const epochReq = String(req.body?.epoch || "").toLowerCase(); // "modern" | "ancient" | "futuristic" (optional)
+    const last = req.body?.last || null; // { title, summary, cost? }
+
+    // Heuristic epoch if caller didn't pass one
+    function classifyEpoch(sys = "", r = "") {
+      const t = (sys + " " + r).toLowerCase();
+      if (/(space|colony|cyber|ai|interstellar|orbital|futur)/.test(t)) return "futuristic";
+      if (/(monarch|king|queen|theocrat|clergy|empire|duke|feud|sultan|caliph)/.test(t)) return "ancient";
+      return "modern";
+    }
+    const epoch = epochReq || classifyEpoch(systemName, role);
+
+    const mode = day <= 1 ? "onboarding" : "reaction";
+
+    const system =
+      "You are a wry newsroom for a political satire game. " +
+      "Write **3 VERY amusing, satirical** ticker chips reacting to events. " +
+      "Return STRICT JSON ARRAY ONLY (length 3). " +
+      'Each item: {"id":"str","kind":"news|social","tone":"up|down|neutral","text":"<=160 chars"}. ' +
+      "Be punchy, one-liners, no hashtags/emojis.";
+
+    const user = [
+      `MODE: ${mode}`,                                  // onboarding | reaction
+      `EPOCH: ${epoch}`,                                // modern | ancient | futuristic
+      `ROLE: ${role || "unknown role"}`,
+      `SYSTEM: ${systemName || "unknown system"}`,
+      last
+        ? `LAST CHOICE: ${String(last.title || "")}. ${String(last.summary || "")}. COST=${Number(last.cost || 0)}.`
+        : "LAST CHOICE: n/a",
+      "",
+      "STYLE & SOURCES by EPOCH:",
+      "- modern → TV/newspapers/social: State TV, The Daily Ledger, @CivicWatch.",
+      "- ancient → town crier, market gossip, palace scribe, temple notices, neighbors’ whispers.",
+      "- futuristic → Orbital Wire, HoloForum, Neuralfeed, Corporate Feeds.",
+      "",
+      "ONBOARDING (day 1): 3 items welcoming/covering the player's rise to power.",
+      "REACTION (day ≥2): 3 items reacting directly to LAST CHOICE.",
+      "",
+      "RULES:",
+      "- Mix sources (at least one ‘news’ and one ‘social’).",
+      "- Each text must be a single sentence, **satirical and witty**, ≤160 chars.",
+      "- Encode the source naturally in the line (e.g., 'Town Crier:', 'The Daily Ledger:', '@CivicWatch:').",
+      "- JSON ARRAY ONLY; no prose outside the array.",
+    ].join("\n");
+
+    const items = await aiJSON({
+      system,
+      user,
+      model: MODEL_ANALYZE, // reuse your lightweight JSON-capable model
+      fallback: [
+        { id: "fallback-1", kind: "news",   tone: "neutral", text: "The Daily Ledger: New ruler arrives; promises change, audits the cutlery." },
+        { id: "fallback-2", kind: "news",   tone: "up",      text: "State Bulletin: Transition smooth—flags ironed, egos pending." },
+        { id: "fallback-3", kind: "social", tone: "neutral", text: "@CivicWatch: We’ll clap when policy lands, not just planes." },
+      ],
+    });
+
+    // Sanitize minimally
+    const coerce = (x, i) => {
+      const id = String(x?.id || `news-${i}`);
+      const kind = String(x?.kind).toLowerCase() === "social" ? "social" : "news";
+      const tone0 = String(x?.tone || "neutral").toLowerCase();
+      const tone = tone0 === "up" || tone0 === "down" ? tone0 : "neutral";
+      const text = String(x?.text || "").slice(0, 160);
+      return { id, kind, tone, text };
+    };
+
+    const out = Array.isArray(items) ? items.slice(0, 3).map(coerce) : [];
+    if (!out.length) return res.json({ items: [] });
+    return res.json({ items: out });
+  } catch (e) {
+    console.error("Error in /api/news-ticker:", e?.message || e);
+    return res.status(502).json({ items: [] });
+  }
+});
 
 // -------------------- Dilemma (AI, minimal prompt) ---------------------------
 app.post("/api/dilemma", async (req, res) => {
@@ -857,6 +937,106 @@ app.post("/api/validate-suggestion", async (req, res) => {
     // eslint-disable-next-line no-console
     console.error("validate-suggestion error:", err?.message || err);
     return res.status(500).json({ error: "Validator failed" });
+  }
+});
+
+// -------------------- Support change analysis (LLM) ------------------------
+app.post("/api/support-analyze", async (req, res) => {
+  try {
+    const text = String(req.body?.text || "").trim();
+    const ctx = req.body?.ctx || {};
+    if (!text) return res.status(400).json({ error: "Missing 'text'." });
+
+    // Derive "middleName" = strongest non-player holder
+    const holders = Array.isArray(ctx?.holders) ? ctx.holders : [];
+    const pIndex =
+      typeof ctx?.playerIndex === "number" && Number.isFinite(ctx.playerIndex)
+        ? ctx.playerIndex
+        : null;
+
+    const withIdx = holders.map((h, i) => ({ ...h, i }));
+    const candidates =
+      pIndex == null ? withIdx : withIdx.filter((h) => h.i !== pIndex);
+    const top =
+      candidates.length > 0
+        ? candidates.reduce((a, b) => (b.percent > a.percent ? b : a), candidates[0])
+        : null;
+    const middleName = String(top?.name || "the establishment");
+
+    const system = [
+      "You assess how a political move shifts short-term support among three blocs:",
+      "- 'people' (general public / the street),",
+      "- 'middle' (the main non-player power holder),",
+      "- 'mom' (the leader’s intimate/personal constituency).",
+      "",
+      "OUTPUT: STRICT JSON ARRAY ONLY (max 3 items).",
+      "Each item: { id: 'people|middle|mom', level: 'low|medium|large|extreme', polarity: 'positive|negative', explain: 'ONE SHORT SENTENCE' }",
+      "",
+      "STYLE RULES for `explain`:",
+      "- Tailor it to the decision (TEXT) and the context (system, blocs).",
+      "- Keep it vivid and specific; 8–18 words; no hashtags/emojis.",
+      "- people → speak as a crowd reaction to the move.",
+      "- middle → reference or speak as " + middleName + " (committees, generals, bankers, etc.).",
+      "- mom → direct speech to the player using 'you' (proud or scolding).",
+      "- Avoid boilerplate like 'mixed reactions'; pick the dominant feel.",
+      "",
+      "MAGNITUDE:",
+      "- Use plausibility: low=5, medium=10, large=15, extreme=20 (we map levels to these deltas).",
+      "- Omit blocs that stay neutral.",
+    ].join("\n");
+
+    const user = [
+      `TEXT: """${text}"""`,
+      "",
+      "CONTEXT:",
+      `- systemName: ${ctx?.systemName || "unknown"}`,
+      `- holders: ${JSON.stringify(holders)}`,
+      `- playerIndex: ${pIndex === null ? "null" : pIndex}`,
+      `- middleName: ${middleName}`,
+      `- day: ${ctx?.day ?? "?"}`,
+      "",
+      "TASK:",
+      "Return JSON ARRAY only. Example:",
+      `[{"id":"people","level":"medium","polarity":"positive","explain":"Crowds welcome the curfew easing tonight."}]`,
+    ].join("\n");
+
+    const items = await aiJSON({
+      system,
+      user,
+      model: MODEL_ANALYZE,   // keep your existing model setting
+      temperature: 0.25,      // slightly tighter for punchy lines
+      fallback: [],
+    });
+
+    // Convert level -> absolute delta (authoritative mapping)
+    const SCALE = { low: 5, medium: 10, large: 15, extreme: 20 };
+
+    const out = Array.isArray(items)
+      ? items
+          .map((x) => {
+            const rawId = String(x?.id || "").toLowerCase();
+            const id = rawId === "people" || rawId === "middle" || rawId === "mom" ? rawId : null;
+            if (!id) return null;
+
+            const level = String(x?.level || "").toLowerCase();
+            const base = SCALE[level] ?? 0;
+            if (!base) return null;
+
+            const pol = String(x?.polarity || "").toLowerCase();
+            const sign = pol === "negative" ? -1 : 1;
+
+            const explain = String(x?.explain || "").trim().slice(0, 140); // allow a full sentence
+            const delta = Math.max(-20, Math.min(20, sign * base));
+
+            return { id, delta, explain };
+          })
+          .filter(Boolean)
+      : [];
+
+    return res.json({ items: out });
+  } catch (e) {
+    console.error("Error in /api/support-analyze:", e?.message || e);
+    return res.status(502).json({ items: [] });
   }
 });
 
