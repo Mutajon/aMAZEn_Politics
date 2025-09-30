@@ -94,7 +94,6 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
   }, [character?.avatarUrl, generateImages]);
 
   // layout
-  const AVATAR = 180;
   const MIRROR = 180;
 
   return (

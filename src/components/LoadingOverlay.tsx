@@ -59,7 +59,7 @@ export default function LoadingOverlay({
   title = "Working on it…",
   quotes,                                 // legacy
   quotesRich = POLITICS_QUOTES,           // default to the list you provided
-  periodMs = 5500,
+  periodMs = 7500,
   onCancel,
   dismissible = false,
 }: Props) {

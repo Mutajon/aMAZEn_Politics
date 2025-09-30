@@ -7,7 +7,7 @@ import type { PushFn } from "../lib/router";
 export default function IntroScreen({ push }: { push: PushFn }) {
   const paragraphs = [
     "Ready to be aMAZEd?",
-    "Life is a branching journey where every choice can lead to a different outcome.",
+    "Life is a branching journey where every choice reflects yourself and leads to a different outcome.",
     "In aMaze’n Politics you travel a constantly shifting maze, where private choices intersect with public life.",
     "Know yourself—and become your best!",
     "Ready to pick your path?",
