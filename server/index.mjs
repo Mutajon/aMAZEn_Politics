@@ -66,11 +66,14 @@ const ALLOWED_SYSTEMS = [
   "Kakistocracy",
 ];
 // Helper: call Chat Completions and try to parse JSON from the reply
+// Automatically falls back to gpt-4o if quota error (429) is encountered
 async function aiJSON({ system, user, model = CHAT_MODEL_DEFAULT, temperature = undefined, fallback = null }) {
-  try {
-    // Build payload WITHOUT temperature by default.
+  const FALLBACK_MODEL = "gpt-4o";
+
+  // Helper function to make the actual API call
+  async function makeRequest(modelToUse) {
     const payload = {
-      model,
+      model: modelToUse,
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
@@ -105,26 +108,55 @@ async function aiJSON({ system, user, model = CHAT_MODEL_DEFAULT, temperature = 
       if (m) return JSON.parse(m[0]);
       return fallback;
     }
+  }
+
+  try {
+    // FIRST ATTEMPT: Try with the requested model
+    return await makeRequest(model);
   } catch (e) {
-    console.error("[server] aiJSON error:", e?.message || e);
+    console.error(`[server] aiJSON error with model ${model}:`, e?.message || e);
+
+    // Check if this is a quota error (429) or insufficient_quota
+    const isQuotaError =
+      e?.message?.includes("429") ||
+      e?.message?.includes("insufficient_quota") ||
+      e?.message?.includes("quota");
+
+    if (isQuotaError && model !== FALLBACK_MODEL) {
+      // FALLBACK ATTEMPT: Try with cheaper model
+      console.log(`[server] ⚠️  QUOTA ERROR DETECTED - Falling back from ${model} to ${FALLBACK_MODEL}`);
+      try {
+        const result = await makeRequest(FALLBACK_MODEL);
+        console.log(`[server] ✅ Fallback to ${FALLBACK_MODEL} succeeded`);
+        return result;
+      } catch (fallbackError) {
+        console.error(`[server] ❌ Fallback to ${FALLBACK_MODEL} also failed:`, fallbackError?.message || fallbackError);
+        return fallback;
+      }
+    }
+
+    // Not a quota error, or already tried fallback model
     return fallback;
   }
 }
 
 
 async function aiText({ system, user, model = CHAT_MODEL_DEFAULT, temperature }) {
-  try {
+  const FALLBACK_MODEL = "gpt-4o";
+
+  // Helper function to make the actual API call
+  async function makeRequest(modelToUse) {
     const body = {
-      model,
+      model: modelToUse,
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
       ],
     };
-  // Only include temperature if it is exactly 1; otherwise omit entirely.
-if (typeof temperature === "number" && temperature === 1) {
-  body.temperature = 1;
-}
+    // Only include temperature if it is exactly 1; otherwise omit entirely.
+    if (typeof temperature === "number" && temperature === 1) {
+      body.temperature = 1;
+    }
 
     const resp = await fetch(CHAT_URL, {
       method: "POST",
@@ -140,8 +172,34 @@ if (typeof temperature === "number" && temperature === 1) {
     }
     const data = await resp.json();
     return (data?.choices?.[0]?.message?.content ?? "").trim();
+  }
+
+  try {
+    // FIRST ATTEMPT: Try with the requested model
+    return await makeRequest(model);
   } catch (e) {
-    console.error("[server] aiText error:", e?.message || e);
+    console.error(`[server] aiText error with model ${model}:`, e?.message || e);
+
+    // Check if this is a quota error (429) or insufficient_quota
+    const isQuotaError =
+      e?.message?.includes("429") ||
+      e?.message?.includes("insufficient_quota") ||
+      e?.message?.includes("quota");
+
+    if (isQuotaError && model !== FALLBACK_MODEL) {
+      // FALLBACK ATTEMPT: Try with cheaper model
+      console.log(`[server] ⚠️  QUOTA ERROR DETECTED - Falling back from ${model} to ${FALLBACK_MODEL}`);
+      try {
+        const result = await makeRequest(FALLBACK_MODEL);
+        console.log(`[server] ✅ Fallback to ${FALLBACK_MODEL} succeeded`);
+        return result;
+      } catch (fallbackError) {
+        console.error(`[server] ❌ Fallback to ${FALLBACK_MODEL} also failed:`, fallbackError?.message || fallbackError);
+        return "";
+      }
+    }
+
+    // Not a quota error, or already tried fallback model
     return "";
   }
 }
@@ -461,17 +519,35 @@ app.post("/api/mirror-summary", async (req, res) => {
     const topWhat    = Array.isArray(req.body?.topWhat)    ? req.body.topWhat    : [];
     const topWhence  = Array.isArray(req.body?.topWhence)  ? req.body.topWhence  : [];
     const topOverall = Array.isArray(req.body?.topOverall) ? req.body.topOverall : [];
+    const dilemma    = req.body?.dilemma || null;
 
     const system =
-      "You are a witty, magical mirror. Respond ONLY with 1–2 short sentences (max ~45 words). " +
+      "You are a witty, magical mirror offering amusing advice. Respond ONLY with 1–2 short sentences (max ~45 words). " +
       "No lists, no headers, no labels. Avoid jargon and gamey terms. Natural, playful tone.";
 
-    const user =
-      "Given the player's value signals, craft an amusing 1–2 sentence appraisal. " +
-      "Tell them WHAT seems to drive them and HOW they mainly justify it (paraphrase labels). " +
-      "Top WHAT: " + JSON.stringify(topWhat) + "\n" +
-      "Top WHENCE: " + JSON.stringify(topWhence) + "\n" +
-      "Overall: " + JSON.stringify(topOverall);
+    let user;
+    if (dilemma) {
+      // New: Provide dilemma-specific recommendations based on personality
+      user =
+        "Given the current dilemma and the player's strongest values, offer an amusing recommendation. " +
+        "Reference their personality traits and suggest which option might suit them best (or warn playfully against certain choices). " +
+        "Be witty and specific to the situation.\n\n" +
+        "DILEMMA: " + dilemma.title + "\n" +
+        "SITUATION: " + dilemma.description + "\n" +
+        "OPTIONS: " + dilemma.actions.map(a => `${a.id.toUpperCase()}) ${a.title} - ${a.summary}`).join(", ") + "\n\n" +
+        "PLAYER'S STRONGEST VALUES:\n" +
+        "Top WHAT (goals): " + JSON.stringify(topWhat) + "\n" +
+        "Top WHENCE (justification): " + JSON.stringify(topWhence) + "\n" +
+        "Overall: " + JSON.stringify(topOverall);
+    } else {
+      // Fallback: Original personality appraisal for when no dilemma context
+      user =
+        "Given the player's value signals, craft an amusing 1–2 sentence appraisal. " +
+        "Tell them WHAT seems to drive them and HOW they mainly justify it (paraphrase labels). " +
+        "Top WHAT: " + JSON.stringify(topWhat) + "\n" +
+        "Top WHENCE: " + JSON.stringify(topWhence) + "\n" +
+        "Overall: " + JSON.stringify(topOverall);
+    }
 
     // tiny retry wrapper
     const tryOnce = () => aiText({ system, user, model: MODEL_MIRROR });
@@ -610,11 +686,11 @@ app.post("/api/news-ticker", async (req, res) => {
     const mode = day <= 1 ? "onboarding" : "reaction";
 
     const system =
-      "You are a wry newsroom for a political satire game. " +
-      "Write **3 VERY amusing, satirical** ticker chips reacting to events. " +
+      "You are a wry political satire writer for a political simulation game. " +
+      "Write **3 VERY short, amusing, satirical** ticker items reacting to events. " +
       "Return STRICT JSON ARRAY ONLY (length 3). " +
-      'Each item: {"id":"str","kind":"news|social","tone":"up|down|neutral","text":"<=160 chars"}. ' +
-      "Be punchy, one-liners, no hashtags/emojis.";
+      'Each item: {"id":"str","kind":"news|social","tone":"up|down|neutral","text":"<=70 chars"}. ' +
+      "Be witty, punchy one-liners with NO source names, NO hashtags, NO emojis.";
 
     const user = [
       `MODE: ${mode}`,                                  // onboarding | reaction
@@ -625,31 +701,50 @@ app.post("/api/news-ticker", async (req, res) => {
         ? `LAST CHOICE: ${String(last.title || "")}. ${String(last.summary || "")}. COST=${Number(last.cost || 0)}.`
         : "LAST CHOICE: n/a",
       "",
-      "STYLE & SOURCES by EPOCH:",
-      "- modern → TV/newspapers/social: State TV, The Daily Ledger, @CivicWatch.",
-      "- ancient → town crier, market gossip, palace scribe, temple notices, neighbors’ whispers.",
-      "- futuristic → Orbital Wire, HoloForum, Neuralfeed, Corporate Feeds.",
+      "EXAMPLES of good short amusing items (follow this style):",
+      "- \"New leader sworn in; GPS still says 'recalculating'\"",
+      "- \"First decree: coffee upgraded to national security asset\"",
+      "- \"Parliament applauds; Wi-Fi password changes to 'democracy123'\"",
+      "- \"Leader raises taxes; piggy banks file for asylum\"",
+      "- \"Finance minister smiles; wallets request a moment of silence\"",
       "",
-      "ONBOARDING (day 1): 3 items welcoming/covering the player's rise to power.",
-      "REACTION (day ≥2): 3 items reacting directly to LAST CHOICE.",
+      "ONBOARDING (day 1): 3 witty items about the player taking power.",
+      "REACTION (day ≥2): 3 witty items reacting directly to LAST CHOICE consequences.",
       "",
       "RULES:",
-      "- Mix sources (at least one ‘news’ and one ‘social’).",
-      "- Each text must be a single sentence, **satirical and witty**, ≤160 chars.",
-      "- Encode the source naturally in the line (e.g., 'Town Crier:', 'The Daily Ledger:', '@CivicWatch:').",
-      "- JSON ARRAY ONLY; no prose outside the array.",
+      "- Each text MAXIMUM 70 characters total",
+      "- NO source names (like 'Daily News:', '@Twitter:', etc.)",
+      "- Single sentence, satirical and witty",
+      "- Mix of 'news' and 'social' kinds",
+      "- JSON ARRAY ONLY; no prose outside the array",
     ].join("\n");
+
+    console.log("[news-ticker] Request params:", { day, role: role.slice(0, 50), systemName, mode, epoch });
 
     const items = await aiJSON({
       system,
       user,
       model: MODEL_ANALYZE, // reuse your lightweight JSON-capable model
-      fallback: [
-        { id: "fallback-1", kind: "news",   tone: "neutral", text: "The Daily Ledger: New ruler arrives; promises change, audits the cutlery." },
-        { id: "fallback-2", kind: "news",   tone: "up",      text: "State Bulletin: Transition smooth—flags ironed, egos pending." },
-        { id: "fallback-3", kind: "social", tone: "neutral", text: "@CivicWatch: We’ll clap when policy lands, not just planes." },
-      ],
+      fallback: null, // No fallbacks - always generate based on actual context
     });
+
+    console.log("[news-ticker] AI returned:", {
+      itemsType: typeof items,
+      isArray: Array.isArray(items),
+      isNull: items === null,
+      itemsValue: items
+    });
+
+    // Check if items is null (API failure) and provide test data for development
+    if (items === null) {
+      console.log("[news-ticker] AI generation failed, providing test data for development");
+      const testItems = [
+        { id: "test-1", kind: "news", tone: "neutral", text: "Markets react to latest policy announcements" },
+        { id: "test-2", kind: "social", tone: "up", text: "Citizens praise new government initiative" },
+        { id: "test-3", kind: "news", tone: "down", text: "Opposition questions economic strategy" }
+      ];
+      return res.json({ items: testItems });
+    }
 
     // Sanitize minimally
     const coerce = (x, i) => {
@@ -657,15 +752,27 @@ app.post("/api/news-ticker", async (req, res) => {
       const kind = String(x?.kind).toLowerCase() === "social" ? "social" : "news";
       const tone0 = String(x?.tone || "neutral").toLowerCase();
       const tone = tone0 === "up" || tone0 === "down" ? tone0 : "neutral";
-      const text = String(x?.text || "").slice(0, 160);
+      const text = String(x?.text || "").slice(0, 70);
       return { id, kind, tone, text };
     };
 
     const out = Array.isArray(items) ? items.slice(0, 3).map(coerce) : [];
-    if (!out.length) return res.json({ items: [] });
+    console.log("[news-ticker] Returning items:", out.length, "items");
     return res.json({ items: out });
   } catch (e) {
     console.error("Error in /api/news-ticker:", e?.message || e);
+
+    // When OpenAI quota is exceeded, provide minimal test data to see loading sequence work
+    if (e?.message?.includes("insufficient_quota") || e?.message?.includes("429")) {
+      console.log("[news-ticker] OpenAI quota exceeded, providing test data for development");
+      const testItems = [
+        { id: "test-1", kind: "news", tone: "neutral", text: "Markets react to latest policy announcements" },
+        { id: "test-2", kind: "social", tone: "up", text: "Citizens praise new government initiative" },
+        { id: "test-3", kind: "news", tone: "down", text: "Opposition questions economic strategy" }
+      ];
+      return res.json({ items: testItems });
+    }
+
     return res.status(502).json({ items: [] });
   }
 });
@@ -682,17 +789,31 @@ app.post("/api/dilemma", async (req, res) => {
     const roleRaw = req.body?.role;
     const systemRaw = req.body?.systemName;
 
-    const role = (typeof roleRaw === "string" && roleRaw.trim()) ? roleRaw.trim() : "Unicorn King";
-    const systemName = (typeof systemRaw === "string" && systemRaw.trim()) ? systemRaw.trim() : "Divine Right Monarchy";
+    const role = (roleRaw && typeof roleRaw === "string" && roleRaw.trim()) ? roleRaw.trim() : "Unicorn King";
+    const systemName = (systemRaw && typeof systemRaw === "string" && systemRaw.trim()) ? systemRaw.trim() : "Divine Right Monarchy";
     const settings    = req.body?.settings || {};
     const day         = Number(req.body?.day || 1);
     const totalDays   = Number(req.body?.totalDays || 7);
     const isFirst     = !!req.body?.previous?.isFirst;
     const isLast      = !!req.body?.previous?.isLast;
     const compassFlat = req.body?.compassValues || {};
+
+    // Enhanced context for intelligent dilemma generation
+    const enhancedContext = req.body?.enhancedContext || null;
+    const lastChoice = req.body?.lastChoice || null;
+    const recentTopics = req.body?.recentTopics || [];
+    const topicCounts = req.body?.topicCounts || {};
+    const supports = req.body?.supports || {};
+
     if (debug) {
       const compassKeys = compassFlat ? Object.keys(compassFlat).length : 0;
-      console.log("[/api/dilemma] IN:", { role, systemName, day, totalDays, compassKeys });
+      console.log("[/api/dilemma] IN:", {
+        role, systemName, day, totalDays, compassKeys,
+        hasEnhancedContext: !!enhancedContext,
+        hasLastChoice: !!lastChoice,
+        recentTopicsCount: recentTopics.length,
+        topicCountsKeys: Object.keys(topicCounts).length
+      });
     }
     
     // Best-effort nudge only
@@ -706,7 +827,8 @@ app.post("/api/dilemma", async (req, res) => {
         ? `Focus topic: ${String(settings.dilemmasSubject)}.`
         : "";
 
-        const system = [
+        // Build enhanced system prompt based on available context
+        let systemParts = [
           "You write **short, punchy political situations** for a choice-based mobile game.",
           "",
           "STYLE & TONE",
@@ -715,31 +837,86 @@ app.post("/api/dilemma", async (req, res) => {
           "- Natural language (no bullet points), feels like in-world events, demands, questions or follow-ups from real actors.",
           "",
           "WORLD FIT & CONTEXT",
-          "- Reflect the CURRENT POLITICAL SYSTEM’s feel. If Absolute Monarchy: decisions are swift and intimidating; if Citizens' Assembly: the player casts a vote and must live with the aggregate outcome.",
+          "- Reflect the CURRENT POLITICAL SYSTEM's feel. If Absolute Monarchy: decisions are swift and intimidating; if Citizens' Assembly: the player casts a vote and must live with the aggregate outcome.",
           "- If a focus topic is provided, center the situation on it.",
           "- If DAY is first, prefer a challenge that arises immediately from the leadership change. If DAY is last, create an especially high-stakes climax that pays off recent tensions.",
-          "- Consider the player’s **top Compass components** (list provided).",
+          "- Consider the player's **top Compass components** (list provided)."
+        ];
+
+        // Add enhanced context rules if available
+        if (enhancedContext) {
+          systemParts.push(
+            "",
+            "INTELLIGENT CONTEXTUAL GENERATION",
+            "- BUILD ON LAST CHOICE: Reference the previous decision's consequences naturally, showing realistic political cause-and-effect.",
+            "- SUPPORT DYNAMICS: If any constituency support is below 30%, create situations that could help recover it. If above 70%, show challenges that test their loyalty.",
+            "- TOPIC DIVERSITY: Avoid repeating the same topic too frequently. If recent topics are provided, choose different areas unless continuation is dramatically compelling.",
+            "- POWER HOLDER TENSIONS: Incorporate conflicts with specific power holders when politically realistic.",
+            "- COMPASS-DRIVEN SITUATIONS: Create scenarios that test the player's strongest political values in meaningful ways."
+          );
+        }
+
+        systemParts.push(
           "",
           "OUTPUT SHAPE (STRICT JSON)",
-          '{"title":"","description":"","actions":[{"id":"a","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale"},' +
-          '{"id":"b","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale"},' +
-          '{"id":"c","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale"}]}',
+          '{"title":"","description":"","actions":[{"id":"a","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}],' +
+          '{"id":"b","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}],' +
+          '{"id":"c","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}],' +
+          '"topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}',
           "",
           "COSTS (SIGN & MAGNITUDE)",
           "- SIGN: Negative=spend/outflow. Positive=revenue/inflow.",
           "- Magnitudes: 0, ±50, ±100, ±150, ±200, ±250.",
           "- Reserve +300..+500 ONLY for broad tax/windfall/aid cases."
-        ].join("\n");
+        );
+
+        const system = systemParts.join("\n");
         
 
-    const user =
-      `ROLE: ${role}\n` +
-      `POLITICAL SYSTEM: ${systemName}\n` +
-      `${focusLine}\n` +
-      `DAY: ${day} of ${totalDays} (${isFirst ? "first" : isLast ? "last" : "mid-campaign"})\n` +
-      `TOP COMPASS COMPONENTS (0..10): ${topCompass.join(", ") || "n/a"}\n` +
-      "TASK: Produce exactly one short situation with exactly three conflicting ways to respond.\n" +
-      "Return STRICT JSON ONLY in the shape specified.";
+    // Build enhanced user prompt
+    let userParts = [
+      `ROLE: ${role}`,
+      `POLITICAL SYSTEM: ${systemName}`,
+      focusLine,
+      `DAY: ${day} of ${totalDays} (${isFirst ? "first" : isLast ? "last" : "mid-campaign"})`,
+      `TOP COMPASS COMPONENTS (0..10): ${topCompass.join(", ") || "n/a"}`
+    ];
+
+    // Add contextual information if available
+    if (enhancedContext) {
+      // Add support levels
+      if (supports.people !== undefined || supports.middle !== undefined || supports.mom !== undefined) {
+        userParts.push(`CURRENT SUPPORT: People ${supports.people || 'n/a'}%, ${enhancedContext.powerHolders?.[1]?.name || 'Middle'} ${supports.middle || 'n/a'}%, Personal Allies ${supports.mom || 'n/a'}%`);
+      }
+
+      // Add last choice context
+      if (lastChoice && lastChoice.title) {
+        userParts.push(`PREVIOUS DECISION: "${lastChoice.title}" - ${lastChoice.summary || 'Player chose this action last turn'}`);
+      }
+
+      // Add topic diversity information
+      if (recentTopics.length > 0) {
+        userParts.push(`RECENT TOPICS (avoid repeating): ${recentTopics.slice(0, 3).join(", ")}`);
+      }
+
+      // Add power holder context
+      if (enhancedContext.powerHolders && enhancedContext.powerHolders.length > 0) {
+        const holders = enhancedContext.powerHolders.slice(0, 3).map(h => `${h.name} (${h.percent}%)`).join(", ");
+        userParts.push(`POWER HOLDERS: ${holders}`);
+      }
+
+      // Add compass tensions if available
+      if (enhancedContext.compassTensions && enhancedContext.compassTensions.length > 0) {
+        userParts.push(`COMPASS TENSIONS: Player values ${enhancedContext.compassTensions.join(", ")} - create scenarios that test these`);
+      }
+    }
+
+    userParts.push(
+      "TASK: Produce exactly one short situation with exactly three conflicting ways to respond.",
+      "Return STRICT JSON ONLY in the shape specified."
+    );
+
+    const user = userParts.filter(part => part.trim()).join("\n");
 
     // ----- Call model WITHOUT fallback so we can detect failure
     let raw = await aiJSON({ system, user, model: MODEL_DILEMMA, temperature: 0.9, fallback: null });
@@ -1017,6 +1194,99 @@ app.post("/api/support-analyze", async (req, res) => {
   } catch (e) {
     console.error("Error in /api/support-analyze:", e?.message || e);
     return res.status(502).json({ items: [] });
+  }
+});
+
+app.post("/api/dynamic-parameters", async (req, res) => {
+  try {
+    const {
+      lastChoice, // DilemmaAction: { id, title, summary, cost, iconHint }
+      politicalContext, // { role, systemName, day, totalDays, compassValues }
+      debug = false
+    } = req.body;
+
+    if (!lastChoice) {
+      return res.json({ parameters: [] });
+    }
+
+    if (debug) {
+      console.log("[/api/dynamic-parameters] IN:", {
+        choice: lastChoice.title,
+        role: politicalContext?.role,
+        day: politicalContext?.day
+      });
+    }
+
+    const system = `You are a political simulation system that generates ultra-short dynamic status parameters based on player actions.
+
+Generate 1-3 contextually relevant dynamic parameters that show the immediate consequences of the player's political decision. These parameters must be:
+- ULTRA-SHORT: Maximum 4-5 words each
+- NO explanations or descriptions
+- Pure factual outcomes with numbers
+- Specific, measurable results only
+
+EXAMPLES (follow this exact format):
+- "40 militia fighters neutralized"
+- "14 civilians dead"
+- "12 countries issue condemnation"
+- "3,000 protesters arrested"
+- "Budget deficit up 20%"
+- "5 ministers resign"
+
+Choose appropriate icons from: Users, TrendingUp, TrendingDown, DollarSign, Shield, AlertTriangle, Heart, Building, Globe, Leaf, Zap, Target, Scale, Flag, Crown, etc.
+
+Set tone as "up" (positive/green), "down" (negative/red), or "neutral" (blue) based on whether this is generally good or bad for the player's position.`;
+
+    const user = `Political Context:
+Role: ${politicalContext?.role || "Leader"}
+Political System: ${politicalContext?.systemName || "Democracy"}
+Day: ${politicalContext?.day || 1} of ${politicalContext?.totalDays || 7}
+
+Player's Last Decision:
+Action: "${lastChoice.title}"
+Details: ${lastChoice.summary}
+Cost: ${lastChoice.cost > 0 ? `+$${lastChoice.cost}` : `$${lastChoice.cost}`}
+
+Based on this political decision, generate 1-3 specific dynamic parameters that would realistically result from this action. Return as JSON:
+
+{
+  "parameters": [
+    {
+      "id": "unique_id",
+      "icon": "IconName",
+      "text": "Specific consequence with numbers",
+      "tone": "up|down|neutral"
+    }
+  ]
+}`;
+
+    const result = await aiJSON({
+      system,
+      user,
+      model: MODEL_DILEMMA, // Use same model as dilemmas
+      temperature: 0.8,
+      fallback: { parameters: [] }
+    });
+
+    // Validate and clean the response
+    const parameters = Array.isArray(result.parameters)
+      ? result.parameters.slice(0, 3).map((param, index) => ({
+          id: param.id || `param_${index}`,
+          icon: param.icon || "AlertTriangle",
+          text: param.text || "Unknown effect",
+          tone: ["up", "down", "neutral"].includes(param.tone) ? param.tone : "neutral"
+        }))
+      : [];
+
+    if (debug) {
+      console.log("[/api/dynamic-parameters] OUT:", parameters);
+    }
+
+    return res.json({ parameters });
+
+  } catch (e) {
+    console.error("Error in /api/dynamic-parameters:", e?.message || e);
+    return res.status(502).json({ parameters: [] });
   }
 });
 

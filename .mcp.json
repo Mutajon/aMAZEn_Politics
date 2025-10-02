@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "url": "http://localhost:3050/mcp",
+      "description": "Playwright MCP server for browser automation and testing"
+    }
+  },
+  "metadata": {
+    "project": "amaze-politics",
+    "description": "MCP configuration for political simulation game with Playwright automation",
+    "created": "2025-10-02",
+    "playwright_server_port": 3050
+  }
+}

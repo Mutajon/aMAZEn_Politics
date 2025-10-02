@@ -10,9 +10,10 @@
 
 import { default as React } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
-import { ArrowLeft, HelpCircle, Cog } from "lucide-react";
+import { HelpCircle, Cog } from "lucide-react";
 import { IconFromKey, getRankColor } from "./PowerDistributionIcons";
 import type { EnhancedPowerHolder, FetchState } from "../hooks/usePowerDistributionState";
+import { useRoleStore } from "../store/roleStore";
 
 interface PowerDistributionContentProps {
   // State
@@ -26,7 +27,6 @@ interface PowerDistributionContentProps {
   showSystemModal: boolean;
 
   // Handlers
-  onBack: () => void;
   onRetry: () => void;
   onChangePercent: (idx: number, value: number) => void;
   onChangeName: (id: string, name: string) => void;
@@ -45,7 +45,6 @@ export default function PowerDistributionContent({
   systemDesc,
   systemFlavor,
   showSystemModal,
-  onBack,
   onRetry,
   onChangePercent,
   onChangeName,
@@ -54,19 +53,10 @@ export default function PowerDistributionContent({
   onShowSystemModal,
   onHideSystemModal,
 }: PowerDistributionContentProps) {
+  const character = useRoleStore((s) => s.character);
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
-      {/* Top bar with Back */}
-      <div className="mb-2">
-        <button
-          onClick={onBack}
-          className="inline-flex items-center gap-2 rounded-2xl px-3 py-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white/80"
-          aria-label="Go back to role selection"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back
-        </button>
-      </div>
 
       {/* Error State */}
       {state === "error" && (
@@ -145,9 +135,17 @@ export default function PowerDistributionContent({
                           {rank}
                         </div>
 
-                        {/* Icon */}
+                        {/* Icon or Avatar */}
                         <div className="w-9 h-9 rounded-xl bg-white/8 border border-white/10 flex items-center justify-center shrink-0">
-                          <IconFromKey keyName={h.icon ?? undefined} className="w-5 h-5 text-amber-300" />
+                          {isPlayer && character?.avatarUrl ? (
+                            <img
+                              src={character.avatarUrl}
+                              alt="Your avatar"
+                              className="w-full h-full rounded-xl object-cover"
+                            />
+                          ) : (
+                            <IconFromKey keyName={h.icon ?? undefined} className="w-5 h-5 text-amber-300" />
+                          )}
                         </div>
 
                         {/* Name and Note */}

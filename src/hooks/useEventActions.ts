@@ -1,4 +1,7 @@
 // src/hooks/useEventActions.ts
+// Enhanced action handlers for event screen with day progression integration.
+// Connects action confirmation to contextual dilemma generation flow.
+
 import { useState } from "react";
 import { useSettingsStore } from "../store/settingsStore";
 import { analyzeTextToCompass } from "../lib/compassMapping";
@@ -18,6 +21,15 @@ interface UseEventActionsProps {
   setBudget: (budget: number | ((prev: number) => number)) => void;
   updateNewsAfterAction: (actionData: { title: string; summary: string; cost: number }) => void;
   applyWithPings: (effects: FXEffect[]) => FXEffect[];
+  enableProgressiveLoading?: boolean; // when true, uses new progressive loading flow
+  startProgressiveLoading?: (
+    supportValues: { people: number; middle: number; mom: number },
+    actionText?: string,
+    analyzeText?: (text: string) => Promise<unknown>,
+    analyzeSupport?: (text: string) => Promise<any[]>,
+    applySupportEffects?: (effects: any[]) => void,
+    updateNewsAfterAction?: (actionData: any) => void
+  ) => Promise<void>;
 }
 
 export function useEventActions({
@@ -30,11 +42,14 @@ export function useEventActions({
   setBudget,
   updateNewsAfterAction,
   applyWithPings,
+  enableProgressiveLoading = true, // Enable new progressive loading flow by default
+  startProgressiveLoading,
 }: UseEventActionsProps) {
   const showBudget = useSettingsStore((s) => s.showBudget);
 
   // Show spinner while we wait for the /api/compass-analyze response
   const [compassLoading, setCompassLoading] = useState(false);
+
 
   // Support manager hook
   const { analyzeSupportWrapper, applySupportEffects } = useEventSupportManager({
@@ -52,50 +67,117 @@ export function useEventActions({
     const a = actionsForDeck.find((x) => x.id === id);
     if (!a) return;
 
-    void runConfirmPipeline(
-      {
-        kind: "action",
-        action: { title: a.title, summary: a.summary, cost: a.cost },
-      },
-      {
-        showBudget,
-        setBudget,
-        analyzeText,
-        onAnalyzeStart: () => setCompassLoading(true),
-        onAnalyzeDone: () => setCompassLoading(false),
-        analyzeSupport: analyzeSupportWrapper,
-        applySupportEffects,
-      }
-    );
+    console.log(`[useEventActions] handleConfirm called with enableProgressiveLoading: ${enableProgressiveLoading}`);
 
-    // Update news after action
-    updateNewsAfterAction({ title: a.title, summary: a.summary, cost: a.cost || 0 });
+    if (enableProgressiveLoading && startProgressiveLoading) {
+      console.log("[useEventActions] Using new progressive loading flow");
+
+      // 1. Immediate budget update for responsive feedback (this happens during coin animation)
+      if (showBudget && a.cost !== undefined) {
+        setBudget(prev => prev + a.cost);
+        console.log(`[useEventActions] Budget updated by ${a.cost}`);
+      }
+
+      // 2. Start progressive loading flow (this will handle news, support, etc. sequentially)
+      // Note: News is not updated immediately - it will be updated as part of the progressive flow
+      const supportValues = {
+        people: vals.people,
+        middle: vals.middle,
+        mom: vals.mom,
+      };
+
+      console.log("[useEventActions] Starting progressive loading flow with support values:", supportValues);
+
+      // 3. Trigger progressive loading with sequential analysis
+      const actionText = `${a.title}. ${a.summary}`;
+      await startProgressiveLoading(
+        supportValues,
+        actionText,
+        analyzeText,
+        analyzeSupportWrapper,
+        applySupportEffects,
+        updateNewsAfterAction
+      );
+      console.log("[useEventActions] Progressive loading flow completed");
+
+    } else {
+      // Legacy flow: use existing confirmation pipeline
+      void runConfirmPipeline(
+        {
+          kind: "action",
+          action: { title: a.title, summary: a.summary, cost: a.cost },
+        },
+        {
+          showBudget,
+          setBudget,
+          analyzeText,
+          onAnalyzeStart: () => setCompassLoading(true),
+          onAnalyzeDone: () => setCompassLoading(false),
+          analyzeSupport: analyzeSupportWrapper,
+          applySupportEffects,
+        }
+      );
+
+      // Update news after action
+      updateNewsAfterAction({ title: a.title, summary: a.summary, cost: a.cost || 0 });
+    }
   };
 
   const handleSuggest = async (text?: string) => {
-    void runConfirmPipeline(
-      {
-        kind: "suggest",
-        text: text,
-        cost: -300, // keep in sync with ActionDeck's suggestCost
-      },
-      {
-        showBudget,
-        setBudget,
-        analyzeText,
-        onAnalyzeStart: () => setCompassLoading(true),
-        onAnalyzeDone: () => setCompassLoading(false),
-        analyzeSupport: analyzeSupportWrapper,
-        applySupportEffects,
-      }
-    );
+    const suggestCost = -300; // keep in sync with ActionDeck's suggestCost
 
-    // Update news after suggestion
-    updateNewsAfterAction({
-      title: "Player suggestion",
-      summary: String(text || "").slice(0, 140),
-      cost: -300,
-    });
+    if (enableProgressiveLoading && startProgressiveLoading) {
+      // New enhanced flow: immediate UI feedback + progressive loading with sequential analysis
+
+      // 1. Immediate budget update for responsive feedback
+      if (showBudget) {
+        setBudget(prev => prev + suggestCost);
+      }
+
+      // 2. Start progressive loading flow with current support values as context
+      const supportValues = {
+        people: vals.people,
+        middle: vals.middle,
+        mom: vals.mom,
+      };
+
+      // 3. Trigger progressive loading with sequential analysis
+      const actionText = `Player suggestion. ${String(text || "").slice(0, 140)}`;
+      await startProgressiveLoading(
+        supportValues,
+        actionText,
+        analyzeText,
+        analyzeSupportWrapper,
+        applySupportEffects,
+        updateNewsAfterAction
+      );
+
+    } else {
+      // Legacy flow: use existing confirmation pipeline
+      void runConfirmPipeline(
+        {
+          kind: "suggest",
+          text: text,
+          cost: suggestCost,
+        },
+        {
+          showBudget,
+          setBudget,
+          analyzeText,
+          onAnalyzeStart: () => setCompassLoading(true),
+          onAnalyzeDone: () => setCompassLoading(false),
+          analyzeSupport: analyzeSupportWrapper,
+          applySupportEffects,
+        }
+      );
+
+      // Update news after suggestion
+      updateNewsAfterAction({
+        title: "Player suggestion",
+        summary: String(text || "").slice(0, 140),
+        cost: suggestCost,
+      });
+    }
   };
 
   return {

@@ -76,6 +76,7 @@ npm run preview      # Preview production build
 │   │   ├── MirrorQuizScreen.tsx
 │   │   ├── NameScreen.tsx       # Character creation
 │   │   ├── PowerDistributionScreen.tsx # Power holder analysis and editing (optimized, 67 lines)
+│   │   ├── DifficultyScreen.tsx # Difficulty level selection (conditional on enableModifiers)
 │   │   └── HighscoreScreen.tsx
 │   ├── store/
 │   │   ├── roleStore.ts         # Role, analysis, character data
@@ -160,8 +161,9 @@ This is a political simulation game with AI-powered content generation, built as
 1. **Role Selection**: Player defines their political role and setting
 2. **Political Analysis**: AI analyzes role to determine power distribution among holders (Executive, Legislature, etc.)
 3. **Character Creation**: AI suggests names and generates avatar with background
-4. **Compass Assessment**: Mirror dialogue and quiz to map player values across 4 dimensions
-5. **Daily Dilemmas**: AI generates political situations with 3 action choices, affecting:
+4. **Difficulty Selection** (optional, if enableModifiers setting is ON): Choose difficulty level that affects initial budget, support, and score
+5. **Compass Assessment**: Mirror dialogue and quiz to map player values across 4 dimensions
+6. **Daily Dilemmas**: AI generates political situations with 3 action choices, affecting:
    - Resources (money/budget)
    - Support from three constituencies: "people" (public), "middle" (main power holder), "mom" (personal allies)
    - Political compass values

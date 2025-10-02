@@ -1,20 +1,22 @@
 // src/components/event/EventContent.tsx
-import React, { useMemo, useRef, useLayoutEffect, useState } from "react";
+import React, { useMemo, useRef, useLayoutEffect, useState, useEffect } from "react";
 import { useDilemmaStore } from "../../store/dilemmaStore";
 import { useRoleStore } from "../../store/roleStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import ResourceBar from "./ResourceBar";
 import SupportList, { type SupportItem, DefaultSupportIcons } from "./SupportList";
 import { NewsTicker } from "./NewsTicker";
-import PlayerStatusStrip, { demoParams } from "./PlayerStatusStrip";
+import PlayerStatusStrip from "./PlayerStatusStrip";
 import DilemmaCard, { demoDilemma } from "./DilemmaCard";
 import MirrorCard from "./MirrorCard";
 import ActionDeck, { type ActionCard } from "./ActionDeck";
-import EventLoadingOverlay from "./EventLoadingOverlay";
 import CompassPillsOverlay from "./CompassPillsOverlay";
+import ProgressiveLoadingCard from "./ProgressiveLoadingCard";
 import { actionsToDeckCards } from "./actionVisuals";
 import type { TickerItem } from "./NewsTicker";
 import type { SupportDeltas, SupportTrends, SupportNotes, Trio } from "../../hooks/useEventState";
+import type { ParamItem } from "./PlayerStatusStrip";
+import type { ProgressiveStage } from "../../hooks/useProgressiveLoading";
 
 interface EventContentProps {
   // State from useEventState
@@ -41,6 +43,30 @@ interface EventContentProps {
   // Compass FX from centralized hook
   compassPings: any[];
 
+  // Dynamic parameters from useDynamicParameters hook
+  dynamicParams: ParamItem[];
+  dynamicParamsAnimatingIndex: number | null;
+
+  // Progressive loading state from useProgressiveLoading
+  progressiveLoading?: {
+    currentStage: ProgressiveStage;
+    isLoading: boolean;
+    loadingCardPosition: number;
+    shouldShowResourceBar: boolean;
+    shouldShowSupportList: boolean;
+    shouldShowNewsTicker: boolean;
+    shouldShowPlayerStatus: boolean;
+    shouldShowDilemma: boolean;
+    shouldShowMirror: boolean;
+    shouldShowActionDeck: boolean;
+    shouldShowLoadingCard: boolean;
+    // Legacy compatibility
+    shouldShowSupport: boolean;
+    shouldShowNews: boolean;
+    shouldShowParameters: boolean;
+    shouldShowActions: boolean;
+  };
+
   // Action handlers
   onConfirm: (id: string) => void;
   onSuggest: (text?: string) => void;
@@ -61,6 +87,9 @@ export default function EventContent({
   overlayPreparing,
   compassLoading,
   compassPings,
+  dynamicParams,
+  dynamicParamsAnimatingIndex,
+  progressiveLoading,
   onConfirm,
   onSuggest,
 }: EventContentProps) {
@@ -128,61 +157,59 @@ export default function EventContent({
 
   return (
     <>
-      <div
-        className="
-          sticky top-0 z-40
-          -mx-5 px-5   /* stretch to page gutters, then restore padding */
-          py-2
-          bg-[#0b1335]/80 backdrop-blur-md
-          border-b border-white/10
-        "
-        style={{ WebkitBackdropFilter: "blur(8px)" }} // improves Safari
-      >
-        <ResourceBar daysLeft={daysLeft} budget={budget} showBudget={showBudget} />
-      </div>
-
-      {/* Support values (3 entities), animated */}
-      <SupportList items={items} animatePercent={true} animateDurationMs={1000} />
-
-      {/* News ticker */}
-      <NewsTicker items={newsItems} />
-
-      {/* Player status strip: dynamic params (left) + portrait (right) */}
-      <PlayerStatusStrip avatarSrc={avatarUrl || undefined} params={demoParams()} />
-
-      {/* Dilemma + Actions (gated until narration is ready) */}
-      <div className="mt-4">
-        {canShowDilemma && current ? (
-          <DilemmaCard title={current.title} description={current.description} />
-        ) : (
-          <DilemmaCard {...demoDilemma()} />
-        )}
-      </div>
-
-      {debugMode && (
-        <div className="mt-2">
-          <button
-            onClick={() => {
-              const { loadNext } = useDilemmaStore.getState();
-              loadNext();
-            }}
-            className="rounded-xl px-3 py-2 bg-white/10 ring-1 ring-white/15 text-white text-[12px]"
-            disabled={loading}
-          >
-            {loading ? "Generating…" : "Generate (dev)"}
-          </button>
+      {progressiveLoading?.shouldShowResourceBar && (
+        <div
+          className="
+            sticky top-0 z-40
+            -mx-5 px-5   /* stretch to page gutters, then restore padding */
+            py-2
+            bg-[#0b1335]/80 backdrop-blur-md
+            border-b border-white/10
+          "
+          style={{ WebkitBackdropFilter: "blur(8px)" }} // improves Safari
+        >
+          <ResourceBar daysLeft={daysLeft} budget={budget} showBudget={showBudget} />
         </div>
       )}
 
-      <div className="mt-3 relative" ref={mirrorWrapRef}>
-        <div className={mirrorLoading ? "animate-pulse" : ""}>
-          <MirrorCard text={mirrorText} />
-        </div>
-        {/* Spinner + stacked pills ABOVE the mirror card; no interaction */}
-        <CompassPillsOverlay effectPills={compassPings} loading={compassLoading} color={mirrorTextColor} />
-      </div>
+      {/* Support values (3 entities), animated */}
+      {progressiveLoading?.shouldShowSupportList && (
+        <SupportList items={items} animatePercent={true} animateDurationMs={1000} />
+      )}
 
-      {canShowDilemma && current && (
+      {/* News ticker */}
+      {progressiveLoading?.shouldShowNewsTicker && (
+        <NewsTicker items={newsItems} />
+      )}
+
+      {/* Player status strip: dynamic params (left) + portrait (right) */}
+      {progressiveLoading?.shouldShowPlayerStatus && (
+        <PlayerStatusStrip
+          avatarSrc={avatarUrl || undefined}
+          params={dynamicParams}
+          animatingIndex={dynamicParamsAnimatingIndex}
+        />
+      )}
+
+      {/* Dilemma + Actions (gated until narration is ready AND real dilemma exists) */}
+      {progressiveLoading?.shouldShowDilemma && canShowDilemma && current && !((current as any)._isFallback) && (
+        <div className="mt-4">
+          <DilemmaCard title={current.title} description={current.description} />
+        </div>
+      )}
+
+
+      {progressiveLoading?.shouldShowMirror && (
+        <div className="mt-3 relative" ref={mirrorWrapRef}>
+          <div className={mirrorLoading ? "animate-pulse" : ""}>
+            <MirrorCard text={mirrorText} />
+          </div>
+          {/* Spinner + stacked pills ABOVE the mirror card; no interaction */}
+          <CompassPillsOverlay effectPills={compassPings} loading={compassLoading} color={mirrorTextColor} />
+        </div>
+      )}
+
+      {canShowDilemma && current && !((current as any)._isFallback) && progressiveLoading?.shouldShowActionDeck && (
         <ActionDeck
           actions={actionsForDeck}
           showBudget={showBudget}
@@ -193,7 +220,17 @@ export default function EventContent({
         />
       )}
 
-      <EventLoadingOverlay show={loading || overlayPreparing} />
+      {/* Progressive Loading Card - small floating card that moves down */}
+      {progressiveLoading?.shouldShowLoadingCard && (
+        <ProgressiveLoadingCard
+          show={progressiveLoading.shouldShowLoadingCard}
+          currentStage={progressiveLoading.currentStage}
+          position={progressiveLoading.loadingCardPosition}
+          currentDay={day}
+          totalDays={totalDays}
+        />
+      )}
+
     </>
   );
 }

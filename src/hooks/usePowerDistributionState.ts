@@ -113,10 +113,6 @@ export function usePowerDistributionState() {
     });
   };
 
-  const handleBack = () => {
-    // Clear only the analysis so the next selected role re-analyzes cleanly
-    setAnalysis(null);
-  };
 
   // State setters for initialization
   const initializeData = (
@@ -176,7 +172,6 @@ export function usePowerDistributionState() {
     handleChangeName,
     handleReset,
     handleLooksGood,
-    handleBack,
 
     // Initialization
     initializeData,

@@ -20,12 +20,12 @@ export function useEventEffects() {
   const [mirrorText, setMirrorText] = useState(demoMirrorLine());
   const [mirrorLoading, setMirrorLoading] = useState(false);
 
-  // Auto-load a dilemma when accessing event screen (even without role data - will use fallback)
+  // Auto-load a dilemma when accessing event screen, but only after role data is available
   useEffect(() => {
-    if (!current && !loading && !error) {
+    if (!current && !loading && !error && selectedRole) {
       loadNext();
     }
-  }, [current, loading, error, loadNext]);
+  }, [current, loading, error, loadNext, selectedRole]);
 
   // First day: generate 3 items about the player's entry
   useEffect(() => {
@@ -51,7 +51,7 @@ export function useEventEffects() {
       if (!current) return;
       setMirrorLoading(true);
       setMirrorText("…the mirror squints, light pooling in the glass…");
-      const text = await requestMirrorDilemmaLine();
+      const text = await requestMirrorDilemmaLine(current);
       if (alive) {
         setMirrorText(text);
         setMirrorLoading(false);

@@ -1,5 +1,6 @@
 import { useSettingsStore } from "../store/settingsStore";
 import { useCompassStore } from "../store/compassStore";
+import type { Dilemma } from "./dilemma";
 
 function topK(arr: number[] | undefined, k = 3): string[] {
   const a = Array.isArray(arr) ? arr : [];
@@ -10,7 +11,7 @@ function topK(arr: number[] | undefined, k = 3): string[] {
     .map(x => String(x.i));
 }
 
-export async function requestMirrorDilemmaLine(): Promise<string> {
+export async function requestMirrorDilemmaLine(dilemma?: Dilemma | null): Promise<string> {
   const debug = useSettingsStore.getState().debugMode;
   try {
     const comp = useCompassStore.getState().values;
@@ -23,6 +24,17 @@ export async function requestMirrorDilemmaLine(): Promise<string> {
           .slice(0, 10),
         3
       ),
+      // Add dilemma context for recommendations
+      dilemma: dilemma ? {
+        title: dilemma.title,
+        description: dilemma.description,
+        actions: dilemma.actions.map(action => ({
+          id: action.id,
+          title: action.title,
+          summary: action.summary,
+          cost: action.cost
+        }))
+      } : null,
     };
 
     if (debug) console.log("[mirror-dilemma] → POST /api/mirror-summary", payload);

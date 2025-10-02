@@ -1,7 +1,8 @@
 // PlayerStatusStrip.tsx
-// Dynamic params (left) + 50x50 portrait (right), with robust image loading.
+// Dynamic params (left) + player portrait (right), with robust image loading and animations.
 
 import React, { useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Users, TrendingUp, Leaf, User } from "lucide-react";
 
 // 🔧 Easy knobs
@@ -24,6 +25,7 @@ type Props = {
   avatarSrc?: string | null;
   params: ParamItem[];
   debugAvatar?: boolean; // set true to print the resolved URL on screen
+  animatingIndex?: number | null; // which parameter is currently animating in
 };
 
 export default function PlayerStatusStrip({ avatarSrc, params, debugAvatar = false }: Props) {
@@ -47,17 +49,23 @@ export default function PlayerStatusStrip({ avatarSrc, params, debugAvatar = fal
   return (
     <div className="mt-4 w-full">
       <div className="flex items-center justify-between">
-        {/* LEFT: dynamic params, wrap on small screens */}
+        {/* LEFT: dynamic params with staggered animations */}
         <div className={`flex-1 flex flex-wrap ${GAP_X} ${GAP_Y} pr-3`}>
-          {params.map((p) => (
-            <ParamChip key={p.id} item={p} />
-          ))}
+          <AnimatePresence>
+            {params.map((p, index) => (
+              <ParamChip
+                key={p.id}
+                item={p}
+                index={index}
+              />
+            ))}
+          </AnimatePresence>
         </div>
 
-        {/* RIGHT: 50x50 portrait pinned to the right edge */}
+        {/* RIGHT: portrait pinned to the right edge with stable positioning */}
         <div
           className="shrink-0 rounded-xl overflow-hidden ring-1 ring-white/15 bg-white/5"
-          style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}
+          style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, minWidth: AVATAR_SIZE }}
           aria-label="Player portrait"
           title={resolvedSrc || undefined}
         >
@@ -89,7 +97,14 @@ export default function PlayerStatusStrip({ avatarSrc, params, debugAvatar = fal
   );
 }
 
-function ParamChip({ item }: { item: ParamItem }) {
+function ParamChip({
+  item,
+  index
+}: {
+  item: ParamItem;
+  index: number;
+  isAnimating?: boolean;
+}) {
   const toneClass =
     item.tone === "up"
       ? "text-emerald-300"
@@ -98,10 +113,29 @@ function ParamChip({ item }: { item: ParamItem }) {
       : "text-sky-300";
 
   return (
-    <div className={`${CHIP_BG} ${CHIP_PAD} inline-flex items-center gap-1.5 backdrop-blur-sm`}>
+    <motion.div
+      initial={{ opacity: 0, x: -20, scale: 0.8 }}
+      animate={{
+        opacity: 1,
+        x: 0,
+        scale: 1,
+        transition: {
+          duration: 0.5,
+          ease: [0.25, 0.46, 0.45, 0.94], // easeOutQuart
+          delay: index * 0.1 // Stagger delay based on index
+        }
+      }}
+      exit={{
+        opacity: 0,
+        x: -20,
+        scale: 0.8,
+        transition: { duration: 0.3 }
+      }}
+      className={`${CHIP_BG} ${CHIP_PAD} inline-flex items-center gap-1.5 backdrop-blur-sm`}
+    >
       <span className={toneClass}>{item.icon}</span>
       <span className={`${TEXT_CLASS} text-white/90 whitespace-nowrap`}>{item.text}</span>
-    </div>
+    </motion.div>
   );
 }
 

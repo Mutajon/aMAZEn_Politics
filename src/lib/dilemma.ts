@@ -16,8 +16,8 @@ export type Dilemma = {
 };
 
 export type DilemmaRequest = {
-  role: string;
-  systemName: string;
+  role: string | null;
+  systemName: string | null;
   holders: Array<{ name: string; weight?: number }>;
   playerIndex: number | null;
   compassValues: Record<string, number>; // 0..10 scale

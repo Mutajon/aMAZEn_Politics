@@ -1,5 +1,6 @@
 // src/store/compassStore.ts
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import { PROPERTIES, type PropKey } from "../data/compass-data";
 
 /** Values are integers 0..10 per component, per property */
@@ -32,32 +33,39 @@ type CompassStore = {
   applyEffects: (effects: Effect[]) => Effect[];
 };
 
-export const useCompassStore = create<CompassStore>((set) => ({
-  values: emptyValues(),
-  reset: () => set({ values: emptyValues() }),
-  setValue: (prop, idx, value) =>
-    set(state => {
-      const next = { ...state.values, [prop]: [...state.values[prop]] };
-      next[prop][idx] = Math.max(0, Math.min(10, Math.round(value)));
-      return { values: next };
+export const useCompassStore = create<CompassStore>()(
+  persist(
+    (set) => ({
+      values: emptyValues(),
+      reset: () => set({ values: emptyValues() }),
+      setValue: (prop, idx, value) =>
+        set(state => {
+          const next = { ...state.values, [prop]: [...state.values[prop]] };
+          next[prop][idx] = Math.max(0, Math.min(10, Math.round(value)));
+          return { values: next };
+        }),
+      applyEffects: (effects) => {
+        const applied: Effect[] = [];
+        set(state => {
+          const next: CompassValues = {
+            what: [...state.values.what],
+            whence: [...state.values.whence],
+            how: [...state.values.how],
+            whither: [...state.values.whither],
+          };
+          for (const eff of effects) {
+            const before = next[eff.prop][eff.idx] ?? 0;
+            const after = Math.max(0, Math.min(10, Math.round(before + eff.delta)));
+            next[eff.prop][eff.idx] = after;
+            applied.push({ ...eff, delta: after - before });
+          }
+          return { values: next };
+        });
+        return applied;
+      },
     }),
-  applyEffects: (effects) => {
-    const applied: Effect[] = [];
-    set(state => {
-      const next: CompassValues = {
-        what: [...state.values.what],
-        whence: [...state.values.whence],
-        how: [...state.values.how],
-        whither: [...state.values.whither],
-      };
-      for (const eff of effects) {
-        const before = next[eff.prop][eff.idx] ?? 0;
-        const after = Math.max(0, Math.min(10, Math.round(before + eff.delta)));
-        next[eff.prop][eff.idx] = after;
-        applied.push({ ...eff, delta: after - before });
-      }
-      return { values: next };
-    });
-    return applied;
-  },
-}));
+    {
+      name: "amaze-politics-compass-store", // localStorage key
+    }
+  )
+);

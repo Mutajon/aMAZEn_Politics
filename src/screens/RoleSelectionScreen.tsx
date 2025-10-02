@@ -129,7 +129,7 @@ const primeSystemFromRole = (systemName?: string) => {
       setAiMsg("Nice! That's a clear role and setting.");
       setChecking(false);
       setRole(input.trim());
-      push("/power");
+      push("/name");
       closeSuggest();
     } catch (err) {
       if (err instanceof AIConnectionError) {
@@ -305,7 +305,7 @@ const primeSystemFromRole = (systemName?: string) => {
                     onClick={() => {
                       setRole(selectedRole.label);
                       primeSystemFromRole(selectedRole.system);
-                      push("/power");
+                      push("/name");
                     }}
                     className="rounded-xl px-4 py-2 text-sm font-semibold shadow bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335]"
                   >

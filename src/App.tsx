@@ -14,8 +14,10 @@ import CompassIntroStart from "./screens/CompassIntroStart";
 import MirrorDialogueScreen from "./screens/MirrorDialogueScreen";
 import MirrorQuizScreen from "./screens/MirrorQuizScreen";
 import BackgroundIntroScreen from "./screens/BackgroundIntroScreen";
+import DifficultyScreen from "./screens/DifficultyScreen";
 import { useEnsureMirroredAvatarOnce } from "./hooks/useEnsureMirroredAvatarOnce";
 import EventScreen from "./screens/EventScreen";
+import EventScreen2 from "./screens/EventScreen2";
 import HighscoreScreen from "./screens/HighscoreScreen";
 if (import.meta.env.DEV) {
   import("./dev/storesDebug").then(m => m.attachStoresDebug());
@@ -30,6 +32,7 @@ export default function App() {
   if (route === "/role") return <RoleSelectionScreen push={push} />;
   if (route === "/campaign") return <CampaignScreen />;
   if (route === "/power") return <PowerDistributionScreen push={push} />;
+  if (route === "/difficulty") return <DifficultyScreen push={push} />;
 
   // NEW split screens
   if (route === "/compass-intro") return <CompassIntroStart push={push} />;
@@ -40,7 +43,7 @@ export default function App() {
   if (route === "/compass-vis") return <CompassVisScreen push={push} />;
   if (route === "/debug-mini") return <MiniCompassDebugScreen push={push} />;
   if (route === "/background-intro") return <BackgroundIntroScreen push={push} />;
-  if (route === "/event") return <EventScreen push={push} />;
+  if (route === "/event") return <EventScreen2 push={push} />;
   if (route === "/highscores") return <HighscoreScreen push={push} />;
 
   

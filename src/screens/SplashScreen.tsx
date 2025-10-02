@@ -43,6 +43,9 @@ const setDilemmasSubjectEnabled = useSettingsStore((s) => s.setDilemmasSubjectEn
 const dilemmasSubject = useSettingsStore((s) => s.dilemmasSubject);
 const setDilemmasSubject = useSettingsStore((s) => s.setDilemmasSubject);
 
+// Enable modifiers
+const enableModifiers = useSettingsStore((s) => s.enableModifiers);
+const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
 
   // -------------------------------------------------------------------------
 
@@ -242,6 +245,35 @@ const setDilemmasSubject = useSettingsStore((s) => s.setDilemmasSubject);
         : "border-white/10 opacity-50 pointer-events-none",
     ].join(" ")}
   />
+</div>
+
+{/* Divider */}
+<div className="my-4 border-t border-white/10" />
+
+{/* Enable modifiers ------------------------------------------------------------- */}
+<div className="flex items-center justify-between gap-3">
+  <div>
+    <div className="text-sm font-medium">Enable modifiers</div>
+    <div className="text-xs text-white/60">
+      Apply dynamic gameplay modifiers (default off).
+    </div>
+  </div>
+  <button
+    onClick={() => setEnableModifiers(!enableModifiers)}
+    role="switch"
+    aria-checked={enableModifiers}
+    className={[
+      "w-12 h-7 rounded-full p-1 transition-colors",
+      enableModifiers ? "bg-emerald-500/70" : "bg-white/20",
+    ].join(" ")}
+  >
+    <span
+      className={[
+        "block w-5 h-5 rounded-full bg-white transition-transform",
+        enableModifiers ? "translate-x-5" : "translate-x-0",
+      ].join(" ")}
+    />
+  </button>
 </div>
 
   </motion.div>

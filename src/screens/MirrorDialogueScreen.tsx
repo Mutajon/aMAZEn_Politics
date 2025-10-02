@@ -70,7 +70,7 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
   const script: Array<{ side: "mirror" | "player"; text: string; italic?: boolean }> = [
     { side: "mirror", text: "Finally... I found you!", italic: true },
     { side: "player", text: "Who are you?" },
-    { side: "mirror", text: `Wrong question, my friend. What you should be asking is who are you, ${playerName}?`, italic: true },
+    { side: "mirror", text: `Wrong question, my friend. What you should be asking is who are YOU, ${playerName}?`, italic: true },
     { side: "mirror", text: "Look at yourself, a hollow avatar with no desires or values.", italic: true },
     { side: "mirror", text: "Come, humor me for a moment, and let us uncover your soul — together.", italic: true },
   ];

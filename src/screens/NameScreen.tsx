@@ -1,10 +1,30 @@
 // src/screens/NameScreen.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import type { PushFn } from "../lib/router";
 import { bgStyle } from "../lib/ui";
 import { useRoleStore } from "../store/roleStore";
+import { useSettingsStore } from "../store/settingsStore";
 import type { Character } from "../store/roleStore";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { motion } from "framer-motion";
+import { getPredefinedCharacters } from "../data/predefinedCharacters";
+
+/** Small built-in placeholder (no asset file needed). */
+const DEFAULT_AVATAR_DATA_URL =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512' viewBox='0 0 128 128'>
+      <defs>
+        <linearGradient id='g' x1='0' x2='0' y1='0' y2='1'>
+          <stop offset='0' stop-color='#EAB308'/>
+          <stop offset='1' stop-color='#FDE68A'/>
+        </linearGradient>
+      </defs>
+      <rect x='0' y='0' width='128' height='128' rx='24' fill='url(#g)'/>
+      <circle cx='64' cy='50' r='22' fill='rgba(0,0,0,0.25)'/>
+      <rect x='26' y='78' width='76' height='30' rx='14' fill='rgba(0,0,0,0.25)'/>
+    </svg>`
+  );
 
 // Loading overlay content (edit here later if you want)
 const OVERLAY_TITLE = "Generating a character you can edit…";
@@ -95,6 +115,8 @@ export default function NameScreen({ push }: { push: PushFn }) {
   const selectedRole = useRoleStore((s) => s.selectedRole);
   const character = useRoleStore((s) => s.character);
   const setCharacter = useRoleStore((s) => s.setCharacter);
+  const updateCharacter = useRoleStore((s) => s.updateCharacter);
+  const generateImages = useSettingsStore((s) => s.generateImages);
 
   const [gender, setGender] = useState<"male" | "female" | "any">(character?.gender || "any");
   const [name, setName] = useState<string>(character?.name || "");
@@ -103,6 +125,12 @@ export default function NameScreen({ push }: { push: PushFn }) {
   const [bgObject, setBgObject] = useState<string>(character?.bgObject || "");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  // New state for avatar generation and two-phase UI
+  const [phase, setPhase] = useState<"input" | "avatar">("input");
+  const [avatarUrl, setAvatarUrl] = useState<string>(character?.avatarUrl || "");
+  const [avatarLoading, setAvatarLoading] = useState(false);
+  const avatarReqRef = useRef(0);
 
   const fullPrompt = useMemo(
     () => buildFullPrompt(selectedRole || "", gender, physical, bgObject),
@@ -113,23 +141,44 @@ export default function NameScreen({ push }: { push: PushFn }) {
     if (!selectedRole) return;
     setLoading(true);
     setErrorMsg("");
+
     try {
-      const res = await fetch("/api/name-suggestions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: selectedRole }),
-      });
-      if (!res.ok) {
-        let j: any = null;
-        try { j = await res.json(); } catch {}
-        throw new Error(j?.error || `HTTP ${res.status}`);
+      // Check if we have predefined characters for this role
+      const predefined = getPredefinedCharacters(selectedRole);
+
+      if (predefined) {
+        console.log("[NameScreen] Using predefined characters for role:", selectedRole);
+        // Use predefined characters - no AI processing needed
+        const data: Trio = {
+          male: predefined.male,
+          female: predefined.female,
+          any: predefined.any
+        };
+        setTrio(data);
+        const pick = data[gender] || data.any;
+        setName(pick?.name || "");
+        setPhysical(extractPhysical(pick?.prompt || ""));
+        setBgObject((prev) => prev || suggestBackgroundObject(selectedRole));
+      } else {
+        console.log("[NameScreen] Using AI generation for custom role:", selectedRole);
+        // Fall back to AI generation for custom roles
+        const res = await fetch("/api/name-suggestions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role: selectedRole }),
+        });
+        if (!res.ok) {
+          let j: any = null;
+          try { j = await res.json(); } catch {}
+          throw new Error(j?.error || `HTTP ${res.status}`);
+        }
+        const data: Trio = await res.json();
+        setTrio(data);
+        const pick = data[gender] || data.any;
+        setName(pick?.name || "");
+        setPhysical(extractPhysical(pick?.prompt || ""));
+        setBgObject((prev) => prev || suggestBackgroundObject(selectedRole));
       }
-      const data: Trio = await res.json();
-      setTrio(data);
-      const pick = data[gender] || data.any;
-      setName(pick?.name || "");
-      setPhysical(extractPhysical(pick?.prompt || ""));
-      setBgObject((prev) => prev || suggestBackgroundObject(selectedRole));
     } catch (e: any) {
       setErrorMsg(e?.message || "Name suggestion failed");
     } finally {
@@ -155,26 +204,77 @@ export default function NameScreen({ push }: { push: PushFn }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gender, trio]);
 
+  // Avatar generation logic (moved from CompassIntroStart)
+  useEffect(() => {
+    if (phase !== "avatar") return;
+    if (!generateImages) return;
+    if (avatarUrl) return; // already have one
+
+    const prompt = fullPrompt.trim();
+    if (!prompt) return;
+
+    const req = ++avatarReqRef.current;
+    const ac = new AbortController();
+    (async () => {
+      try {
+        setAvatarLoading(true);
+        const res = await fetch("/api/generate-avatar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt }),
+          signal: ac.signal,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !(data as any)?.dataUrl) {
+          throw new Error((data as any)?.error || `HTTP ${res.status}`);
+        }
+        if (req !== avatarReqRef.current) return;
+        setAvatarUrl((data as any).dataUrl);
+        updateCharacter({ avatarUrl: (data as any).dataUrl });
+      } catch (e: any) {
+        // Handle error if needed
+      } finally {
+        if (req === avatarReqRef.current) setAvatarLoading(false);
+      }
+    })();
+
+    return () => ac.abort();
+  }, [phase, generateImages, fullPrompt, avatarUrl, updateCharacter]);
+
+  // Calculate display avatar
+  const displayAvatar = useMemo(() => {
+    if (avatarUrl) return avatarUrl;
+    if (!generateImages) return DEFAULT_AVATAR_DATA_URL;
+    return "";
+  }, [avatarUrl, generateImages]);
+
   const onContinue = () => {
-    const fullChar: Character = {
-      gender,
-      name: name.trim(),
-      description: physical.trim(),
-      avatarUrl: character?.avatarUrl,
-      imagePrompt: fullPrompt,
-      bgObject,
-    };
-    setCharacter(fullChar);
-    push("/compass-intro");
+    if (phase === "input") {
+      // Phase 1: Clear any existing avatar and save character data, then move to avatar generation
+      const fullChar: Character = {
+        gender,
+        name: name.trim(),
+        description: physical.trim(),
+        avatarUrl: "", // Clear existing avatar to force regeneration
+        imagePrompt: fullPrompt,
+        bgObject,
+      };
+      setCharacter(fullChar);
+      setAvatarUrl(""); // Clear local avatar state to force regeneration
+      setPhase("avatar");
+    } else {
+      // Phase 2: Continue to power distribution
+      push("/power");
+    }
   };
 
   return (
     <div className="min-h-[100dvh] px-5 py-8" style={bgStyle}>
       <LoadingOverlay
-  visible={loading}          // uses your existing loading state
-  title={OVERLAY_TITLE}
-  quotes={LOADING_QUOTES}
-/>
+        visible={loading || (phase === "avatar" && avatarLoading)}
+        title={phase === "avatar" ? "Generating your avatar..." : OVERLAY_TITLE}
+        quotes={LOADING_QUOTES}
+      />
 
       <div className="w-full max-w-2xl mx-auto">
         <h1 className="sr-only">Forge Your Character</h1>
@@ -189,76 +289,132 @@ export default function NameScreen({ push }: { push: PushFn }) {
         )}
 
         <div className="mt-2 rounded-3xl p-6 bg-white/5 border border-white/10 shadow-xl">
-         
+          {phase === "input" ? (
+            // Phase 1: Input form
+            <>
+              <div className="flex items-center gap-8 justify-center">
+                <label className="flex items-center gap-2 text-white">
+                  <input
+                    type="radio"
+                    name="g"
+                    className="accent-amber-300 focus:ring-2 focus:ring-amber-300/60"
+                    checked={gender === "male"}
+                    onChange={() => setGender("male")}
+                  />
+                  <span>Male</span>
+                </label>
+                <label className="flex items-center gap-2 text-white">
+                  <input
+                    type="radio"
+                    name="g"
+                    className="accent-amber-300 focus:ring-2 focus:ring-amber-300/60"
+                    checked={gender === "female"}
+                    onChange={() => setGender("female")}
+                  />
+                  <span>Female</span>
+                </label>
+                <label className="flex items-center gap-2 text-white">
+                  <input
+                    type="radio"
+                    name="g"
+                    className="accent-amber-300 focus:ring-2 focus:ring-amber-300/60"
+                    checked={gender === "any"}
+                    onChange={() => setGender("any")}
+                  />
+                  <span>Any</span>
+                </label>
+              </div>
 
-          <div className="flex items-center gap-8 justify-center">
-            <label className="flex items-center gap-2 text-white">
-              <input
-                type="radio"
-                name="g"
-                className="accent-amber-300 focus:ring-2 focus:ring-amber-300/60"
-                checked={gender === "male"}
-                onChange={() => setGender("male")}
-              />
-              <span>Male</span>
-            </label>
-            <label className="flex items-center gap-2 text-white">
-              <input
-                type="radio"
-                name="g"
-                className="accent-amber-300 focus:ring-2 focus:ring-amber-300/60"
-                checked={gender === "female"}
-                onChange={() => setGender("female")}
-              />
-              <span>Female</span>
-            </label>
-            <label className="flex items-center gap-2 text-white">
-              <input
-                type="radio"
-                name="g"
-                className="accent-amber-300 focus:ring-2 focus:ring-amber-300/60"
-                checked={gender === "any"}
-                onChange={() => setGender("any")}
-              />
-              <span>Any</span>
-            </label>
-          </div>
+              <div className="mt-6">
+                <div className="text-white/90 mb-2">Name:</div>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Character name"
+                  className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
+                />
+              </div>
 
-          <div className="mt-6">
-            <div className="text-white/90 mb-2">Name:</div>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Character name"
-              className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
-            />
-          </div>
+              <div className="mt-6">
+                <div className="text-white/90 mb-2">Description (mention any facial features and accessories you want present):</div>
+                <textarea
+                  rows={6}
+                  value={physical}
+                  onChange={(e) => setPhysical(e.target.value)}
+                  placeholder="with a dignified expression, long black hair tied in a topknot, a finely groomed beard…"
+                  className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
+                />
+              </div>
 
-          <div className="mt-6">
-            <div className="text-white/90 mb-2">Description (mention any facial features and accessories you want present):</div>
-            <textarea
-              rows={6}
-              value={physical}
-              onChange={(e) => setPhysical(e.target.value)}
-              placeholder="with a dignified expression, long black hair tied in a topknot, a finely groomed beard…"
-              className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
-            />
-    
-          </div>
-
-          <div className="mt-6 flex justify-center">
-            <button
-              disabled={loading}
-              onClick={onContinue}
-              className={`rounded-2xl px-5 py-3 font-semibold text-lg shadow-lg ${
-                !loading
-                  ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] hover:scale-[1.02] active:scale-[0.98]"
-                  : "bg-white/10 text-white/60 cursor-not-allowed"
-              }`}
+              <div className="mt-6 flex justify-center">
+                <button
+                  disabled={loading}
+                  onClick={onContinue}
+                  className={`rounded-2xl px-5 py-3 font-semibold text-lg shadow-lg ${
+                    !loading
+                      ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] hover:scale-[1.02] active:scale-[0.98]"
+                      : "bg-white/10 text-white/60 cursor-not-allowed"
+                  }`}
+                >
+                  Create Character
+                </button>
+              </div>
+            </>
+          ) : (
+            // Phase 2: Avatar display
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="flex flex-col items-center"
             >
-              Create Character
-            </button>
-          </div>
+              {displayAvatar && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.2, duration: 0.5 }}
+                  className="mb-6"
+                >
+                  <img
+                    src={displayAvatar}
+                    alt="Your character"
+                    className="w-48 h-48 rounded-full object-cover border-4 border-amber-300/30 shadow-xl"
+                  />
+                </motion.div>
+              )}
+
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4, duration: 0.5 }}
+                className="text-center mb-8"
+              >
+                <h2 className="text-2xl font-bold text-white mb-2">{name}</h2>
+                <p className="text-white/70 text-sm">
+                  {genderizeRole(selectedRole || "", gender)}
+                </p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6, duration: 0.5 }}
+                className="flex justify-center"
+              >
+                <button
+                  disabled={avatarLoading}
+                  onClick={onContinue}
+                  className={`rounded-2xl px-6 py-3 font-semibold text-lg shadow-lg ${
+                    !avatarLoading
+                      ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] hover:scale-[1.02] active:scale-[0.98]"
+                      : "bg-white/10 text-white/60 cursor-not-allowed"
+                  }`}
+                >
+                  Continue to power analysis
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 // src/store/roleStore.ts
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 /* ---------- Types ---------- */
 export type PowerHolder = {
@@ -49,27 +50,34 @@ type RoleState = {
   reset: () => void;
 };
 
-export const useRoleStore = create<RoleState>((set, get) => ({
-  selectedRole: null,
-  analysis: null,
-  character: null,
+export const useRoleStore = create<RoleState>()(
+  persist(
+    (set, get) => ({
+      selectedRole: null,
+      analysis: null,
+      character: null,
 
-  setRole: (r) => set({ selectedRole: r }),
-  setAnalysis: (a) => set({ analysis: a }),
+      setRole: (r) => set({ selectedRole: r }),
+      setAnalysis: (a) => set({ analysis: a }),
 
-  setCharacter: (c) => set({ character: c }),
+      setCharacter: (c) => set({ character: c }),
 
-  updateCharacter: (patch) => {
-    const prev = get().character ?? {
-      gender: "any" as const,
-      name: "",
-      description: "",
-      avatarUrl: undefined,
-      imagePrompt: undefined,
-      bgObject: undefined,
-    };
-    set({ character: { ...prev, ...patch } });
-  },
+      updateCharacter: (patch) => {
+        const prev = get().character ?? {
+          gender: "any" as const,
+          name: "",
+          description: "",
+          avatarUrl: undefined,
+          imagePrompt: undefined,
+          bgObject: undefined,
+        };
+        set({ character: { ...prev, ...patch } });
+      },
 
-  reset: () => set({ selectedRole: null, analysis: null, character: null }),
-}));
+      reset: () => set({ selectedRole: null, analysis: null, character: null }),
+    }),
+    {
+      name: "amaze-politics-role-store", // localStorage key
+    }
+  )
+);

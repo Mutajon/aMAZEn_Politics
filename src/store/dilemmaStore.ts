@@ -1,6 +1,7 @@
 // src/store/dilemmaStore.ts
 import { create } from "zustand";
-import type { Dilemma, DilemmaRequest } from "../lib/dilemma";
+import { persist } from "zustand/middleware";
+import type { Dilemma, DilemmaRequest, DilemmaAction } from "../lib/dilemma";
 import { useSettingsStore } from "./settingsStore";
 import { useRoleStore } from "./roleStore";
 import { useCompassStore } from "./compassStore"; // <-- A) use compass values (0..10)
@@ -16,6 +17,19 @@ function dlog(...args: any[]) {
   }
 }
 
+type DayProgressionState = {
+  isProgressing: boolean;
+  progressingToDay: number;
+  analysisComplete: {
+    support: boolean;
+    compass: boolean;
+    dynamic: boolean;
+    mirror: boolean;
+    news: boolean;
+    contextualDilemma: boolean;
+  };
+};
+
 type DilemmaState = {
   day: number;
   totalDays: number;
@@ -25,14 +39,50 @@ type DilemmaState = {
   loading: boolean;
   error: string | null;
 
+  // Track last choice for dynamic parameters
+  lastChoice: DilemmaAction | null;
+
+  // Day progression state (NewDilemmaLogic.md integration)
+  dayProgression: DayProgressionState;
+
+  // Topic tracking for diversity (Rule #9)
+  recentTopics: string[];
+  topicCounts: Record<string, number>;
+
+  // Game resources and support (0-100 for support)
+  budget: number;
+  supportPeople: number;
+  supportMiddle: number;
+  supportMom: number;
+  score: number;
+
+  // Difficulty level
+  difficulty: "baby-boss" | "freshman" | "tactician" | "old-fox" | null;
+  setDifficulty: (level: "baby-boss" | "freshman" | "tactician" | "old-fox") => void;
+
   loadNext: () => Promise<void>;
   nextDay: () => void;
   setTotalDays: (n: number) => void;
   applyChoice: (id: "a" | "b" | "c") => void;
   reset: () => void;
+
+  // Resource and support setters
+  setBudget: (n: number) => void;
+  setSupportPeople: (n: number) => void;
+  setSupportMiddle: (n: number) => void;
+  setSupportMom: (n: number) => void;
+  setScore: (n: number) => void;
+
+  // Day progression methods
+  startDayProgression: () => void;
+  setAnalysisComplete: (analysis: keyof DayProgressionState['analysisComplete']) => void;
+  endDayProgression: () => void;
+
+  // Topic tracking methods
+  addDilemmaTopic: (topic: string) => void;
 };
 
-export const useDilemmaStore = create<DilemmaState>((set, get) => ({
+export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
   day: 1,
   totalDays: 7,
 
@@ -40,6 +90,35 @@ export const useDilemmaStore = create<DilemmaState>((set, get) => ({
   history: [],
   loading: false,
   error: null,
+  lastChoice: null,
+
+  // Day progression state
+  dayProgression: {
+    isProgressing: false,
+    progressingToDay: 1,
+    analysisComplete: {
+      support: false,
+      compass: false,
+      dynamic: false,
+      mirror: false,
+      news: false,
+      contextualDilemma: false,
+    },
+  },
+
+  // Topic tracking
+  recentTopics: [],
+  topicCounts: {},
+
+  // Game resources and support
+  budget: 1500,
+  supportPeople: 50,
+  supportMiddle: 50,
+  supportMom: 50,
+  score: 0,
+
+  // Difficulty level
+  difficulty: null,
 
   async loadNext() {
     // If something is already loading, bail early
@@ -103,7 +182,8 @@ export const useDilemmaStore = create<DilemmaState>((set, get) => ({
     const { day, totalDays } = get();
     const v = Math.min(totalDays, day + 1);
     dlog("nextDay ->", v);
-    set({ day: v });
+    // Reset lastChoice when moving to next day (dynamic parameters should reset)
+    set({ day: v, lastChoice: null });
   },
 
   setTotalDays(n) {
@@ -113,12 +193,177 @@ export const useDilemmaStore = create<DilemmaState>((set, get) => ({
   },
 
   applyChoice(id) {
-    dlog("applyChoice ->", id);
+    const { current } = get();
+    if (!current) {
+      dlog("applyChoice: no current dilemma");
+      return;
+    }
+
+    const choice = current.actions.find(action => action.id === id);
+    if (!choice) {
+      dlog("applyChoice: choice not found ->", id);
+      return;
+    }
+
+    dlog("applyChoice ->", id, choice.title);
+    set({ lastChoice: choice });
   },
 
   reset() {
     dlog("reset dilemmas");
-    set({ day: 1, current: null, history: [], loading: false, error: null });
+    set({
+      day: 1,
+      current: null,
+      history: [],
+      loading: false,
+      error: null,
+      lastChoice: null,
+      dayProgression: {
+        isProgressing: false,
+        progressingToDay: 1,
+        analysisComplete: {
+          support: false,
+          compass: false,
+          dynamic: false,
+          mirror: false,
+          news: false,
+          contextualDilemma: false,
+        },
+      },
+      recentTopics: [],
+      topicCounts: {},
+      budget: 1500,
+      supportPeople: 50,
+      supportMiddle: 50,
+      supportMom: 50,
+      score: 0,
+      difficulty: null,
+    });
+  },
+
+  // Resource and support setters
+  setBudget(n) {
+    const v = Math.round(Number(n) || 0);
+    dlog("setBudget ->", v);
+    set({ budget: v });
+  },
+
+  setSupportPeople(n) {
+    const v = Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
+    dlog("setSupportPeople ->", v);
+    set({ supportPeople: v });
+  },
+
+  setSupportMiddle(n) {
+    const v = Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
+    dlog("setSupportMiddle ->", v);
+    set({ supportMiddle: v });
+  },
+
+  setSupportMom(n) {
+    const v = Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
+    dlog("setSupportMom ->", v);
+    set({ supportMom: v });
+  },
+
+  setScore(n) {
+    const v = Math.round(Number(n) || 0);
+    dlog("setScore ->", v);
+    set({ score: v });
+  },
+
+  setDifficulty(level) {
+    dlog("setDifficulty ->", level);
+    set({ difficulty: level });
+
+    // Apply difficulty modifiers
+    const modifiers = {
+      "baby-boss": { supportMod: 10, budgetMod: 250, scoreMod: -200 },
+      "freshman": { supportMod: 0, budgetMod: 0, scoreMod: 0 },
+      "tactician": { supportMod: -10, budgetMod: -250, scoreMod: 200 },
+      "old-fox": { supportMod: -20, budgetMod: -500, scoreMod: 500 },
+    };
+
+    const mod = modifiers[level];
+
+    // Apply support modifiers (add percentage points, clamped to 0-100)
+    set({
+      supportPeople: Math.max(0, Math.min(100, 50 + mod.supportMod)),
+      supportMiddle: Math.max(0, Math.min(100, 50 + mod.supportMod)),
+      supportMom: Math.max(0, Math.min(100, 50 + mod.supportMod)),
+      budget: 1500 + mod.budgetMod,
+      score: mod.scoreMod,
+    });
+  },
+
+  // Day progression methods
+  startDayProgression() {
+    const { day } = get();
+    dlog("startDayProgression ->", day + 1);
+    set({
+      dayProgression: {
+        isProgressing: true,
+        progressingToDay: day + 1,
+        analysisComplete: {
+          support: false,
+          compass: false,
+          dynamic: false,
+          mirror: false,
+          news: false,
+          contextualDilemma: false,
+        },
+      },
+    });
+  },
+
+  setAnalysisComplete(analysis) {
+    const { dayProgression } = get();
+    dlog("setAnalysisComplete ->", analysis);
+    set({
+      dayProgression: {
+        ...dayProgression,
+        analysisComplete: {
+          ...dayProgression.analysisComplete,
+          [analysis]: true,
+        },
+      },
+    });
+  },
+
+  endDayProgression() {
+    const { dayProgression } = get();
+    dlog("endDayProgression -> day:", dayProgression.progressingToDay);
+    set({
+      day: dayProgression.progressingToDay,
+      lastChoice: null, // Reset for new day
+      dayProgression: {
+        isProgressing: false,
+        progressingToDay: dayProgression.progressingToDay,
+        analysisComplete: {
+          support: false,
+          compass: false,
+          dynamic: false,
+          mirror: false,
+          news: false,
+          contextualDilemma: false,
+        },
+      },
+    });
+  },
+
+  // Topic tracking methods (Rule #9)
+  addDilemmaTopic(topic) {
+    const { recentTopics, topicCounts } = get();
+    const newRecentTopics = [topic, ...recentTopics.slice(0, 2)]; // Keep last 3
+    const newTopicCounts = {
+      ...topicCounts,
+      [topic]: (topicCounts[topic] || 0) + 1,
+    };
+    dlog("addDilemmaTopic ->", topic, "recent:", newRecentTopics);
+    set({
+      recentTopics: newRecentTopics,
+      topicCounts: newTopicCounts,
+    });
   },
 }));
 
@@ -146,14 +391,14 @@ function buildSnapshot(): DilemmaRequest {
     const roleState = useRoleStore.getState();
   
     const roleText =
-      typeof roleState.selectedRole === "string"
+      typeof roleState.selectedRole === "string" && roleState.selectedRole.trim()
         ? roleState.selectedRole.trim()
-        : "";
+        : null;
   
     const systemText =
-      typeof roleState.analysis?.systemName === "string"
+      typeof roleState.analysis?.systemName === "string" && roleState.analysis.systemName.trim()
         ? roleState.analysis.systemName.trim()
-        : "";
+        : null;
   
     // holders: map store's {name, percent} -> API snapshot {name, weight}
     const holders = Array.isArray(roleState.analysis?.holders)

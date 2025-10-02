@@ -1,5 +1,5 @@
 // src/hooks/useEventNarration.ts
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useNarrator } from "./useNarrator";
@@ -57,13 +57,29 @@ export function useEventNarration() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.title, current?.description]);
 
-  // Start narration when we reveal the dilemma (once)
-  useEffect(() => {
-    if (!canShowDilemma) return;
+  // Start narration when we reveal the dilemma (once) - controlled by reveal sequence
+  const startNarrationIfReady = useCallback((shouldShowDilemma: boolean = true) => {
+    if (!canShowDilemma || !shouldShowDilemma) return;
     const p = preparedDilemmaRef.current;
     if (narrationEnabled && p && !dilemmaPlayedRef.current) {
       dilemmaPlayedRef.current = true;
       p.start().catch((e) => console.warn("[Event] TTS start blocked:", e));
+    }
+  }, [canShowDilemma, narrationEnabled]);
+
+  // Auto-start narration for first day (when no reveal sequence is controlling it)
+  useEffect(() => {
+    if (!canShowDilemma) return;
+    const p = preparedDilemmaRef.current;
+    if (narrationEnabled && p && !dilemmaPlayedRef.current) {
+      // Add a small delay to ensure this runs after the manual trigger would have run
+      const timer = setTimeout(() => {
+        if (!dilemmaPlayedRef.current) {
+          dilemmaPlayedRef.current = true;
+          p.start().catch((e) => console.warn("[Event] TTS start blocked:", e));
+        }
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [canShowDilemma, narrationEnabled]);
 
@@ -75,5 +91,6 @@ export function useEventNarration() {
     canShowDilemma,
     overlayPreparing,
     narrationEnabled,
+    startNarrationIfReady,
   };
 }

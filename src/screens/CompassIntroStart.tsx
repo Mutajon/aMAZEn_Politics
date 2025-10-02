@@ -1,11 +1,12 @@
 // src/screens/CompassIntroStart.tsx
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import type { PushFn } from "../lib/router";
 import { bgStyle } from "../lib/ui";
 import { useRoleStore } from "../store/roleStore";
 import { useSettingsStore } from "../store/settingsStore";
-import LoadingOverlay from "../components/LoadingOverlay";
+import { useNarrator, type PreparedTTS } from "../hooks/useNarrator";
 import { motion, AnimatePresence } from "framer-motion";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 /** Small built-in placeholder (no asset file needed). */
 const DEFAULT_AVATAR_DATA_URL =
@@ -23,6 +24,16 @@ const DEFAULT_AVATAR_DATA_URL =
       <rect x='26' y='78' width='76' height='30' rx='14' fill='rgba(0,0,0,0.25)'/>
     </svg>`
   );
+
+// Loading quotes for the overlay
+const LOADING_QUOTES = [
+  "Preparing the mirror of self-discovery…",
+  "Polishing reflective surfaces for maximum introspection…",
+  "Calibrating the cosmic mirror for your political soul…",
+  "Loading ancient wisdom about knowing thyself…",
+  "Adjusting the looking glass for perfect clarity…",
+  "Preparing your journey into the depths of conscience…",
+];
 
 function trimEra(role: string): string {
   return (role || "").replace(/\s*[—–-].*$/u, "").trim();
@@ -55,75 +66,79 @@ function genderizeRole(role: string, gender: "male" | "female" | "any"): string 
 
 export default function CompassIntroStart({ push }: { push: PushFn }) {
   const generateImages = useSettingsStore((s) => s.generateImages);
-
   const character = useRoleStore((s) => s.character);
   const selectedRole = useRoleStore((s) => s.selectedRole);
-  const updateCharacter = useRoleStore((s) => s.updateCharacter);
 
-  const [avatarUrl, setAvatarUrl] = useState<string>(character?.avatarUrl || "");
-  const [loading, setLoading] = useState(false);
-
+  const [loading, setLoading] = useState(true);
   const [showImage, setShowImage] = useState(false);
   const [showText, setShowText] = useState(false);
+  const [narrationReady, setNarrationReady] = useState(false);
 
-  const avatarReqRef = useRef(0);
+  // Narration setup
+  const { prepare } = useNarrator();
+  const preparedTTSRef = useRef<PreparedTTS | null>(null);
 
   /** The URL we actually display, factoring in settings + fallback. */
   const displayAvatar = useMemo(() => {
-    // A) If an avatar is already saved, always show it (your preference A)
-    if (avatarUrl) return avatarUrl;
-    // B) If images are OFF and we don't have one, show placeholder
+    // If an avatar is already saved, always show it
+    if (character?.avatarUrl) return character.avatarUrl;
+    // If images are OFF and we don't have one, show placeholder
     if (!generateImages) return DEFAULT_AVATAR_DATA_URL;
-    // C) If images are ON and we don't have one yet, we’ll show a “preparing” state until generated
-    return "";
-  }, [avatarUrl, generateImages]);
-
-  // generate avatar if enabled and needed
-  useEffect(() => {
-    const prompt = (character?.imagePrompt || character?.description || "").trim();
-    if (!generateImages) return; // images disabled → skip fetching
-    if (!prompt || avatarUrl) return;
-
-    const req = ++avatarReqRef.current;
-    const ac = new AbortController();
-    (async () => {
-      try {
-        setLoading(true);
-        const res = await fetch("/api/generate-avatar", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt }),
-          signal: ac.signal,
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !(data as any)?.dataUrl) {
-          throw new Error((data as any)?.error || `HTTP ${res.status}`);
-        }
-        if (req !== avatarReqRef.current) return;
-        setAvatarUrl((data as any).dataUrl);
-        updateCharacter({ avatarUrl: (data as any).dataUrl });
-      } catch (e: any) {
-        
-      } finally {
-        if (req === avatarReqRef.current) setLoading(false);
-      }
-    })();
-
-    return () => ac.abort();
-  }, [generateImages, character?.imagePrompt, character?.description, avatarUrl, updateCharacter]);
-
-  // staged reveal: use the actual thing we’re displaying (avatar or placeholder)
-  useEffect(() => {
-    if (!displayAvatar) return;
-    setShowImage(true);
-    const t = setTimeout(() => setShowText(true), 900);
-    return () => clearTimeout(t);
-  }, [displayAvatar]);
+    // If images are ON but we don't have one, show placeholder too (since generation happens in NameScreen now)
+    return DEFAULT_AVATAR_DATA_URL;
+  }, [character?.avatarUrl, generateImages]);
 
   const roleText = genderizeRole(trimEra(selectedRole || ""), character?.gender || "any");
 
+  // Start narration preparation immediately on mount
+  useEffect(() => {
+    if (!character?.name || !roleText) return;
+
+    const narrationText = `Welcome ${character.name}. It is the night before your first day as ${roleText}. A package arrives with no return address, only the words: Know Thyself. Inside, a mirror—black, breathless, waiting.`;
+
+    const prepareAndStartNarration = async () => {
+      try {
+        console.log("[CompassIntroStart] Preparing narration");
+        const prepared = await prepare(narrationText);
+        preparedTTSRef.current = prepared;
+
+        // Start narration immediately when ready
+        if (!prepared.disposed()) {
+          console.log("[CompassIntroStart] Starting narration");
+          await prepared.start();
+        }
+
+        console.log("[CompassIntroStart] Narration complete, revealing content");
+        // Only after narration is ready, start the reveal sequence
+        setLoading(false);
+        setShowImage(true);
+        setTimeout(() => setShowText(true), 600);
+        setTimeout(() => setNarrationReady(true), 1200);
+      } catch (error) {
+        console.error("[CompassIntroStart] Narration preparation failed:", error);
+        // If narration fails, still allow progression
+        setLoading(false);
+        setShowImage(true);
+        setTimeout(() => setShowText(true), 600);
+        setTimeout(() => setNarrationReady(true), 1200);
+      }
+    };
+
+    prepareAndStartNarration();
+
+    // Cleanup on unmount
+    return () => {
+      if (preparedTTSRef.current) {
+        preparedTTSRef.current.dispose();
+        preparedTTSRef.current = null;
+      }
+    };
+  }, [character?.name, roleText, prepare]);
+
   return (
     <div className="min-h-[100dvh] px-5 py-6" style={bgStyle}>
+      <LoadingOverlay visible={loading} title="Know Thyself…" quotes={LOADING_QUOTES} />
+
       <div className="w-full max-w-xl mx-auto">
         <div className="relative mt-2 grid place-items-center">
           <motion.div
@@ -160,7 +175,7 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
               <p className="text-lg">Welcome {character?.name || "Player"},</p>
               <p className="mt-3">
                 It is the night before your first day as{" "}
-                <span className="font-semibold">{roleText}</span>. A package arrives with no return, only the words:{" "}
+                <span className="font-semibold">{roleText}</span>. A package arrives with no return address, only the words:{" "}
                 <span className="font-extrabold text-amber-300">Know Thyself</span>.
               </p>
               <p className="mt-3">Inside, a mirror—black, breathless, waiting.</p>
@@ -169,31 +184,22 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
         </AnimatePresence>
 
         <div className="mt-8 flex justify-center">
-          <motion.button
-            initial={{ opacity: 0, scale: 0.92, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 22 }}
-            onClick={() => push("/compass-mirror")}
-            className="rounded-2xl px-5 py-3 font-semibold text-lg shadow-lg bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] hover:scale-[1.02] active:scale-[0.98]"
-          >
-            Look in the mirror
-          </motion.button>
+          <AnimatePresence>
+            {narrationReady && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.92, y: 8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.92, y: 8 }}
+                transition={{ type: "spring", stiffness: 300, damping: 22 }}
+                onClick={() => push("/compass-mirror")}
+                className="rounded-2xl px-5 py-3 font-semibold text-lg shadow-lg bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] hover:scale-[1.02] active:scale-[0.98]"
+              >
+                Look in the mirror
+              </motion.button>
+            )}
+          </AnimatePresence>
         </div>
       </div>
-
-      {/* Only show the loader when images are ON */}
-      <LoadingOverlay
-        visible={generateImages && loading}
-        title="Preparing avatar…"
-        quotes={[
-          "Great faces take great pixels.",
-          "Applying heroic jawline filter…",
-          "Double-checking cheekbone symmetry…",
-          "No text, just vibes, promise.",
-          "Polishing the background glow…",
-        ]}
-    
-      />
     </div>
   );
 }

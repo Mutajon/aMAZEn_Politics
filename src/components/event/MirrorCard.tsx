@@ -102,12 +102,12 @@ export default function MirrorCard({ text, italic = true, className }: MirrorCar
         <img
           src={MIRROR_IMG_SRC}
           alt="Mirror"
-          className="pointer-events-none select-none absolute top-0 right-0 z-0"
+          className="pointer-events-none select-none absolute top-0 left-0 z-0"
           style={{
             width: IMG_WIDTH_PX,
             height: "auto",
             opacity: IMG_OPACITY,
-            transform: `translate(${IMG_OFFSET_X}px, ${IMG_OFFSET_Y}px)`,
+            transform: `translate(${IMG_OFFSET_Y}px, ${IMG_OFFSET_Y}px)`,
           }}
           loading="lazy"
         />

@@ -15,6 +15,7 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import PowerDistributionContent from "../components/PowerDistributionContent";
 import { usePowerDistributionState, makeId, clampPct } from "../hooks/usePowerDistributionState";
 import { usePowerDistributionAnalysis } from "../hooks/usePowerDistributionAnalysis";
+import { useSettingsStore } from "../store/settingsStore";
 
 // Loading quotes for the overlay
 const LOADING_QUOTES = [
@@ -46,7 +47,6 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
     handleChangeName,
     handleReset,
     handleLooksGood,
-    handleBack,
     initializeData,
   } = state;
 
@@ -66,15 +66,18 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
     clampPct,
   });
 
-  // Enhanced handlers with navigation
-  const handleBackWithNavigation = () => {
-    handleBack();
-    push("/role");
-  };
+  // Check if modifiers are enabled
+  const enableModifiers = useSettingsStore((s) => s.enableModifiers);
 
+  // Enhanced handlers with navigation
   const handleLooksGoodWithNavigation = () => {
     handleLooksGood();
-    push("/name");
+    // Navigate to difficulty screen if modifiers are enabled, otherwise go to compass intro
+    if (enableModifiers) {
+      push("/difficulty");
+    } else {
+      push("/compass-intro");
+    }
   };
 
   const handleRetry = () => {
@@ -97,7 +100,6 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
         showSystemModal={showSystemModal}
 
         // Handlers
-        onBack={handleBackWithNavigation}
         onRetry={handleRetry}
         onChangePercent={handleChangePercent}
         onChangeName={handleChangeName}

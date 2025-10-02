@@ -1,6 +1,11 @@
 // src/hooks/useEventState.ts
+// Manages event screen state including support values and budget.
+// Pulls persistent data from dilemmaStore and manages UI-specific state locally.
+// Used by EventScreen and EventScreen2 for gameplay state management.
+
 import React, { useState, useRef } from "react";
 import { useRoleStore, type PowerHolder } from "../store/roleStore";
+import { useDilemmaStore } from "../store/dilemmaStore";
 import { DefaultSupportIcons } from "../components/event/SupportList";
 import { pickIconForHolder } from "../lib/powerHolderIcon";
 
@@ -32,8 +37,36 @@ const clampPercent = (n: number): number =>
   Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
 
 export function useEventState() {
-  // Support trio local demo state
-  const [vals, setVals] = useState<Trio>({ people: 50, middle: 50, mom: 50 });
+  // Pull support and budget from dilemmaStore (persistent)
+  const supportPeople = useDilemmaStore((s) => s.supportPeople);
+  const supportMiddle = useDilemmaStore((s) => s.supportMiddle);
+  const supportMom = useDilemmaStore((s) => s.supportMom);
+  const budget = useDilemmaStore((s) => s.budget);
+
+  const setSupportPeopleStore = useDilemmaStore((s) => s.setSupportPeople);
+  const setSupportMiddleStore = useDilemmaStore((s) => s.setSupportMiddle);
+  const setSupportMomStore = useDilemmaStore((s) => s.setSupportMom);
+  const setBudgetStore = useDilemmaStore((s) => s.setBudget);
+
+  // Compute vals object for backward compatibility
+  const vals: Trio = { people: supportPeople, middle: supportMiddle, mom: supportMom };
+
+  // Helper to update all three support values at once (for backward compatibility)
+  // Supports both direct values and functional updates
+  const setVals = (newVals: Trio | ((prev: Trio) => Trio)) => {
+    const resolved = typeof newVals === 'function' ? newVals(vals) : newVals;
+    setSupportPeopleStore(resolved.people);
+    setSupportMiddleStore(resolved.middle);
+    setSupportMomStore(resolved.mom);
+  };
+
+  // Helper to update budget (for backward compatibility)
+  // Supports both direct values and functional updates
+  const setBudget = (newBudget: number | ((prev: number) => number)) => {
+    const resolved = typeof newBudget === 'function' ? newBudget(budget) : newBudget;
+    setBudgetStore(resolved);
+  };
+
   const [delta, setDelta] = useState<number | null>(null);
   const [trend, setTrend] = useState<"up" | "down" | null>(null);
 
@@ -63,9 +96,6 @@ export function useEventState() {
     React.createElement(DefaultSupportIcons.BuildingIcon, { className: "w-4 h-4" })
   );
   const didInitMiddleRef = useRef(false);
-
-  // Budget state
-  const [budget, setBudget] = useState(1500); // demo value
 
   // Pull holders & playerIndex from role analysis
   const holdersSnap = useRoleStore((s) => s.analysis?.holders as PowerHolder[] | undefined);
