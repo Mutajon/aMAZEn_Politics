@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
  * Cycles through an array of strings every `periodMs`.
  * Starts at index 0. Resets when `items` identity changes.
  */
-export function useRotatingText(items: string[], periodMs = 3000) {
+export function useRotatingText(items: string[], periodMs = 3000):string {
   const [i, setI] = useState(0);
   const timer = useRef<number | null>(null);
 

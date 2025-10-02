@@ -690,7 +690,11 @@ app.post("/api/dilemma", async (req, res) => {
     const isFirst     = !!req.body?.previous?.isFirst;
     const isLast      = !!req.body?.previous?.isLast;
     const compassFlat = req.body?.compassValues || {};
-
+    if (debug) {
+      const compassKeys = compassFlat ? Object.keys(compassFlat).length : 0;
+      console.log("[/api/dilemma] IN:", { role, systemName, day, totalDays, compassKeys });
+    }
+    
     // Best-effort nudge only
     const topCompass = Object.entries(compassFlat)
       .sort((a, b) => Number(b[1]) - Number(a[1]))

@@ -1,35 +1,42 @@
-// src/lib/mirrorDilemma.ts
 import { useSettingsStore } from "../store/settingsStore";
+import { useCompassStore } from "../store/compassStore";
 
-/**
- * Fetch a 1–2 sentence mirror line that reacts to the *current dilemma*.
- * For this first step we send empty arrays; in a later step we'll pass
- * top compass components and other context.
- */
-export async function requestMirrorDilemmaLine(opts?: {
-  topWhat?: string[];
-  topWhence?: string[];
-  topOverall?: string[];
-}): Promise<string> {
+function topK(arr: number[] | undefined, k = 3): string[] {
+  const a = Array.isArray(arr) ? arr : [];
+  return a
+    .map((v, i) => ({ v: Number(v) || 0, i }))
+    .sort((a, b) => b.v - a.v)
+    .slice(0, k)
+    .map(x => String(x.i));
+}
+
+export async function requestMirrorDilemmaLine(): Promise<string> {
   const debug = useSettingsStore.getState().debugMode;
   try {
-    const body = {
-      topWhat: opts?.topWhat ?? [],
-      topWhence: opts?.topWhence ?? [],
-      topOverall: opts?.topOverall ?? [],
+    const comp = useCompassStore.getState().values;
+    const payload = {
+      topWhat:    topK(comp?.what, 3),
+      topWhence:  topK(comp?.whence, 3),
+      topOverall: topK(
+        ["what","whence","how","whither"]
+          .flatMap((k) => (Array.isArray((comp as any)?.[k]) ? (comp as any)[k] : []))
+          .slice(0, 10),
+        3
+      ),
     };
-    if (debug) console.log("[mirror-dilemma] → POST /api/mirror-summary", body);
+
+    if (debug) console.log("[mirror-dilemma] → POST /api/mirror-summary", payload);
 
     const r = await fetch("/api/mirror-summary", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
     });
 
     const j = await r.json().catch(() => ({}));
     const text = (j?.summary || "").trim();
     if (debug) console.log("[mirror-dilemma] ←", text || j);
-    return text || "The mirror is quiet—try again.";
+    return text || "The mirror squints—say more, and it will too.";
   } catch (e: any) {
     if (debug) console.log("[mirror-dilemma] ERROR", e?.message || e);
     return "The mirror is foggy…";

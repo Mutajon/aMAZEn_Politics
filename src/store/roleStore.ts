@@ -28,6 +28,7 @@ export type Character = {
   imagePrompt?: string;
   /** AI-chosen background object (e.g., "red pagoda") */
   bgObject?: string;
+  avatarMirrored?: boolean;
 };
 
 /* ---------- Store ---------- */

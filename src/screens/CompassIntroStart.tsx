@@ -61,7 +61,6 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
   const updateCharacter = useRoleStore((s) => s.updateCharacter);
 
   const [avatarUrl, setAvatarUrl] = useState<string>(character?.avatarUrl || "");
-  const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
   const [showImage, setShowImage] = useState(false);
@@ -90,7 +89,6 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
     (async () => {
       try {
         setLoading(true);
-        setErrorMsg("");
         const res = await fetch("/api/generate-avatar", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -105,9 +103,7 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
         setAvatarUrl((data as any).dataUrl);
         updateCharacter({ avatarUrl: (data as any).dataUrl });
       } catch (e: any) {
-        if (e?.name !== "AbortError") {
-          setErrorMsg(e?.message || "Avatar generation failed");
-        }
+        
       } finally {
         if (req === avatarReqRef.current) setLoading(false);
       }
@@ -196,7 +192,7 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
           "No text, just vibes, promise.",
           "Polishing the background glow…",
         ]}
-        periodMs={3000}
+    
       />
     </div>
   );
