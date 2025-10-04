@@ -369,6 +369,96 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
 
 // ---- helpers ----
 
+// Compass component names for enhanced context
+const COMPASS_NAMES = {
+  what: ["Truth/Trust", "Liberty/Agency", "Equality/Equity", "Care/Solidarity", "Create/Courage", "Wellbeing", "Security/Safety", "Freedom/Responsibility", "Honor/Sacrifice", "Sacred/Awe"],
+  whence: ["Evidence", "Public Reason", "Personal", "Tradition", "Revelation", "Nature", "Pragmatism", "Aesthesis", "Fidelity", "Law (Office)"],
+  how: ["Law/Std.", "Deliberation", "Mobilize", "Markets", "Mutual Aid", "Ritual", "Design/UX", "Enforce", "Civic Culture", "Philanthropy"],
+  whither: ["Self", "Family", "Friends", "In-Group", "Nation", "Civiliz.", "Humanity", "Earth", "Cosmos", "God"]
+};
+
+// Analyze compass, power holders, and support to create enhanced context for dilemma generation
+function analyzeEnhancedContext() {
+  const { values: compassRaw } = useCompassStore.getState();
+  const { analysis } = useRoleStore.getState();
+  const { supportPeople, supportMiddle, supportMom } = useDilemmaStore.getState();
+
+  // Extract top compass components across all dimensions
+  const allComponents: Array<{dimension: string; index: number; name: string; value: number}> = [];
+
+  for (const dim of ["what", "whence", "how", "whither"] as const) {
+    const arr = Array.isArray(compassRaw?.[dim]) ? compassRaw[dim] : [];
+    arr.forEach((value: number, index: number) => {
+      if (value > 0) {
+        allComponents.push({
+          dimension: dim,
+          index,
+          name: COMPASS_NAMES[dim][index] || `${dim}${index}`,
+          value: Math.max(0, Math.min(10, Math.round(value)))
+        });
+      }
+    });
+  }
+
+  // Sort by value and get top 5
+  const topCompassComponents = allComponents
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5);
+
+  // Identify compass tensions (high values in potentially conflicting areas)
+  const compassTensions: string[] = [];
+  const highValues = allComponents.filter(c => c.value >= 6);
+
+  // Check for common tensions
+  const liberty = highValues.find(c => c.name === "Liberty/Agency");
+  const security = highValues.find(c => c.name === "Security/Safety");
+  const law = highValues.find(c => c.name === "Law/Std." || c.name === "Law (Office)");
+  const equality = highValues.find(c => c.name === "Equality/Equity");
+  const markets = highValues.find(c => c.name === "Markets");
+  const self = highValues.find(c => c.name === "Self");
+  const collective = highValues.find(c => c.name === "Humanity" || c.name === "Nation" || c.name === "In-Group");
+
+  if (liberty && (security || law)) compassTensions.push("Freedom vs Order");
+  if (equality && markets) compassTensions.push("Equality vs Markets");
+  if (self && collective) compassTensions.push("Individual vs Collective");
+
+  // Analyze power holders
+  const holders = Array.isArray(analysis?.holders) ? analysis!.holders : [];
+  const playerIndex = typeof analysis?.playerIndex === "number" ? analysis!.playerIndex : null;
+
+  const powerHolders = holders.map((h, idx) => ({
+    name: String(h?.name ?? "Group"),
+    percent: Number((h as any)?.percent ?? 0),
+    isPlayer: idx === playerIndex
+  }));
+
+  const playerPowerPercent = playerIndex !== null && holders[playerIndex]
+    ? Number((holders[playerIndex] as any)?.percent ?? 0)
+    : 0;
+
+  // Identify support crises
+  const lowSupportEntities: string[] = [];
+  const criticalSupportEntities: string[] = [];
+
+  if (supportPeople < 25) lowSupportEntities.push("people");
+  if (supportPeople < 20) criticalSupportEntities.push("people");
+
+  if (supportMiddle < 25) lowSupportEntities.push("middle");
+  if (supportMiddle < 20) criticalSupportEntities.push("middle");
+
+  if (supportMom < 25) lowSupportEntities.push("mom");
+  if (supportMom < 20) criticalSupportEntities.push("mom");
+
+  return {
+    compassTensions,
+    topCompassComponents,
+    powerHolders,
+    playerPowerPercent,
+    lowSupportEntities,
+    criticalSupportEntities
+  };
+}
+
 // flatten 0..10 arrays into a flat map like what0..what9, whence0..9, how0..9, whither0..9
 function flattenCompass(vals: any): Record<string, number> {
   const out: Record<string, number> = {};
@@ -385,21 +475,21 @@ function flattenCompass(vals: any): Record<string, number> {
 function buildSnapshot(): DilemmaRequest {
     const { debugMode, dilemmasSubjectEnabled, dilemmasSubject } =
       useSettingsStore.getState();
-    const { day, totalDays } = useDilemmaStore.getState();
-  
+    const { day, totalDays, lastChoice, supportPeople, supportMiddle, supportMom, recentTopics, topicCounts } = useDilemmaStore.getState();
+
     // --- role/system from the role store (trimmed) ---
     const roleState = useRoleStore.getState();
-  
+
     const roleText =
       typeof roleState.selectedRole === "string" && roleState.selectedRole.trim()
         ? roleState.selectedRole.trim()
         : null;
-  
+
     const systemText =
       typeof roleState.analysis?.systemName === "string" && roleState.analysis.systemName.trim()
         ? roleState.analysis.systemName.trim()
         : null;
-  
+
     // holders: map store's {name, percent} -> API snapshot {name, weight}
     const holders = Array.isArray(roleState.analysis?.holders)
       ? roleState.analysis!.holders.map((h) => ({
@@ -408,43 +498,62 @@ function buildSnapshot(): DilemmaRequest {
           weight: Number((h as any)?.percent ?? 0),
         }))
       : [];
-  
+
     const playerIndex =
       typeof roleState.analysis?.playerIndex === "number"
         ? roleState.analysis!.playerIndex
         : null;
-  
+
     // Compass values (flattened 0..10 map)
     const compassRaw = useCompassStore.getState().values;
     const compassValues = flattenCompass(compassRaw);
-  
+
+    // Enhanced context for intelligent dilemma generation (NewDilemmaLogic.md compliance)
+    const enhancedContext = analyzeEnhancedContext();
+
     const snap: DilemmaRequest = {
       // DilemmaRequest expects string, so never undefined.
-      // The server will treat "" as “no value” and apply its own fallback.
+      // The server will treat "" as "no value" and apply its own fallback.
       role: roleText,
       systemName: systemText,
-  
+
       holders,
       playerIndex,
       compassValues,
-  
+
       settings: { dilemmasSubjectEnabled, dilemmasSubject },
       day,
       totalDays,
       previous: { isFirst: day === 1, isLast: day === totalDays },
-  
-      supports: {}, // unchanged
+
+      // NEW: Send current support values for crisis detection (Rule 4d.vi, Rule 25b.ii)
+      supports: {
+        people: supportPeople,
+        middle: supportMiddle,
+        mom: supportMom
+      },
+
+      // NEW: Send last choice for follow-up dilemmas (Rule 4c, Rule 25b.iii)
+      lastChoice: lastChoice || null,
+
+      // NEW: Send topic tracking for diversity (Rule #9)
+      recentTopics: recentTopics || [],
+      topicCounts: topicCounts || {},
+
+      // NEW: Send enhanced context analysis
+      enhancedContext: enhancedContext || null,
+
       debug: debugMode,
     };
-  
-    
+
+
     return snap;
   }
   
   
 
 function localMock(day: number): Dilemma {
-  return {
+  const dilemma: any = {
     title:
       day === 1 ? "First Night in the Palace" : "Crowds Swell Outside the Palace",
     description:
@@ -475,4 +584,7 @@ function localMock(day: number): Dilemma {
       },
     ],
   };
+  // Add topic for tracking (Rule #9)
+  (dilemma as any).topic = "Security";
+  return dilemma;
 }

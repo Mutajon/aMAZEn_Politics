@@ -26,6 +26,7 @@ type Props = {
   onConfirm: (id: string) => void;
   onSuggest?: (text?: string) => void;
   suggestCost?: number;
+  triggerCoinFlight?: (from: Point, to: Point) => void; // Optional: use parent's trigger if provided
   dilemma: { title: string; description: string };
 };
 
@@ -44,6 +45,7 @@ export default function ActionDeck({
   onConfirm,
   onSuggest,
   suggestCost = -300,
+  triggerCoinFlight: parentTriggerCoinFlight,
   dilemma,
 }: Props) {
   // State management
@@ -75,8 +77,10 @@ export default function ActionDeck({
     resetState,
   } = state;
 
-  // Coin flight system
-  const { flights, triggerCoinFlight, clearFlights } = useCoinFlights();
+  // Coin flight system - use parent's trigger if provided, otherwise use local
+  const localCoinFlights = useCoinFlights();
+  const triggerCoinFlight = parentTriggerCoinFlight || localCoinFlights.triggerCoinFlight;
+  const { flights, clearFlights } = localCoinFlights;
 
   // Suggestion validation
   const suggestion = useActionSuggestion({
@@ -148,8 +152,16 @@ export default function ActionDeck({
     }
 
     const cost = card.cost ?? 0;
-    if (cost >= 0) {
-      // from card → to budget
+
+    // Skip coin animation if cost is zero
+    if (cost === 0) {
+      debugLog("handleConfirm: zero cost, skipping coin animation");
+      onConfirm(id);
+      return;
+    }
+
+    if (cost > 0) {
+      // from card → to budget (positive cost = gain money)
       syncCoinAndBudget(
         () => getCenterRect(targetEl),
         () => getBudgetAnchorRect(),
@@ -158,7 +170,7 @@ export default function ActionDeck({
         debugLog
       );
     } else {
-      // from budget → to card
+      // from budget → to card (negative cost = spend money)
       syncCoinAndBudget(
         () => getBudgetAnchorRect(),
         () => getCenterRect(targetEl),

@@ -37,7 +37,8 @@ export default function ProgressiveLoadingCard({
   if (!show) return null;
 
   const daysLeft = totalDays - currentDay + 1;
-  const progressPercentage = Math.round(((currentDay - 1) / totalDays) * 100);
+  // Progress bar starts full (100%) and decreases as days pass
+  const progressPercentage = Math.round((daysLeft / totalDays) * 100);
 
   return (
     <AnimatePresence>

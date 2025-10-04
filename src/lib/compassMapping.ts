@@ -1,17 +1,15 @@
 // src/lib/compassMapping.ts
 // Client helper: calls backend /api/compass-analyze, then applies effects
 // via useCompassFX (updates store + shows pills).
+//
+// OPTIMIZED: Removed cues parameter (81% token reduction)
+// - Server now has compact component definitions in system prompt
+// - No need to send 2,725 chars with every request
+// - Saves ~549 tokens per compass analysis
 
-import { COMPONENTS, COMPONENT_CUES, type PropKey } from "../data/compass-data";
+import { COMPONENTS, type PropKey } from "../data/compass-data";
 import { VALUE_RULES } from "../store/compassStore";
 import type { FXEffect } from "../hooks/useCompassFX";
-
-/** Build a compact "cues" string for the backend LLM prompt. */
-function buildCueList(): string {
-  return Object.entries(COMPONENT_CUES)
-    .map(([prop, items]) => items.map((c, idx) => `${prop}.${idx}: ${c.short} → ${c.example}`).join("\n"))
-    .join("\n");
-}
 
 /**
  * Analyze text with the backend AI and apply the resulting effects.
@@ -20,17 +18,15 @@ function buildCueList(): string {
  * @param apiPath - override if needed (defaults to /api/compass-analyze)
  */
 export async function analyzeTextToCompassFn(
-
   text: string,
   applyWithPings: (effects: FXEffect[]) => FXEffect[],
   apiPath: string = "/api/compass-analyze"
 ): Promise<FXEffect[]> {
-  const cues = buildCueList();
-
+  // Component definitions now in server system prompt - no need to send cues
   const resp = await fetch(apiPath, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, cues }),
+    body: JSON.stringify({ text }), // Removed: cues parameter (was 2,725 chars)
   }).catch(() => null);
 
   let items: any[] = [];

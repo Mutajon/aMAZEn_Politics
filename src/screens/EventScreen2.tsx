@@ -18,7 +18,14 @@ import CompassPillsOverlay from "../components/event/CompassPillsOverlay";
 import ActionDeck, { type ActionCard } from "../components/event/ActionDeck";
 import { actionsToDeckCards } from "../components/event/actionVisuals";
 import { requestMirrorDilemmaLine } from "../lib/mirrorDilemma";
+import { analyzeTextToCompass } from "../lib/compassMapping";
+import { analyzeSupport } from "../lib/supportAnalysis";
 import { useSettingsStore } from "../store/settingsStore";
+import { useCompassStore } from "../store/compassStore";
+import useCompassFX from "../hooks/useCompassFX";
+import { useDynamicParameters } from "../hooks/useDynamicParameters";
+import { useCoinFlights, CoinFlightOverlay } from "../components/event/CoinFlightSystem";
+import { AnimatePresence } from "framer-motion";
 import { Users, Heart, Building2, TrendingUp, TrendingDown, DollarSign, Shield, AlertTriangle, Globe, Leaf, Zap, Target, Scale, Flag, Crown } from "lucide-react";
 
 type Props = {
@@ -96,14 +103,26 @@ export default function EventScreen2(_props: Props) {
   const showBudget = useSettingsStore((s) => s.showBudget);
 
   // Narration integration - prepares and auto-plays TTS when dilemma loads
-  const { canShowDilemma, startNarrationIfReady } = useEventNarration();
+  const { canShowDilemma } = useEventNarration();
+
+  // Compass FX for pills animation
+  const { pings: compassPings, applyWithPings } = useCompassFX();
+
+  // Dynamic parameters hook - manages parameter generation and animation
+  const {
+    parameters: dynamicParams,
+    animatingIndex: dynamicParamsAnimatingIndex,
+    generateParameters,
+  } = useDynamicParameters();
+
+  // Coin flight system - managed at parent level so it persists across ActionDeck unmounts
+  const { flights, triggerCoinFlight, clearFlights } = useCoinFlights();
 
   // Loading sequence state
   const [loadingStage, setLoadingStage] = useState<'initial' | 'support' | 'supportAnalysis' | 'news' | 'dynamicParams' | 'playerStatus' | 'dilemma' | 'mirror' | 'complete'>('initial');
   const [supportItems, setSupportItems] = useState<any[]>([]);
   const [supportChanges, setSupportChanges] = useState<any[]>([]);
   const [newsItems, setNewsItems] = useState<any[]>([]);
-  const [dynamicParams, setDynamicParams] = useState<any[]>([]);
   const [isAnalyzingSupport, setIsAnalyzingSupport] = useState(false);
   const [isGeneratingNews, setIsGeneratingNews] = useState(false);
   const [isGeneratingParams, setIsGeneratingParams] = useState(false);
@@ -234,60 +253,24 @@ export default function EventScreen2(_props: Props) {
       await new Promise(resolve => setTimeout(resolve, 300));
 
       // Step 6: Generate dynamic parameters (day 1 = none, day 2+ = based on previous choice)
+      // Note: Dynamic parameters are now managed by useDynamicParameters hook
       setLoadingStage('dynamicParams');
       setIsGeneratingParams(true);
 
-      if (day === 1) {
-        console.log("[EventScreen2] Day 1 - no dynamic parameters");
-        setDynamicParams([]);
-        await new Promise(resolve => setTimeout(resolve, 300));
-      } else {
+      if (day > 1) {
         console.log("[EventScreen2] Generating dynamic parameters for day", day);
         try {
-          // TODO: Get previous choice from store when available
-          const previousChoice = null; // Placeholder - replace with actual previous choice
-
-          if (previousChoice) {
-            const paramResponse = await fetch('/api/dynamic-parameters', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                lastChoice: previousChoice,
-                politicalContext: {
-                  role: selectedRole || DEFAULT_ROLE,
-                  systemName: analysis?.systemName || DEFAULT_ANALYSIS.systemName,
-                  day,
-                  totalDays
-                }
-              })
-            });
-
-            if (paramResponse.ok) {
-              const paramData = await paramResponse.json();
-              console.log("[EventScreen2] Dynamic parameters generated:", paramData.parameters?.length, "items");
-
-              // Transform API response to PlayerStatusStrip format
-              const transformedParams = (paramData.parameters || []).map((param: any) => ({
-                id: param.id,
-                icon: getIconComponent(param.icon),
-                text: param.text,
-                tone: param.tone
-              }));
-
-              setDynamicParams(transformedParams);
-            } else {
-              setDynamicParams([]);
-            }
-          } else {
-            setDynamicParams([]);
-          }
+          await generateParameters();
+          console.log("[EventScreen2] Dynamic parameters generated successfully");
         } catch (error) {
           console.error('[EventScreen2] Failed to generate dynamic parameters:', error);
-          setDynamicParams([]);
         }
+      } else {
+        console.log("[EventScreen2] Day 1 - no dynamic parameters");
       }
 
       setIsGeneratingParams(false);
+      await new Promise(resolve => setTimeout(resolve, 300));
       await new Promise(resolve => setTimeout(resolve, 300));
 
       // Step 7: Show PlayerStatusStrip
@@ -328,15 +311,214 @@ export default function EventScreen2(_props: Props) {
   // Build action cards from current dilemma
   const actionsForDeck: ActionCard[] = current ? actionsToDeckCards(current.actions) : [];
 
-  // Action handlers (TODO: implement full action confirmation pipeline)
-  const handleConfirm = (id: string) => {
-    console.log("[EventScreen2] Action confirmed:", id);
-    // TODO: Implement action confirmation pipeline
-    // - Update budget
-    // - Run compass analysis
-    // - Run support analysis
-    // - Update news
-    // - Load next dilemma
+  // Progressive analysis after action confirmation
+  const runProgressiveAnalysis = async (action: ActionCard) => {
+    const actionText = `${action.title}. ${action.summary}`;
+    console.log("[EventScreen2] Starting progressive analysis for:", actionText);
+
+    // Step 1: Show support list again (will show changes animation)
+    await new Promise(resolve => setTimeout(resolve, 500));
+    setLoadingStage('support');
+    const supportData = getSupportItems(supportPeople, supportMiddle, supportMom);
+    setSupportItems(supportData);
+
+    // Step 2: Analyze support changes from the action
+    await new Promise(resolve => setTimeout(resolve, 300));
+    setLoadingStage('supportAnalysis');
+    setIsAnalyzingSupport(true);
+
+    try {
+      const ctx = {
+        systemName: analysis?.systemName || "",
+        holders: Array.isArray(analysis?.holders)
+          ? analysis!.holders.map((h) => ({ name: h.name, percent: h.percent }))
+          : [],
+        playerIndex: typeof analysis?.playerIndex === "number" ? analysis!.playerIndex : null,
+        day: day || 1,
+      };
+
+      const effects = await analyzeSupport(actionText, ctx);
+      console.log("[EventScreen2] Support effects:", effects);
+
+      // Update support values in store
+      const { setSupportPeople, setSupportMiddle, setSupportMom } = useDilemmaStore.getState();
+      const newPeopleValue = Math.max(0, Math.min(100, supportPeople + (effects.find(e => e.id === "people")?.delta || 0)));
+      const newMiddleValue = Math.max(0, Math.min(100, supportMiddle + (effects.find(e => e.id === "middle")?.delta || 0)));
+      const newMomValue = Math.max(0, Math.min(100, supportMom + (effects.find(e => e.id === "mom")?.delta || 0)));
+
+      setSupportPeople(newPeopleValue);
+      setSupportMiddle(newMiddleValue);
+      setSupportMom(newMomValue);
+
+      // Build support items WITH delta, trend, AND note inside each item (for animation)
+      const updatedSupportItems = getSupportItems(newPeopleValue, newMiddleValue, newMomValue).map(item => {
+        const effect = effects.find(e => e.id === item.id);
+        return {
+          ...item,
+          delta: effect?.delta || null,
+          trend: effect && effect.delta > 0 ? "up" : effect && effect.delta < 0 ? "down" : null,
+          note: effect?.explain || null,  // API returns 'explain' not 'note'
+        };
+      });
+
+      setSupportItems(updatedSupportItems);
+      setSupportChanges([]); // Clear old changes array (not needed with delta in items)
+
+      await new Promise(resolve => setTimeout(resolve, 1200));
+    } catch (error) {
+      console.error('[EventScreen2] Support analysis failed:', error);
+    }
+    setIsAnalyzingSupport(false);
+
+    // Step 3: Update news ticker
+    console.log("[EventScreen2] Generating news ticker after action");
+    setLoadingStage('news');
+    setIsGeneratingNews(true);
+
+    try {
+      const response = await fetch('/api/news-ticker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: selectedRole || DEFAULT_ROLE,
+          day,
+          systemName: analysis?.systemName || DEFAULT_ANALYSIS.systemName,
+          previousChoice: actionText,
+          count: 3,
+          style: "short_amusing"
+        })
+      });
+
+      if (response.ok) {
+        const newsData = await response.json();
+        console.log("[EventScreen2] News generated:", newsData.items?.length, "items");
+        setNewsItems(newsData.items || []);
+      }
+    } catch (error) {
+      console.error('[EventScreen2] Failed to generate news:', error);
+    }
+    setIsGeneratingNews(false);
+
+    // Step 4: Load compass pills (only after day 1)
+    if (day > 1) {
+      console.log("[EventScreen2] Analyzing compass changes");
+      try {
+        // Use applyWithPings to update compass store AND trigger pill animation
+        await analyzeTextToCompass(actionText, applyWithPings);
+        console.log("[EventScreen2] Compass analysis complete - pills should be visible");
+      } catch (error) {
+        console.error('[EventScreen2] Compass analysis failed:', error);
+      }
+    }
+
+    // Step 5: Load next dilemma in background + dynamic params
+    setLoadingStage('dynamicParams');
+    setIsGeneratingParams(true);
+
+    const dilemmaPromise = (async () => {
+      console.log("[EventScreen2] Loading NEXT dilemma in background...");
+      try {
+        // Always load next dilemma (don't check if (!current), always advance)
+        await loadNext();
+        console.log("[EventScreen2] Next dilemma loaded successfully");
+      } catch (error) {
+        console.error('[EventScreen2] Failed to load next dilemma:', error);
+      }
+    })();
+
+    // Generate dynamic parameters (day 2+ based on previous choice)
+    if (day > 1) {
+      console.log("[EventScreen2] Generating dynamic parameters for day", day);
+      try {
+        await generateParameters();
+        console.log("[EventScreen2] Dynamic parameters generated");
+      } catch (error) {
+        console.error('[EventScreen2] Failed to generate dynamic parameters:', error);
+      }
+    } else {
+      console.log("[EventScreen2] Day 1 - no dynamic parameters");
+      // Parameters are already managed by the hook, no need to set manually
+    }
+    setIsGeneratingParams(false);
+
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // Step 6: Show PlayerStatusStrip
+    setLoadingStage('playerStatus');
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // Step 7: Wait for dilemma to load
+    await dilemmaPromise;
+
+    // Step 8: Show dilemma
+    console.log("[EventScreen2] Dilemma loaded - showing dilemma card");
+    setLoadingStage('dilemma');
+
+    // Step 9: Load mirror text for new dilemma
+    const mirrorPromise = (async () => {
+      await dilemmaPromise; // Ensure dilemma is loaded first
+
+      const loadedDilemma = useDilemmaStore.getState().current;
+      if (loadedDilemma) {
+        console.log("[EventScreen2] Loading mirror text for new dilemma...");
+        setLoadingStage('mirror');
+        setMirrorLoading(true);
+        setMirrorText("…the mirror squints, light pooling in the glass…");
+        try {
+          const text = await requestMirrorDilemmaLine(loadedDilemma);
+          setMirrorText(text);
+          console.log("[EventScreen2] Mirror text loaded successfully");
+        } catch (error) {
+          console.error('[EventScreen2] Failed to load mirror text:', error);
+          setMirrorText("…the mirror seems distracted, its surface clouded…");
+        } finally {
+          setMirrorLoading(false);
+        }
+      }
+    })();
+
+    await mirrorPromise;
+
+    // Step 10: Complete - show action deck
+    console.log("[EventScreen2] All analysis complete - ready for next choice");
+    setLoadingStage('complete');
+  };
+
+  // Action handlers - implements full confirmation pipeline with progressive reveal
+  const handleConfirm = async (id: string) => {
+    const action = actionsForDeck.find((a) => a.id === id);
+    if (!action) return;
+
+    console.log("[EventScreen2] Action confirmed:", id, action.title);
+
+    // NOTE: Coin animation is now managed at EventScreen2 level via portal
+    // It will persist independently even when ActionDeck unmounts - no timing needed!
+
+    // 1. Update budget immediately (happens during coin animation for visual feedback)
+    if (showBudget && action.cost !== undefined && action.cost !== 0) {
+      const { setBudget } = useDilemmaStore.getState();
+      setBudget(budget + action.cost);
+      console.log(`[EventScreen2] Budget updated by ${action.cost}`);
+    }
+
+    // 2. Save the choice to store for context
+    const { applyChoice } = useDilemmaStore.getState();
+    applyChoice(id as "a" | "b" | "c");
+
+    // 3. Decrement days left (advance to next day)
+    const { nextDay } = useDilemmaStore.getState();
+    nextDay();
+    console.log("[EventScreen2] Advanced to next day");
+
+    // 4. Start new day sequence immediately (coin animation persists independently)
+    console.log("[EventScreen2] Starting new day sequence (coins will continue animating)");
+    setLoadingStage('initial');
+
+    // Small delay to allow UI to reset
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // 5. Start progressive analysis sequence (coins flying in background)
+    await runProgressiveAnalysis(action);
   };
 
   const handleSuggest = (text?: string) => {
@@ -351,14 +533,15 @@ export default function EventScreen2(_props: Props) {
         <div
           className="
             sticky top-0 z-40
-            -mx-5 px-5   /* stretch to page gutters, then restore padding */
             py-2
             bg-[#0b1335]/80 backdrop-blur-md
             border-b border-white/10
           "
           style={{ WebkitBackdropFilter: "blur(8px)" }}
         >
-          <ResourceBar daysLeft={daysLeft} budget={budget} showBudget={showBudget} />
+          <div className="w-full max-w-xl mx-auto px-5">
+            <ResourceBar daysLeft={daysLeft} budget={budget} showBudget={showBudget} />
+          </div>
         </div>
 
         <div className="w-full max-w-xl mx-auto px-5 py-5">
@@ -373,13 +556,11 @@ export default function EventScreen2(_props: Props) {
 
           {/* Step 2: SupportList - appears after 0.5 seconds */}
           {loadingStage !== 'initial' && supportItems.length > 0 && (
-            <div className="mt-4">
-              <SupportList
-                items={supportItems}
-                changes={supportChanges}
-                animateChanges={supportChanges.length > 0}
-              />
-            </div>
+            <SupportList
+              items={supportItems}
+              changes={supportChanges}
+              animateChanges={supportChanges.length > 0}
+            />
           )}
 
           {/* Step 4: NewsTicker - show immediately when news items are ready */}
@@ -394,14 +575,14 @@ export default function EventScreen2(_props: Props) {
             <div className="mt-6">
               <PlayerStatusStrip
                 params={dynamicParams}
-                animatingIndex={null}
+                animatingIndex={dynamicParamsAnimatingIndex}
               />
             </div>
           )}
 
           {/* Step 7: DilemmaCard - show when dilemma loaded and narration ready */}
           {(loadingStage === 'dilemma' || loadingStage === 'mirror' || loadingStage === 'complete') && current && canShowDilemma && (
-            <div className="mt-8">
+            <div className="mt-4">
               <DilemmaCard
                 title={current.title}
                 description={current.description}
@@ -417,7 +598,8 @@ export default function EventScreen2(_props: Props) {
               <div className={mirrorLoading ? "animate-pulse" : ""}>
                 <MirrorCard text={mirrorText} />
               </div>
-              {/* Note: Compass pills will be added here after day 1 when player makes choices */}
+              {/* Compass pills - show when triggered by compass analysis (day 2+) */}
+              <CompassPillsOverlay effectPills={compassPings} loading={false} color="#7de8ff" />
             </div>
           )}
 
@@ -429,11 +611,22 @@ export default function EventScreen2(_props: Props) {
               budget={budget}
               onConfirm={handleConfirm}
               onSuggest={handleSuggest}
+              triggerCoinFlight={triggerCoinFlight}
               dilemma={{ title: current.title, description: current.description }}
             />
           )}
         </div>
       </div>
+
+      {/* Coin Flight Overlay - portal-based, persists independently of ActionDeck lifecycle */}
+      <AnimatePresence>
+        {flights.length > 0 && (
+          <CoinFlightOverlay
+            flights={flights}
+            onAllDone={clearFlights}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

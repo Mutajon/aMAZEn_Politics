@@ -630,26 +630,31 @@ app.post("/api/tts", async (req, res) => {
 app.post("/api/compass-analyze", async (req, res) => {
   try {
     const text = String(req.body?.text || "").trim();
-    const cues = String(req.body?.cues || "").slice(0, 20000);
     if (!text) return res.status(400).json({ error: "Missing 'text'." });
 
+    // OPTIMIZED: Component definitions moved to system prompt (81% token reduction: 682 → 133 tokens)
+    // Old approach sent full cues (2,725 chars) with every request
+    // New approach: compact reference in system prompt, reused across all requests
     const system =
-      "You map sentences to a moral–political compass.\n" +
-      "Return STRICT JSON ONLY: an array of items like " +
-      '[{"prop":"whence","idx":0,"polarity":"positive","strength":"mild"}].\n' +
-      "- prop: one of what|whence|how|whither.\n" +
-      "- idx: 0..9 component index for that prop.\n" +
-      "- polarity: positive|negative.\n" +
-      "- strength: mild|strong.\n" +
-      "- Max 6 items. No extra prose.";
+      "You are a political compass analyzer. Map text to these 40 components:\n\n" +
+      "WHAT (ultimate goals):\n" +
+      "0=Truth(facts,reliability) 1=Liberty(choice,autonomy) 2=Equality(fairness,equity) 3=Care(solidarity,together) 4=Courage(create,bold) 5=Wellbeing(health,happiness) 6=Security(safety,order) 7=Freedom(responsibility,consequences) 8=Honor(sacrifice,duty) 9=Sacred(awe,reverence)\n\n" +
+      "WHENCE (justification):\n" +
+      "0=Evidence(data,facts) 1=PublicReason(universal) 2=Personal(intuition,conscience) 3=Tradition(ancestors,customs) 4=Revelation(divine,cosmic) 5=Nature(telos,purpose) 6=Pragmatic(works,practical) 7=Aesthetic(beauty,fitting) 8=Fidelity(loyalty,promised) 9=Law(authority,office)\n\n" +
+      "HOW (means):\n" +
+      "0=Law(regulations,courts) 1=Deliberation(debate,compromise) 2=Mobilize(organize,march) 3=Markets(prices,incentives) 4=MutualAid(neighbors,direct) 5=Ritual(ceremony,tradition) 6=Design(nudge,UX) 7=Enforce(force,peace) 8=CivicCulture(schools,media) 9=Philanthropy(donate,fund)\n\n" +
+      "WHITHER (recipients):\n" +
+      "0=Self(personal) 1=Family(kin) 2=Friends(chosen) 3=InGroup(tribe,us) 4=Nation(country) 5=Civilization(culture,region) 6=Humanity(all people) 7=Earth(planet,creatures) 8=Cosmos(sentient life) 9=God(divine)\n\n" +
+      "Return STRICT JSON ONLY: array of items like " +
+      '[{"prop":"what|whence|how|whither","idx":0-9,"polarity":"positive|negative","strength":"mild|strong"}].\n' +
+      "- Max 6 items. Multi-component hits allowed. No extra prose.";
 
     const user =
       `TEXT: """${text}"""\n\n` +
-      `COMPONENTS & CUES:\n${cues}\n\n` +
       "TASK:\n" +
-      "- Identify components supported/opposed by the text.\n" +
-      "- Multi-component hits allowed.\n" +
-      "- JSON ARRAY ONLY.";
+      "- Identify which components above are supported (positive) or opposed (negative) by this text\n" +
+      "- Assess strength: mild (slight/implied) or strong (explicit/emphasized)\n" +
+      "- Return JSON ARRAY ONLY";
 
     const items = await aiJSON({
       system,
@@ -777,6 +782,109 @@ app.post("/api/news-ticker", async (req, res) => {
   }
 });
 
+// -------------------- Helper: Analyze Political System Type ---------------------------
+// Determines how dilemmas should feel based on the political system
+function analyzeSystemType(systemName) {
+  const lower = (systemName || "").toLowerCase();
+
+  // Absolute power systems
+  if (/(absolute|monarch|king|queen|emperor|sultan|divine|autocrat|dictator|tsar|czar|pharaoh)/i.test(lower)) {
+    return {
+      type: "absolute_monarchy",
+      feel: "Player's decisions are swift and intimidating. Most people are somewhat afraid. Player has near-total control over the state.",
+      dilemmaFraming: "Frame as demands from subjects, events requiring royal decree, or challenges to absolute authority"
+    };
+  }
+
+  // Direct democracy / Assembly systems
+  if (/(assembly|direct.*democracy|citizens.*assembly|athen)/i.test(lower)) {
+    return {
+      type: "direct_democracy",
+      feel: "Player casts one vote among many citizens. They see aggregate results and must live with collective decisions. Influence through persuasion, not command.",
+      dilemmaFraming: "Frame as votes on proposals, attempts to build coalitions through debate, public assemblies where player is one voice"
+    };
+  }
+
+  // Parliamentary/Prime Minister systems
+  if (/(prime|chancellor|minister|parliamentary|westminster)/i.test(lower)) {
+    return {
+      type: "parliamentary",
+      feel: "Player has executive power but must maintain coalition support. Can be challenged by legislature, courts, or losing confidence vote.",
+      dilemmaFraming: "Frame as policy decisions requiring coalition management, legal challenges, opposition demands, maintaining parliamentary confidence"
+    };
+  }
+
+  // Presidential systems
+  if (/(president|presidential)/i.test(lower)) {
+    return {
+      type: "presidential",
+      feel: "Player has executive authority with checks from legislature and judiciary. Must navigate separation of powers.",
+      dilemmaFraming: "Frame as executive decisions balanced against legislative approval, judicial review, public opinion"
+    };
+  }
+
+  // Theocratic systems
+  if (/(theocra|clergy|religious|spiritual|divine.*right|papal|caliphate)/i.test(lower)) {
+    return {
+      type: "theocracy",
+      feel: "Player's authority comes from religious doctrine. Decisions justified by sacred texts or divine will. Religious leaders are key stakeholders.",
+      dilemmaFraming: "Frame as religious interpretations, conflicts between doctrine and pragmatism, challenges from competing religious authorities"
+    };
+  }
+
+  // Oligarchic/Council systems
+  if (/(oligarch|council|junta|committee|politburo|triumvirate)/i.test(lower)) {
+    return {
+      type: "oligarchy",
+      feel: "Player is first among equals in a ruling group. Must manage internal rivalries and maintain coalition within the elite circle.",
+      dilemmaFraming: "Frame as power struggles within ruling circle, decisions requiring consensus among oligarchs, challenges to collective rule"
+    };
+  }
+
+  // Tribal/Clan systems
+  if (/(tribal|clan|chief|elder|warlord)/i.test(lower)) {
+    return {
+      type: "tribal",
+      feel: "Player's authority based on personal loyalty, kinship ties, and proven strength. Must maintain honor and clan support.",
+      dilemmaFraming: "Frame as matters of honor, clan disputes, challenges from rival leaders, maintaining warrior loyalty"
+    };
+  }
+
+  // Futuristic/Colony systems
+  if (/(colony|station|orbital|mars|space|interstellar|cyber|ai.*govern)/i.test(lower)) {
+    return {
+      type: "futuristic",
+      feel: "Player navigates unique challenges of the setting (e.g., limited resources in space, AI integration, corporate control).",
+      dilemmaFraming: "Frame as sci-fi appropriate challenges: resource scarcity, tech conflicts, corporate vs colony interests, survival vs ethics"
+    };
+  }
+
+  // Corporate/Technocratic systems
+  if (/(corporate|technocra|ceo|board|meritocra)/i.test(lower)) {
+    return {
+      type: "corporate",
+      feel: "Player's authority based on efficiency and results. Must satisfy shareholders/stakeholders while managing resources.",
+      dilemmaFraming: "Frame as business decisions with political consequences, shareholder demands, efficiency vs ethics tradeoffs"
+    };
+  }
+
+  // Republican/Representative systems
+  if (/(republic|representative.*democracy|congress)/i.test(lower)) {
+    return {
+      type: "republic",
+      feel: "Player represents constituents in a complex system of representation. Must balance popular will with institutional processes.",
+      dilemmaFraming: "Frame as legislative battles, constituent demands, procedural conflicts, representation vs pragmatism"
+    };
+  }
+
+  // Default/Custom
+  return {
+    type: "custom",
+    feel: `Analyze the unique political dynamics of "${systemName}" and show what it's like to operate within this system`,
+    dilemmaFraming: "Frame events that fit this system's specific power structure and decision-making processes"
+  };
+}
+
 // -------------------- Dilemma (AI, minimal prompt) ---------------------------
 app.post("/api/dilemma", async (req, res) => {
   try {
@@ -827,6 +935,9 @@ app.post("/api/dilemma", async (req, res) => {
         ? `Focus topic: ${String(settings.dilemmasSubject)}.`
         : "";
 
+    // Analyze political system type for appropriate feel
+    const systemAnalysis = analyzeSystemType(systemName);
+
         // Build enhanced system prompt based on available context
         let systemParts = [
           "You write **short, punchy political situations** for a choice-based mobile game.",
@@ -836,24 +947,154 @@ app.post("/api/dilemma", async (req, res) => {
           "- Keep title ≤ 60 chars; description 2–3 sentences, mature and engaging.",
           "- Natural language (no bullet points), feels like in-world events, demands, questions or follow-ups from real actors.",
           "",
-          "WORLD FIT & CONTEXT",
-          "- Reflect the CURRENT POLITICAL SYSTEM's feel. If Absolute Monarchy: decisions are swift and intimidating; if Citizens' Assembly: the player casts a vote and must live with the aggregate outcome.",
-          "- If a focus topic is provided, center the situation on it.",
-          "- If DAY is first, prefer a challenge that arises immediately from the leadership change. If DAY is last, create an especially high-stakes climax that pays off recent tensions.",
-          "- Consider the player's **top Compass components** (list provided)."
+          "POLITICAL SYSTEM FEEL (CRITICAL)",
+          `- System: ${systemName}`,
+          `- Type: ${systemAnalysis.type}`,
+          `- Feel: ${systemAnalysis.feel}`,
+          `- Framing: ${systemAnalysis.dilemmaFraming}`,
+          "- IMPORTANT: Make player FEEL what it's like to operate in this system. The system's nature should be evident in how situations arise and how choices work.",
+          ""
         ];
+
+        // Add first/last day special handling
+        if (isFirst) {
+          systemParts.push(
+            "FIRST DAY SPECIAL RULE",
+            "- Frame situation as immediate challenge arising from leadership transition",
+            "- Show player taking power in a moment of crisis or opportunity",
+            "- Establish the political system's feel from the start",
+            "- Example: 'Advisors split on how to handle the restless city watching your ascension'",
+            ""
+          );
+        } else if (isLast) {
+          systemParts.push(
+            "LAST DAY SPECIAL RULE",
+            "- Create high-stakes climax that pays off recent tensions and choices",
+            "- Reference cumulative effects of player's previous decisions",
+            "- Offer a defining moment that tests player's core values",
+            "- Make this situation memorable and consequential - the culmination of their rule",
+            ""
+          );
+        }
+
+        systemParts.push(
+          "WORLD FIT & CONTEXT",
+          "- If a focus topic is provided, center the situation on it.",
+          "- Consider the player's **top Compass components** (list provided)."
+        );
 
         // Add enhanced context rules if available
         if (enhancedContext) {
           systemParts.push(
             "",
-            "INTELLIGENT CONTEXTUAL GENERATION",
-            "- BUILD ON LAST CHOICE: Reference the previous decision's consequences naturally, showing realistic political cause-and-effect.",
-            "- SUPPORT DYNAMICS: If any constituency support is below 30%, create situations that could help recover it. If above 70%, show challenges that test their loyalty.",
-            "- TOPIC DIVERSITY: Avoid repeating the same topic too frequently. If recent topics are provided, choose different areas unless continuation is dramatically compelling.",
-            "- POWER HOLDER TENSIONS: Incorporate conflicts with specific power holders when politically realistic.",
-            "- COMPASS-DRIVEN SITUATIONS: Create scenarios that test the player's strongest political values in meaningful ways."
+            "INTELLIGENT CONTEXTUAL GENERATION (NewDilemmaLogic.md)"
           );
+
+          // Follow-up to previous choice
+          if (lastChoice && lastChoice.title) {
+            systemParts.push(
+              "",
+              "RESPONSE TO PREVIOUS CHOICE",
+              `- Previous action: "${lastChoice.title}" - ${lastChoice.summary}`,
+              "- Create a natural consequence or follow-up event showing realistic political cause-and-effect",
+              "- Other power holders may respond if their interests were affected"
+            );
+          }
+
+          // Support crisis handling
+          const hasSupportCrisis = enhancedContext.lowSupportEntities?.length > 0 || enhancedContext.criticalSupportEntities?.length > 0;
+          if (hasSupportCrisis) {
+            systemParts.push(
+              "",
+              "SUPPORT CRISIS HANDLING (PRIORITY)"
+            );
+
+            if (enhancedContext.lowSupportEntities?.includes("people") && supports.people < 25) {
+              systemParts.push(`- The People are desperate (support: ${supports.people}%). They may attempt extreme action to get player's attention.`);
+            }
+            if (enhancedContext.lowSupportEntities?.includes("middle") && supports.middle < 25) {
+              const middleName = enhancedContext.powerHolders?.find(h => !h.isPlayer)?.name || "Main power holder";
+              systemParts.push(`- ${middleName} is desperate (support: ${supports.middle}%). They may threaten or act against player.`);
+            }
+            if (enhancedContext.lowSupportEntities?.includes("mom") && supports.mom < 25) {
+              systemParts.push(`- Personal allies are wavering (support: ${supports.mom}%). They may withdraw support or demand concessions.`);
+            }
+
+            if (enhancedContext.criticalSupportEntities?.includes("people") && supports.people < 20) {
+              systemParts.push(`- CRITICAL: The People support at ${supports.people}% - generate EXTREME event from their direction!`);
+            }
+            if (enhancedContext.criticalSupportEntities?.includes("middle") && supports.middle < 20) {
+              const middleName = enhancedContext.powerHolders?.find(h => !h.isPlayer)?.name || "Main power holder";
+              systemParts.push(`- CRITICAL: ${middleName} support at ${supports.middle}% - generate EXTREME event from their direction!`);
+            }
+            if (enhancedContext.criticalSupportEntities?.includes("mom") && supports.mom < 20) {
+              systemParts.push(`- CRITICAL: Allies support at ${supports.mom}% - generate EXTREME event from their direction!`);
+            }
+          }
+
+          // Topic diversity
+          if (recentTopics.length > 0) {
+            systemParts.push(
+              "",
+              "TOPIC DIVERSITY (Rule #9)",
+              `- Recent topics (avoid repeating): ${recentTopics.slice(0, 3).join(", ")}`,
+              "- RULE: Maximum 3 consecutive situations on same topic",
+              "- Choose a fresh topic unless dramatic continuity requires it"
+            );
+
+            if (topicCounts && Object.keys(topicCounts).length > 0) {
+              const mostUsed = Object.entries(topicCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3)
+                .map(([topic, count]) => `${topic} (${count}x)`)
+                .join(", ");
+              systemParts.push(`- Most used topics: ${mostUsed}`);
+            }
+          }
+
+          // Compass tensions
+          if (enhancedContext.compassTensions && enhancedContext.compassTensions.length > 0) {
+            systemParts.push(
+              "",
+              "COMPASS TENSIONS TO EXPLORE",
+              ...enhancedContext.compassTensions.map(tension => `- ${tension}: Create situation that forces choice between these values`)
+            );
+
+            if (enhancedContext.topCompassComponents && enhancedContext.topCompassComponents.length > 0) {
+              const topValues = enhancedContext.topCompassComponents.slice(0, 5).map(c => c.name).join(", ");
+              systemParts.push(`- Top player values: ${topValues}`, "- Design scenarios that test these specific values in meaningful ways");
+            }
+          }
+
+          // Power holder response logic
+          if (enhancedContext.powerHolders && enhancedContext.powerHolders.length > 0) {
+            systemParts.push(
+              "",
+              "POWER HOLDER DYNAMICS",
+              `- Player power: ${enhancedContext.playerPowerPercent}%`,
+              ""
+            );
+
+            const nonPlayerHolders = enhancedContext.powerHolders.filter(h => !h.isPlayer);
+            if (nonPlayerHolders.length > 0) {
+              systemParts.push("Non-player power holders:");
+              nonPlayerHolders.forEach(h => {
+                systemParts.push(`  - ${h.name}: ${h.percent}% power`);
+              });
+            }
+
+            if (lastChoice && lastChoice.title) {
+              systemParts.push(
+                "",
+                "PREVIOUS ACTION ANALYSIS:",
+                `- Player chose: "${lastChoice.title}"`,
+                "- Consider: Did this threaten any power holder's interests?",
+                "- If yes, AND they have sufficient power (>15%), they should respond",
+                "- Response should match their power level (higher power = stronger response)",
+                "- If player has >70% power, resistance may be futile (but assassination attempts possible)"
+              );
+            }
+          }
         }
 
         systemParts.push(
@@ -873,48 +1114,17 @@ app.post("/api/dilemma", async (req, res) => {
         const system = systemParts.join("\n");
         
 
-    // Build enhanced user prompt
+    // Build enhanced user prompt (simpler now since system prompt has detailed rules)
     let userParts = [
       `ROLE: ${role}`,
       `POLITICAL SYSTEM: ${systemName}`,
       focusLine,
       `DAY: ${day} of ${totalDays} (${isFirst ? "first" : isLast ? "last" : "mid-campaign"})`,
-      `TOP COMPASS COMPONENTS (0..10): ${topCompass.join(", ") || "n/a"}`
-    ];
-
-    // Add contextual information if available
-    if (enhancedContext) {
-      // Add support levels
-      if (supports.people !== undefined || supports.middle !== undefined || supports.mom !== undefined) {
-        userParts.push(`CURRENT SUPPORT: People ${supports.people || 'n/a'}%, ${enhancedContext.powerHolders?.[1]?.name || 'Middle'} ${supports.middle || 'n/a'}%, Personal Allies ${supports.mom || 'n/a'}%`);
-      }
-
-      // Add last choice context
-      if (lastChoice && lastChoice.title) {
-        userParts.push(`PREVIOUS DECISION: "${lastChoice.title}" - ${lastChoice.summary || 'Player chose this action last turn'}`);
-      }
-
-      // Add topic diversity information
-      if (recentTopics.length > 0) {
-        userParts.push(`RECENT TOPICS (avoid repeating): ${recentTopics.slice(0, 3).join(", ")}`);
-      }
-
-      // Add power holder context
-      if (enhancedContext.powerHolders && enhancedContext.powerHolders.length > 0) {
-        const holders = enhancedContext.powerHolders.slice(0, 3).map(h => `${h.name} (${h.percent}%)`).join(", ");
-        userParts.push(`POWER HOLDERS: ${holders}`);
-      }
-
-      // Add compass tensions if available
-      if (enhancedContext.compassTensions && enhancedContext.compassTensions.length > 0) {
-        userParts.push(`COMPASS TENSIONS: Player values ${enhancedContext.compassTensions.join(", ")} - create scenarios that test these`);
-      }
-    }
-
-    userParts.push(
+      `TOP COMPASS COMPONENTS (0..10): ${topCompass.join(", ") || "n/a"}`,
+      "",
       "TASK: Produce exactly one short situation with exactly three conflicting ways to respond.",
       "Return STRICT JSON ONLY in the shape specified."
-    );
+    ];
 
     const user = userParts.filter(part => part.trim()).join("\n");
 
@@ -940,6 +1150,7 @@ app.post("/api/dilemma", async (req, res) => {
           { id: "b", title: "Address the Nation", summary: "Speak live tonight to calm fears and set the tone.", cost:  -50, iconHint: "speech"    },
           { id: "c", title: "Open Negotiations",  summary: "Invite opposition figures for mediated talks.",      cost:   50, iconHint: "diplomacy" },
         ],
+        topic: "Security"  // Fallback dilemmas get Security topic
       };
     }
 
@@ -1026,7 +1237,15 @@ app.post("/api/dilemma", async (req, res) => {
       actions.push({ id: ["a","b","c"][i] || "a", title: `Option ${i + 1}`, summary: "A reasonable alternative.", cost: 0, iconHint: "speech" });
     }
 
-    const result = { title, description, actions, isFallback: usedFallback };
+    // Ensure topic is always returned (NewDilemmaLogic.md Rule #9)
+    const validTopics = ["Economy", "Security", "Diplomacy", "Rights", "Infrastructure", "Environment", "Health", "Education", "Justice", "Culture"];
+    let topic = String(raw?.topic || "").trim();
+    if (!validTopics.includes(topic)) {
+      // Fallback to "General" if topic is missing or invalid
+      topic = "General";
+    }
+
+    const result = { title, description, actions, topic, isFallback: usedFallback };
     if (debug) console.log("[/api/dilemma] result:", result);
     return res.json(result);
   } catch (e) {

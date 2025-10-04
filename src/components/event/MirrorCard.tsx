@@ -24,8 +24,8 @@ const RADIUS_BR       = T.cornerBR;
 const MIRROR_IMG_SRC  = "/assets/images/mirror.png";
 const IMG_WIDTH_PX    = 65;   // your latest values
 const IMG_OPACITY     = 0.95;
-const IMG_OFFSET_X    = -540;
-const IMG_OFFSET_Y    = -2;
+const IMG_OFFSET_X    = -32;  // Position so left half is cut by component edge
+const IMG_OFFSET_Y    = 0;    // Will be calculated dynamically for vertical center
 
 // Keep text away from the image
 const TEXT_INSET_LEFT_PX  = 20; // nudge if the image intrudes from the left
@@ -56,6 +56,21 @@ export default function MirrorCard({ text, italic = true, className }: MirrorCar
     return segments.map((_, i) => 1 + (j ? pseudoRandom(i) * j : 0));
   }, [segments]);
 
+  // Calculate card height dynamically to position image in vertical center
+  const cardRef = React.useRef<HTMLDivElement>(null);
+  const [imageOffsetY, setImageOffsetY] = React.useState(IMG_OFFSET_Y);
+
+  React.useEffect(() => {
+    if (cardRef.current) {
+      const cardHeight = cardRef.current.offsetHeight;
+      // Position image at vertical center (subtract half of image height when rendered)
+      // Approximate image height ratio: if width is 65px, height is ~85px (based on typical mirror image aspect)
+      const approxImageHeight = IMG_WIDTH_PX * 1.3; // Adjust multiplier based on actual image
+      const centerOffset = (cardHeight - approxImageHeight) / 2;
+      setImageOffsetY(centerOffset);
+    }
+  }, [text]); // Recalculate when text changes (affects card height)
+
   return (
     <motion.div
       className={["w-full flex justify-start", OUTER_MARGIN_Y, className || ""].join(" ")}
@@ -66,6 +81,7 @@ export default function MirrorCard({ text, italic = true, className }: MirrorCar
     >
       {/* Full-width card body */}
       <div
+        ref={cardRef}
         className="relative overflow-hidden w-full"
         style={{
           background: CARD_BG,
@@ -98,7 +114,7 @@ export default function MirrorCard({ text, italic = true, className }: MirrorCar
           )}
         </div>
 
-        {/* Mirror image BEHIND the text */}
+        {/* Mirror image BEHIND the text, positioned at vertical center with left half cut */}
         <img
           src={MIRROR_IMG_SRC}
           alt="Mirror"
@@ -107,7 +123,7 @@ export default function MirrorCard({ text, italic = true, className }: MirrorCar
             width: IMG_WIDTH_PX,
             height: "auto",
             opacity: IMG_OPACITY,
-            transform: `translate(${IMG_OFFSET_Y}px, ${IMG_OFFSET_Y}px)`,
+            transform: `translate(${IMG_OFFSET_X}px, ${imageOffsetY}px)`,
           }}
           loading="lazy"
         />
