@@ -64,6 +64,7 @@ type DilemmaState = {
   nextDay: () => void;
   setTotalDays: (n: number) => void;
   applyChoice: (id: "a" | "b" | "c") => void;
+  setLastChoice: (action: DilemmaAction) => void;
   reset: () => void;
 
   // Resource and support setters
@@ -182,8 +183,9 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
     const { day, totalDays } = get();
     const v = Math.min(totalDays, day + 1);
     dlog("nextDay ->", v);
-    // Reset lastChoice when moving to next day (dynamic parameters should reset)
-    set({ day: v, lastChoice: null });
+    // Note: Keep lastChoice intact so EventScreen3 collector can analyze it on the next day
+    // lastChoice will be naturally overwritten when the player makes their next choice
+    set({ day: v });
   },
 
   setTotalDays(n) {
@@ -207,6 +209,11 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
 
     dlog("applyChoice ->", id, choice.title);
     set({ lastChoice: choice });
+  },
+
+  setLastChoice(action) {
+    dlog("setLastChoice ->", action.id, action.title);
+    set({ lastChoice: action });
   },
 
   reset() {
@@ -472,7 +479,7 @@ function flattenCompass(vals: any): Record<string, number> {
   return out;
 }
 
-function buildSnapshot(): DilemmaRequest {
+export function buildSnapshot(): DilemmaRequest {
     const { debugMode, dilemmasSubjectEnabled, dilemmasSubject } =
       useSettingsStore.getState();
     const { day, totalDays, lastChoice, supportPeople, supportMiddle, supportMom, recentTopics, topicCounts } = useDilemmaStore.getState();
