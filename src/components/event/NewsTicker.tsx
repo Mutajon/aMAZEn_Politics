@@ -12,7 +12,7 @@ import { motion, useAnimation } from "framer-motion";
 import { Newspaper, MessageCircle, TrendingUp, TrendingDown } from "lucide-react";
 
 /* ====================== TUNABLES (EDIT HERE) ====================== */
-export const TICKER_SPEED_PX_PER_SEC = 115.2;             // scroll speed
+export const TICKER_SPEED_PX_PER_SEC = 80.64;              // scroll speed (30% slower: 115.2 * 0.7)
 export const TICKER_STEP = 3;                              // move exactly N items per cycle
 export const TICKER_ITEM_GAP_PX = 12;                      // Tailwind gap-3 ≈ 12px
 export const TICKER_TEXT_CLASS = "text-sm text-white/90";  // chip text font

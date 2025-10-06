@@ -1,8 +1,9 @@
 // MirrorCard.tsx
 // Full-width card styled like MirrorBubble, with local tunables.
-// Adds traveling shimmer effect (magical vibe) and text insets so it won't overlap the mirror art.
+// Adds typewriter reveal effect followed by traveling shimmer effect (magical vibe).
+// Text insets ensure it won't overlap the mirror art.
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { mirrorBubbleTheme as T } from "../../theme/mirrorBubbleTheme";
 
@@ -31,6 +32,10 @@ const IMG_OFFSET_Y    = 0;    // Will be calculated dynamically for vertical cen
 const TEXT_INSET_LEFT_PX  = 20; // nudge if the image intrudes from the left
 const TEXT_INSET_RIGHT_PX = 0;
 
+// Typewriter reveal effect (initial text reveal)
+const TYPEWRITER_ENABLED    = true;
+const TYPEWRITER_DURATION_S = 1.0;          // Total time to reveal all characters
+
 // Magical shimmer effect (traveling glow - better readability than wobble)
 const SHIMMER_ENABLED       = true;
 const SHIMMER_DURATION_S    = 2.0;          // Time for shimmer to travel across text
@@ -51,6 +56,21 @@ export type MirrorCardProps = {
 export default function MirrorCard({ text, italic = true, className }: MirrorCardProps) {
   // Always use character-level splitting for smooth shimmer effect
   const segments = useMemo(() => splitGraphemes(text), [text]);
+
+  // Track typewriter reveal completion
+  const [typewriterComplete, setTypewriterComplete] = useState(!TYPEWRITER_ENABLED);
+
+  // Reset typewriter when text changes
+  useEffect(() => {
+    if (TYPEWRITER_ENABLED) {
+      setTypewriterComplete(false);
+      // Mark as complete after typewriter duration
+      const timer = setTimeout(() => {
+        setTypewriterComplete(true);
+      }, TYPEWRITER_DURATION_S * 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [text]);
 
   // Calculate card height dynamically to position image in vertical center
   const cardRef = React.useRef<HTMLDivElement>(null);
@@ -103,10 +123,11 @@ export default function MirrorCard({ text, italic = true, className }: MirrorCar
             hyphens: "none",
           }}
         >
-          {SHIMMER_ENABLED ? (
+          {SHIMMER_ENABLED || TYPEWRITER_ENABLED ? (
             <MagicShimmer
               segments={segments}
               totalSegments={segments.length}
+              typewriterComplete={typewriterComplete}
             />
           ) : (
             text
@@ -131,14 +152,16 @@ export default function MirrorCard({ text, italic = true, className }: MirrorCar
   );
 }
 
-/* -------------------- Magical shimmer text -------------------- */
+/* -------------------- Magical shimmer text with typewriter reveal -------------------- */
 
 function MagicShimmer({
   segments,
   totalSegments,
+  typewriterComplete,
 }: {
   segments: string[];
   totalSegments: number;
+  typewriterComplete: boolean;
 }) {
   const totalCycle = SHIMMER_DURATION_S + SHIMMER_PAUSE_S;
 
@@ -147,29 +170,54 @@ function MagicShimmer({
       {segments.map((seg, i) => {
         if (seg === "\n") return <br key={`br-${i}`} />;
 
-        // Calculate stagger delay - shimmer travels from left to right
-        const delay = (i / totalSegments) * SHIMMER_DURATION_S;
+        // Typewriter: reveal character by character
+        const typewriterDelay = TYPEWRITER_ENABLED
+          ? (i / totalSegments) * TYPEWRITER_DURATION_S
+          : 0;
+
+        // Shimmer: travel from left to right (starts after typewriter completes)
+        const shimmerDelay = SHIMMER_ENABLED
+          ? (i / totalSegments) * SHIMMER_DURATION_S
+          : 0;
 
         return (
           <motion.span
             key={`seg-${i}`}
             className="inline will-change-[text-shadow,opacity]"
-            animate={{
-              textShadow: [
-                "0 0 0px transparent",                                      // Normal (start)
-                `0 0 ${SHIMMER_GLOW_SIZE} ${SHIMMER_GLOW_COLOR}`,          // Shimmer peak (glow)
-                "0 0 0px transparent",                                      // Fade out
-                "0 0 0px transparent",                                      // Wait (pause)
-              ],
-              opacity: [1, 1.3, 1, 1],  // Subtle brightness pulse during shimmer
-            }}
-            transition={{
-              duration: totalCycle,
-              repeat: Infinity,
-              delay: delay,
-              ease: "easeInOut",
-              times: [0, 0.15, 0.3, 1],  // Keyframe timing: fast shimmer, long pause
-            }}
+            initial={TYPEWRITER_ENABLED ? { opacity: 0 } : { opacity: 1 }}
+            animate={
+              typewriterComplete && SHIMMER_ENABLED
+                ? {
+                    // Shimmer animation (after typewriter completes)
+                    opacity: [1, 1.3, 1, 1],
+                    textShadow: [
+                      "0 0 0px transparent",
+                      `0 0 ${SHIMMER_GLOW_SIZE} ${SHIMMER_GLOW_COLOR}`,
+                      "0 0 0px transparent",
+                      "0 0 0px transparent",
+                    ],
+                  }
+                : {
+                    // Typewriter animation (initial reveal)
+                    opacity: 1,
+                  }
+            }
+            transition={
+              typewriterComplete && SHIMMER_ENABLED
+                ? {
+                    // Shimmer transition
+                    duration: totalCycle,
+                    repeat: Infinity,
+                    delay: shimmerDelay,
+                    ease: "easeInOut",
+                    times: [0, 0.15, 0.3, 1],
+                  }
+                : {
+                    // Typewriter transition
+                    duration: 0.05,
+                    delay: typewriterDelay,
+                  }
+            }
           >
             {seg === " " ? "\u00A0" : seg}
           </motion.span>

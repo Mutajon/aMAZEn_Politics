@@ -59,10 +59,11 @@ export default function SupportList({
 }: Props) {
   return (
     <div className="mt-4 space-y-1.5">
-      {items.map((it) => (
+      {items.map((it, index) => (
         <SupportCard
           key={it.id}
           item={it}
+          index={index}
           animatePercent={animatePercent}
           animateDurationMs={animateDurationMs}
         />
@@ -73,10 +74,12 @@ export default function SupportList({
 
 function SupportCard({
   item,
+  index,
   animatePercent,
   animateDurationMs,
 }: {
   item: SupportItem;
+  index: number;
   animatePercent: boolean;
   animateDurationMs: number;
 }) {
@@ -140,7 +143,16 @@ function SupportCard({
   const badgeBg = ICON_BADGE_BG[id] ?? "bg-white/20";
 
   return (
-    <div className="rounded-2xl bg-white/6 border border-white/10 text-white px-3 py-3 shadow-sm">
+    <motion.div
+      className="rounded-2xl bg-white/6 border border-white/10 text-white px-3 py-3 shadow-sm"
+      initial={{ opacity: 0, x: -30 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{
+        duration: 0.5,
+        delay: index * 0.2, // Stagger: 0s, 0.2s, 0.4s
+        ease: [0.25, 0.46, 0.45, 0.94] // easeOutQuart
+      }}
+    >
       <div className="flex items-start">
         {/* Left icon badge — colored background + white lines */}
         <div className={`mr-3 inline-flex items-center justify-center shrink-0 ${ICON_BADGE_SHAPE} ${ICON_BADGE_PADDING} ${badgeBg} ${ICON_BADGE_RING}`}>
@@ -225,7 +237,7 @@ function SupportCard({
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 

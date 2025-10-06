@@ -113,13 +113,14 @@ export default function ActionDeckContent({
         ref={deckRef}
         style={lockHeight && deckHeight != null ? { height: deckHeight, overflow: "hidden" } : undefined}
       >
-        {/* Cards row (3 columns) */}
+        {/* Stagger container for cards + suggest button */}
         <motion.div
-          className="grid grid-cols-3 gap-3"
           initial={false}
           animate="show"
           variants={{ hidden: {}, show: { transition: { staggerChildren: ENTER_STAGGER } } }}
         >
+        {/* Cards row (3 columns) */}
+        <div className="grid grid-cols-3 gap-3">
           {cards.map((c) => {
             const isSelected = selectedCard?.id === c.id;
             const disabled = Boolean(confirmingId) || !c.affordable;
@@ -141,12 +142,10 @@ export default function ActionDeckContent({
                   isSelected ? "ring-2 ring-white/30" : "",
                 ].join(" ")}
                 variants={{
-                  hidden: { opacity: 0, y: ENTER_Y, scale: 0.97, rotate: -1.2 },
+                  hidden: { opacity: 0, scale: 0.85 },
                   show: {
                     opacity: 1,
-                    y: 0,
                     scale: 1.0,
-                    rotate: 0,
                     transition: {
                       type: "tween",
                       duration: ENTER_DURATION,
@@ -199,6 +198,43 @@ export default function ActionDeckContent({
               </motion.div>
             );
           })}
+        </div>
+
+        {/* Suggest-your-own pill (part of stagger sequence) */}
+        <motion.div className="mt-3" layout
+          variants={{
+            hidden: { opacity: 0, scale: 0.85 },
+            show: {
+              opacity: 1,
+              scale: 1.0,
+              transition: {
+                type: "tween",
+                duration: ENTER_DURATION,
+                ease: [0.16, 1, 0.3, 1]
+              }
+            },
+          }}
+        >
+          <motion.button
+            type="button"
+            layout
+            ref={suggestRef}
+            animate={othersDown ? suggestCtrl : undefined}
+            className={SUGGEST_BTN_CLASS}
+            onClick={onOpenSuggest}
+            disabled={Boolean(confirmingId) || validatingSuggest || !canAffordSuggestion}
+          >
+            <span className="text-[12.5px] font-semibold">Suggest your own</span>
+            {showBudget && (
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-black/35 ring-1 ring-white/25">
+                <span className={`text-[11px] font-semibold ${suggestCost < 0 ? "text-rose-100" : "text-emerald-100"}`}>
+                  {suggestCost >= 0 ? `+${suggestCost}` : `${suggestCost}`}
+                </span>
+                <Coins className="w-3.5 h-3.5 text-amber-300" />
+              </span>
+            )}
+          </motion.button>
+        </motion.div>
         </motion.div>
 
         {/* Expanded overlay */}
@@ -246,7 +282,7 @@ export default function ActionDeckContent({
 
                 <div className="mt-2">
                   <div className="text-[15px] font-semibold text-white">{selectedCard.title}</div>
-                  <div className="text-[13.5px] leading-snug text-white/95 mt-1">{selectedCard.summary}</div>
+                  <div className="text-[13.5px] leading-snug text-white/95 mt-1 line-clamp-2">{selectedCard.summary}</div>
                 </div>
 
                 <div className="mt-3 flex items-center justify-center gap-3">
@@ -343,29 +379,6 @@ export default function ActionDeckContent({
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Suggest-your-own pill */}
-        <motion.div className="mt-3" layout>
-          <motion.button
-            type="button"
-            layout
-            ref={suggestRef}
-            animate={othersDown ? suggestCtrl : undefined}
-            className={SUGGEST_BTN_CLASS}
-            onClick={onOpenSuggest}
-            disabled={Boolean(confirmingId) || validatingSuggest || !canAffordSuggestion}
-          >
-            <span className="text-[12.5px] font-semibold">Suggest your own</span>
-            {showBudget && (
-              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-black/35 ring-1 ring-white/25">
-                <span className={`text-[11px] font-semibold ${suggestCost < 0 ? "text-rose-100" : "text-emerald-100"}`}>
-                  {suggestCost >= 0 ? `+${suggestCost}` : `${suggestCost}`}
-                </span>
-                <Coins className="w-3.5 h-3.5 text-amber-300" />
-              </span>
-            )}
-          </motion.button>
-        </motion.div>
       </div>
     </LayoutGroup>
   );

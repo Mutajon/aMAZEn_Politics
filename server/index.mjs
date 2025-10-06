@@ -1122,6 +1122,12 @@ app.post("/api/dilemma", async (req, res) => {
           '{"id":"c","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}],' +
           '"topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}',
           "",
+          "ACTION SUMMARY LENGTH (CRITICAL)",
+          "- MUST be ONE sentence only",
+          "- Maximum 15-20 words",
+          "- Clear, direct, actionable description",
+          "- Example: 'Restrict movement after dusk with visible patrols.'",
+          "",
           "COSTS (SIGN & MAGNITUDE)",
           "- SIGN: Negative=spend/outflow. Positive=revenue/inflow.",
           "- Magnitudes: 0, ±50, ±100, ±150, ±200, ±250.",
@@ -1583,15 +1589,31 @@ Generate 1-3 contextually relevant dynamic parameters that show the immediate co
 - Pure factual outcomes with numbers
 - Specific, measurable results only
 
+CRITICAL RESTRICTIONS - NEVER mention these topics:
+- Support levels (people support, middle entity support, mom support)
+- Budget changes or money (the player already sees budget separately)
+- General approval ratings
+
+FOCUS ON these types of consequences:
+- Casualties, deaths, or injuries (specific numbers)
+- International reactions (countries condemning/praising, sanctions, etc.)
+- Resignations or appointments (ministers, officials, etc.)
+- Protests or demonstrations (number of protesters, arrests, etc.)
+- Economic indicators (inflation, GDP, unemployment - NOT budget)
+- Policy outcomes (laws passed, treaties signed, etc.)
+- Infrastructure changes (buildings constructed/destroyed, etc.)
+- Military outcomes (fighters neutralized, territory gained/lost, etc.)
+
 EXAMPLES (follow this exact format):
 - "40 militia fighters neutralized"
 - "14 civilians dead"
 - "12 countries issue condemnation"
 - "3,000 protesters arrested"
-- "Budget deficit up 20%"
+- "Inflation up 15%"
 - "5 ministers resign"
+- "3 hospitals under construction"
 
-Choose appropriate icons from: Users, TrendingUp, TrendingDown, DollarSign, Shield, AlertTriangle, Heart, Building, Globe, Leaf, Zap, Target, Scale, Flag, Crown, etc.
+Choose appropriate icons from: Users, TrendingUp, TrendingDown, Shield, AlertTriangle, Heart, Building, Globe, Leaf, Zap, Target, Scale, Flag, Crown, Activity, etc.
 
 Set tone as "up" (positive/green), "down" (negative/red), or "neutral" (blue) based on whether this is generally good or bad for the player's position.`;
 

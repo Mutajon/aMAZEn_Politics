@@ -7,10 +7,10 @@ import { Users, TrendingUp, Leaf, User } from "lucide-react";
 
 // 🔧 Easy knobs
 const AVATAR_SIZE = 100;
-const TEXT_CLASS = "text-[11px] leading-snug";
+const TEXT_CLASS = "text-[13px] leading-snug";
 const CHIP_BG = "bg-white/6 ring-1 ring-white/10 rounded-lg";
 const CHIP_PAD = "px-2 py-1";
-const ICON_SIZE = "w-3.5 h-3.5";
+const ICON_SIZE = "w-4.5 h-4.5";
 const GAP_X = "gap-2";
 const GAP_Y = "gap-1.5";
 
@@ -114,20 +114,19 @@ function ParamChip({
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: -20, scale: 0.8 }}
+      initial={{ opacity: 0, scale: 0.8 }}
       animate={{
         opacity: 1,
-        x: 0,
-        scale: 1,
+        scale: [0.8, 1.15, 1.0], // Pop effect: start small, overshoot, settle
         transition: {
-          duration: 0.5,
-          ease: [0.25, 0.46, 0.45, 0.94], // easeOutQuart
-          delay: index * 0.1 // Stagger delay based on index
+          duration: 0.6,
+          times: [0, 0.6, 1], // Control keyframe timing
+          ease: [0.34, 1.56, 0.64, 1], // easeOutBack for bounce
+          delay: index * 0.15 // Increased stagger delay
         }
       }}
       exit={{
         opacity: 0,
-        x: -20,
         scale: 0.8,
         transition: { duration: 0.3 }
       }}
