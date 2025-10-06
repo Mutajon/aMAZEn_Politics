@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { useSettingsStore } from "../store/settingsStore";
+import { useDilemmaStore } from "../store/dilemmaStore";
 import { analyzeTextToCompass } from "../lib/compassMapping";
 import { runConfirmPipeline } from "../lib/eventConfirm";
 import { useEventSupportManager } from "../components/event/EventSupportManager";
@@ -67,6 +68,8 @@ export function useEventActions({
     const a = actionsForDeck.find((x) => x.id === id);
     if (!a) return;
 
+    const { current, day, addHistoryEntry } = useDilemmaStore.getState();
+
     console.log(`[useEventActions] handleConfirm called with enableProgressiveLoading: ${enableProgressiveLoading}`);
 
     if (enableProgressiveLoading && startProgressiveLoading) {
@@ -100,6 +103,23 @@ export function useEventActions({
       );
       console.log("[useEventActions] Progressive loading flow completed");
 
+      // 4. Collect history entry after support analysis completes
+      // Note: vals will have been updated by applySupportEffects during progressive loading
+      if (current) {
+        addHistoryEntry({
+          day,
+          dilemmaTitle: current.title,
+          dilemmaDescription: current.description,
+          choiceId: a.id,
+          choiceTitle: a.title,
+          choiceSummary: a.summary,
+          supportPeople: vals.people,  // Updated values after support analysis
+          supportMiddle: vals.middle,
+          supportMom: vals.mom,
+        });
+        console.log(`[useEventActions] History entry added for Day ${day}`);
+      }
+
     } else {
       // Legacy flow: use existing confirmation pipeline
       void runConfirmPipeline(
@@ -125,6 +145,7 @@ export function useEventActions({
 
   const handleSuggest = async (text?: string) => {
     const suggestCost = -300; // keep in sync with ActionDeck's suggestCost
+    const { current, day, addHistoryEntry } = useDilemmaStore.getState();
 
     if (enableProgressiveLoading && startProgressiveLoading) {
       // New enhanced flow: immediate UI feedback + progressive loading with sequential analysis
@@ -151,6 +172,23 @@ export function useEventActions({
         applySupportEffects,
         updateNewsAfterAction
       );
+
+      // 4. Collect history entry after support analysis completes
+      if (current) {
+        const suggestionSummary = String(text || "").slice(0, 140);
+        addHistoryEntry({
+          day,
+          dilemmaTitle: current.title,
+          dilemmaDescription: current.description,
+          choiceId: "suggest",
+          choiceTitle: "Player Suggestion",
+          choiceSummary: suggestionSummary,
+          supportPeople: vals.people,
+          supportMiddle: vals.middle,
+          supportMom: vals.mom,
+        });
+        console.log(`[useEventActions] History entry added for Day ${day} (player suggestion)`);
+      }
 
     } else {
       // Legacy flow: use existing confirmation pipeline

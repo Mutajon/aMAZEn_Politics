@@ -15,6 +15,18 @@ export type Dilemma = {
   source?: string;
 };
 
+export type DilemmaHistoryEntry = {
+  day: number;
+  dilemmaTitle: string;        // Full title as generated
+  dilemmaDescription: string;  // Full description as generated
+  choiceId: string;            // "a", "b", or "c"
+  choiceTitle: string;         // Full action title
+  choiceSummary: string;       // Full action summary
+  supportPeople: number;       // Support values AFTER this choice (0-100)
+  supportMiddle: number;
+  supportMom: number;
+};
+
 export type DilemmaRequest = {
   role: string | null;
   systemName: string | null;
@@ -35,6 +47,7 @@ export type DilemmaRequest = {
     lastDilemmaTitle?: string;
   };
   supports?: { people?: number; mom?: number; middle?: number };
+  dilemmaHistory?: DilemmaHistoryEntry[];  // Full game history for context
 
   // NEW: let the server log only when your Debug mode is ON
   debug?: boolean;

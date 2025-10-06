@@ -1,5 +1,7 @@
 import { useSettingsStore } from "../store/settingsStore";
 import { useCompassStore } from "../store/compassStore";
+import { useDilemmaStore } from "../store/dilemmaStore";
+import { useRoleStore } from "../store/roleStore";
 import { COMPONENTS, type PropKey } from "../data/compass-data";
 import type { Dilemma } from "./dilemma";
 
@@ -48,11 +50,33 @@ export async function requestMirrorDilemmaLine(dilemma?: Dilemma | null): Promis
   const debug = useSettingsStore.getState().debugMode;
   try {
     const comp = useCompassStore.getState().values;
+    const {
+      day,
+      totalDays,
+      dilemmaHistory,
+      supportPeople,
+      supportMiddle,
+      supportMom
+    } = useDilemmaStore.getState();
+
+    // Get middle entity name from role store
+    const { analysis } = useRoleStore.getState();
+    const holders = Array.isArray(analysis?.holders) ? analysis.holders : [];
+    const playerIndex = typeof analysis?.playerIndex === "number" ? analysis.playerIndex : null;
+
+    // Find strongest non-player holder
+    const withIdx = holders.map((h, i) => ({ ...h, i }));
+    const candidates = playerIndex == null ? withIdx : withIdx.filter((h) => h.i !== playerIndex);
+    const top = candidates.length > 0
+      ? candidates.reduce((a, b) => ((b as any).percent > (a as any).percent ? b : a), candidates[0])
+      : null;
+    const middleName = String((top as any)?.name || "the establishment");
+
     const payload = {
       topWhat:    topKWithNames(comp?.what, "what", 2),
       topWhence:  topKWithNames(comp?.whence, "whence", 2),
-      topOverall: topOverallWithNames(comp, 2),
-      // Add dilemma context for recommendations
+      topOverall: topOverallWithNames(comp, 3), // Increased to 3 for richer context
+      // Add dilemma context
       dilemma: dilemma ? {
         title: dilemma.title,
         description: dilemma.description,
@@ -63,6 +87,14 @@ export async function requestMirrorDilemmaLine(dilemma?: Dilemma | null): Promis
           cost: action.cost
         }))
       } : null,
+      // NEW: Game context for holistic reflection
+      dilemmaHistory,
+      supportPeople,
+      supportMiddle,
+      supportMom,
+      middleName,
+      day,
+      totalDays,
     };
 
     if (debug) console.log("[mirror-dilemma] → POST /api/mirror-summary", payload);

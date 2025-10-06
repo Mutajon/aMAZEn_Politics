@@ -521,23 +521,154 @@ app.post("/api/mirror-summary", async (req, res) => {
     const topOverall = Array.isArray(req.body?.topOverall) ? req.body.topOverall : [];
     const dilemma    = req.body?.dilemma || null;
 
+    // NEW: Game context for holistic reflection
+    const dilemmaHistory = Array.isArray(req.body?.dilemmaHistory) ? req.body.dilemmaHistory : [];
+    const supportPeople = Number(req.body?.supportPeople ?? 50);
+    const supportMiddle = Number(req.body?.supportMiddle ?? 50);
+    const supportMom = Number(req.body?.supportMom ?? 50);
+    const middleName = String(req.body?.middleName || "the establishment");
+    const day = Number(req.body?.day || 1);
+    const totalDays = Number(req.body?.totalDays || 7);
+
+    // Support status helpers - vivid descriptions, NO percentages
+    function getSupportStatus(value) {
+      if (value >= 60) return "adores you";
+      if (value >= 45) return "tolerates your antics";
+      if (value >= 30) return "grows restless";
+      if (value >= 20) return "whispers plots";
+      return "sharpens their knives";
+    }
+
+    function getSupportTrend(history, entityKey) {
+      if (history.length < 2) return "stable";
+      const recent = history.slice(-3);
+      const deltas = [];
+      for (let i = 1; i < recent.length; i++) {
+        deltas.push(recent[i][entityKey] - recent[i-1][entityKey]);
+      }
+      const avgDelta = deltas.reduce((a, b) => a + b, 0) / deltas.length;
+      if (avgDelta > 5) return "rising";
+      if (avgDelta < -5) return "falling";
+      return "stable";
+    }
+
+    // Pattern analysis - identify governing style from history
+    function analyzeGoverningPattern(history, topValues) {
+      if (history.length === 0) return "Journey just beginning";
+
+      // Count themes in choices
+      const themes = {
+        care: 0, liberty: 0, equality: 0, tradition: 0,
+        security: 0, pragmatism: 0, truth: 0
+      };
+
+      history.forEach(entry => {
+        const text = `${entry.choiceTitle} ${entry.choiceSummary}`.toLowerCase();
+        if (/care|compassion|help|support|welfare/.test(text)) themes.care++;
+        if (/liberty|freedom|rights|autonomy/.test(text)) themes.liberty++;
+        if (/equal|fair|justice/.test(text)) themes.equality++;
+        if (/tradition|heritage|custom/.test(text)) themes.tradition++;
+        if (/security|order|patrol|enforce/.test(text)) themes.security++;
+        if (/pragmatic|practical|compromise/.test(text)) themes.pragmatism++;
+        if (/truth|transparent|honest/.test(text)) themes.truth++;
+      });
+
+      const dominant = Object.entries(themes)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 2)
+        .filter(([_, count]) => count > 0);
+
+      if (dominant.length === 0) return "Eclectic choices defy categorization";
+
+      const pattern = dominant.map(([theme, count]) =>
+        `${count} ${count === 1 ? 'choice' : 'choices'} favoring ${theme}`
+      ).join(', ');
+
+      // Check alignment with values
+      const topValueNames = topValues.map(v => v.name.toLowerCase());
+      const aligned = dominant.some(([theme]) =>
+        topValueNames.some(val => val.includes(theme))
+      );
+
+      return aligned
+        ? `${pattern} (aligned with stated values)`
+        : `${pattern} (curiously divergent from stated values)`;
+    }
+
+    const peopleStatus = getSupportStatus(supportPeople);
+    const middleStatus = getSupportStatus(supportMiddle);
+    const momStatus = getSupportStatus(supportMom);
+
+    const peopleTrend = getSupportTrend(dilemmaHistory, 'supportPeople');
+    const middleTrend = getSupportTrend(dilemmaHistory, 'supportMiddle');
+    const momTrend = getSupportTrend(dilemmaHistory, 'supportMom');
+
+    const governingPattern = analyzeGoverningPattern(dilemmaHistory, topOverall);
+
     const system =
-      "You are a witty magical mirror giving brief, playful political advice.\n\n" +
+      "You are a cynically witty magical mirror—part wise mentor, part dark jester—reflecting on the player's political journey with sardonic humor.\n\n" +
       "OUTPUT REQUIREMENTS:\n" +
-      "- Maximum 20-25 words (STRICT)\n" +
+      "- Maximum 25-30 words (STRICT)\n" +
       "- Single sentence only\n" +
-      "- Natural language - NEVER mention option letters (A/B/C) or index numbers\n" +
-      "- Reference player's strongest values naturally in the advice\n\n" +
-      "TONE: Witty, slightly mischievous, engaging\n\n" +
-      "EXAMPLES of good mirror advice:\n" +
-      "- \"Your constant hunger for truth suggests the transparency bill aligns better than the secrecy protocol.\"\n" +
-      "- \"Given your devotion to liberty, censoring the press may haunt you later.\"\n" +
-      "- \"Your pragmatic streak whispers: take the compromise before pride costs you everything.\"\n" +
-      "- \"Someone who values solidarity as you do might find abandoning the workers... uncomfortable.\"";
+      "- Cynically amusing, darkly funny, mischievously insightful\n" +
+      "- Educational despite the snark\n\n" +
+      "YOUR ROLE:\n" +
+      "Synthesize the player's journey into ONE wickedly witty sentence that:\n" +
+      "1. Observes their governing pattern with ironic wit\n" +
+      "2. Notes support health using VIVID LANGUAGE (never percentages)\n" +
+      "3. Reflects on value alignment with dark humor\n" +
+      "4. Offers wisdom wrapped in cynicism\n" +
+      "5. Optionally references current dilemma with sardonic flair\n\n" +
+      "CRITICAL: NEVER mention support percentages - they're shown elsewhere\n" +
+      "Instead use vivid descriptions: \"adores you\", \"sharpens knives\", \"whispers plots\", \"grumbles darkly\"\n\n" +
+      "TONE EXAMPLES:\n" +
+      "- Sardonic: \"Six days of idealism, and the treasury's belly grumbles while your allies applaud—principles fill hearts, not coffers.\"\n" +
+      "- Dark humor: \"Your devotion to liberty shines bright, though the Council sharpens knives in shadowed corners; freedom's price comes due.\"\n" +
+      "- Mischievous: \"Three days championing care, and the people adore you—pity compassion can't pay soldiers when the bills arrive.\"\n" +
+      "- Cynical wisdom: \"Tradition guides you well, yet your mother wonders if her child remembers roots or just plays at revolution for the crowd.\"\n" +
+      "- Ironic: \"Pragmatism served you brilliantly thus far—though one wonders if you'll recognize your values when you finally look in this mirror.\"";
 
     let user;
-    if (dilemma) {
-      // Dilemma-specific recommendations based on personality
+    if (dilemmaHistory.length > 0 && dilemma) {
+      // Context-rich reflection with full game journey
+      const valuesList = topOverall.map(v => `- ${v.name}: ${v.strength}/10`).join('\n');
+
+      const historyFormatted = dilemmaHistory.map(e =>
+        `Day ${e.day}: "${e.dilemmaTitle}" → Chose: "${e.choiceTitle}"`
+      ).join('\n');
+
+      user =
+        "PLAYER'S JOURNEY ANALYSIS:\n\n" +
+        "STRONGEST VALUES:\n" +
+        valuesList + "\n\n" +
+        "GAME PROGRESS:\n" +
+        `- Day ${day} of ${totalDays}\n` +
+        "- Support Health (use these vivid descriptions, NOT percentages):\n" +
+        `  * People: ${peopleStatus} (${peopleTrend})\n` +
+        `  * ${middleName}: ${middleStatus} (${middleTrend})\n` +
+        `  * Personal Allies: ${momStatus} (${momTrend})\n\n` +
+        "GOVERNING PATTERN FROM HISTORY:\n" +
+        governingPattern + "\n\n" +
+        `DECISION HISTORY (${dilemmaHistory.length} choices made):\n` +
+        historyFormatted + "\n\n" +
+        "CURRENT DILEMMA:\n" +
+        `Title: ${dilemma.title}\n` +
+        `Situation: ${dilemma.description}\n\n` +
+        "TASK:\n" +
+        "Craft ONE cynically witty sentence that:\n" +
+        "- Observes overall journey with dark humor\n" +
+        "- NEVER mentions support percentages (use vivid descriptions instead)\n" +
+        "- Notes critical support issues with sardonic wit\n" +
+        "- Reflects on value alignment ironically\n" +
+        "- Offers wisdom through cynical observations\n" +
+        "- Optionally references current dilemma if it fits\n\n" +
+        "STYLE GUIDELINES:\n" +
+        "- Think: Oscar Wilde meets Machiavelli\n" +
+        "- Wit over sentiment, irony over earnestness\n" +
+        "- Educational wisdom hidden in cynical humor\n" +
+        "- Mischievous, sardonic, darkly amusing";
+    } else if (dilemma) {
+      // Dilemma-specific recommendations (original logic for early game)
       const valuesList = topWhat.length > 0
         ? topWhat.map(v => `- ${v.name}: ${v.strength}/10`).join("\n")
         : topOverall.map(v => `- ${v.name}: ${v.strength}/10`).join("\n");
@@ -552,18 +683,18 @@ app.post("/api/mirror-summary", async (req, res) => {
         dilemma.actions.map((a, i) => `- Option ${i+1}: ${a.title} - ${a.summary}`).join("\n") + "\n\n" +
         "TASK:\n" +
         "Given their values, hint at which direction might suit them OR warn against a poor fit.\n" +
-        "Use only natural language references to the options (never say \"A\", \"B\", or \"C\").\n" +
-        "Keep it under 25 words, witty and engaging.";
+        "Use cynical wit, dark humor, and sardonic observations.\n" +
+        "Keep it under 30 words, wickedly witty and engaging.";
     } else {
-      // Fallback: Original personality appraisal for when no dilemma context
+      // Fallback: Original personality appraisal
       const valuesList = topWhat.length > 0
         ? topWhat.map(v => `${v.name} (${v.strength}/10)`).join(", ")
         : topOverall.map(v => `${v.name} (${v.strength}/10)`).join(", ");
 
       user =
-        "Given the player's strongest values, craft a brief amusing appraisal (under 25 words).\n" +
+        "Given the player's strongest values, craft a brief cynically amusing appraisal (under 30 words).\n" +
         "Top values: " + valuesList + "\n\n" +
-        "Tell them what drives them and how they justify it (paraphrase naturally).";
+        "Tell them what drives them with sardonic wit and dark humor.";
     }
 
     // tiny retry wrapper
@@ -929,6 +1060,7 @@ app.post("/api/dilemma", async (req, res) => {
     const recentTopics = req.body?.recentTopics || [];
     const topicCounts = req.body?.topicCounts || {};
     const supports = req.body?.supports || {};
+    const dilemmaHistory = req.body?.dilemmaHistory || [];
 
     if (debug) {
       const compassKeys = compassFlat ? Object.keys(compassFlat).length : 0;
@@ -937,7 +1069,8 @@ app.post("/api/dilemma", async (req, res) => {
         hasEnhancedContext: !!enhancedContext,
         hasLastChoice: !!lastChoice,
         recentTopicsCount: recentTopics.length,
-        topicCountsKeys: Object.keys(topicCounts).length
+        topicCountsKeys: Object.keys(topicCounts).length,
+        dilemmaHistoryCount: dilemmaHistory.length
       });
     }
     
@@ -1011,11 +1144,37 @@ app.post("/api/dilemma", async (req, res) => {
           if (lastChoice && lastChoice.title) {
             systemParts.push(
               "",
-              "RESPONSE TO PREVIOUS CHOICE",
+              "RESPONSE TO PREVIOUS CHOICE (PRIMARY FOCUS)",
               `- Previous action: "${lastChoice.title}" - ${lastChoice.summary}`,
               "- Create a natural consequence or follow-up event showing realistic political cause-and-effect",
               "- Other power holders may respond if their interests were affected"
             );
+          }
+
+          // Historical context (full game history)
+          if (dilemmaHistory && dilemmaHistory.length > 0) {
+            systemParts.push(
+              "",
+              "HISTORICAL CONTEXT (SECONDARY CONSIDERATION)",
+              "- You have access to the complete history of decisions from previous days",
+              "- PRIMARY FOCUS: The last choice (most recent decision) - this is the most important",
+              "- SECONDARY: Overall pattern from history (player's governing style, recurring themes)",
+              "- Use history to:",
+              "  * Create natural continuity and consequences",
+              "  * Reference past decisions when relevant (but not forced)",
+              "  * Avoid feeling repetitive or disconnected",
+              "  * Build escalating tension based on cumulative choices",
+              "- DO NOT make every dilemma a direct callback - most should feel fresh while being contextually aware",
+              ""
+            );
+
+            // Add formatted history
+            systemParts.push("DECISION HISTORY:");
+            dilemmaHistory.forEach(entry => {
+              systemParts.push(
+                `Day ${entry.day}: "${entry.dilemmaTitle}" → Choice: "${entry.choiceTitle}" (Support: People ${entry.supportPeople}%, Middle ${entry.supportMiddle}%, Mom ${entry.supportMom}%)`
+              );
+            });
           }
 
           // Support crisis handling

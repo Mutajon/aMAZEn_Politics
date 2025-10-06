@@ -1,7 +1,7 @@
 // src/store/dilemmaStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Dilemma, DilemmaRequest, DilemmaAction } from "../lib/dilemma";
+import type { Dilemma, DilemmaRequest, DilemmaAction, DilemmaHistoryEntry } from "../lib/dilemma";
 import { useSettingsStore } from "./settingsStore";
 import { useRoleStore } from "./roleStore";
 import { useCompassStore } from "./compassStore"; // <-- A) use compass values (0..10)
@@ -42,6 +42,9 @@ type DilemmaState = {
   // Track last choice for dynamic parameters
   lastChoice: DilemmaAction | null;
 
+  // Dilemma history for AI context (full game history)
+  dilemmaHistory: DilemmaHistoryEntry[];
+
   // Day progression state (NewDilemmaLogic.md integration)
   dayProgression: DayProgressionState;
 
@@ -81,6 +84,10 @@ type DilemmaState = {
 
   // Topic tracking methods
   addDilemmaTopic: (topic: string) => void;
+
+  // Dilemma history methods
+  addHistoryEntry: (entry: DilemmaHistoryEntry) => void;
+  clearHistory: () => void;
 };
 
 export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
@@ -92,6 +99,9 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
   loading: false,
   error: null,
   lastChoice: null,
+
+  // Dilemma history for AI context
+  dilemmaHistory: [],
 
   // Day progression state
   dayProgression: {
@@ -225,6 +235,7 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
       loading: false,
       error: null,
       lastChoice: null,
+      dilemmaHistory: [],
       dayProgression: {
         isProgressing: false,
         progressingToDay: 1,
@@ -372,6 +383,19 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
       topicCounts: newTopicCounts,
     });
   },
+
+  // Dilemma history methods
+  addHistoryEntry(entry) {
+    const { dilemmaHistory } = get();
+    const newHistory = [...dilemmaHistory, entry];
+    dlog("addHistoryEntry -> Day", entry.day, ":", entry.dilemmaTitle, "→", entry.choiceTitle);
+    set({ dilemmaHistory: newHistory });
+  },
+
+  clearHistory() {
+    dlog("clearHistory -> clearing all dilemma history");
+    set({ dilemmaHistory: [] });
+  },
 }));
 
 // ---- helpers ----
@@ -482,7 +506,7 @@ function flattenCompass(vals: any): Record<string, number> {
 export function buildSnapshot(): DilemmaRequest {
     const { debugMode, dilemmasSubjectEnabled, dilemmasSubject } =
       useSettingsStore.getState();
-    const { day, totalDays, lastChoice, supportPeople, supportMiddle, supportMom, recentTopics, topicCounts } = useDilemmaStore.getState();
+    const { day, totalDays, lastChoice, supportPeople, supportMiddle, supportMom, recentTopics, topicCounts, dilemmaHistory } = useDilemmaStore.getState();
 
     // --- role/system from the role store (trimmed) ---
     const roleState = useRoleStore.getState();
@@ -549,6 +573,9 @@ export function buildSnapshot(): DilemmaRequest {
 
       // NEW: Send enhanced context analysis
       enhancedContext: enhancedContext || null,
+
+      // NEW: Send full dilemma history for better AI context
+      dilemmaHistory: dilemmaHistory || [],
 
       debug: debugMode,
     };

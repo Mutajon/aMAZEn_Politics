@@ -7,6 +7,7 @@ import { useNarrator } from "../hooks/useNarrator";
 import type { PreparedTTS } from "../hooks/useNarrator";
 import { useSettingsStore } from "../store/settingsStore";
 import { useRoleStore } from "../store/roleStore";
+import { useDilemmaStore } from "../store/dilemmaStore";
 
 /**
  * Phases:
@@ -279,6 +280,10 @@ useEffect(() => {
                 className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
                 onClick={() => {
                   console.log("[BackgroundIntro] Begin clicked");
+
+                  // Clear dilemma history when starting a new game (Day 1)
+                  useDilemmaStore.getState().clearHistory();
+                  console.log("[BackgroundIntro] Dilemma history cleared for new game");
 
                   push("/event");
                 }}
