@@ -14,6 +14,7 @@ import { useState, useCallback } from "react";
 import { useDilemmaStore, buildSnapshot } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
+import { COMPONENTS, type PropKey } from "../data/compass-data";
 import type { Dilemma, DilemmaAction } from "../lib/dilemma";
 import type { TickerItem } from "../components/event/NewsTicker";
 
@@ -77,16 +78,49 @@ export type CollectedData = {
 // ============================================================================
 
 /**
- * Calculate top K indices from array (for mirror compass analysis)
- * Same logic as mirrorDilemma.ts
+ * Get top K compass values with names and strengths (not indices)
+ * Returns value names for natural language mirror recommendations
  */
-function topK(arr: number[] | undefined, k = 3): string[] {
+function topKWithNames(arr: number[] | undefined, prop: PropKey, k = 2): Array<{ name: string; strength: number }> {
   if (!Array.isArray(arr)) return [];
   return arr
-    .map((v, i) => ({ v: Number(v) || 0, i }))
+    .map((v, i) => ({
+      v: Number(v) || 0,
+      i,
+      name: COMPONENTS[prop]?.[i]?.short || `${prop} #${i + 1}`,
+    }))
+    .filter(x => x.v > 0) // Only non-zero values
     .sort((a, b) => b.v - a.v)
     .slice(0, k)
-    .map(x => String(x.i));
+    .map(x => ({ name: x.name, strength: Math.round(x.v * 10) / 10 }));
+}
+
+/**
+ * Get top overall values across all compass dimensions
+ */
+function topOverallWithNames(compassValues: any, k = 2): Array<{ name: string; strength: number; dimension: PropKey }> {
+  const allValues: Array<{ v: number; name: string; dimension: PropKey }> = [];
+
+  (["what", "whence", "how", "whither"] as PropKey[]).forEach((prop) => {
+    const arr = Array.isArray(compassValues?.[prop]) ? compassValues[prop] : [];
+    arr.forEach((v: number, i: number) => {
+      allValues.push({
+        v: Number(v) || 0,
+        name: COMPONENTS[prop]?.[i]?.short || `${prop} #${i + 1}`,
+        dimension: prop,
+      });
+    });
+  });
+
+  return allValues
+    .filter(x => x.v > 0) // Only non-zero values
+    .sort((a, b) => b.v - a.v)
+    .slice(0, k)
+    .map(x => ({
+      name: x.name,
+      strength: Math.round(x.v * 10) / 10,
+      dimension: x.dimension
+    }));
 }
 
 /**
@@ -113,12 +147,9 @@ async function fetchDilemma(): Promise<Dilemma> {
     throw new Error("Invalid dilemma response: missing required fields");
   }
 
-  return {
-    title: data.title,
-    description: data.description,
-    actions: data.actions,
-    topic: data.topic || "General"
-  } as Dilemma;
+  // Return the full response to preserve supportEffects for Day 2+
+  // The collector will extract what it needs
+  return data;
 }
 
 /**
@@ -286,15 +317,10 @@ async function fetchNews(): Promise<TickerItem[]> {
 async function fetchMirrorText(dilemma: Dilemma): Promise<string> {
   const { values: compassValues } = useCompassStore.getState();
 
-  // Calculate top compass components
-  const topWhat = topK(compassValues?.what, 3);
-  const topWhence = topK(compassValues?.whence, 3);
-  const topOverall = topK(
-    ["what", "whence", "how", "whither"]
-      .flatMap(k => (compassValues as any)?.[k] || [])
-      .slice(0, 10),
-    3
-  );
+  // Calculate top compass components with names (not indices)
+  const topWhat = topKWithNames(compassValues?.what, "what", 2);
+  const topWhence = topKWithNames(compassValues?.whence, "whence", 2);
+  const topOverall = topOverallWithNames(compassValues, 2);
 
   const payload = {
     topWhat,
@@ -357,18 +383,18 @@ export function useEventDataCollector() {
       setCollectionProgress(10); // Starting requests
 
       const phase1Tasks: Promise<any>[] = [
-        fetchDilemma(),  // [0] Required
+        fetchDilemma(),  // [0] Required - Day 2+ includes supportEffects in response
         fetchNews(),     // [1] Optional
       ];
 
-      // Day 2+ only: Add analysis of previous choice
-      const totalTasks = day > 1 && lastChoice ? 6 : 3; // Phase 1 (2-5) + Phase 2 (1)
+      // Day 2+ only: Add analysis of previous choice (compass + dynamic params)
+      // NOTE: Support analysis now comes FROM the dilemma API response on Day 2+
+      const totalTasks = day > 1 && lastChoice ? 5 : 3; // Phase 1 (2-4) + Phase 2 (1)
       if (day > 1 && lastChoice) {
-        console.log('[Collector] 📊 Day 2+ detected - adding support/compass/dynamic analysis');
+        console.log('[Collector] 📊 Day 2+ detected - adding compass/dynamic analysis');
         phase1Tasks.push(
-          fetchSupportAnalysis(lastChoice),  // [2]
-          fetchCompassPills(lastChoice),     // [3]
-          fetchDynamicParams(lastChoice)     // [4]
+          fetchCompassPills(lastChoice),     // [2] (was [3])
+          fetchDynamicParams(lastChoice)     // [3] (was [4])
         );
       }
 
@@ -391,8 +417,15 @@ export function useEventDataCollector() {
         setIsCollecting(false);
         return;
       }
-      const dilemma = phase1Results[0].value as Dilemma;
-      console.log('[Collector] ✅ Dilemma received:', dilemma.title);
+      const dilemmaResponse = phase1Results[0].value as any; // Can include supportEffects on Day 2+
+      console.log('[Collector] ✅ Dilemma received:', dilemmaResponse.title);
+
+      // Extract dilemma data (always present)
+      const dilemma: Dilemma = {
+        title: dilemmaResponse.title,
+        description: dilemmaResponse.description,
+        actions: dilemmaResponse.actions
+      };
 
       // Verify dilemma completeness
       if (!dilemma || !dilemma.title || !dilemma.description || dilemma.actions?.length !== 3) {
@@ -400,6 +433,13 @@ export function useEventDataCollector() {
         setCollectionError("Invalid dilemma data received");
         setIsCollecting(false);
         return;
+      }
+
+      // Extract supportEffects from dilemma response (Day 2+ only)
+      let supportEffects: SupportEffect[] | null = null;
+      if (day > 1 && dilemmaResponse.supportEffects) {
+        supportEffects = dilemmaResponse.supportEffects;
+        console.log(`[Collector] ✅ Support effects from dilemma: ${supportEffects?.length || 0} effects`);
       }
 
       // NEWS (Optional - use fallback)
@@ -413,38 +453,36 @@ export function useEventDataCollector() {
       }
 
       // Day 2+ results (Optional - use null fallback)
-      let supportEffects: SupportEffect[] | null = null;
       let compassPills: CompassPill[] | null = null;
       let dynamicParams: DynamicParam[] | null = null;
 
       if (day > 1 && lastChoice) {
         console.log('[Collector] 📊 Processing Day 2+ analysis results...');
 
-        // SUPPORT
+        // SUPPORT - Now extracted from dilemma response above (no longer a separate API call)
+        if (!supportEffects || supportEffects.length === 0) {
+          console.warn('[Collector] ⚠️ Support effects missing from dilemma response');
+          errors.support = "Support effects not included in dilemma response";
+        } else {
+          console.log(`[Collector] ✅ Support analysis: ${supportEffects.length} effects`);
+        }
+
+        // COMPASS (now at index [2], was [3])
         if (phase1Results[2]?.status === "fulfilled") {
-          supportEffects = phase1Results[2].value;
-          console.log(`[Collector] ✅ Support analysis: ${supportEffects?.length || 0} effects`);
-        } else if (phase1Results[2]) {
-          console.warn('[Collector] ⚠️ Support analysis failed');
-          errors.support = phase1Results[2].reason;
-        }
-
-        // COMPASS
-        if (phase1Results[3]?.status === "fulfilled") {
-          compassPills = phase1Results[3].value;
+          compassPills = phase1Results[2].value;
           console.log(`[Collector] ✅ Compass analysis: ${compassPills?.length || 0} pills`);
-        } else if (phase1Results[3]) {
+        } else if (phase1Results[2]) {
           console.warn('[Collector] ⚠️ Compass analysis failed');
-          errors.compass = phase1Results[3].reason;
+          errors.compass = phase1Results[2].reason;
         }
 
-        // DYNAMIC
-        if (phase1Results[4]?.status === "fulfilled") {
-          dynamicParams = phase1Results[4].value;
+        // DYNAMIC (now at index [3], was [4])
+        if (phase1Results[3]?.status === "fulfilled") {
+          dynamicParams = phase1Results[3].value;
           console.log(`[Collector] ✅ Dynamic params: ${dynamicParams?.length || 0} params`);
-        } else if (phase1Results[4]) {
+        } else if (phase1Results[3]) {
           console.warn('[Collector] ⚠️ Dynamic params failed');
-          errors.dynamic = phase1Results[4].reason;
+          errors.dynamic = phase1Results[3].reason;
         }
       }
 
@@ -529,10 +567,17 @@ export function useEventDataCollector() {
       const { lastChoice } = useDilemmaStore.getState();
       if (!lastChoice) return false; // Should have previous choice on Day 2+
 
-      // These can be null (failed to load) but status tracking must exist
-      if (collectedData.status.supportReady === undefined) return false;
-      if (collectedData.status.compassReady === undefined) return false;
-      if (collectedData.status.dynamicReady === undefined) return false;
+      // Day 2+ requires support, compass, and dynamic analysis to be ready
+      // These must be true (data successfully loaded), not just defined
+      // If they're false, it means data failed to load or hasn't loaded yet
+      if (!collectedData.status.supportReady) return false;
+      if (!collectedData.status.compassReady) return false;
+      if (!collectedData.status.dynamicReady) return false;
+
+      // Also verify the actual data arrays exist (double-check)
+      if (!collectedData.supportEffects || collectedData.supportEffects.length === 0) return false;
+      if (!collectedData.compassPills || collectedData.compassPills.length === 0) return false;
+      // dynamicParams can be empty, that's ok
     }
 
     return true;

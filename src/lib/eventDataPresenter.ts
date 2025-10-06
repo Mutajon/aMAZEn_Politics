@@ -107,68 +107,88 @@ export async function presentEventData(
   // ========== STEP 0: ResourceBar (always visible) ==========
   setPresentationStep(0);
   console.log("[Presenter] Step 0: ResourceBar");
-  await delay(300);
+  await delay(800); // Increased from 300ms - let resource bar settle
 
   // ========== STEP 1: SupportList (initial values) ==========
   setPresentationStep(1);
   console.log("[Presenter] Step 1: SupportList (initial)");
-  await delay(500);
+  await delay(1500); // Increased from 500ms - let user see initial support values
 
-  // ========== STEP 2A: Support Changes (Day 2+ only) ==========
+  // ========== STEP 2: Support Changes Animation (Day 2+ only) ==========
+  // This step applies support deltas FIRST, then advances presentation step
+  // When step advances, SupportList re-renders with new percent values from store
+  // SupportList animates counter from old → new values (1000ms RAF animation)
+  // Delta pills, trend arrows, and explanation notes appear simultaneously
   if (!isFirstDay && collectedData.supportEffects && collectedData.supportEffects.length > 0) {
-    console.log("[Presenter] Step 2A: Support changes animation (Day 2+)");
+    console.log(`[Presenter] Step 2: Support effects found - ${collectedData.supportEffects.length} deltas to apply`);
+    console.log("[Presenter] Step 2: Applying support deltas and triggering animation (Day 2+)");
 
-    // Apply deltas to store - this updates the global state
+    // 1. Apply deltas to store FIRST - updates global state (supportPeople, supportMiddle, supportMom)
     applySupportDeltas(collectedData.supportEffects);
 
-    // Advance step to trigger re-render with deltas visible
+    // 2. Small delay to ensure Zustand store updates propagate before re-render
+    //    Without this, setPresentationStep might trigger re-render before store fully updates
+    //    This ensures buildSupportItems() reads fresh values (e.g., 35% instead of 50%)
+    await delay(50);
+
+    // 3. Advance step to 2 - triggers EventScreen3 re-render
+    //    buildSupportItems() now reads updated values from store + adds delta/trend/note
+    //    SupportList receives new percent prop and animates from old → new value
     setPresentationStep(2);
 
-    // Wait for animation to complete
-    await delay(1200);
+    // 4. Wait for animations to complete:
+    //    - Counter animates from old to new percent (1000ms)
+    //    - Delta pill scales in (250ms)
+    //    - Trend arrow starts bobbing
+    //    - Note text appears
+    //    Total: 2500ms to see counter animation + read notes
+    await delay(2500); // Increased from 1200ms - give user time to see counter animation and read explanation
   } else if (isFirstDay) {
-    console.log("[Presenter] Step 2A: SKIPPED (Day 1 - no previous choice)");
+    console.log("[Presenter] Step 2: SKIPPED (Day 1 - no previous choice)");
+  } else {
+    console.warn(`[Presenter] Step 2: SKIPPED - Missing support effects! Has effects: ${!!collectedData.supportEffects}, Length: ${collectedData.supportEffects?.length || 0}`);
   }
 
-  // ========== STEP 2/3: NewsTicker ==========
+  // ========== STEP 3: NewsTicker ==========
   setPresentationStep(3);
   console.log("[Presenter] Step 3: NewsTicker");
-  await delay(800);
+  await delay(2000); // Increased from 800ms - let user read news items
 
-  // ========== STEP 3/4: PlayerStatusStrip ==========
+  // ========== STEP 4: PlayerStatusStrip ==========
   setPresentationStep(4);
   console.log("[Presenter] Step 4: PlayerStatusStrip");
-  await delay(300);
+  await delay(2000); // Increased from 300ms - let user see dynamic parameters
 
-  // ========== STEP 4/5: DilemmaCard ==========
+  // ========== STEP 5: DilemmaCard ==========
   setPresentationStep(5);
   console.log("[Presenter] Step 5: DilemmaCard");
-  await delay(500);
+  await delay(1500); // Increased from 500ms - let user start reading dilemma
 
   // Note: Narration integration happens in EventScreen3 via useEventNarration
   // The presenter just provides the timing, the component handles narration readiness
 
-  // ========== STEP 4A: Compass Pills (Day 2+ only) ==========
+  // ========== STEP 5A: Compass Pills (Day 2+ only) ==========
+  // Pills overlay on top of existing content, no step advancement needed
   if (!isFirstDay && collectedData.compassPills && collectedData.compassPills.length > 0) {
-    console.log("[Presenter] Step 4A: Compass pills (Day 2+)");
+    console.log("[Presenter] Step 5A: Compass pills (Day 2+)");
 
     // Apply deltas to store
     applyCompassDeltas(collectedData.compassPills);
 
     // Pills overlay appears automatically via CompassPillsOverlay component
     // No need to advance step - it overlays on top of existing content
-    // Wait a moment for pills to appear (they auto-collapse after 2s)
-    await delay(300);
+    // Wait for pills to appear and auto-collapse (they collapse after 2s)
+    await delay(2500); // Increased from 300ms - let user see compass pills
   } else if (isFirstDay) {
-    console.log("[Presenter] Step 4A: SKIPPED (Day 1 - no previous choice)");
+    console.log("[Presenter] Step 5A: SKIPPED (Day 1 - no previous choice)");
   }
 
-  // ========== STEP 5/6: MirrorCard ==========
+  // ========== STEP 6: MirrorCard ==========
   setPresentationStep(6);
   console.log("[Presenter] Step 6: MirrorCard");
-  await delay(400);
+  await delay(1500); // Increased from 400ms - let user read mirror text
 
-  // ========== STEP 6/7: ActionDeck (final) ==========
+  // ========== STEP 7: ActionDeck (final) ==========
   setPresentationStep(7);
   console.log("[Presenter] Step 7: ActionDeck - presentation complete, player can interact");
 
@@ -195,6 +215,7 @@ export function buildSupportItems(
   name: string;
   percent: number;
   delta?: number | null;
+  trend?: "up" | "down" | null;
   note?: string | null;
   icon: React.ReactNode;
   accentClass: string;
@@ -203,25 +224,42 @@ export function buildSupportItems(
   const { supportPeople, supportMiddle, supportMom } = useDilemmaStore.getState();
   const { analysis } = useRoleStore.getState();
 
+  console.log(`[buildSupportItems] Step: ${presentationStep}, Values from store: people=${supportPeople}, middle=${supportMiddle}, mom=${supportMom}`);
+
   // Get middle entity info from analysis
   const playerIndex = typeof analysis?.playerIndex === "number" ? analysis.playerIndex : 0;
   const middleEntity = Array.isArray(analysis?.holders) && analysis.holders.length > playerIndex + 1
     ? analysis.holders[playerIndex + 1]
     : { name: "Council", icon: "🏛️" };
 
-  // Show deltas only after Step 2A (presentationStep >= 2)
+  // Show deltas only after Step 2 (presentationStep >= 2)
   const showDeltas = presentationStep >= 2;
   const supportEffects = showDeltas && collectedData?.supportEffects ? collectedData.supportEffects : null;
 
+  // Helper to get effect data for an entity
+  const getEffectData = (id: string) => {
+    const effect = supportEffects?.find(e => e.id === id);
+    return {
+      delta: effect?.delta || null,
+      trend: effect && effect.delta > 0 ? "up" as const : effect && effect.delta < 0 ? "down" as const : null,
+      note: effect?.explain || null,
+    };
+  };
+
   // Import icons (these need to be imported at component level, so we'll use React.createElement)
   // For now, return simple structure - EventScreen3 will add icons
+  const peopleEffect = getEffectData("people");
+  const middleEffect = getEffectData("middle");
+  const momEffect = getEffectData("mom");
+
   return [
     {
       id: "people",
       name: "The People",
       percent: supportPeople,
-      delta: supportEffects?.find(e => e.id === "people")?.delta || null,
-      note: supportEffects?.find(e => e.id === "people")?.explain || null,
+      delta: peopleEffect.delta,
+      trend: peopleEffect.trend,
+      note: peopleEffect.note,
       icon: null as any, // Filled in by EventScreen3
       accentClass: "bg-emerald-600",
       moodVariant: "civic" as const,
@@ -230,18 +268,20 @@ export function buildSupportItems(
       id: "middle",
       name: middleEntity.name,
       percent: supportMiddle,
-      delta: supportEffects?.find(e => e.id === "middle")?.delta || null,
-      note: supportEffects?.find(e => e.id === "middle")?.explain || null,
+      delta: middleEffect.delta,
+      trend: middleEffect.trend,
+      note: middleEffect.note,
       icon: null as any, // Filled in by EventScreen3
       accentClass: "bg-amber-600",
       moodVariant: "civic" as const,
     },
     {
       id: "mom",
-      name: "Inner Circle",
+      name: "Mom",
       percent: supportMom,
-      delta: supportEffects?.find(e => e.id === "mom")?.delta || null,
-      note: supportEffects?.find(e => e.id === "mom")?.explain || null,
+      delta: momEffect.delta,
+      trend: momEffect.trend,
+      note: momEffect.note,
       icon: null as any, // Filled in by EventScreen3
       accentClass: "bg-rose-600",
       moodVariant: "empathetic" as const,

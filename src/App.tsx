@@ -44,8 +44,7 @@ export default function App() {
   if (route === "/compass-vis") return <CompassVisScreen push={push} />;
   if (route === "/debug-mini") return <MiniCompassDebugScreen push={push} />;
   if (route === "/background-intro") return <BackgroundIntroScreen push={push} />;
-  if (route === "/event") return <EventScreen2 push={push} />;
-  if (route === "/event3") return <EventScreen3 push={push} />;
+  if (route === "/event") return <EventScreen3 push={push} />;
   if (route === "/highscores") return <HighscoreScreen push={push} />;
 
   

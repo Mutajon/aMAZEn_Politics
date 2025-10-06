@@ -522,31 +522,48 @@ app.post("/api/mirror-summary", async (req, res) => {
     const dilemma    = req.body?.dilemma || null;
 
     const system =
-      "You are a witty, magical mirror offering amusing advice. Respond ONLY with 1–2 short sentences (max ~45 words). " +
-      "No lists, no headers, no labels. Avoid jargon and gamey terms. Natural, playful tone.";
+      "You are a witty magical mirror giving brief, playful political advice.\n\n" +
+      "OUTPUT REQUIREMENTS:\n" +
+      "- Maximum 20-25 words (STRICT)\n" +
+      "- Single sentence only\n" +
+      "- Natural language - NEVER mention option letters (A/B/C) or index numbers\n" +
+      "- Reference player's strongest values naturally in the advice\n\n" +
+      "TONE: Witty, slightly mischievous, engaging\n\n" +
+      "EXAMPLES of good mirror advice:\n" +
+      "- \"Your constant hunger for truth suggests the transparency bill aligns better than the secrecy protocol.\"\n" +
+      "- \"Given your devotion to liberty, censoring the press may haunt you later.\"\n" +
+      "- \"Your pragmatic streak whispers: take the compromise before pride costs you everything.\"\n" +
+      "- \"Someone who values solidarity as you do might find abandoning the workers... uncomfortable.\"";
 
     let user;
     if (dilemma) {
-      // New: Provide dilemma-specific recommendations based on personality
+      // Dilemma-specific recommendations based on personality
+      const valuesList = topWhat.length > 0
+        ? topWhat.map(v => `- ${v.name}: ${v.strength}/10`).join("\n")
+        : topOverall.map(v => `- ${v.name}: ${v.strength}/10`).join("\n");
+
       user =
-        "Given the current dilemma and the player's strongest values, offer an amusing recommendation. " +
-        "Reference their personality traits and suggest which option might suit them best (or warn playfully against certain choices). " +
-        "Be witty and specific to the situation.\n\n" +
-        "DILEMMA: " + dilemma.title + "\n" +
-        "SITUATION: " + dilemma.description + "\n" +
-        "OPTIONS: " + dilemma.actions.map(a => `${a.id.toUpperCase()}) ${a.title} - ${a.summary}`).join(", ") + "\n\n" +
         "PLAYER'S STRONGEST VALUES:\n" +
-        "Top WHAT (goals): " + JSON.stringify(topWhat) + "\n" +
-        "Top WHENCE (justification): " + JSON.stringify(topWhence) + "\n" +
-        "Overall: " + JSON.stringify(topOverall);
+        valuesList + "\n\n" +
+        "CURRENT DILEMMA:\n" +
+        "Title: " + dilemma.title + "\n" +
+        "Situation: " + dilemma.description + "\n\n" +
+        "OPTIONS (do NOT mention these letters):\n" +
+        dilemma.actions.map((a, i) => `- Option ${i+1}: ${a.title} - ${a.summary}`).join("\n") + "\n\n" +
+        "TASK:\n" +
+        "Given their values, hint at which direction might suit them OR warn against a poor fit.\n" +
+        "Use only natural language references to the options (never say \"A\", \"B\", or \"C\").\n" +
+        "Keep it under 25 words, witty and engaging.";
     } else {
       // Fallback: Original personality appraisal for when no dilemma context
+      const valuesList = topWhat.length > 0
+        ? topWhat.map(v => `${v.name} (${v.strength}/10)`).join(", ")
+        : topOverall.map(v => `${v.name} (${v.strength}/10)`).join(", ");
+
       user =
-        "Given the player's value signals, craft an amusing 1–2 sentence appraisal. " +
-        "Tell them WHAT seems to drive them and HOW they mainly justify it (paraphrase labels). " +
-        "Top WHAT: " + JSON.stringify(topWhat) + "\n" +
-        "Top WHENCE: " + JSON.stringify(topWhence) + "\n" +
-        "Overall: " + JSON.stringify(topOverall);
+        "Given the player's strongest values, craft a brief amusing appraisal (under 25 words).\n" +
+        "Top values: " + valuesList + "\n\n" +
+        "Tell them what drives them and how they justify it (paraphrase naturally).";
     }
 
     // tiny retry wrapper
@@ -1245,7 +1262,129 @@ app.post("/api/dilemma", async (req, res) => {
       topic = "General";
     }
 
-    const result = { title, description, actions, topic, isFallback: usedFallback };
+    // ===================================================================
+    // Day 2+: Generate support effects based on BOTH lastChoice AND new dilemma
+    // This ensures support changes align with how the story actually developed
+    // ===================================================================
+    let supportEffects = null;
+
+    // Debug logging to diagnose missing support effects
+    console.log("[/api/dilemma] Support check - day:", day, "lastChoice:", lastChoice ? "EXISTS" : "NULL", "lastChoice.title:", lastChoice?.title || "MISSING");
+
+    if (day > 1 && lastChoice && lastChoice.title) {
+      console.log("[/api/dilemma] ✅ Generating support effects...");
+      try {
+        if (debug) console.log("[/api/dilemma] Day 2+ - generating support effects aligned with story...");
+
+        // Derive "middleName" = strongest non-player holder
+        const holders = Array.isArray(req.body?.holders) ? req.body.holders : [];
+        const pIndex = typeof req.body?.playerIndex === "number" ? req.body.playerIndex : null;
+
+        const withIdx = holders.map((h, i) => ({ ...h, i }));
+        const candidates = pIndex == null ? withIdx : withIdx.filter((h) => h.i !== pIndex);
+        const top = candidates.length > 0
+          ? candidates.reduce((a, b) => (b.percent > a.percent ? b : a), candidates[0])
+          : null;
+        const middleName = String(top?.name || "the establishment");
+
+        const supportSystem = [
+          "You assess how political events shift short-term support among three groups:",
+          "- 'people' (general public / the street),",
+          "- 'middle' (the main non-player power holder),",
+          "- 'mom' (the player's MOTHER - literal parent who raised them, caring but judgmental).",
+          "",
+          "OUTPUT: STRICT JSON ARRAY ONLY (ALWAYS exactly 3 items - one for each group).",
+          "Each item: { id: 'people|middle|mom', level: 'low|medium|large|extreme', polarity: 'positive|negative', explain: 'ONE SHORT SENTENCE' }",
+          "",
+          "CRITICAL: Base support changes on how the NEW SITUATION describes reactions.",
+          "If the new situation says 'public loves this' → people support INCREASES",
+          "If the new situation says '" + middleName + " in uproar' → middle support DECREASES",
+          "If the new situation says 'loyalists proud' → mom support INCREASES",
+          "",
+          "STYLE RULES for `explain`:",
+          "- Keep it vivid and specific; 8–18 words; no hashtags/emojis.",
+          "- people → speak as a crowd reaction.",
+          "- middle → reference or speak as " + middleName + ".",
+          "- mom → MATERNAL voice speaking directly to her child using 'you' (proud, worried, disappointed, or gently scolding like a concerned mother).",
+          "",
+          "MAGNITUDE:",
+          "- Use plausibility: low=5, medium=10, large=15, extreme=20.",
+          "- ALWAYS include all 3 groups. Mom ALWAYS has an opinion about her child's choices, even if subtle (use 'low' for minor reactions).",
+          "- Never omit any group - if truly neutral, use level='low' with slight positive or negative lean.",
+        ].join("\n");
+
+        const supportUser = [
+          `PREVIOUS ACTION: "${lastChoice.title}" - ${lastChoice.summary}`,
+          "",
+          `NEW SITUATION: """${description}"""`,
+          "",
+          "CONTEXT:",
+          `- systemName: ${systemName}`,
+          `- holders: ${JSON.stringify(holders)}`,
+          `- middleName: ${middleName}`,
+          `- day: ${day}`,
+          "",
+          "TASK:",
+          "Analyze how support changes based on BOTH the previous action AND how the new situation describes reactions.",
+          "Return JSON ARRAY with EXACTLY 3 items (people, middle, mom). Example:",
+          `[{"id":"people","level":"medium","polarity":"positive","explain":"Crowds welcome the curfew easing tonight."},{"id":"middle","level":"low","polarity":"negative","explain":"Council grumbles about lost control."},{"id":"mom","level":"low","polarity":"positive","explain":"I'm proud you're trying to help people, dear."}]`,
+        ].join("\n");
+
+        const supportItems = await aiJSON({
+          system: supportSystem,
+          user: supportUser,
+          model: MODEL_ANALYZE,
+          temperature: 0.25,
+          fallback: [],
+        });
+
+        // Convert level -> absolute delta
+        const SCALE = { low: 5, medium: 10, large: 15, extreme: 20 };
+
+        supportEffects = Array.isArray(supportItems)
+          ? supportItems
+              .map((x) => {
+                const rawId = String(x?.id || "").toLowerCase();
+                const id = rawId === "people" || rawId === "middle" || rawId === "mom" ? rawId : null;
+                if (!id) return null;
+
+                const level = String(x?.level || "").toLowerCase();
+                const base = SCALE[level] ?? 0;
+                if (!base) return null;
+
+                const pol = String(x?.polarity || "").toLowerCase();
+                const sign = pol === "negative" ? -1 : 1;
+
+                const explain = String(x?.explain || "").trim().slice(0, 140);
+                const delta = Math.max(-20, Math.min(20, sign * base));
+
+                return { id, delta, explain };
+              })
+              .filter(Boolean)
+          : [];
+
+        console.log("[/api/dilemma] ✅ Support effects generated:", supportEffects.length, "effects");
+        if (debug) console.log("[/api/dilemma] Support effects details:", supportEffects);
+      } catch (supportError) {
+        console.error("[/api/dilemma] ❌ Support effects FAILED:", supportError?.message || supportError);
+        // Continue without support effects rather than failing the whole request
+        supportEffects = [];
+      }
+    } else {
+      console.log("[/api/dilemma] ⏭️ Skipping support effects - condition not met (day > 1 && lastChoice && lastChoice.title)");
+    }
+
+    // Build result - include supportEffects for Day 2+
+    const result = {
+      title,
+      description,
+      actions,
+      topic,
+      isFallback: usedFallback,
+      ...(supportEffects !== null && { supportEffects }) // Only include if Day 2+
+    };
+
+    console.log("[/api/dilemma] 📦 Final result has supportEffects:", supportEffects !== null, "length:", supportEffects?.length || 0);
     if (debug) console.log("[/api/dilemma] result:", result);
     return res.json(result);
   } catch (e) {

@@ -1,6 +1,6 @@
 // MirrorCard.tsx
 // Full-width card styled like MirrorBubble, with local tunables.
-// Adds per-letter bobbing (magical vibe) and text insets so it won't overlap the mirror art.
+// Adds traveling shimmer effect (magical vibe) and text insets so it won't overlap the mirror art.
 
 import React, { useMemo } from "react";
 import { motion } from "framer-motion";
@@ -31,12 +31,12 @@ const IMG_OFFSET_Y    = 0;    // Will be calculated dynamically for vertical cen
 const TEXT_INSET_LEFT_PX  = 20; // nudge if the image intrudes from the left
 const TEXT_INSET_RIGHT_PX = 0;
 
-// Magical per-letter bobbing
-const MAGIC_ENABLED        = true;
-const MAGIC_AMPLITUDE_PX   = 2;        // 1–3px looks good
-const MAGIC_DURATION_S     = 1.6;
-const MAGIC_STAGGER_S      = 0.035;
-const MAGIC_RANDOM_JITTER  = 0.25;
+// Magical shimmer effect (traveling glow - better readability than wobble)
+const SHIMMER_ENABLED       = true;
+const SHIMMER_DURATION_S    = 2.0;          // Time for shimmer to travel across text
+const SHIMMER_PAUSE_S       = 3.0;          // Pause between shimmer cycles
+const SHIMMER_GLOW_COLOR    = "rgba(255, 255, 255, 0.8)";  // Bright white glow
+const SHIMMER_GLOW_SIZE     = "8px";        // Glow radius
 
 // Spacing around the card
 const OUTER_MARGIN_Y  = "my-2";
@@ -49,12 +49,8 @@ export type MirrorCardProps = {
 };
 
 export default function MirrorCard({ text, italic = true, className }: MirrorCardProps) {
+  // Always use character-level splitting for smooth shimmer effect
   const segments = useMemo(() => splitGraphemes(text), [text]);
-  const ampScale = useMemo(() => {
-    if (!MAGIC_ENABLED) return [];
-    const j = Math.max(0, Math.min(1, MAGIC_RANDOM_JITTER));
-    return segments.map((_, i) => 1 + (j ? pseudoRandom(i) * j : 0));
-  }, [segments]);
 
   // Calculate card height dynamically to position image in vertical center
   const cardRef = React.useRef<HTMLDivElement>(null);
@@ -99,15 +95,18 @@ export default function MirrorCard({ text, italic = true, className }: MirrorCar
         {/* Text FIRST (above image) with safe insets */}
         <div
           className={["relative z-10 whitespace-pre-wrap", italic ? "italic" : ""].join(" ")}
-          style={{ paddingLeft: TEXT_INSET_LEFT_PX, paddingRight: TEXT_INSET_RIGHT_PX }}
+          style={{
+            paddingLeft: TEXT_INSET_LEFT_PX,
+            paddingRight: TEXT_INSET_RIGHT_PX,
+            wordBreak: "keep-all",
+            overflowWrap: "break-word",
+            hyphens: "none",
+          }}
         >
-          {MAGIC_ENABLED ? (
-            <MagicBobble
+          {SHIMMER_ENABLED ? (
+            <MagicShimmer
               segments={segments}
-              ampScale={ampScale}
-              amplitude={MAGIC_AMPLITUDE_PX}
-              duration={MAGIC_DURATION_S}
-              stagger={MAGIC_STAGGER_S}
+              totalSegments={segments.length}
             />
           ) : (
             text
@@ -132,38 +131,44 @@ export default function MirrorCard({ text, italic = true, className }: MirrorCar
   );
 }
 
-/* -------------------- Magical per-letter text -------------------- */
+/* -------------------- Magical shimmer text -------------------- */
 
-function MagicBobble({
+function MagicShimmer({
   segments,
-  ampScale,
-  amplitude,
-  duration,
-  stagger,
+  totalSegments,
 }: {
   segments: string[];
-  ampScale: number[];
-  amplitude: number;
-  duration: number;
-  stagger: number;
+  totalSegments: number;
 }) {
+  const totalCycle = SHIMMER_DURATION_S + SHIMMER_PAUSE_S;
+
   return (
     <span>
       {segments.map((seg, i) => {
         if (seg === "\n") return <br key={`br-${i}`} />;
-        const scale = ampScale[i] ?? 1;
+
+        // Calculate stagger delay - shimmer travels from left to right
+        const delay = (i / totalSegments) * SHIMMER_DURATION_S;
+
         return (
           <motion.span
-            key={`ch-${i}-${seg}`}
-            className="inline-block will-change-transform"
-            animate={{ y: [-amplitude * scale, amplitude * scale] }}
+            key={`seg-${i}`}
+            className="inline will-change-[text-shadow,opacity]"
+            animate={{
+              textShadow: [
+                "0 0 0px transparent",                                      // Normal (start)
+                `0 0 ${SHIMMER_GLOW_SIZE} ${SHIMMER_GLOW_COLOR}`,          // Shimmer peak (glow)
+                "0 0 0px transparent",                                      // Fade out
+                "0 0 0px transparent",                                      // Wait (pause)
+              ],
+              opacity: [1, 1.3, 1, 1],  // Subtle brightness pulse during shimmer
+            }}
             transition={{
-              type: "tween",
-              ease: "easeInOut",
-              duration,
+              duration: totalCycle,
               repeat: Infinity,
-              repeatType: "mirror",
-              delay: i * stagger,
+              delay: delay,
+              ease: "easeInOut",
+              times: [0, 0.15, 0.3, 1],  // Keyframe timing: fast shimmer, long pause
             }}
           >
             {seg === " " ? "\u00A0" : seg}
@@ -183,13 +188,6 @@ function splitGraphemes(str: string): string[] {
   } catch {
     return Array.from(str);
   }
-}
-
-function pseudoRandom(i: number) {
-  let t = (i + 1) * 0x6d2b79f5;
-  t = Math.imul(t ^ (t >>> 15), t | 1);
-  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
 /* -------------------- Demo helper export (important) -------------------- */

@@ -1,5 +1,5 @@
 // src/screens/RoleSelectionScreen.tsx
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Variants } from "framer-motion";
 import { bgStyle } from "../lib/ui";
@@ -7,6 +7,7 @@ import type { PushFn } from "../lib/router";
 import { validateRoleStrict, AIConnectionError } from "../lib/validation";
 import { useRoleStore } from "../store/roleStore";
 import { POLITICAL_SYSTEMS } from "../data/politicalSystems";
+import { getPredefinedPowerDistribution } from "../data/predefinedPowerDistributions";
 
 // Map display names in the roles list to our canonical political systems.
 const SYSTEM_ALIAS: Record<string, string> = {
@@ -32,18 +33,40 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const setRole = useRoleStore((s) => s.setRole);
   const setAnalysis = useRoleStore(s => s.setAnalysis);
 
-// Prime the political system in the store for pre-defined roles.
-// (Power screen will still fetch/analyze holders; this just sets systemName/Desc/Flavor.)
-const primeSystemFromRole = (systemName?: string) => {
-  const ps = findPoliticalSystemByName(systemName);
-  setAnalysis({
-    systemName: ps?.name ?? "",
-    systemDesc: ps?.description ?? "",
-    flavor: ps?.flavor ?? "",
-    holders: [],          // holders are determined on the Power screen
-    playerIndex: null,
-  });
+// Prime the complete analysis (system + holders) for pre-defined roles.
+// If predefined power distribution exists, use it; otherwise just set system info.
+const primeAnalysisFromRole = (roleLabel: string, systemName?: string) => {
+  // Check if we have a predefined power distribution for this role
+  const predefinedAnalysis = getPredefinedPowerDistribution(roleLabel);
+
+  if (predefinedAnalysis) {
+    // Use the complete predefined analysis (no AI call needed later)
+    setAnalysis(predefinedAnalysis);
+  } else {
+    // Fall back to just priming the political system (AI will analyze holders later)
+    const ps = findPoliticalSystemByName(systemName);
+    setAnalysis({
+      systemName: ps?.name ?? "",
+      systemDesc: ps?.description ?? "",
+      flavor: ps?.flavor ?? "",
+      holders: [],          // holders will be determined on the Power screen via AI
+      playerIndex: null,
+    });
+  }
 };
+
+// Clear holders when entering role selection to ensure fresh API call
+// This prevents cached holders from skipping the API analysis
+useEffect(() => {
+  const currentAnalysis = useRoleStore.getState().analysis;
+  if (currentAnalysis?.holders && currentAnalysis.holders.length > 0) {
+    setAnalysis({
+      ...currentAnalysis,
+      holders: [],
+      playerIndex: null,
+    });
+  }
+}, [setAnalysis]);
 
   // Roles with political system + flavor text
   const roles: RoleItem[] = [
@@ -304,7 +327,7 @@ const primeSystemFromRole = (systemName?: string) => {
                   <button
                     onClick={() => {
                       setRole(selectedRole.label);
-                      primeSystemFromRole(selectedRole.system);
+                      primeAnalysisFromRole(selectedRole.label, selectedRole.system);
                       push("/name");
                     }}
                     className="rounded-xl px-4 py-2 text-sm font-semibold shadow bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335]"

@@ -47,7 +47,9 @@ npm run preview      # Preview production build
 │   ├── data/
 │   │   ├── compass-data.ts      # 40-component political compass definitions
 │   │   ├── mirror-quiz-pool.ts  # Questions for compass assessment
-│   │   └── politicalSystems.ts  # Canonical political system types
+│   │   ├── politicalSystems.ts  # Canonical political system types
+│   │   ├── predefinedCharacters.ts # Predefined character names/descriptions (eliminates AI calls)
+│   │   └── predefinedPowerDistributions.ts # Predefined power distributions (eliminates AI calls)
 │   ├── hooks/
 │   │   ├── useNarrator.ts       # Text-to-speech integration
 │   │   ├── useCompassFX.ts      # Compass animation effects
@@ -159,14 +161,23 @@ This is a political simulation game with AI-powered content generation, built as
 ### Game Flow Architecture
 
 1. **Role Selection**: Player defines their political role and setting
-2. **Political Analysis**: AI analyzes role to determine power distribution among holders (Executive, Legislature, etc.)
-3. **Character Creation**: AI suggests names and generates avatar with background
+   - **Predefined roles** (4 preset options): Use static data from `predefinedPowerDistributions.ts` - no AI call
+   - **Custom roles**: Validated via `/api/validate-role`, then analyzed in next step
+2. **Political Analysis**: Determines power distribution among holders (Executive, Legislature, etc.)
+   - **Predefined roles**: Instantly load from static data - no AI call needed
+   - **Custom roles**: AI analyzes via `/api/analyze-role`
+3. **Character Creation**: Suggests names and generates avatar with background
+   - **Predefined roles**: Use static data from `predefinedCharacters.ts` - no AI call for names
+   - **Custom roles**: AI generates names via `/api/name-suggestions`
+   - Avatar generation: AI call via `/api/generate-avatar` (both predefined and custom)
 4. **Difficulty Selection** (optional, if enableModifiers setting is ON): Choose difficulty level that affects initial budget, support, and score
 5. **Compass Assessment**: Mirror dialogue and quiz to map player values across 4 dimensions
 6. **Daily Dilemmas**: AI generates political situations with 3 action choices, affecting:
    - Resources (money/budget)
    - Support from three constituencies: "people" (public), "middle" (main power holder), "mom" (personal allies)
    - Political compass values
+
+**AI Call Optimization**: Predefined roles eliminate **2 AI calls** per playthrough (role analysis + name generation), providing instant loading and consistent experience.
 
 ### Action Confirmation Pipeline
 

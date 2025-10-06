@@ -497,12 +497,12 @@ export function buildSnapshot(): DilemmaRequest {
         ? roleState.analysis.systemName.trim()
         : null;
 
-    // holders: map store's {name, percent} -> API snapshot {name, weight}
+    // holders: map store's {name, percent} -> API snapshot {name, percent}
     const holders = Array.isArray(roleState.analysis?.holders)
       ? roleState.analysis!.holders.map((h) => ({
           name: String(h?.name ?? "Group"),
-          // map percent -> weight; default to 0 when missing
-          weight: Number((h as any)?.percent ?? 0),
+          // Send as 'percent' to match server expectation; default to 0 when missing
+          percent: Number((h as any)?.percent ?? 0),
         }))
       : [];
 
@@ -553,6 +553,10 @@ export function buildSnapshot(): DilemmaRequest {
       debug: debugMode,
     };
 
+    // Debug: Log lastChoice being sent
+    if (day > 1) {
+      console.log('[buildSnapshot] Day 2+ - lastChoice being sent:', lastChoice ? { id: lastChoice.id, title: lastChoice.title } : 'NULL');
+    }
 
     return snap;
   }
