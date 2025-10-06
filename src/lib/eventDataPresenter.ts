@@ -93,11 +93,13 @@ function applyCompassDeltas(compassPills: CollectedData['compassPills']): void {
  *
  * @param collectedData - All data collected by EventDataCollector
  * @param setPresentationStep - Callback to update presentation step (controls what's visible)
+ * @param onDilemmaRevealed - Optional callback to trigger when dilemma card is shown (e.g., start narration)
  * @returns Promise that resolves when presentation is complete
  */
 export async function presentEventData(
   collectedData: CollectedData,
-  setPresentationStep: (step: number) => void
+  setPresentationStep: (step: number) => void,
+  onDilemmaRevealed?: () => void
 ): Promise<void> {
   const { day } = useDilemmaStore.getState();
   const isFirstDay = day === 1;
@@ -162,10 +164,17 @@ export async function presentEventData(
   // ========== STEP 5: DilemmaCard ==========
   setPresentationStep(5);
   console.log("[Presenter] Step 5: DilemmaCard");
-  await delay(1500); // Increased from 500ms - let user start reading dilemma
 
-  // Note: Narration integration happens in EventScreen3 via useEventNarration
-  // The presenter just provides the timing, the component handles narration readiness
+  // Small delay to let DilemmaCard render and animate in
+  await delay(300);
+
+  // Trigger narration AFTER the card is visible (EventScreen3 passes startNarrationIfReady)
+  if (onDilemmaRevealed) {
+    console.log("[Presenter] Triggering dilemma narration");
+    onDilemmaRevealed();
+  }
+
+  await delay(1200); // Let user start reading dilemma
 
   // ========== STEP 5A: Compass Pills (Day 2+ only) ==========
   // Pills overlay on top of existing content, no step advancement needed

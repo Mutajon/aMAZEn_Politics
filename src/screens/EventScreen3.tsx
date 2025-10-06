@@ -13,6 +13,7 @@ import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useEventDataCollector, type DynamicParam } from "../hooks/useEventDataCollector";
+import { useEventNarration } from "../hooks/useEventNarration";
 import { presentEventData, buildSupportItems } from "../lib/eventDataPresenter";
 import { cleanAndAdvanceDay } from "../lib/eventDataCleaner";
 import CollectorLoadingOverlay from "../components/event/CollectorLoadingOverlay";
@@ -111,6 +112,9 @@ export default function EventScreen3(_props: Props) {
     isReady
   } = useEventDataCollector();
 
+  // Narration integration - prepares TTS when dilemma loads, provides canShowDilemma flag
+  const { canShowDilemma, startNarrationIfReady } = useEventNarration();
+
   // Phase tracking
   const [phase, setPhase] = useState<'collecting' | 'presenting' | 'interacting' | 'cleaning'>('collecting');
 
@@ -156,17 +160,22 @@ export default function EventScreen3(_props: Props) {
   }, [phase, isCollecting, collectionError, day]);
 
   // ========================================================================
-  // EFFECT 2: Advance to presenting when data ready and run presenter
+  // EFFECT 2: Advance to presenting when data ready AND narration ready
   // ========================================================================
   useEffect(() => {
-    console.log(`[EventScreen3] EFFECT 2 - isReady: ${isReady}, phase: ${phase}, hasData: ${!!collectedData}`);
+    console.log(`[EventScreen3] EFFECT 2 - isReady: ${isReady}, canShowDilemma: ${canShowDilemma}, phase: ${phase}, hasData: ${!!collectedData}`);
 
-    if (isReady && phase === 'collecting' && collectedData && !isCollecting) {
-      console.log('[EventScreen3] ✅ All data ready - starting presentation sequence');
+    // Wait for BOTH data collection AND narration preparation
+    if (isReady && canShowDilemma && phase === 'collecting' && collectedData && !isCollecting) {
+      console.log('[EventScreen3] ✅ All data + narration ready - starting presentation sequence');
       setPhase('presenting');
 
-      // Run presentation sequence
-      presentEventData(collectedData, setPresentationStep)
+      // Run presentation sequence with narration callback
+      presentEventData(
+        collectedData,
+        setPresentationStep,
+        () => startNarrationIfReady(true) // Trigger narration when dilemma card is revealed
+      )
         .then(() => {
           console.log('[EventScreen3] Presentation complete - advancing to interacting phase');
           setPhase('interacting');
@@ -175,7 +184,7 @@ export default function EventScreen3(_props: Props) {
           console.error('[EventScreen3] Presentation error:', error);
         });
     }
-  }, [isReady, phase, collectedData, isCollecting]);
+  }, [isReady, canShowDilemma, phase, collectedData, isCollecting]);
 
   // ========================================================================
   // ACTION HANDLERS

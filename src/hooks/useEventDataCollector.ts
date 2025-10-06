@@ -534,6 +534,12 @@ export function useEventDataCollector() {
 
       console.log('[Collector] 💾 Storing collected data to state');
       setCollectedData(data);
+
+      // IMPORTANT: Update global dilemma store so useEventNarration can prepare TTS
+      // EventScreen3 doesn't use the global store for display, but narration hook needs it
+      console.log('[Collector] 📢 Updating global dilemmaStore.current for narration');
+      useDilemmaStore.setState({ current: dilemma });
+
       setCollectionProgress(100); // Complete!
       setIsCollecting(false);
       console.log('[Collector] 🎉 Collection complete! Ready for presentation.');

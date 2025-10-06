@@ -37,6 +37,25 @@ const TTS_VOICE = process.env.TTS_VOICE || "alloy";     // alloy|echo|fable|onyx
 const TTS_FORMAT = process.env.TTS_FORMAT || "mp3";       // mp3|opus|aac|flac
 // ---------------------------------------------------------------------------
 
+// -------------------- Shared AI Prompt Rules --------------------
+// Anti-jargon rules to ensure accessibility across all content generation
+const ANTI_JARGON_RULES = `
+LANGUAGE ACCESSIBILITY (CRITICAL)
+- Use PLAIN MODERN ENGLISH - avoid historical/technical jargon that requires specialized knowledge
+- Instead of obscure historical terms like "Haliaia", "Boule", "Archon" → use simple equivalents like "high court", "council", "chief magistrate"
+- Players should understand immediately without needing to look up terms
+- Familiar institutional names are fine: "Senate", "Parliament", "Council", "Assembly", "Congress"
+- Prioritize CLARITY over historical accuracy
+- Write for a general audience, not history experts
+- Example transformations:
+  * "Haliaia" → "high court" or "supreme judges"
+  * "Boule" → "council" or "assembly"
+  * "Archon" → "chief magistrate" or "leader"
+  * "Ecclesia" → "citizen assembly" or "popular assembly"
+  * "Strategos" → "military commander" or "general"
+`.trim();
+// ----------------------------------------------------------------
+
 // Canonical political systems (must match the client table)
 const ALLOWED_SYSTEMS = [
   "Absolute Monarchy",
@@ -843,7 +862,8 @@ app.post("/api/news-ticker", async (req, res) => {
       "Write **3 VERY short, amusing, satirical** ticker items reacting to events. " +
       "Return STRICT JSON ARRAY ONLY (length 3). " +
       'Each item: {"id":"str","kind":"news|social","tone":"up|down|neutral","text":"<=70 chars"}. ' +
-      "Be witty, punchy one-liners with NO source names, NO hashtags, NO emojis.";
+      "Be witty, punchy one-liners with NO source names, NO hashtags, NO emojis.\n\n" +
+      ANTI_JARGON_RULES;
 
     const user = [
       `MODE: ${mode}`,                                  // onboarding | reaction
@@ -1096,6 +1116,8 @@ app.post("/api/dilemma", async (req, res) => {
           "- Do NOT use the word 'dilemma'.",
           "- Keep title ≤ 60 chars; description 2–3 sentences, mature and engaging.",
           "- Natural language (no bullet points), feels like in-world events, demands, questions or follow-ups from real actors.",
+          "",
+          ANTI_JARGON_RULES, // CRITICAL: Plain language, no obscure historical terms
           "",
           "POLITICAL SYSTEM FEEL (CRITICAL)",
           `- System: ${systemName}`,
@@ -1747,6 +1769,8 @@ Generate 1-3 contextually relevant dynamic parameters that show the immediate co
 - NO explanations or descriptions
 - Pure factual outcomes with numbers
 - Specific, measurable results only
+
+${ANTI_JARGON_RULES}
 
 CRITICAL RESTRICTIONS - NEVER mention these topics:
 - Support levels (people support, middle entity support, mom support)
