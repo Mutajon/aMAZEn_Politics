@@ -4,7 +4,7 @@
  * Orchestrates action card selection, suggestion validation, and coin flight animations.
  * Handles confirm flow with card collapse animations and budget synchronization.
  *
- * Used by: EventScreen.tsx
+ * Used by: EventScreen3.tsx
  * Uses: ActionDeckContent, CoinFlightSystem, useActionDeckState, useActionSuggestion
  */
 

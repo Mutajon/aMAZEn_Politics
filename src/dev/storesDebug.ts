@@ -70,13 +70,26 @@ export function attachStoresDebug() {
   g.setSettings = (partial: Partial<{ generateImages: boolean }>) =>
     useSettingsStore.setState(prev => ({ ...prev, ...partial }));
 
+  // Day bundle API mode toggles
+  g.useBundleMode = () => {
+    useSettingsStore.getState().setUseDayBundleAPI(true);
+    console.log("%c[Bundle Mode] ENABLED ✅ - Using unified /api/day-bundle endpoint", "color:#10b981;font-weight:bold");
+  };
+
+  g.useLegacyMode = () => {
+    useSettingsStore.getState().setUseDayBundleAPI(false);
+    console.log("%c[Legacy Mode] ENABLED 🔧 - Using sequential API calls", "color:#f59e0b;font-weight:bold");
+  };
+
   g.resetAllStores = () => {
     useRoleStore.getState().reset();
     useCompassStore.getState().reset();
     // settings is persisted; if you want to clear it too:
-    // localStorage.removeItem("settings-v1");
+    // localStorage.removeItem("settings-v6");
   };
 
-  console.info("%c[stores] debug helpers attached (debugStores, setRoleStore, resetRoleStore, setCompassValue, bumpCompass, resetCompass, setSettings, resetAllStores)",
-    "color:#93c5fd");
+  console.info("%c[stores] debug helpers attached", "color:#93c5fd;font-weight:bold");
+  console.info("%c  debugStores(), setRoleStore(), resetRoleStore(), setCompassValue(), bumpCompass(), resetCompass(), setSettings(), resetAllStores()", "color:#93c5fd");
+  console.info("%c  useBundleMode() ✅ - Switch to bundle API (default)", "color:#10b981");
+  console.info("%c  useLegacyMode() 🔧 - Switch to legacy sequential calls", "color:#f59e0b");
 }

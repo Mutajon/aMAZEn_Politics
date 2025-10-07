@@ -113,6 +113,7 @@ export function useEventActions({
           choiceId: a.id,
           choiceTitle: a.title,
           choiceSummary: a.summary,
+          cost: a.cost,                // Budget impact
           supportPeople: vals.people,  // Updated values after support analysis
           supportMiddle: vals.middle,
           supportMom: vals.mom,
@@ -183,6 +184,7 @@ export function useEventActions({
           choiceId: "suggest",
           choiceTitle: "Player Suggestion",
           choiceSummary: suggestionSummary,
+          cost: suggestCost,           // Budget impact of suggestion
           supportPeople: vals.people,
           supportMiddle: vals.middle,
           supportMom: vals.mom,

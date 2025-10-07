@@ -99,49 +99,76 @@ export function useNarrator() {
       const format = opts.format || "mp3";
       const volume = typeof opts.volume === "number" ? Math.max(0, Math.min(1, opts.volume)) : 1;
 
-      log("prepare() fetch /api/tts … voice =", voice, "format =", format);
-      const r = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice, format }),
-        signal: abortRef.current.signal,
+      // Race TTS fetch against 10-second timeout
+      const TTS_TIMEOUT_MS = 10000;
+      log("prepare() fetch /api/tts … voice =", voice, "format =", format, "timeout =", TTS_TIMEOUT_MS, "ms");
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("TTS timeout")), TTS_TIMEOUT_MS);
       });
-      if (!r.ok) {
-        const t = await r.text().catch(() => "");
-        throw new Error(`Server TTS error ${r.status}: ${t}`);
+
+      const fetchPromise = (async () => {
+        const r = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, voice, format }),
+          signal: abortRef.current.signal,
+        });
+        if (!r.ok) {
+          const t = await r.text().catch(() => "");
+          throw new Error(`Server TTS error ${r.status}: ${t}`);
+        }
+
+        const buf = await r.arrayBuffer();
+        const type =
+          format === "aac" ? "audio/aac" :
+          format === "flac" ? "audio/flac" :
+          format === "opus" ? "audio/ogg" :
+          "audio/mpeg";
+        const blob = new Blob([buf], { type });
+        const url = URL.createObjectURL(blob);
+
+        objectUrlRef.current = url;
+        const audio = new Audio(url);
+        audio.preload = "auto";
+        audio.volume = volume;
+
+        // Wait for 'canplaythrough' so we know the buffer is ready
+        await new Promise<void>((resolve, reject) => {
+          const onReady = () => {
+            audio.removeEventListener("canplaythrough", onReady);
+            audio.removeEventListener("error", onErr);
+            resolve();
+          };
+          const onErr = (e: any) => {
+            audio.removeEventListener("canplaythrough", onReady);
+            audio.removeEventListener("error", onErr);
+            reject(new Error("Audio element error"));
+          };
+          audio.addEventListener("canplaythrough", onReady, { once: true });
+          audio.addEventListener("error", onErr, { once: true });
+          // Nudge the decoder on some browsers
+          audio.load();
+        });
+
+        return audio;
+      })();
+
+      let audio: HTMLAudioElement;
+      try {
+        audio = await Promise.race([fetchPromise, timeoutPromise]);
+      } catch (error: any) {
+        if (error.message === "TTS timeout") {
+          console.warn("[Narrator/OAI] ⏱️ TTS prepare timed out after 10s - proceeding with text only");
+          // Return no-op PreparedTTS to allow UI to proceed
+          return {
+            start: async () => {},
+            dispose: () => {},
+            disposed: () => true,
+          };
+        }
+        throw error; // Re-throw other errors
       }
-
-      const buf = await r.arrayBuffer();
-      const type =
-        format === "aac" ? "audio/aac" :
-        format === "flac" ? "audio/flac" :
-        format === "opus" ? "audio/ogg" :
-        "audio/mpeg";
-      const blob = new Blob([buf], { type });
-      const url = URL.createObjectURL(blob);
-
-      objectUrlRef.current = url;
-      const audio = new Audio(url);
-      audio.preload = "auto";
-      audio.volume = volume;
-
-      // Wait for 'canplaythrough' so we know the buffer is ready
-      await new Promise<void>((resolve, reject) => {
-        const onReady = () => {
-          audio.removeEventListener("canplaythrough", onReady);
-          audio.removeEventListener("error", onErr);
-          resolve();
-        };
-        const onErr = (e: any) => {
-          audio.removeEventListener("canplaythrough", onReady);
-          audio.removeEventListener("error", onErr);
-          reject(new Error("Audio element error"));
-        };
-        audio.addEventListener("canplaythrough", onReady, { once: true });
-        audio.addEventListener("error", onErr, { once: true });
-        // Nudge the decoder on some browsers
-        audio.load();
-      });
 
       let disposed = false;
 

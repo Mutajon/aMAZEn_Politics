@@ -73,7 +73,9 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   useEffect(() => {
     (async () => {
       if (done && !summary) {
+        console.log("[MirrorQuizScreen] 🎯 Fetching mirror summary...");
         const s = await generateMirrorSummary(values, { useAI: true, topN: 2 });
+        console.log("[MirrorQuizScreen] ✅ Mirror summary received:", s?.slice(0, 50));
         setSummary(s);
       }
     })();

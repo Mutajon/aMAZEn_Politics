@@ -223,11 +223,38 @@ export default function EventScreen3(_props: Props) {
 
   /**
    * Handle custom action suggestion
+   * Creates a custom action card and proceeds to cleaning phase
    */
-  const handleSuggest = (text?: string) => {
+  const handleSuggest = async (text?: string) => {
+    if (!text) {
+      console.warn('[EventScreen3] Suggest received with empty text');
+      return;
+    }
+
     console.log('[EventScreen3] Suggest your own:', text);
-    // ActionDeck handles suggestion validation internally
-    // This handler is just for EventScreen3 to be notified
+
+    // Create a custom action card (id='custom') with the suggested text
+    const customActionCard = {
+      id: 'custom',
+      title: text.slice(0, 60), // Use first part as title
+      summary: text, // Full text as summary
+      cost: -300, // Default cost for suggestions (matches UI)
+      iconHint: 'speech' as const,
+    };
+
+    console.log('[EventScreen3] Created custom action:', customActionCard);
+
+    // Advance to cleaning phase
+    setPhase('cleaning');
+    console.log('[EventScreen3] Entering cleaning phase');
+
+    // Run cleaner (handles: save choice, update budget, coin animation, advance day)
+    await cleanAndAdvanceDay(customActionCard, clearFlights);
+
+    // After cleaning complete, reset to collecting phase for next day
+    console.log('[EventScreen3] Cleaning complete - resetting to collecting phase');
+    setPhase('collecting');
+    setPresentationStep(-1);
   };
 
   // ========================================================================
@@ -298,19 +325,22 @@ export default function EventScreen3(_props: Props) {
         : <Heart className="w-4 h-4" />
     }));
 
-    // Build action cards
-    const actionsForDeck: ActionCard[] = collectedData.dilemma
+    // Check if post-game mode
+    const isPostGame = collectedData.isPostGame || false;
+
+    // Build action cards (only for normal days)
+    const actionsForDeck: ActionCard[] = !isPostGame && collectedData.dilemma
       ? actionsToDeckCards(collectedData.dilemma.actions)
       : [];
 
     return (
       <div className="min-h-screen p-6 pb-24" style={bgStyle}>
         <div className="max-w-3xl mx-auto space-y-3">
-          {/* Step 0+: ResourceBar (always visible) */}
+          {/* Step 0+: ResourceBar (always visible, shows daysLeft=0 in post-game) */}
           {presentationStep >= 0 && (
             <ResourceBar
               budget={budget}
-              daysLeft={daysLeft}
+              daysLeft={isPostGame ? 0 : daysLeft}
               showBudget={showBudget}
             />
           )}
@@ -333,12 +363,25 @@ export default function EventScreen3(_props: Props) {
             />
           )}
 
-          {/* Step 5+: DilemmaCard */}
+          {/* Step 5+: DilemmaCard OR ReactionSummary */}
           {presentationStep >= 5 && collectedData && (
-            <DilemmaCard
-              title={collectedData.dilemma.title}
-              description={collectedData.dilemma.description}
-            />
+            <>
+              {isPostGame && collectedData.reactionSummary ? (
+                // Post-game: Show reaction summary instead of dilemma
+                <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-amber-600/40 rounded-lg p-5 shadow-xl">
+                  <h2 className="text-xl font-semibold text-amber-400 mb-3">Final Outcome</h2>
+                  <p className="text-slate-200 text-base leading-relaxed">
+                    {collectedData.reactionSummary}
+                  </p>
+                </div>
+              ) : collectedData.dilemma ? (
+                // Normal day: Show dilemma
+                <DilemmaCard
+                  title={collectedData.dilemma.title}
+                  description={collectedData.dilemma.description}
+                />
+              ) : null}
+            </>
           )}
 
           {/* Step 6+: MirrorCard */}
@@ -346,20 +389,42 @@ export default function EventScreen3(_props: Props) {
             <MirrorCard text={collectedData.mirrorText} />
           )}
 
-          {/* Step 7: ActionDeck (3 AI choices + Suggest Your Own) */}
+          {/* Step 7: ActionDeck OR Summary Button */}
           {presentationStep >= 7 && phase === 'interacting' && (
-            <ActionDeck
-              actions={actionsForDeck}
-              showBudget={showBudget}
-              budget={budget}
-              onConfirm={handleConfirm}
-              onSuggest={handleSuggest}
-              triggerCoinFlight={triggerCoinFlight}
-              dilemma={{
-                title: collectedData.dilemma.title,
-                description: collectedData.dilemma.description
-              }}
-            />
+            <>
+              {isPostGame ? (
+                // Post-game: Show "View Summary" button
+                <div className="flex justify-center pt-6">
+                  <button
+                    onClick={() => {
+                      // Navigate to summary screen
+                      if (_props.push) {
+                        _props.push('/summary');
+                      }
+                    }}
+                    className="px-8 py-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-lg font-semibold rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105"
+                  >
+                    View Game Summary
+                  </button>
+                </div>
+              ) : (
+                // Normal day: Show action deck
+                collectedData.dilemma && (
+                  <ActionDeck
+                    actions={actionsForDeck}
+                    showBudget={showBudget}
+                    budget={budget}
+                    onConfirm={handleConfirm}
+                    onSuggest={handleSuggest}
+                    triggerCoinFlight={triggerCoinFlight}
+                    dilemma={{
+                      title: collectedData.dilemma.title,
+                      description: collectedData.dilemma.description
+                    }}
+                  />
+                )
+              )}
+            </>
           )}
         </div>
 

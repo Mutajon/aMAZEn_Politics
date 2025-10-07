@@ -230,10 +230,17 @@ export function buildSupportItems(
   accentClass: string;
   moodVariant: "civic" | "empathetic";
 }> {
-  const { supportPeople, supportMiddle, supportMom } = useDilemmaStore.getState();
   const { analysis } = useRoleStore.getState();
 
-  console.log(`[buildSupportItems] Step: ${presentationStep}, Values from store: people=${supportPeople}, middle=${supportMiddle}, mom=${supportMom}`);
+  // Use snapshot from collectedData (captured BEFORE deltas applied)
+  // This shows the "before" values; deltas show change; store has "after" values
+  const supportSnapshot = collectedData?.currentSupport || {
+    people: 50,
+    middle: 50,
+    mom: 50
+  };
+
+  console.log(`[buildSupportItems] Step: ${presentationStep}, Snapshot values: people=${supportSnapshot.people}, middle=${supportSnapshot.middle}, mom=${supportSnapshot.mom}`);
 
   // Get middle entity info from analysis
   const playerIndex = typeof analysis?.playerIndex === "number" ? analysis.playerIndex : 0;
@@ -265,7 +272,7 @@ export function buildSupportItems(
     {
       id: "people",
       name: "The People",
-      percent: supportPeople,
+      percent: supportSnapshot.people + (peopleEffect.delta || 0), // Target = snapshot + delta for animation
       delta: peopleEffect.delta,
       trend: peopleEffect.trend,
       note: peopleEffect.note,
@@ -276,7 +283,7 @@ export function buildSupportItems(
     {
       id: "middle",
       name: middleEntity.name,
-      percent: supportMiddle,
+      percent: supportSnapshot.middle + (middleEffect.delta || 0), // Target = snapshot + delta for animation
       delta: middleEffect.delta,
       trend: middleEffect.trend,
       note: middleEffect.note,
@@ -287,7 +294,7 @@ export function buildSupportItems(
     {
       id: "mom",
       name: "Mom",
-      percent: supportMom,
+      percent: supportSnapshot.mom + (momEffect.delta || 0), // Target = snapshot + delta for animation
       delta: momEffect.delta,
       trend: momEffect.trend,
       note: momEffect.note,

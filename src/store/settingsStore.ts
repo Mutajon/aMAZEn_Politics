@@ -36,6 +36,11 @@ type SettingsState = {
   enableModifiers: boolean;
   setEnableModifiers: (v: boolean) => void;
   toggleEnableModifiers: () => void;
+
+  // --- NEW: Day bundle API (unified endpoint) ---
+  useDayBundleAPI: boolean;
+  setUseDayBundleAPI: (v: boolean) => void;
+  toggleUseDayBundleAPI: () => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -75,10 +80,22 @@ export const useSettingsStore = create<SettingsState>()(
       enableModifiers: false,
       setEnableModifiers: (v) => set({ enableModifiers: v }),
       toggleEnableModifiers: () => set({ enableModifiers: !get().enableModifiers }),
+
+      // NEW: Day bundle API (default ON - bundle mode is now primary)
+      useDayBundleAPI: true,
+      setUseDayBundleAPI: (v) => {
+        console.log(`[settingsStore] useDayBundleAPI toggled: ${v ? 'ENABLED' : 'DISABLED'}`);
+        set({ useDayBundleAPI: v });
+      },
+      toggleUseDayBundleAPI: () => {
+        const newValue = !get().useDayBundleAPI;
+        console.log(`[settingsStore] useDayBundleAPI toggled: ${newValue ? 'ENABLED' : 'DISABLED'}`);
+        set({ useDayBundleAPI: newValue });
+      },
     }),
     {
       // Bump key so no stale objects hide the new fields
-      name: "settings-v5",
+      name: "settings-v6", // Bumped from v5 to v6 for day bundle flag
       partialize: (s) => ({
         generateImages: s.generateImages,
         narrationEnabled: s.narrationEnabled,
@@ -88,6 +105,7 @@ export const useSettingsStore = create<SettingsState>()(
         dilemmasSubjectEnabled: s.dilemmasSubjectEnabled,
         dilemmasSubject: s.dilemmasSubject,
         enableModifiers: s.enableModifiers,
+        useDayBundleAPI: s.useDayBundleAPI, // Persist day bundle flag
       }),
     }
   )

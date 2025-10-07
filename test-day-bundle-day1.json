@@ -1,0 +1,39 @@
+{
+  "role": "Prime Minister of the United Kingdom",
+  "systemName": "Parliamentary Democracy",
+  "holders": [
+    { "name": "The People", "percent": 40 },
+    { "name": "Parliament", "percent": 35 },
+    { "name": "Judiciary", "percent": 15 },
+    { "name": "Military", "percent": 10 }
+  ],
+  "playerIndex": 1,
+  "compassValues": {
+    "what0": 8,
+    "what1": 7,
+    "what2": 6,
+    "whence0": 7,
+    "whence1": 6,
+    "how0": 8,
+    "how4": 5,
+    "whither4": 7,
+    "whither6": 6
+  },
+  "settings": {
+    "dilemmasSubjectEnabled": false,
+    "dilemmasSubject": ""
+  },
+  "day": 1,
+  "totalDays": 7,
+  "supports": {
+    "people": 50,
+    "middle": 50,
+    "mom": 50,
+    "budget": 1500
+  },
+  "lastChoice": null,
+  "recentTopics": [],
+  "topicCounts": {},
+  "dilemmaHistory": [],
+  "debug": true
+}

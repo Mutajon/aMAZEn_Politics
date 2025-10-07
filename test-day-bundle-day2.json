@@ -1,0 +1,55 @@
+{
+  "role": "Prime Minister of the United Kingdom",
+  "systemName": "Parliamentary Democracy",
+  "holders": [
+    { "name": "The People", "percent": 40 },
+    { "name": "Parliament", "percent": 35 },
+    { "name": "Judiciary", "percent": 15 },
+    { "name": "Military", "percent": 10 }
+  ],
+  "playerIndex": 1,
+  "compassValues": {
+    "what0": 8,
+    "what1": 7,
+    "what2": 6,
+    "whence0": 7,
+    "whence1": 6,
+    "how0": 8,
+    "how4": 5,
+    "whither4": 7,
+    "whither6": 6
+  },
+  "settings": {
+    "dilemmasSubjectEnabled": false,
+    "dilemmasSubject": ""
+  },
+  "day": 2,
+  "totalDays": 7,
+  "supports": {
+    "people": 45,
+    "middle": 55,
+    "mom": 50,
+    "budget": 1350
+  },
+  "lastChoice": {
+    "id": "a",
+    "title": "Deploy Peacekeepers to Border",
+    "summary": "Send 2,000 peacekeeping forces to the disputed border region with strict ROE.",
+    "cost": -150
+  },
+  "recentTopics": ["Security"],
+  "topicCounts": { "Security": 1 },
+  "dilemmaHistory": [
+    {
+      "day": 1,
+      "dilemmaTitle": "Border Crisis Escalates",
+      "choiceTitle": "Deploy Peacekeepers to Border",
+      "choiceSummary": "Send 2,000 peacekeeping forces to the disputed border region with strict ROE.",
+      "supportPeople": 45,
+      "supportMiddle": 55,
+      "supportMom": 50,
+      "cost": -150
+    }
+  ],
+  "debug": true
+}

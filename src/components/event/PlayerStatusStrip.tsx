@@ -114,21 +114,16 @@ function ParamChip({
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
+      initial={{ opacity: 0, scale: 0.92 }}
       animate={{
         opacity: 1,
-        scale: [0.8, 1.15, 1.0], // Pop effect: start small, overshoot, settle
+        scale: [0.92, 1.08, 1.0], // Subtle pop: start near full, slight overshoot, settle
         transition: {
-          duration: 0.6,
-          times: [0, 0.6, 1], // Control keyframe timing
+          duration: 0.5,
+          times: [0, 0.6, 1],
           ease: [0.34, 1.56, 0.64, 1], // easeOutBack for bounce
-          delay: index * 0.15 // Increased stagger delay
+          delay: index * 0.12 // Stagger delay
         }
-      }}
-      exit={{
-        opacity: 0,
-        scale: 0.8,
-        transition: { duration: 0.3 }
       }}
       className={`${CHIP_BG} ${CHIP_PAD} inline-flex items-center gap-1.5 backdrop-blur-sm`}
     >

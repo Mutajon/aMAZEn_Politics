@@ -14,6 +14,7 @@ import { useState, useCallback } from "react";
 import { useDilemmaStore, buildSnapshot } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
+import { useSettingsStore } from "../store/settingsStore";
 import { COMPONENTS, type PropKey } from "../data/compass-data";
 import type { Dilemma, DilemmaAction } from "../lib/dilemma";
 import type { TickerItem } from "../components/event/NewsTicker";
@@ -42,8 +43,12 @@ export type DynamicParam = {
 };
 
 export type CollectedData = {
-  // Core data (always present)
-  dilemma: Dilemma;
+  // Post-game flag (Day 8)
+  isPostGame?: boolean;
+  reactionSummary?: string;  // Only present in post-game
+
+  // Core data (always present except in post-game where dilemma is missing)
+  dilemma?: Dilemma;  // Optional in post-game
   mirrorText: string;
   newsItems: TickerItem[];
 
@@ -51,6 +56,14 @@ export type CollectedData = {
   supportEffects: SupportEffect[] | null;
   compassPills: CompassPill[] | null;
   dynamicParams: DynamicParam[] | null;
+
+  // Support snapshot (captured BEFORE applying deltas)
+  // Used for display: shows "before" values, deltas show change, store has "after" values
+  currentSupport: {
+    people: number;
+    middle: number;
+    mom: number;
+  };
 
   // Status tracking
   status: {
@@ -76,6 +89,190 @@ export type CollectedData = {
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
+
+/**
+ * Fetch day bundle from unified API endpoint
+ * Returns: dilemma + news + mirror + supportEffects + dynamic + compassPills in ONE call
+ * OR post-game bundle: reactionSummary + news + mirror + supportEffects + dynamic + compassPills
+ * REQUIRED - throws error if fails (NO fallback)
+ */
+async function fetchDayBundle(): Promise<{
+  isPostGame?: boolean;
+  reactionSummary?: string;
+  dilemma?: Dilemma;
+  newsItems: TickerItem[];
+  mirrorText: string;
+  supportEffects: SupportEffect[] | null;
+  dynamicParams: DynamicParam[] | null;
+  compassPills: CompassPill[] | null;
+}> {
+  console.log('[fetchDayBundle] 🚀 Starting unified bundle fetch...');
+
+  const { day } = useDilemmaStore.getState();
+  const snapshot = buildSnapshot();
+
+  console.log(`[fetchDayBundle] Fetching bundle for Day ${day}...`);
+
+  const response = await fetch("/api/day-bundle", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(snapshot)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "Unknown error");
+    console.error(`[fetchDayBundle] ❌ API failed: ${response.status} - ${errorText}`);
+    throw new Error(`Day bundle API failed: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  console.log('[fetchDayBundle] ✅ Bundle received, validating...');
+
+  // Check if this is a post-game response
+  const isPostGame = data.type === "post-game";
+
+  if (isPostGame) {
+    console.log('[fetchDayBundle] 🏁 Post-game bundle detected');
+
+    // Post-game validation
+    if (!data.reactionSummary) {
+      console.error('[fetchDayBundle] ❌ Missing reaction summary in post-game bundle');
+      throw new Error("Invalid post-game bundle: missing reaction summary");
+    }
+
+    if (!Array.isArray(data.news)) {
+      console.error('[fetchDayBundle] ❌ Invalid news in post-game bundle');
+      throw new Error("Invalid post-game bundle: news must be an array");
+    }
+
+    if (!data.mirror || !data.mirror.summary) {
+      console.error('[fetchDayBundle] ❌ Invalid mirror in post-game bundle');
+      throw new Error("Invalid post-game bundle: missing or invalid mirror");
+    }
+
+    if (!Array.isArray(data.supportEffects) || data.supportEffects.length === 0) {
+      console.error('[fetchDayBundle] ❌ Missing support effects in post-game bundle');
+      throw new Error("Invalid post-game bundle: requires support effects");
+    }
+
+    console.log('[fetchDayBundle] ✅ Post-game validation passed');
+    console.log(`[fetchDayBundle] 📊 Post-game contents: reaction summary, ${data.news.length} news, mirror, ${data.supportEffects?.length || 0} support effects, ${data.dynamic?.length || 0} dynamic params, ${data.compassPills?.length || 0} compass pills`);
+  } else {
+    // Normal day validation
+    if (!data.dilemma || !data.dilemma.title || !data.dilemma.description) {
+      console.error('[fetchDayBundle] ❌ Invalid dilemma in bundle:', data.dilemma);
+      throw new Error("Invalid bundle: missing or invalid dilemma");
+    }
+
+    if (!Array.isArray(data.dilemma.actions) || data.dilemma.actions.length !== 3) {
+      console.error('[fetchDayBundle] ❌ Invalid actions in bundle:', data.dilemma.actions);
+      throw new Error("Invalid bundle: dilemma must have exactly 3 actions");
+    }
+
+    if (!Array.isArray(data.news)) {
+      console.error('[fetchDayBundle] ❌ Invalid news in bundle:', data.news);
+      throw new Error("Invalid bundle: news must be an array");
+    }
+
+    if (!data.mirror || !data.mirror.summary) {
+      console.error('[fetchDayBundle] ❌ Invalid mirror in bundle:', data.mirror);
+      throw new Error("Invalid bundle: missing or invalid mirror");
+    }
+
+    // Day 2+ validation
+    if (day > 1) {
+      if (!Array.isArray(data.supportEffects) || data.supportEffects.length === 0) {
+        console.error('[fetchDayBundle] ❌ Missing support effects on Day 2+');
+        throw new Error("Invalid bundle: Day 2+ requires support effects");
+      }
+
+      if (!Array.isArray(data.dynamic)) {
+        console.error('[fetchDayBundle] ❌ Missing dynamic params on Day 2+');
+        throw new Error("Invalid bundle: Day 2+ requires dynamic parameters");
+      }
+    }
+
+    console.log('[fetchDayBundle] ✅ Validation passed');
+    console.log(`[fetchDayBundle] 📊 Bundle contents: dilemma, ${data.news.length} news, mirror, ${data.supportEffects?.length || 0} support effects, ${data.dynamic?.length || 0} dynamic params, ${data.compassPills?.length || 0} compass pills`);
+  }
+
+  // Extract and format data
+  const dilemma: Dilemma | undefined = isPostGame
+    ? undefined
+    : {
+        title: data.dilemma.title,
+        description: data.dilemma.description,
+        actions: data.dilemma.actions as [DilemmaAction, DilemmaAction, DilemmaAction],
+        topic: data.dilemma.topic
+      };
+
+  const reactionSummary: string | undefined = isPostGame
+    ? String(data.reactionSummary || "")
+    : undefined;
+
+  const newsItems: TickerItem[] = data.news.map((item: any) => ({
+    id: String(item.id || `news-${Math.random()}`),
+    kind: item.kind === "social" ? "social" : "news",
+    tone: ["up", "down", "neutral"].includes(item.tone) ? item.tone : "neutral",
+    text: String(item.text || "")
+  }));
+
+  const mirrorText = String(data.mirror.summary || "");
+
+  const supportEffects: SupportEffect[] | null = (day === 1 && !isPostGame)
+    ? null
+    : (data.supportEffects || []).map((effect: any) => ({
+        id: effect.id,
+        delta: Number(effect.delta || 0),
+        explain: String(effect.explain || "")
+      }));
+
+  const dynamicParams: DynamicParam[] | null = (day === 1 && !isPostGame)
+    ? null
+    : (data.dynamic || []).map((param: any) => ({
+        id: String(param.id || ""),
+        icon: String(param.icon || "AlertTriangle"),
+        text: String(param.text || ""),
+        tone: ["up", "down", "neutral"].includes(param.tone) ? param.tone : "neutral"
+      }));
+
+  // Extract compass pills (Day 2+ or post-game, included in bundle now)
+  const compassPills: CompassPill[] | null = (day === 1 && !isPostGame)
+    ? null
+    : (data.compassPills || []).map((item: any) => {
+        const prop = item.prop;
+        const idx = Number(item.idx);
+        const polarity = String(item.polarity || "").toLowerCase();
+        const strength = String(item.strength || "").toLowerCase();
+
+        if (!["what", "whence", "how", "whither"].includes(prop)) return null;
+        if (!Number.isFinite(idx) || idx < 0 || idx > 9) return null;
+
+        let delta = 0;
+        if (polarity === "positive") {
+          delta = strength === "strong" ? 2 : 1;
+        } else if (polarity === "negative") {
+          delta = strength === "strong" ? -2 : -1;
+        }
+
+        if (delta === 0) return null;
+
+        return { prop: prop as any, idx, delta };
+      }).filter(Boolean) as CompassPill[];
+
+  console.log('[fetchDayBundle] 🎉 Bundle processing complete');
+
+  return {
+    isPostGame,
+    reactionSummary,
+    dilemma,
+    newsItems,
+    mirrorText,
+    supportEffects,
+    dynamicParams,
+    compassPills
+  };
+}
 
 /**
  * Get top K compass values with names and strengths (not indices)
@@ -375,7 +572,92 @@ export function useEventDataCollector() {
     console.log(`[Collector] Day: ${day}, Has lastChoice: ${!!lastChoice}`);
     const errors: CollectedData["errors"] = {};
 
+    // Check if bundle API mode is enabled
+    const { useDayBundleAPI } = useSettingsStore.getState();
+
     try {
+      // ========================================================================
+      // BUNDLE MODE: Single unified API call
+      // ========================================================================
+      if (useDayBundleAPI) {
+        console.log('[Collector] 🎯 BUNDLE MODE ENABLED - using unified API');
+        setCollectionProgress(10); // Starting bundle request
+
+        try {
+          // 1. Capture current support values BEFORE fetching bundle
+          // These become the "before" values shown in UI; deltas show change; store gets "after" values
+          const { supportPeople, supportMiddle, supportMom } = useDilemmaStore.getState();
+          const currentSupport = {
+            people: supportPeople,
+            middle: supportMiddle,
+            mom: supportMom
+          };
+          console.log(`[Collector] 📸 Support snapshot: people=${currentSupport.people}, middle=${currentSupport.middle}, mom=${currentSupport.mom}`);
+
+          // 2. Fetch complete bundle (dilemma + news + mirror + support + dynamic + compass)
+          console.log('[Collector] 📦 Fetching day bundle (includes compass analysis)...');
+          const bundle = await fetchDayBundle();
+          console.log('[Collector] ✅ Bundle received');
+          setCollectionProgress(85); // Bundle received (including compass)
+
+          // 3. Build collected data structure with snapshot
+          console.log('[Collector] 🏗️ Building collected data from bundle...');
+          const data: CollectedData = {
+            isPostGame: bundle.isPostGame,
+            reactionSummary: bundle.reactionSummary,
+            dilemma: bundle.dilemma,
+            mirrorText: bundle.mirrorText,
+            newsItems: bundle.newsItems,
+            supportEffects: bundle.supportEffects,
+            compassPills: bundle.compassPills, // Now included in bundle!
+            dynamicParams: bundle.dynamicParams,
+            currentSupport, // Snapshot captured before bundle call
+            status: {
+              dilemmaReady: bundle.isPostGame ? false : !!bundle.dilemma, // No dilemma in post-game
+              mirrorReady: true,
+              newsReady: bundle.newsItems.length > 0,
+              supportReady: (day > 1 || bundle.isPostGame) ? bundle.supportEffects !== null : true,
+              compassReady: (day > 1 || bundle.isPostGame) ? bundle.compassPills !== null : true,
+              dynamicReady: (day > 1 || bundle.isPostGame) ? bundle.dynamicParams !== null : true
+            },
+            errors
+          };
+
+          console.log('[Collector] 💾 Storing collected data to state');
+          setCollectedData(data);
+
+          // Update global dilemma store for narration
+          console.log('[Collector] 📢 Updating global dilemmaStore.current for narration');
+          useDilemmaStore.setState({ current: bundle.dilemma });
+
+          setCollectionProgress(100); // Complete!
+          setIsCollecting(false);
+          console.log('[Collector] 🎉 BUNDLE MODE collection complete! Ready for presentation.');
+          return;
+
+        } catch (error: any) {
+          console.error('[Collector] ❌ BUNDLE MODE failed:', error);
+          setCollectionError(`Failed to load game data: ${error.message || 'Unknown error'}. Please try again.`);
+          setIsCollecting(false);
+          setCollectionProgress(0);
+          return;
+        }
+      }
+
+      // ========================================================================
+      // LEGACY MODE: Multiple sequential/parallel API calls
+      // ========================================================================
+      console.log('[Collector] 🔧 LEGACY MODE - using sequential API calls');
+
+      // Capture current support values BEFORE any API calls
+      const { supportPeople, supportMiddle, supportMom } = useDilemmaStore.getState();
+      const currentSupport = {
+        people: supportPeople,
+        middle: supportMiddle,
+        mom: supportMom
+      };
+      console.log(`[Collector] 📸 Support snapshot: people=${currentSupport.people}, middle=${currentSupport.middle}, mom=${currentSupport.mom}`);
+
       // ========================================================================
       // PHASE 1: Independent Parallel Requests
       // ========================================================================
@@ -521,6 +803,7 @@ export function useEventDataCollector() {
         supportEffects,
         compassPills,
         dynamicParams,
+        currentSupport, // Snapshot captured at start of collection
         status: {
           dilemmaReady: true,
           mirrorReady: !!mirrorText,

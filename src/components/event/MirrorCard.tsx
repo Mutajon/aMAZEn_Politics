@@ -30,7 +30,7 @@ const IMG_OFFSET_Y    = 0;    // Will be calculated dynamically for vertical cen
 
 // Keep text away from the image
 const TEXT_INSET_LEFT_PX  = 20; // nudge if the image intrudes from the left
-const TEXT_INSET_RIGHT_PX = 0;
+const TEXT_INSET_RIGHT_PX = 12; // prevent text cutoff on right edge
 
 // Typewriter reveal effect (initial text reveal)
 const TYPEWRITER_ENABLED    = true;
@@ -118,9 +118,9 @@ export default function MirrorCard({ text, italic = true, className }: MirrorCar
           style={{
             paddingLeft: TEXT_INSET_LEFT_PX,
             paddingRight: TEXT_INSET_RIGHT_PX,
-            wordBreak: "keep-all",
+            wordBreak: "break-word",
             overflowWrap: "break-word",
-            hyphens: "none",
+            hyphens: "auto",
           }}
         >
           {SHIMMER_ENABLED || TYPEWRITER_ENABLED ? (

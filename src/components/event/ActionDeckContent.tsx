@@ -132,6 +132,21 @@ export default function ActionDeckContent({
                 layoutId={`card-${c.id}`}
                 ref={attachCardRef(c.id)}
                 animate={othersDown && c.id !== confirmingId ? othersCtrl : undefined}
+                whileHover={!disabled ? {
+                  scale: 1.03,
+                  y: -3,
+                  rotate: [0, -1.5, 1.5, 0],
+                  transition: {
+                    type: "spring",
+                    stiffness: 400,
+                    damping: 10,
+                    rotate: {
+                      duration: 0.3,
+                      repeat: 0,
+                      ease: "easeInOut"
+                    }
+                  }
+                } : undefined}
                 transition={springJuice}
                 className={[
                   CARD_BASE,

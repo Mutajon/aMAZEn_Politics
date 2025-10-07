@@ -1,7 +1,7 @@
 // src/hooks/useEventState.ts
 // Manages event screen state including support values and budget.
 // Pulls persistent data from dilemmaStore and manages UI-specific state locally.
-// Used by EventScreen and EventScreen2 for gameplay state management.
+// NOTE: This hook is legacy - EventScreen3 uses EventDataCollector pattern instead.
 
 import React, { useState, useRef } from "react";
 import { useRoleStore, type PowerHolder } from "../store/roleStore";

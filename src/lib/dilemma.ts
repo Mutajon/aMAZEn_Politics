@@ -22,6 +22,7 @@ export type DilemmaHistoryEntry = {
   choiceId: string;            // "a", "b", or "c"
   choiceTitle: string;         // Full action title
   choiceSummary: string;       // Full action summary
+  cost: number;                // Budget impact of this choice
   supportPeople: number;       // Support values AFTER this choice (0-100)
   supportMiddle: number;
   supportMom: number;

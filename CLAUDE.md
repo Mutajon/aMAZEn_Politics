@@ -54,10 +54,11 @@ npm run preview      # Preview production build
 │   │   ├── useNarrator.ts       # Text-to-speech integration
 │   │   ├── useCompassFX.ts      # Compass animation effects
 │   │   ├── useRotatingText.ts   # Loading text animations
-│   │   ├── useEventState.ts     # EventScreen state management (support, budget, etc.)
-│   │   ├── useEventEffects.ts   # EventScreen side effects (news, mirror, auto-loading)
-│   │   ├── useEventNarration.ts # EventScreen TTS/narration logic
-│   │   ├── useEventActions.ts   # EventScreen action handlers (confirm, suggest)
+│   │   ├── useEventState.ts     # LEGACY: EventScreen state management (support, budget, etc.)
+│   │   ├── useEventEffects.ts   # LEGACY: EventScreen side effects (news, mirror, auto-loading)
+│   │   ├── useEventNarration.ts # EventScreen3 TTS/narration logic
+│   │   ├── useEventActions.ts   # EventScreen3 action handlers (confirm, suggest)
+│   │   ├── useEventDataCollector.ts # EventScreen3 data collection (bundle + legacy modes)
 │   │   ├── usePowerDistributionState.ts # PowerDistributionScreen state management
 │   │   ├── usePowerDistributionAnalysis.ts # AI analysis and political system classification
 │   │   ├── useActionDeckState.ts # ActionDeck state management and animations
@@ -66,12 +67,14 @@ npm run preview      # Preview production build
 │   │   ├── router.ts            # Hash-based routing system
 │   │   ├── dilemma.ts           # Dilemma type definitions
 │   │   ├── compassMapping.ts    # Text → compass value analysis
-│   │   ├── supportAnalysis.ts   # Support change calculations
-│   │   ├── eventConfirm.ts      # Action confirmation pipeline
+│   │   ├── supportAnalysis.ts   # LEGACY: Support change calculations
+│   │   ├── eventConfirm.ts      # LEGACY: Action confirmation pipeline
+│   │   ├── eventDataPresenter.ts # EventScreen3 progressive data revelation
+│   │   ├── eventDataCleaner.ts  # EventScreen3 post-action cleanup
 │   │   ├── mirrorDilemma.ts     # Mirror dialogue generation
 │   │   └── narration.ts         # TTS text processing
 │   ├── screens/
-│   │   ├── EventScreen.tsx      # Main gameplay screen
+│   │   ├── EventScreen3.tsx     # Main gameplay screen (Collector → Presenter → Cleaner)
 │   │   ├── RoleSelectionScreen.tsx
 │   │   ├── CompassIntroStart.tsx
 │   │   ├── MirrorDialogueScreen.tsx
@@ -79,7 +82,8 @@ npm run preview      # Preview production build
 │   │   ├── NameScreen.tsx       # Character creation
 │   │   ├── PowerDistributionScreen.tsx # Power holder analysis and editing (optimized, 67 lines)
 │   │   ├── DifficultyScreen.tsx # Difficulty level selection (conditional on enableModifiers)
-│   │   └── HighscoreScreen.tsx
+│   │   ├── HighscoreScreen.tsx # Hall of Fame leaderboard
+│   │   └── GameSummaryScreen.tsx # Post-game decision history summary
 │   ├── store/
 │   │   ├── roleStore.ts         # Role, analysis, character data
 │   │   ├── compassStore.ts      # 4D political compass values
@@ -109,7 +113,8 @@ This is a political simulation game with AI-powered content generation, built as
 - `/compass-quiz` → Compass questionnaire
 - `/name` → Character creation with AI avatar generation
 - `/event` → Daily dilemma gameplay screen
-- `/highscores` → Game results
+- `/highscores` → Hall of Fame leaderboard
+- `/summary` → Post-game decision history (all 7 choices)
 
 **State Management**: Zustand stores in `src/store/`:
 - `roleStore` - Selected role, political analysis, character data
@@ -119,35 +124,40 @@ This is a political simulation game with AI-powered content generation, built as
 - `mirrorQuizStore` - Compass assessment progress
 
 **Key UI Components**:
-- `src/screens/EventScreen.tsx` - Main gameplay orchestrator (optimized, 107 lines)
+- `src/screens/EventScreen3.tsx` - Main gameplay screen (Collector → Presenter → Cleaner architecture)
 - `src/screens/PowerDistributionScreen.tsx` - Power holder analysis orchestrator (optimized, 67 lines)
-- `src/components/event/EventContent.tsx` - Event UI rendering logic (extracted from EventScreen)
+- `src/components/event/EventContent.tsx` - Event UI rendering logic (extracted from EventScreen3)
 - `src/components/PowerDistributionContent.tsx` - Power distribution UI rendering (extracted from PowerDistributionScreen)
 - `src/components/event/` - Specialized event UI (ActionDeck, ResourceBar, SupportList, NewsTicker)
 - `src/components/MiniCompass.tsx` - Political compass visualization
 - Political compass system with 40 total components across 4 dimensions
 
 **Custom Hooks for Complex Logic**:
-- `useEventState` - Event screen state management (support values, budget, middle entity)
-- `useEventEffects` - Side effects (news fetching, mirror dialogue, auto-loading)
+- `useEventDataCollector` - EventScreen3 data collection (supports bundle + legacy API modes)
 - `useEventNarration` - TTS preparation and playback logic
 - `useEventActions` - Action confirmation pipeline and news updates
 - `usePowerDistributionState` - Power distribution state management (holders, political system, UI state)
 - `usePowerDistributionAnalysis` - AI role analysis, system classification, and data processing
 - `useActionDeckState` - Action deck state management (selection, confirmation flow, animations)
 - `useActionSuggestion` - Suggestion validation and AI processing logic
+- ~~`useEventState`~~ (LEGACY) - Old state management pattern
+- ~~`useEventEffects`~~ (LEGACY) - Old side effects pattern
 
 ### Backend Architecture (Express + OpenAI)
 
 **AI-Powered Endpoints** (`server/index.mjs`):
+- `/api/day-bundle` - **[NEW PRIMARY]** Unified endpoint returning:
+  - **Days 1-7**: dilemma + news + mirror + support + dynamic + compass (1 call)
+  - **Day 8** (post-game): reactionSummary + news + mirror + support + dynamic + compass (no dilemma)
 - `/api/validate-role` - Validates user role input
 - `/api/analyze-role` - Generates political system analysis
 - `/api/generate-avatar` - Creates character avatars
-- `/api/dilemma` - Generates daily political dilemmas (enhanced with NewDilemmaLogic.md rules)
-- `/api/support-analyze` - Analyzes political support changes
-- `/api/compass-analyze` - Maps text to political compass values (OPTIMIZED: 81% token reduction)
-- `/api/news-ticker` - Generates satirical news reactions
-- `/api/mirror-summary` - Creates personality summaries
+- `/api/compass-analyze` - Maps text to political compass values (OPTIMIZED: 81% token reduction) - Integrated into bundle
+- `/api/dilemma` - [LEGACY] Generates daily political dilemmas (enhanced with NewDilemmaLogic.md rules)
+- `/api/support-analyze` - [LEGACY] Analyzes political support changes
+- `/api/news-ticker` - [LEGACY] Generates satirical news reactions
+- `/api/mirror-summary` - [LEGACY] Creates personality summaries
+- `/api/dynamic-parameters` - [LEGACY] Generates player status parameters
 - `/api/tts` - Text-to-speech generation
 
 **AI Model Configuration**: Uses environment variables for different specialized models:
@@ -157,6 +167,68 @@ This is a political simulation game with AI-powered content generation, built as
 - `MODEL_MIRROR` - Mirror dialogue
 - `IMAGE_MODEL` - Avatar generation
 - `TTS_MODEL` - Text-to-speech
+
+### Day Bundle API (Unified Endpoint)
+
+**Overview**: The `/api/day-bundle` endpoint consolidates 5-6 separate API calls into a single unified request, improving performance and AI context quality.
+
+**Default Mode**: Bundle API is **ON by default** (as of implementation). Legacy sequential mode available as fallback.
+
+**What it Returns** (single JSON response):
+
+**Days 1-7** (Normal gameplay):
+```json
+{
+  "dilemma": { "title": "...", "description": "...", "actions": [...], "topic": "..." },
+  "news": [ {"id": "...", "kind": "news|social", "tone": "up|down|neutral", "text": "..."} ],
+  "mirror": { "summary": "..." },
+  "supportEffects": [ {"id": "people|middle|mom", "delta": 0, "explain": "..."} ],  // Day 2+ only
+  "dynamic": [ {"id": "...", "icon": "...", "text": "...", "tone": "..."} ],  // Day 2+ only, 1-5 params
+  "compassPills": [ {"prop": "what|whence|how|whither", "idx": 0-9, "polarity": "positive|negative", "strength": "mild|strong"} ]  // Day 2+ only
+}
+```
+
+**Day 8** (Post-game):
+```json
+{
+  "type": "post-game",
+  "reactionSummary": "2-3 sentences describing immediate consequences of final choice",
+  "news": [ {"id": "...", "kind": "news|social", "tone": "up|down|neutral", "text": "..."} ],
+  "mirror": { "summary": "Reflection on player's value consistency across all 7 days" },
+  "supportEffects": [ {"id": "people|middle|mom", "delta": 0, "explain": "..."} ],
+  "dynamic": [ {"id": "...", "icon": "...", "text": "...", "tone": "..."} ],
+  "compassPills": [ {"prop": "...", "idx": 0-9, "polarity": "...", "strength": "..."} ]
+}
+```
+Note: Day 8 has NO dilemma field - game is over, showing only reactions and summary button.
+
+**Full Game History Context**: The bundle API receives complete game history from Day 1 to current day, including:
+- All previous decisions (title, summary, cost)
+- Support values after each choice
+- Automatic governing pattern analysis (care, liberty, security themes)
+- Support trends across entire game
+- Topic diversity tracking
+
+**Benefits**:
+- **Performance**: ~60-70% faster (1 API call vs 5-6)
+- **Better Coherence**: Dilemma, news, mirror, and support generated together with shared context
+- **Token Efficiency**: ~50% reduction in total tokens per day
+- **True Memory**: AI sees entire game narrative, not just last action
+- **Narrative Quality**: Better continuity and callbacks to earlier decisions
+
+**API Call Pattern**:
+- **Bundle Mode (Default)**: 1 call per day → `/api/day-bundle` (includes compass analysis)
+- **Legacy Mode**: 5-6 calls per day → `/api/dilemma`, `/api/news-ticker`, `/api/mirror-summary`, `/api/support-analyze`, `/api/dynamic-parameters`, `/api/compass-analyze`
+
+**Toggling Modes** (in browser console):
+```javascript
+useBundleMode()   // ✅ Enable bundle API (default)
+useLegacyMode()   // 🔧 Switch to legacy sequential calls
+```
+
+**Console Log Markers**:
+- Bundle mode: `[Collector] 🎯 BUNDLE MODE ENABLED`
+- Legacy mode: `[Collector] 🔧 LEGACY MODE`
 
 ### Game Flow Architecture
 
@@ -172,58 +244,77 @@ This is a political simulation game with AI-powered content generation, built as
    - Avatar generation: AI call via `/api/generate-avatar` (both predefined and custom)
 4. **Difficulty Selection** (optional, if enableModifiers setting is ON): Choose difficulty level that affects initial budget, support, and score
 5. **Compass Assessment**: Mirror dialogue and quiz to map player values across 4 dimensions
-6. **Daily Dilemmas**: AI generates political situations with 3 action choices, affecting:
+6. **Daily Dilemmas** (Days 1-7): AI generates political situations with 3 action choices, affecting:
    - Resources (money/budget)
    - Support from three constituencies: "people" (public), "middle" (main power holder), "mom" (personal allies)
    - Political compass values
+7. **Post-Game Reaction** (Day 8): After final choice on Day 7, shows:
+   - Reaction summary describing immediate consequences of final choice
+   - Final support changes and compass effects
+   - News ticker with satirical reactions to the end of term
+   - Mirror summary analyzing player's value consistency across all 7 days
+   - "View Game Summary" button (no new dilemma)
+8. **Game Summary Screen**: Lists all 7 choices made during the game:
+   - Character info and final stats (budget, support levels)
+   - Full decision history with dilemma context
+   - Navigation to Hall of Fame or new game
 
 **AI Call Optimization**: Predefined roles eliminate **2 AI calls** per playthrough (role analysis + name generation), providing instant loading and consistent experience.
 
-### Action Confirmation Pipeline
+### EventScreen3 Architecture: Collector → Presenter → Cleaner
 
-When a player confirms a choice in the EventScreen, the following sequence occurs:
+EventScreen3 uses a clean three-phase architecture for gameplay flow:
 
-#### 1. Immediate UI Changes
-- **Card Animation**: Chosen card collapses while others animate downward and fade out
-- **Coin Flight**: Animated coins fly between action card and budget counter based on cost direction
-- **Budget Update**: Budget counter updates immediately and synchronously via `setBudget()`
+#### Phase 1: COLLECTING (useEventDataCollector)
+Gathers all data needed for a dilemma screen with loading overlay.
 
-#### 2. Parallel AI Analysis (via `runConfirmPipeline`)
-The system runs two AI analyses simultaneously using `Promise.allSettled()`:
+**Bundle Mode (Default)**:
+1. Fetch `/api/day-bundle` → Returns dilemma + news + mirror + support + dynamic (1 call)
+2. Fetch `/api/compass-analyze` separately → Compass pills (Day 2+ only)
+3. Build `CollectedData` structure → Ready for presentation
 
-**A. Compass Analysis** (`/api/compass-analyze`):
-- Combines action text: `"${title}. ${summary}"`
-- AI analyzes against 40 compass components across 4 dimensions:
-  - **What** (goals): Truth, Liberty, Equality, Care, etc. (10 components)
-  - **Whence** (justification): Evidence, Tradition, Personal intuition, etc. (10 components)
-  - **How** (means): Law, Markets, Mobilization, Mutual Aid, etc. (10 components)
-  - **Whither** (recipients): Individual, Community, Nation, Global, etc. (10 components)
-- Results appear as animated "compass pills" showing political value shifts
-- Updates player's position in `compassStore`
+**Legacy Mode** (if enabled via `useLegacyMode()`):
+1. Phase 1 (Parallel): dilemma, news, compass, dynamic params
+2. Phase 2 (Sequential): mirror dialogue (needs dilemma context)
+3. Build `CollectedData` structure → Ready for presentation
 
-**B. Support Analysis** (`/api/support-analyze`):
-- Analyzes impact on three constituencies using political context:
-  - **"people"** - General public support
-  - **"middle"** - Main power holder (from power distribution analysis)
-  - **"mom"** - Personal allies/inner circle
-- Uses context: political system, power holders, current game day
-- Returns support deltas with explanations
-- Updates support tracking with animated changes
+#### Phase 2: PRESENTING (eventDataPresenter)
+Sequentially reveals collected data with proper timing and animations.
 
-#### 3. State Management
-- **Immediate**: Budget updates synchronously for responsive UI
-- **Parallel**: Compass and support analyses run independently
-- **Resilient**: Failed analyses don't block successful ones
-- **Responsive**: UI remains interactive during background processing
+**Presentation Steps**:
+1. **Step 0**: ResourceBar appears (budget display)
+2. **Step 1**: SupportList appears (initial values)
+3. **Step 2**: Support changes animate (Day 2+ only) - deltas, trends, explanations
+4. **Step 3**: NewsTicker appears with reactions
+5. **Step 4**: PlayerStatusStrip appears (dynamic parameters)
+6. **Step 5**: DilemmaCard appears + narration starts
+7. **Step 5A**: Compass pills overlay (Day 2+ only)
+8. **Step 6**: MirrorCard appears
+9. **Step 7**: ActionDeck appears - player can now interact
 
-#### 4. Visual Feedback System
-- Compass pills animate in showing political shifts
-- Support bars animate to new levels with delta indicators
-- Coin flight effects provide immediate cost feedback
-- Loading states show analysis progress independently
-- News ticker updates with satirical reactions
+#### Phase 3: INTERACTING
+Player chooses an action or suggests custom action.
 
-This architecture ensures **immediate visual feedback** while **rich AI analysis happens in the background**, maintaining game responsiveness while providing deep political simulation.
+- **Card Animation**: Chosen card collapses, others fade out
+- **Coin Flight**: Animated coins fly to/from budget counter
+- **Budget Update**: Immediate synchronous update
+- **History Entry**: Records decision in `dilemmaHistory` for next day's context
+
+#### Phase 4: CLEANING (eventDataCleaner)
+Post-action cleanup and day advancement.
+
+1. Save player's choice to store
+2. Update budget immediately
+3. Wait for coin animation (1200ms)
+4. Clear coin flights
+5. Advance to next day → Returns to COLLECTING phase
+
+**Key Benefits of This Architecture**:
+- ✅ **Separation of Concerns**: Collecting, presenting, and cleaning are isolated
+- ✅ **Progressive Revelation**: Data loads in background, reveals sequentially
+- ✅ **Resilient**: Failed optional data doesn't block required data
+- ✅ **Bundle-Ready**: Designed to work with both unified and sequential APIs
+- ✅ **Maintainable**: Each phase is a focused, testable module
 
 ### Political Compass System
 
@@ -320,7 +411,36 @@ This architecture enables better React performance optimizations (memoization, s
 
 - Preserve existing design and functionality when making changes
 - If additional changes are recommended, ask for confirmation first
-- The EventScreen, PowerDistributionScreen, and ActionDeck optimizations serve as models for refactoring other large components
+- The EventScreen3, PowerDistributionScreen, and ActionDeck optimizations serve as models for refactoring other large components
 - Use the extracted hook patterns for similar complex components (RoleSelectionScreen, etc.)
-- when you write new code, make sure to make it well annotated. each file should also start with a short description of what it does and how does it connect to other files in the project (which other files use it and how)
-- whenever you change things, go over the claude.md file and check if it needs to be updated. if so, update it
+- When you write new code, make sure to make it well annotated. Each file should also start with a short description of what it does and how it connects to other files in the project
+- Whenever you change things, go over the claude.md file and check if it needs to be updated. If so, update it
+
+### Day Bundle API - Developer Reference
+
+**Current Status**: ✅ **LIVE and DEFAULT** (as of implementation)
+
+**Quick Toggle Commands** (browser console):
+```javascript
+useBundleMode()   // ✅ Default - unified API
+useLegacyMode()   // 🔧 Fallback - sequential calls
+```
+
+**Implementation Files**:
+- Server: `/server/index.mjs` - Line ~1857 (`/api/day-bundle` endpoint)
+- Client: `/src/hooks/useEventDataCollector.ts` - Lines 80-194 (`fetchDayBundle()` function)
+- Settings: `/src/store/settingsStore.ts` - `useDayBundleAPI` flag (default: `true`)
+- Debug: `/src/dev/storesDebug.ts` - `useBundleMode()` and `useLegacyMode()` helpers
+
+**Testing**:
+- Test files available: `test-day-bundle-day1.json` and `test-day-bundle-day2.json` (root directory)
+- Test command: `curl -X POST http://localhost:8787/api/day-bundle -H "Content-Type: application/json" -d @test-day-bundle-day1.json`
+
+**Documentation**:
+- Full implementation plan: `.claude/singledayapibundle.md`
+- All features tested and validated ✅
+
+**Legacy Components** (kept for reference, not actively used):
+- `useEventState.ts`, `useEventEffects.ts` - Old state management
+- `eventConfirm.ts` - Old confirmation pipeline
+- `/api/dilemma`, `/api/support-analyze`, `/api/news-ticker`, `/api/mirror-summary`, `/api/dynamic-parameters` - Separate endpoints

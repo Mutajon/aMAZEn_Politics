@@ -55,7 +55,7 @@ export default function HighscoreScreen({ push }: { push: PushFn }) {
       <div className="w-full max-w-5xl mx-auto">
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-2xl font-extrabold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
-            Highscore — Leaders
+            Top Hall of Famers
           </h1>
           <button
             onClick={() => push("/")}

@@ -534,11 +534,13 @@ app.post("/api/generate-avatar", async (req, res) => {
 
 // -------------------- Mirror summary (uses AI) ---------------
 app.post("/api/mirror-summary", async (req, res) => {
+  console.log("[/api/mirror-summary] 📨 Request received");
   try {
     const topWhat    = Array.isArray(req.body?.topWhat)    ? req.body.topWhat    : [];
     const topWhence  = Array.isArray(req.body?.topWhence)  ? req.body.topWhence  : [];
     const topOverall = Array.isArray(req.body?.topOverall) ? req.body.topOverall : [];
     const dilemma    = req.body?.dilemma || null;
+    console.log("[/api/mirror-summary] 🔍 Parsed inputs - topWhat:", topWhat.length, "topWhence:", topWhence.length, "topOverall:", topOverall.length);
 
     // NEW: Game context for holistic reflection
     const dilemmaHistory = Array.isArray(req.body?.dilemmaHistory) ? req.body.dilemmaHistory : [];
@@ -731,9 +733,10 @@ app.post("/api/mirror-summary", async (req, res) => {
     }
 
     const summary = text.trim();
+    console.log("[/api/mirror-summary] ✅ Sending response:", summary.slice(0, 50), "...");
     res.json({ summary, isFallback });
   } catch (e) {
-    console.error("Error in /api/mirror-summary:", e?.message || e);
+    console.error("[/api/mirror-summary] ❌ Error:", e?.message || e);
     res.status(500).json({
       summary: "The mirror is foggy—try again in a moment.",
       isFallback: true,
@@ -1853,6 +1856,682 @@ Based on this political decision, generate 1-3 specific dynamic parameters that 
   }
 });
 
+
+// -------------------- DAY BUNDLE (unified endpoint) ---------------------------
+// Single endpoint that returns: dilemma + news + mirror + supportEffects + dynamic
+// Reduces 5-6 API calls to 1, improves context with full game history
+app.post("/api/day-bundle", async (req, res) => {
+  try {
+    console.log("[day-bundle] 🚀 Starting bundle generation...");
+
+    if (!OPENAI_KEY) {
+      console.error("[day-bundle] ❌ Missing OPENAI_API_KEY");
+      return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
+    }
+
+    // Extract request data
+    const {
+      role,
+      systemName,
+      holders = [],
+      playerIndex,
+      compassValues = {},
+      settings = {},
+      day = 1,
+      totalDays = 7,
+      supports = {},
+      lastChoice = null,
+      recentTopics = [],
+      topicCounts = {},
+      dilemmaHistory = [],
+      debug = false
+    } = req.body || {};
+
+    console.log(`[day-bundle] Day ${day}/${totalDays}, Role: ${String(role).slice(0, 50)}, System: ${systemName}`);
+    console.log(`[day-bundle] Has lastChoice: ${!!lastChoice}, History entries: ${dilemmaHistory.length}`);
+
+    const isFirstDay = day === 1;
+    const isLastDay = day === totalDays;
+    const isPostGame = day > totalDays; // Day 8 = post-game reaction screen
+
+    // ========================================================================
+    // POST-GAME SPECIAL HANDLING (Day 8 - after final choice)
+    // ========================================================================
+    if (isPostGame) {
+      console.log("[day-bundle] 🏁 Post-game mode - generating reaction summary");
+
+      if (!lastChoice) {
+        console.error("[day-bundle] ❌ Post-game requires lastChoice");
+        return res.status(400).json({ error: "Post-game requires last choice data" });
+      }
+
+      // Derive middle entity name for support effects
+      const withIdx = holders.map((h, i) => ({ ...h, i }));
+      const candidates = playerIndex == null ? withIdx : withIdx.filter((h) => h.i !== playerIndex);
+      const topHolder = candidates.length > 0
+        ? candidates.reduce((a, b) => (b.percent > a.percent ? b : a), candidates[0])
+        : null;
+      const middleName = String(topHolder?.name || "the establishment");
+
+      // Build system prompt for post-game content
+      const postGameSystem = [
+        "You generate POST-GAME content for a political simulation. The player's 7-day term is OVER.",
+        "",
+        "OUTPUT STRUCTURE: Return STRICT JSON with exactly these sections:",
+        "{",
+        '  "reactionSummary": "...",',
+        '  "news": [ {"id": "", "kind": "news|social", "tone": "up|down|neutral", "text": ""} ],',
+        '  "mirror": { "summary": "" },',
+        '  "supportEffects": [ {"id": "people|middle|mom", "delta": 0, "explain": ""} ],',
+        '  "dynamic": [ {"id": "", "icon": "", "text": "", "tone": "up|down|neutral"} ]',
+        "}",
+        "",
+        ANTI_JARGON_RULES,
+        "",
+        "=== REACTION SUMMARY ===",
+        "- 2-3 dramatic sentences describing IMMEDIATE consequences of final choice",
+        "- Make it cinematic and conclusive - this is the END",
+        "- Show specific, tangible outcomes (not vague 'time will tell')",
+        "- Examples: 'The legislation passes amid fierce protests.', 'Troops mobilize at dawn.'",
+        "",
+        "=== NEWS SECTION ===",
+        "- Exactly 3 items reacting to the FINAL CHOICE",
+        "- Each: Max 70 characters total",
+        "- Witty, satirical, punchy one-liners about the end of the term",
+        "- NO source names, NO hashtags, NO emojis",
+        "- Mix of 'news' and 'social' kinds",
+        "- Tone: up (positive/green), down (negative/red), neutral (blue)",
+        "",
+        "=== MIRROR SECTION ===",
+        "- Maximum 30 words (STRICT)",
+        "- Analyze player's VALUE CONSISTENCY across all 7 decisions",
+        "- Did they stay true to their compass values? Or waver? Or contradict?",
+        "- Tone: Reflective, insightful, with dark humor",
+        "- Focus on PATTERNS: 'You championed liberty... until it cost you support', 'Your pragmatism never wavered', etc.",
+        "- NEVER mention support percentages",
+        "",
+        "=== SUPPORT EFFECTS SECTION ===",
+        "- Exactly 3 items (people, middle, mom) - ALWAYS include all 3",
+        "- Format: {id: 'people|middle|mom', delta: number, explain: 'short sentence'}",
+        "- Delta magnitudes: ±5 (low), ±10 (medium), ±15 (large), ±20 (extreme)",
+        "- Explain style:",
+        "  * people: Third-person crowd/public reaction - NEVER use 'The People' as speaker",
+        `  * middle: Speak AS ${middleName} - must say '${middleName}' or 'We' explicitly`,
+        "  * mom: MATERNAL voice speaking directly to her child using 'you'",
+        "- Keep vivid and specific; 8-18 words",
+        "",
+        "=== DYNAMIC PARAMETERS SECTION ===",
+        "- Generate 1-5 final outcome parameters showing consequences of LAST CHOICE",
+        "- ULTRA-SHORT: Maximum 4-5 words each",
+        "- NO explanations - pure factual outcomes with numbers",
+        "- Specific, measurable results only",
+        "- Examples: '40 militia fighters neutralized', '3,000 protesters arrested', '12 countries condemn'",
+        "- Icons: Users, TrendingUp, TrendingDown, Shield, AlertTriangle, Heart, Building, Globe, Leaf, Zap, Target, Scale, Flag, Crown, Activity",
+        "- Tone: up (good for player), down (bad for player), neutral (informational)"
+      ].filter(Boolean).join("\n");
+
+      // Build user prompt with full game context
+      const postGameUser = [
+        `ROLE: ${role || "Unknown"}`,
+        `POLITICAL SYSTEM: ${systemName || "Unknown"}`,
+        `FINAL DAY: Day ${totalDays} (term complete)`,
+        "",
+        "POWER HOLDERS:",
+        ...holders.map(h => `- ${h.name}: ${h.percent}% power${h.i === playerIndex ? " (PLAYER)" : ""}`),
+        "",
+        "FINAL STATE:",
+        `- Budget: $${supports.budget || 0}`,
+        `- Support: People ${supports.people || 50}%, ${middleName} ${supports.middle || 50}%, Mom ${supports.mom || 50}%`,
+        "",
+        "TOP COMPASS VALUES:",
+        ...Object.entries(compassValues)
+          .sort((a, b) => Number(b[1]) - Number(a[1]))
+          .slice(0, 5)
+          .map(([k, v]) => `- ${k}: ${v}/10`),
+        "",
+        `FULL GAME HISTORY (${dilemmaHistory.length} decisions):`,
+        ...dilemmaHistory.map(entry =>
+          `Day ${entry.day}: "${entry.dilemmaTitle}" → Chose "${entry.choiceTitle}"`
+        ),
+        "",
+        "FINAL CHOICE (Day 7):",
+        `- Title: "${lastChoice.title}"`,
+        `- Summary: ${lastChoice.summary}`,
+        `- Cost: ${lastChoice.cost >= 0 ? '+' : ''}$${lastChoice.cost}`,
+        "",
+        "TASK:",
+        "Generate ALL sections for the POST-GAME reaction screen:",
+        "1. Reaction summary: 2-3 sentences about immediate consequences of final choice",
+        "2. News: 3 witty reactions to the end of the term",
+        "3. Mirror: Reflection on player's value consistency across all 7 days",
+        "4. Support effects: 3 deltas showing reactions to final choice",
+        "5. Dynamic params: 1-5 final outcome metrics"
+      ].join("\n");
+
+      console.log("[day-bundle] 🤖 Calling AI for post-game content...");
+
+      const raw = await aiJSON({
+        system: postGameSystem,
+        user: postGameUser,
+        model: MODEL_DILEMMA,
+        temperature: 0.9,
+        fallback: null
+      });
+
+      if (!raw) {
+        console.error("[day-bundle] ❌ Post-game AI generation failed");
+        return res.status(502).json({ error: "Post-game generation failed" });
+      }
+
+      console.log("[day-bundle] ✅ Post-game content received");
+
+      // Validate post-game response
+      if (!raw.reactionSummary || !Array.isArray(raw.news) || !raw.mirror?.summary || !Array.isArray(raw.supportEffects)) {
+        console.error("[day-bundle] ❌ Invalid post-game structure");
+        return res.status(502).json({ error: "Invalid post-game structure" });
+      }
+
+      // Normalize post-game data
+      const normalizedNews = raw.news.slice(0, 3).map((item, i) => ({
+        id: String(item?.id || `news-${i}`),
+        kind: String(item?.kind).toLowerCase() === "social" ? "social" : "news",
+        tone: ["up", "down"].includes(String(item?.tone).toLowerCase()) ? String(item.tone).toLowerCase() : "neutral",
+        text: String(item?.text || "").slice(0, 70)
+      }));
+
+      const normalizedSupport = (raw.supportEffects || []).slice(0, 3).map(effect => ({
+        id: String(effect?.id || "").toLowerCase(),
+        delta: Math.max(-20, Math.min(20, Math.round(Number(effect?.delta) || 0))),
+        explain: String(effect?.explain || "").slice(0, 140)
+      })).filter(e => ["people", "middle", "mom"].includes(e.id));
+
+      const normalizedDynamic = (raw.dynamic || []).slice(0, 5).map((param, i) => ({
+        id: String(param?.id || `param-${i}`),
+        icon: String(param?.icon || "AlertTriangle"),
+        text: String(param?.text || "").slice(0, 50),
+        tone: ["up", "down", "neutral"].includes(String(param?.tone)) ? String(param.tone) : "neutral"
+      }));
+
+      // Run compass analysis for final choice
+      let compassPills = [];
+      console.log("[day-bundle] 🧭 Running compass analysis for final choice...");
+      try {
+        const lastChoiceText = `${lastChoice.title}. ${lastChoice.summary}`;
+
+        const compassSystem =
+          "You are a political compass analyzer. Map text to these 40 components:\n\n" +
+          "WHAT (ultimate goals):\n" +
+          "0=Truth(facts,reliability) 1=Liberty(choice,autonomy) 2=Equality(fairness,equity) 3=Care(solidarity,together) 4=Courage(create,bold) 5=Wellbeing(health,happiness) 6=Security(safety,order) 7=Freedom(responsibility,consequences) 8=Honor(sacrifice,duty) 9=Sacred(awe,reverence)\n\n" +
+          "WHENCE (justification):\n" +
+          "0=Evidence(data,facts) 1=PublicReason(universal) 2=Personal(intuition,conscience) 3=Tradition(ancestors,customs) 4=Revelation(divine,cosmic) 5=Nature(telos,purpose) 6=Pragmatic(works,practical) 7=Aesthetic(beauty,fitting) 8=Fidelity(loyalty,promised) 9=Law(authority,office)\n\n" +
+          "HOW (means):\n" +
+          "0=Law(regulations,courts) 1=Deliberation(debate,compromise) 2=Mobilize(organize,march) 3=Markets(prices,incentives) 4=MutualAid(neighbors,direct) 5=Ritual(ceremony,tradition) 6=Design(nudge,UX) 7=Enforce(force,peace) 8=CivicCulture(schools,media) 9=Philanthropy(donate,fund)\n\n" +
+          "WHITHER (recipients):\n" +
+          "0=Self(personal) 1=Family(kin) 2=Friends(chosen) 3=InGroup(tribe,us) 4=Nation(country) 5=Civilization(culture,region) 6=Humanity(all people) 7=Earth(planet,creatures) 8=Cosmos(sentient life) 9=God(divine)\n\n" +
+          "Return STRICT JSON ONLY: array of items like " +
+          '[{"prop":"what|whence|how|whither","idx":0-9,"polarity":"positive|negative","strength":"mild|strong"}].\n' +
+          "- Max 6 items. Multi-component hits allowed. No extra prose.";
+
+        const compassUser =
+          `TEXT: """${lastChoiceText}"""\n\n` +
+          "TASK:\n" +
+          "- Identify which components above are supported (positive) or opposed (negative) by this text\n" +
+          "- Assess strength: mild (slight/implied) or strong (explicit/emphasized)\n" +
+          "- Return JSON ARRAY ONLY";
+
+        const items = await aiJSON({
+          system: compassSystem,
+          user: compassUser,
+          model: MODEL_ANALYZE,
+          temperature: 0.2,
+          fallback: [],
+        });
+
+        compassPills = Array.isArray(items) ? items : [];
+        console.log(`[day-bundle] ✅ Compass analysis: ${compassPills.length} items`);
+      } catch (error) {
+        console.warn("[day-bundle] ⚠️ Compass analysis failed:", error?.message || error);
+        compassPills = [];
+      }
+
+      // Return post-game bundle
+      const postGameBundle = {
+        type: "post-game",  // Signal to client this is end-game
+        reactionSummary: String(raw.reactionSummary).slice(0, 500),
+        news: normalizedNews,
+        mirror: {
+          summary: String(raw.mirror.summary).slice(0, 200)
+        },
+        supportEffects: normalizedSupport,
+        dynamic: normalizedDynamic,
+        compassPills: compassPills
+      };
+
+      console.log("[day-bundle] 🎉 Post-game bundle complete - sending response");
+      return res.json(postGameBundle);
+    }
+
+    // ========================================================================
+    // NORMAL DAY HANDLING (Days 1-7)
+    // ========================================================================
+
+    // Derive middle entity name (strongest non-player holder)
+    const withIdx = holders.map((h, i) => ({ ...h, i }));
+    const candidates = playerIndex == null ? withIdx : withIdx.filter((h) => h.i !== playerIndex);
+    const topHolder = candidates.length > 0
+      ? candidates.reduce((a, b) => (b.percent > a.percent ? b : a), candidates[0])
+      : null;
+    const middleName = String(topHolder?.name || "the establishment");
+
+    console.log(`[day-bundle] Middle entity: ${middleName}, Player index: ${playerIndex}`);
+
+    // Build focus line from settings
+    const focusLine = settings?.dilemmasSubjectEnabled && settings?.dilemmasSubject
+      ? `Focus topic: ${String(settings.dilemmasSubject)}.`
+      : "";
+
+    // Analyze political system type for appropriate feel
+    const systemAnalysis = analyzeSystemType(systemName);
+
+    // ========================================================================
+    // SYSTEM PROMPT: Unified instructions for all sections
+    // ========================================================================
+    const systemParts = [
+      "You generate ALL content for one day in a political simulation game in a SINGLE response.",
+      "",
+      "OUTPUT STRUCTURE: Return STRICT JSON with exactly these sections:",
+      "{",
+      '  "dilemma": { "title": "", "description": "", "actions": [{...}], "topic": "" },',
+      '  "news": [ {"id": "", "kind": "news|social", "tone": "up|down|neutral", "text": ""} ],',
+      '  "mirror": { "summary": "" },',
+      '  "supportEffects": [ {"id": "people|middle|mom", "delta": 0, "explain": ""} ],',
+      '  "dynamic": [ {"id": "", "icon": "", "text": "", "tone": "up|down|neutral"} ]',
+      "}",
+      "",
+      ANTI_JARGON_RULES,
+      "",
+      "=== DILEMMA SECTION ===",
+      "- Do NOT use the word 'dilemma'",
+      "- Title: ≤60 chars",
+      "- Description: 2-3 sentences, mature and engaging",
+      "- Actions: Exactly 3 choices with format:",
+      '  {"id": "a|b|c", "title": "", "summary": "ONE sentence, 15-20 words", "cost": number, "iconHint": "security|speech|diplomacy|money|tech|heart|scale", "topic": "Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}',
+      "- Costs: Magnitudes 0, ±50, ±100, ±150, ±200, ±250 (or ±300-500 for broad tax/windfall)",
+      "- Sign: Negative=spend, Positive=revenue",
+      `- Political system feel: ${systemAnalysis.type} - ${systemAnalysis.feel}`,
+      `- Framing: ${systemAnalysis.dilemmaFraming}`,
+      focusLine,
+      isFirstDay ? [
+        "- FIRST DAY DILEMMA REQUIREMENTS:",
+        "  * NOT a generic 'what's your first move' or 'set priorities' situation",
+        "  * MUST be a SPECIFIC, DRAMATIC crisis happening RIGHT NOW on Day 1",
+        "  * Acknowledge the leadership transition briefly (1-2 words max), then focus on the crisis",
+        "  * Crisis examples:",
+        "    - External threat (neighboring country invasion threat, diplomatic crisis, trade embargo)",
+        "    - Internal unrest (opposition protests, military coup threat, separatist violence)",
+        "    - Economic emergency (market crash, bank run, currency collapse, resource shortage)",
+        "    - Public health crisis (epidemic outbreak, food contamination, infrastructure collapse)",
+        "    - Ethical scandal (corruption exposure, abuse revelation, environmental disaster)",
+        "  * Frame as 'The new leadership awakens to find...' or 'Within hours of taking power...'",
+        "  * Make it URGENT and CONSEQUENTIAL - not a routine policy decision",
+        "  * Three actions should offer DISTINCT approaches (aggressive/moderate/passive OR military/diplomatic/economic)",
+        "  * Title should capture the crisis vividly (≤60 chars)",
+        "  * Description: 2-3 sentences setting up the immediate threat/challenge"
+      ].join("\n") : "",
+      isLastDay ? "- LAST DAY: High-stakes climax paying off previous tensions" : "",
+      "",
+      "=== NEWS SECTION ===",
+      "- Exactly 3 items",
+      "- Each: Max 70 characters total",
+      "- Witty, satirical, punchy one-liners",
+      "- NO source names (like 'Daily News:'), NO hashtags, NO emojis",
+      "- Mix of 'news' and 'social' kinds",
+      "- Tone: up (positive/green), down (negative/red), neutral (blue)",
+      isFirstDay
+        ? "- DAY 1: 3 witty items about player taking power (onboarding mode)"
+        : "- DAY 2+: 3 witty reactions to LAST CHOICE consequences",
+      "",
+      "=== MIRROR SECTION ===",
+      "- Maximum 35 words (STRICT)",
+      "- Two sentences maximum",
+      "- Cynically amusing, darkly funny, mischievously insightful",
+      "- Tone: Oscar Wilde meets Machiavelli",
+      "- NEVER mention support percentages (shown elsewhere)",
+      "- Use vivid descriptions: 'adores you', 'sharpens knives', 'whispers plots'",
+      isFirstDay
+        ? "- DAY 1: Brief personality appraisal based on compass values"
+        : [
+            "- DAY 2-7: Two-part reflection:",
+            "  PART 1 (20 words): Comment on governing pattern, support health, and value alignment",
+            "  PART 2 (15 words): Suggest NEXT STEP for current dilemma based on their values and situation",
+            "  - Format: 'Your [description of past pattern]. Perhaps [subtle suggestion referencing current choices]?'",
+            "  - Example: 'Your care-driven reforms won hearts but emptied coffers. Perhaps pragmatism over principle this time?'",
+            "  - Next step should subtly reference ONE theme from the 3 current action choices",
+            "  - Keep it strategic but cryptic - the mirror guides without commanding"
+          ].join("\n"),
+      "",
+      "=== SUPPORT EFFECTS SECTION (DAY 2+ ONLY) ===",
+      isFirstDay ? "- DAY 1: Return empty array []" : "",
+      !isFirstDay ? [
+        "- Exactly 3 items (people, middle, mom) - ALWAYS include all 3",
+        "- Format: {id: 'people|middle|mom', delta: number, explain: 'short sentence'}",
+        "- Delta magnitudes: ±5 (low), ±10 (medium), ±15 (large), ±20 (extreme)",
+        "- Explain style:",
+        "  * people: Third-person crowd/public reaction (e.g., 'Crowds resent...', 'Citizens applaud...') - NEVER use 'The People' as speaker",
+        `  * middle: Speak AS ${middleName} - must say '${middleName}' or 'We' explicitly (e.g., '${middleName} condemns...', 'We applaud your resolve...') - DO NOT confuse with 'people'`,
+        "  * mom: MATERNAL voice speaking directly to her child using 'you' (e.g., 'I'm proud you...', 'You worry me when...')",
+        "- Keep vivid and specific; 8-18 words; no hashtags/emojis",
+        "- Base on how NEW SITUATION describes reactions to PREVIOUS ACTION"
+      ].join("\n") : "",
+      "",
+      "=== DYNAMIC PARAMETERS SECTION (DAY 2+ ONLY) ===",
+      isFirstDay ? "- DAY 1: Return empty array []" : "",
+      !isFirstDay ? [
+        "- Generate 1-5 contextual dynamic parameters showing consequences of LAST CHOICE",
+        "- Can reuse same parameter types from previous days if showing escalation/continuation (e.g., 'Day 2: 3 skirmishes contained' → 'Day 3: 8 skirmishes contained')",
+        "- ULTRA-SHORT: Maximum 4-5 words each",
+        "- NO explanations or descriptions - pure factual outcomes with numbers",
+        "- Specific, measurable results only",
+        "- NEVER mention: support levels, budget changes, approval ratings",
+        "- Focus on: casualties, resignations, protests, international reactions, economic indicators, policy outcomes",
+        "- Examples: '40 militia fighters neutralized', '14 civilians dead', '12 countries condemn', '3,000 protesters arrested'",
+        "- Icons: Users, TrendingUp, TrendingDown, Shield, AlertTriangle, Heart, Building, Globe, Leaf, Zap, Target, Scale, Flag, Crown, Activity",
+        "- Tone: up (good for player), down (bad for player), neutral (informational)"
+      ].join("\n") : "",
+    ].filter(Boolean);
+
+    const system = systemParts.join("\n");
+
+    // ========================================================================
+    // USER PROMPT: Full game context
+    // ========================================================================
+    const userParts = [
+      `ROLE: ${role || "Unknown"}`,
+      `POLITICAL SYSTEM: ${systemName || "Unknown"}`,
+      `DAY: ${day} of ${totalDays} (${isFirstDay ? "first" : isLastDay ? "last" : "mid-campaign"})`,
+      "",
+      "POWER HOLDERS:",
+      ...holders.map(h => `- ${h.name}: ${h.percent}% power${h.i === playerIndex ? " (PLAYER)" : ""}`),
+      "",
+      "CURRENT STATE:",
+      `- Budget: $${supports.budget || 0}`,
+      `- Support: People ${supports.people || 50}%, ${middleName} ${supports.middle || 50}%, Mom ${supports.mom || 50}%`,
+      "",
+      "TOP COMPASS VALUES:",
+      ...Object.entries(compassValues)
+        .sort((a, b) => Number(b[1]) - Number(a[1]))
+        .slice(0, 5)
+        .map(([k, v]) => `- ${k}: ${v}/10`),
+    ];
+
+    // Add full game history (if any)
+    if (dilemmaHistory.length > 0) {
+      userParts.push(
+        "",
+        `FULL GAME HISTORY (${dilemmaHistory.length} decisions):`,
+        ...dilemmaHistory.map(entry =>
+          `Day ${entry.day}: "${entry.dilemmaTitle}" → Chose "${entry.choiceTitle}" → Support: ${entry.supportPeople}/${entry.supportMiddle}/${entry.supportMom}%`
+        )
+      );
+
+      // Add governing pattern analysis
+      const themes = { care: 0, liberty: 0, equality: 0, tradition: 0, security: 0, pragmatism: 0, truth: 0 };
+      dilemmaHistory.forEach(entry => {
+        const text = `${entry.choiceTitle} ${entry.choiceSummary}`.toLowerCase();
+        if (/care|compassion|help|support|welfare/.test(text)) themes.care++;
+        if (/liberty|freedom|rights|autonomy/.test(text)) themes.liberty++;
+        if (/equal|fair|justice/.test(text)) themes.equality++;
+        if (/tradition|heritage|custom/.test(text)) themes.tradition++;
+        if (/security|order|patrol|enforce/.test(text)) themes.security++;
+        if (/pragmatic|practical|compromise/.test(text)) themes.pragmatism++;
+        if (/truth|transparent|honest/.test(text)) themes.truth++;
+      });
+
+      const dominantThemes = Object.entries(themes)
+        .filter(([_, count]) => count > 0)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 2);
+
+      if (dominantThemes.length > 0) {
+        userParts.push(
+          "",
+          "GOVERNING PATTERN:",
+          ...dominantThemes.map(([theme, count]) => `- ${count} choices favoring ${theme}`)
+        );
+      }
+    }
+
+    // Add last choice (Day 2+)
+    if (!isFirstDay && lastChoice) {
+      userParts.push(
+        "",
+        "LAST CHOICE (previous day):",
+        `- Title: "${lastChoice.title}"`,
+        `- Summary: ${lastChoice.summary}`,
+        `- Cost: ${lastChoice.cost >= 0 ? '+' : ''}$${lastChoice.cost}`
+      );
+    }
+
+    // Add topic diversity tracking
+    if (recentTopics.length > 0) {
+      userParts.push(
+        "",
+        "TOPIC DIVERSITY:",
+        `- Recent topics (avoid repeating): ${recentTopics.slice(0, 3).join(", ")}`,
+        "- Rule: Maximum 3 consecutive situations on same topic"
+      );
+
+      if (Object.keys(topicCounts).length > 0) {
+        const mostUsed = Object.entries(topicCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([topic, count]) => `${topic} (${count}x)`)
+          .join(", ");
+        userParts.push(`- Most used topics: ${mostUsed}`);
+      }
+    }
+
+    userParts.push(
+      "",
+      "TASK:",
+      "Generate ALL sections in one JSON response:",
+      "1. New dilemma for current day",
+      isFirstDay ? "2. News: 3 items about taking power" : "2. News: 3 reactions to last choice",
+      "3. Mirror: Cynical reflection on player's journey",
+      isFirstDay ? "4. Support effects: [] (empty - Day 1)" : "4. Support effects: 3 deltas showing how groups reacted to last choice",
+      isFirstDay ? "5. Dynamic params: [] (empty - Day 1)" : "5. Dynamic params: 1-3 consequences of last choice"
+    );
+
+    const user = userParts.join("\n");
+
+    if (debug) {
+      console.log("[day-bundle] 📝 System prompt length:", system.length, "chars");
+      console.log("[day-bundle] 📝 User prompt length:", user.length, "chars");
+    }
+
+    // ========================================================================
+    // AI CALL: Single request for all content
+    // ========================================================================
+    console.log("[day-bundle] 🤖 Calling AI model...");
+
+    const raw = await aiJSON({
+      system,
+      user,
+      model: MODEL_DILEMMA, // Use dilemma model (can be overridden via env)
+      temperature: 0.9,
+      fallback: null // NO fallback - must succeed or return null
+    });
+
+    if (!raw) {
+      console.error("[day-bundle] ❌ AI returned null - generation failed");
+      return res.status(502).json({ error: "AI generation failed - no response" });
+    }
+
+    console.log("[day-bundle] ✅ AI response received");
+
+    // ========================================================================
+    // VALIDATION: Strict validation of ALL required fields
+    // ========================================================================
+    console.log("[day-bundle] 🔍 Validating response structure...");
+
+    // Validate dilemma (REQUIRED)
+    if (!raw.dilemma || !raw.dilemma.title || !raw.dilemma.description || !Array.isArray(raw.dilemma.actions) || raw.dilemma.actions.length !== 3) {
+      console.error("[day-bundle] ❌ Invalid dilemma structure:", raw.dilemma);
+      return res.status(502).json({ error: "Invalid dilemma structure" });
+    }
+
+    // Validate news (REQUIRED)
+    if (!Array.isArray(raw.news) || raw.news.length === 0) {
+      console.error("[day-bundle] ❌ Invalid news structure:", raw.news);
+      return res.status(502).json({ error: "Invalid news structure" });
+    }
+
+    // Validate mirror (REQUIRED)
+    if (!raw.mirror || !raw.mirror.summary) {
+      console.error("[day-bundle] ❌ Invalid mirror structure:", raw.mirror);
+      return res.status(502).json({ error: "Invalid mirror structure" });
+    }
+
+    // Validate support effects (REQUIRED on Day 2+)
+    if (!isFirstDay) {
+      if (!Array.isArray(raw.supportEffects) || raw.supportEffects.length === 0) {
+        console.error("[day-bundle] ❌ Missing support effects (required on Day 2+)");
+        return res.status(502).json({ error: "Missing support effects (Day 2+ requires support analysis)" });
+      }
+    }
+
+    // Validate dynamic params (REQUIRED on Day 2+, but can be empty array)
+    if (!isFirstDay) {
+      if (!Array.isArray(raw.dynamic)) {
+        console.error("[day-bundle] ❌ Missing dynamic params (required on Day 2+)");
+        return res.status(502).json({ error: "Missing dynamic params (Day 2+ requires dynamic parameters)" });
+      }
+    }
+
+    console.log("[day-bundle] ✅ Validation passed");
+
+    // ========================================================================
+    // NORMALIZATION: Clean up and normalize data
+    // ========================================================================
+    console.log("[day-bundle] 🧹 Normalizing response data...");
+
+    // Normalize dilemma actions (same logic as /api/dilemma)
+    const normalizedActions = raw.dilemma.actions.slice(0, 3).map((a, idx) => {
+      const id = (["a","b","c"][idx] || "a");
+      const title = String(a?.title || `Option ${idx + 1}`).slice(0, 80);
+      const summary = String(a?.summary || "").slice(0, 180);
+      const allowedHints = new Set(["security","speech","diplomacy","money","tech","heart","scale"]);
+      const iconHint = allowedHints.has(String(a?.iconHint)) ? String(a?.iconHint) : "speech";
+
+      // Cost normalization
+      let cost = Math.max(-250, Math.min(500, Math.round(Number(a?.cost) || 0)));
+
+      return { id, title, summary, cost, iconHint };
+    });
+
+    // Normalize news
+    const normalizedNews = raw.news.slice(0, 3).map((item, i) => ({
+      id: String(item?.id || `news-${i}`),
+      kind: String(item?.kind).toLowerCase() === "social" ? "social" : "news",
+      tone: ["up", "down"].includes(String(item?.tone).toLowerCase()) ? String(item.tone).toLowerCase() : "neutral",
+      text: String(item?.text || "").slice(0, 70)
+    }));
+
+    // Normalize support effects
+    const normalizedSupport = isFirstDay ? [] : (raw.supportEffects || []).slice(0, 3).map(effect => ({
+      id: String(effect?.id || "").toLowerCase(),
+      delta: Math.max(-20, Math.min(20, Math.round(Number(effect?.delta) || 0))),
+      explain: String(effect?.explain || "").slice(0, 140)
+    })).filter(e => ["people", "middle", "mom"].includes(e.id));
+
+    // Normalize dynamic params
+    const normalizedDynamic = isFirstDay ? [] : (raw.dynamic || []).slice(0, 5).map((param, i) => ({
+      id: String(param?.id || `param-${i}`),
+      icon: String(param?.icon || "AlertTriangle"),
+      text: String(param?.text || "").slice(0, 50),
+      tone: ["up", "down", "neutral"].includes(String(param?.tone)) ? String(param.tone) : "neutral"
+    }));
+
+    console.log("[day-bundle] ✅ Normalization complete");
+    console.log(`[day-bundle] 📊 Generated: dilemma, ${normalizedNews.length} news, mirror, ${normalizedSupport.length} support effects, ${normalizedDynamic.length} dynamic params`);
+
+    // ========================================================================
+    // COMPASS ANALYSIS: Analyze previous action (Day 2+ only)
+    // ========================================================================
+    let compassPills = [];
+    if (!isFirstDay && lastChoice) {
+      console.log("[day-bundle] 🧭 Running compass analysis for last choice...");
+      try {
+        const lastChoiceText = `${lastChoice.title}. ${lastChoice.summary}`;
+
+        // Same system prompt as /api/compass-analyze
+        const compassSystem =
+          "You are a political compass analyzer. Map text to these 40 components:\n\n" +
+          "WHAT (ultimate goals):\n" +
+          "0=Truth(facts,reliability) 1=Liberty(choice,autonomy) 2=Equality(fairness,equity) 3=Care(solidarity,together) 4=Courage(create,bold) 5=Wellbeing(health,happiness) 6=Security(safety,order) 7=Freedom(responsibility,consequences) 8=Honor(sacrifice,duty) 9=Sacred(awe,reverence)\n\n" +
+          "WHENCE (justification):\n" +
+          "0=Evidence(data,facts) 1=PublicReason(universal) 2=Personal(intuition,conscience) 3=Tradition(ancestors,customs) 4=Revelation(divine,cosmic) 5=Nature(telos,purpose) 6=Pragmatic(works,practical) 7=Aesthetic(beauty,fitting) 8=Fidelity(loyalty,promised) 9=Law(authority,office)\n\n" +
+          "HOW (means):\n" +
+          "0=Law(regulations,courts) 1=Deliberation(debate,compromise) 2=Mobilize(organize,march) 3=Markets(prices,incentives) 4=MutualAid(neighbors,direct) 5=Ritual(ceremony,tradition) 6=Design(nudge,UX) 7=Enforce(force,peace) 8=CivicCulture(schools,media) 9=Philanthropy(donate,fund)\n\n" +
+          "WHITHER (recipients):\n" +
+          "0=Self(personal) 1=Family(kin) 2=Friends(chosen) 3=InGroup(tribe,us) 4=Nation(country) 5=Civilization(culture,region) 6=Humanity(all people) 7=Earth(planet,creatures) 8=Cosmos(sentient life) 9=God(divine)\n\n" +
+          "Return STRICT JSON ONLY: array of items like " +
+          '[{"prop":"what|whence|how|whither","idx":0-9,"polarity":"positive|negative","strength":"mild|strong"}].\n' +
+          "- Max 6 items. Multi-component hits allowed. No extra prose.";
+
+        const compassUser =
+          `TEXT: """${lastChoiceText}"""\n\n` +
+          "TASK:\n" +
+          "- Identify which components above are supported (positive) or opposed (negative) by this text\n" +
+          "- Assess strength: mild (slight/implied) or strong (explicit/emphasized)\n" +
+          "- Return JSON ARRAY ONLY";
+
+        const items = await aiJSON({
+          system: compassSystem,
+          user: compassUser,
+          model: MODEL_ANALYZE,
+          temperature: 0.2,
+          fallback: [],
+        });
+
+        compassPills = Array.isArray(items) ? items : [];
+        console.log(`[day-bundle] ✅ Compass analysis: ${compassPills.length} items`);
+      } catch (error) {
+        console.warn("[day-bundle] ⚠️ Compass analysis failed:", error?.message || error);
+        compassPills = []; // Soft-fail: continue without compass
+      }
+    } else {
+      console.log("[day-bundle] ⏭️ Skipping compass analysis (Day 1 or no lastChoice)");
+    }
+
+    // ========================================================================
+    // RESPONSE: Send normalized bundle with compass
+    // ========================================================================
+    const bundle = {
+      dilemma: {
+        title: String(raw.dilemma.title).slice(0, 120),
+        description: String(raw.dilemma.description).slice(0, 500),
+        actions: normalizedActions,
+        topic: raw.dilemma.topic || "General"
+      },
+      news: normalizedNews,
+      mirror: {
+        summary: String(raw.mirror.summary).slice(0, 200)
+      },
+      supportEffects: normalizedSupport,
+      dynamic: normalizedDynamic,
+      compassPills: compassPills  // NEW: Compass analysis included in bundle
+    };
+
+    console.log("[day-bundle] 🎉 Bundle generation complete - sending response");
+    return res.json(bundle);
+
+  } catch (e) {
+    console.error("[day-bundle] ❌ Unexpected error:", e?.message || e);
+    console.error("[day-bundle] Stack trace:", e?.stack);
+    return res.status(500).json({ error: `Bundle generation failed: ${e?.message || "Unknown error"}` });
+  }
+});
 
 // -------------------- Start server ---------------------------
 const PORT = Number(process.env.PORT) || 3001;

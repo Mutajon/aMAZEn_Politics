@@ -16,10 +16,9 @@ import MirrorQuizScreen from "./screens/MirrorQuizScreen";
 import BackgroundIntroScreen from "./screens/BackgroundIntroScreen";
 import DifficultyScreen from "./screens/DifficultyScreen";
 import { useEnsureMirroredAvatarOnce } from "./hooks/useEnsureMirroredAvatarOnce";
-import EventScreen from "./screens/EventScreen";
-import EventScreen2 from "./screens/EventScreen2";
 import EventScreen3 from "./screens/EventScreen3";
 import HighscoreScreen from "./screens/HighscoreScreen";
+import GameSummaryScreen from "./screens/GameSummaryScreen";
 if (import.meta.env.DEV) {
   import("./dev/storesDebug").then(m => m.attachStoresDebug());
 }
@@ -46,8 +45,9 @@ export default function App() {
   if (route === "/background-intro") return <BackgroundIntroScreen push={push} />;
   if (route === "/event") return <EventScreen3 push={push} />;
   if (route === "/highscores") return <HighscoreScreen push={push} />;
+  if (route === "/summary") return <GameSummaryScreen push={push} />;
 
-  
+
 
   return (
     <SplashScreen

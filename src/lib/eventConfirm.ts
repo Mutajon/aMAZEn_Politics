@@ -1,8 +1,8 @@
 // src/lib/eventConfirm.ts
-// Centralized confirm pipeline used by EventScreen.
+// Centralized confirm pipeline used by legacy EventScreen/EventScreen2.
 // - Applies budget delta immediately (so coin+counter stay in sync).
 // - Triggers compass analysis and support analysis IN PARALLEL.
-// - Keeps UI concerns out of EventScreen. No design changes here.
+// NOTE: EventScreen3 uses EventDataCollector → EventDataPresenter → EventDataCleaner pattern instead.
 
 import type { Dispatch, SetStateAction } from "react";
 

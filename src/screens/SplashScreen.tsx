@@ -1,10 +1,17 @@
 // src/screens/SplashScreen.tsx
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 import { bgStyle } from "../lib/ui";
 import { useSettingsStore } from "../store/settingsStore";
 import { useNarrator } from "../hooks/useNarrator";
 
+const SUBTITLES = [
+  "Take on a challenge",
+  "Choose your path",
+  "Discover yourself",
+  "Will you make it into the Hall of Fame?"
+];
 
 export default function SplashScreen({
   onStart,
@@ -14,6 +21,7 @@ export default function SplashScreen({
   onHighscores?: () => void; // optional, so we don't break existing callers
 }) {
 
+  const [visibleSubtitles, setVisibleSubtitles] = useState(0);
   const [showButton, setShowButton] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -49,9 +57,22 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
 
   // -------------------------------------------------------------------------
 
+  // Simple subtitle reveal: show title, wait 0.5s, fade in all subtitles
   useEffect(() => {
-    const t = setTimeout(() => setShowButton(true), 1000);
-    return () => clearTimeout(t);
+    // Wait 500ms after title, then show all subtitles at once
+    const subtitleTimer = setTimeout(() => {
+      setVisibleSubtitles(SUBTITLES.length);
+    }, 500);
+
+    // Then show button 500ms after subtitles appear
+    const buttonTimer = setTimeout(() => {
+      setShowButton(true);
+    }, 1000);
+
+    return () => {
+      clearTimeout(subtitleTimer);
+      clearTimeout(buttonTimer);
+    };
   }, []);
 
   return (
@@ -288,23 +309,68 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
           transition={{ type: "spring", stiffness: 200, damping: 18 }}
           className="text-4xl sm:text-5xl font-extrabold leading-tight tracking-tight bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]"
         >
-          aMAZE&apos;n Politics
+          Speed Politics
         </motion.h1>
 
-        <motion.p
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25, duration: 0.35 }}
-          className="text-base sm:text-lg bg-gradient-to-r from-indigo-200 via-violet-200 to-amber-200 bg-clip-text text-transparent"
-        >
-          Discover yourself — and your best!
-        </motion.p>
+        {/* Animated subtitles - simple fade in */}
+        <div className="relative min-h-[200px] flex flex-col items-center justify-start pt-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: visibleSubtitles >= SUBTITLES.length ? 1 : 0 }}
+            transition={{ duration: 0.5 }}
+            className="relative"
+          >
+            <motion.div
+              className="flex flex-col items-center space-y-2"
+              animate={{
+                backgroundPosition: ["0% 100%", "0% 0%"],
+              }}
+              transition={{
+                duration: 1.5,
+                repeat: Infinity,
+                repeatDelay: 1.5,
+                ease: "linear"
+              }}
+              style={{
+                backgroundImage: "linear-gradient(180deg, rgba(199, 210, 254, 1), rgba(221, 214, 254, 1), rgba(253, 230, 138, 1), rgba(221, 214, 254, 1), rgba(199, 210, 254, 1))",
+                backgroundSize: "100% 300%",
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              {SUBTITLES.map((subtitle, index) => (
+                <div key={index} className="flex flex-col items-center gap-1">
+                  <p className="text-base sm:text-lg font-medium">
+                    {subtitle}
+                  </p>
+                  {index < SUBTITLES.length - 1 && (
+                    <ChevronDown className="w-5 h-5 text-white/40" />
+                  )}
+                </div>
+              ))}
+            </motion.div>
+          </motion.div>
+        </div>
 
         <div className="mt-8 flex flex-col items-center gap-3 min-h-[52px]">
   {/* Primary: Start */}
   <motion.button
-    initial={{ opacity: 0 }}
-    animate={{ opacity: showButton ? 1 : 0 }}
+    initial={{ opacity: 0, rotate: 0 }}
+    animate={{ opacity: showButton ? 1 : 0, rotate: 0 }}
+    whileHover={{
+      scale: 1.02,
+      rotate: [0, -2, 2, -2, 2, 0],
+      transition: {
+        rotate: {
+          duration: 0.5,
+          repeat: 0
+        },
+        scale: {
+          duration: 0.2
+        }
+      }
+    }}
     transition={{ type: "spring", stiffness: 250, damping: 22 }}
     style={{ visibility: showButton ? "visible" : "hidden" }}
     onClick={() => {
@@ -331,7 +397,7 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
                bg-white/10 hover:bg-white/15 text-white/90 border border-white/15
                shadow-sm active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-white/20"
   >
-    High Scores
+    Hall of Fame
   </motion.button>
 </div>
 

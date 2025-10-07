@@ -16,6 +16,7 @@ export async function generateMirrorSummary(
 
   if (useAI) {
     try {
+      console.log("[mirrorSummary] 🎯 Calling API:", apiPath);
       const resp = await fetch(apiPath, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -25,12 +26,17 @@ export async function generateMirrorSummary(
           topOverall: overall.map(minify),
         }),
       });
+      console.log("[mirrorSummary] 📨 Response status:", resp.status, resp.statusText);
       if (resp.ok) {
         const j = await resp.json();
         const s = String(j?.summary || "").trim();
+        console.log("[mirrorSummary] ✅ Received summary:", s?.slice(0, 50));
         if (s) return s;
+      } else {
+        console.warn("[mirrorSummary] ⚠️ Non-OK response, falling back to local");
       }
-    } catch {
+    } catch (error: any) {
+      console.error("[mirrorSummary] ❌ Fetch failed:", error?.message || error);
       // fall through to local
     }
   }
@@ -65,7 +71,7 @@ function topByProp(values: CompassValues, prop: PropKey, n: number): TopItem[] {
 }
 
 function minify(t: TopItem) {
-  return { label: t.label, score: t.score };
+  return { name: t.label, strength: t.score };
 }
 
 function soften(label: string) {

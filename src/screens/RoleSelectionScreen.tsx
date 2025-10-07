@@ -57,11 +57,14 @@ const primeAnalysisFromRole = (roleLabel: string, systemName?: string) => {
 
 // Clear holders when entering role selection to ensure fresh API call
 // This prevents cached holders from skipping the API analysis
+// IMPORTANT: Also clear systemName/systemDesc/flavor to prevent stale political system data
 useEffect(() => {
   const currentAnalysis = useRoleStore.getState().analysis;
   if (currentAnalysis?.holders && currentAnalysis.holders.length > 0) {
     setAnalysis({
-      ...currentAnalysis,
+      systemName: "",
+      systemDesc: "",
+      flavor: "",
       holders: [],
       playerIndex: null,
     });
