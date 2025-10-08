@@ -540,6 +540,13 @@ app.post("/api/mirror-summary", async (req, res) => {
     const topOverall = Array.isArray(req.body?.topOverall) ? req.body.topOverall : [];
     const dilemma    = req.body?.dilemma || null;
 
+    // DEBUG LOGGING
+    console.log("\n[mirror-summary] ===== REQUEST DEBUG =====");
+    console.log("[mirror-summary] topWhat:", JSON.stringify(topWhat));
+    console.log("[mirror-summary] topWhence:", JSON.stringify(topWhence));
+    console.log("[mirror-summary] topOverall:", JSON.stringify(topOverall));
+    console.log("[mirror-summary] Has dilemma:", !!dilemma);
+
     // NEW: Game context for holistic reflection
     const dilemmaHistory = Array.isArray(req.body?.dilemmaHistory) ? req.body.dilemmaHistory : [];
     const supportPeople = Number(req.body?.supportPeople ?? 50);
@@ -705,15 +712,28 @@ app.post("/api/mirror-summary", async (req, res) => {
         "Use cynical wit, dark humor, and sardonic observations.\n" +
         "Keep it under 30 words, wickedly witty and engaging.";
     } else {
-      // Fallback: Original personality appraisal
+      // Fallback: Original personality appraisal (Quiz screen)
       const valuesList = topWhat.length > 0
         ? topWhat.map(v => `${v.name} (${v.strength}/10)`).join(", ")
         : topOverall.map(v => `${v.name} (${v.strength}/10)`).join(", ");
 
+      console.log("[mirror-summary] QUIZ SCREEN PATH - valuesList:", valuesList);
+
       user =
-        "Given the player's strongest values, craft a brief cynically amusing appraisal (under 30 words).\n" +
-        "Top values: " + valuesList + "\n\n" +
-        "Tell them what drives them with sardonic wit and dark humor.";
+        "PLAYER'S STRONGEST VALUES:\n" +
+        valuesList + "\n\n" +
+        "TASK:\n" +
+        "Craft a brief personality appraisal (under 30 words) that is short, engaging, and cynically amusing:\n" +
+        "- ACCURATELY reflects their TOP values (these are what they value MOST)\n" +
+        "- Describes what drives them WITH dark humor, not AGAINST their values\n" +
+        "- If they value Truth, describe them as truth-seeking (not lie-spreading)\n" +
+        "- If they value Liberty, describe them as freedom-loving (not authoritarian)\n" +
+        "- Add sardonic wit about HOW they pursue these values, not mockery of the values themselves\n\n" +
+        "EXAMPLE (if values were Care + Pragmatism):\n" +
+        "\"You champion compassion with ruthless efficiency—hearts warmed, ledgers balanced, and no one quite sure if you're saint or accountant.\"\n\n" +
+        "Now craft your appraisal:";
+
+      console.log("[mirror-summary] USER PROMPT:\n" + user);
     }
 
     // tiny retry wrapper

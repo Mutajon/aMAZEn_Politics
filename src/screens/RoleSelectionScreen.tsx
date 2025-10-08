@@ -152,6 +152,17 @@ useEffect(() => {
       setAiMsg("Nice! That's a clear role and setting.");
       setChecking(false);
       setRole(input.trim());
+
+      // BUGFIX: Clear stale political system data when entering custom role
+      // This ensures AI will analyze the custom role fresh instead of using cached predefined data
+      setAnalysis({
+        systemName: "",
+        systemDesc: "",
+        flavor: "",
+        holders: [],
+        playerIndex: null,
+      });
+
       push("/name");
       closeSuggest();
     } catch (err) {

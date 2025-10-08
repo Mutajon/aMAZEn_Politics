@@ -16,8 +16,6 @@ import MirrorQuizScreen from "./screens/MirrorQuizScreen";
 import BackgroundIntroScreen from "./screens/BackgroundIntroScreen";
 import DifficultyScreen from "./screens/DifficultyScreen";
 import { useEnsureMirroredAvatarOnce } from "./hooks/useEnsureMirroredAvatarOnce";
-import EventScreen from "./screens/EventScreen";
-import EventScreen2 from "./screens/EventScreen2";
 import EventScreen3 from "./screens/EventScreen3";
 import HighscoreScreen from "./screens/HighscoreScreen";
 if (import.meta.env.DEV) {

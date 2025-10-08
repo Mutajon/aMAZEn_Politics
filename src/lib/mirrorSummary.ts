@@ -65,7 +65,7 @@ function topByProp(values: CompassValues, prop: PropKey, n: number): TopItem[] {
 }
 
 function minify(t: TopItem) {
-  return { label: t.label, score: t.score };
+  return { name: t.label, strength: t.score };
 }
 
 function soften(label: string) {

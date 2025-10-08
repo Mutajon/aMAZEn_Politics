@@ -71,7 +71,7 @@ npm run preview      # Preview production build
 │   │   ├── mirrorDilemma.ts     # Mirror dialogue generation
 │   │   └── narration.ts         # TTS text processing
 │   ├── screens/
-│   │   ├── EventScreen.tsx      # Main gameplay screen
+│   │   ├── EventScreen3.tsx     # Main gameplay screen
 │   │   ├── RoleSelectionScreen.tsx
 │   │   ├── CompassIntroStart.tsx
 │   │   ├── MirrorDialogueScreen.tsx
@@ -119,9 +119,9 @@ This is a political simulation game with AI-powered content generation, built as
 - `mirrorQuizStore` - Compass assessment progress
 
 **Key UI Components**:
-- `src/screens/EventScreen.tsx` - Main gameplay orchestrator (optimized, 107 lines)
+- `src/screens/EventScreen3.tsx` - Main gameplay screen with sequential presentation architecture
 - `src/screens/PowerDistributionScreen.tsx` - Power holder analysis orchestrator (optimized, 67 lines)
-- `src/components/event/EventContent.tsx` - Event UI rendering logic (extracted from EventScreen)
+- `src/components/event/EventContent.tsx` - Event UI rendering logic
 - `src/components/PowerDistributionContent.tsx` - Power distribution UI rendering (extracted from PowerDistributionScreen)
 - `src/components/event/` - Specialized event UI (ActionDeck, ResourceBar, SupportList, NewsTicker)
 - `src/components/MiniCompass.tsx` - Political compass visualization

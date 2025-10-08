@@ -2,6 +2,7 @@
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
 import { useSettingsStore } from "../store/settingsStore";
+import { COMPONENTS, type PropKey } from "../data/compass-data";
 
 type StoresSnapshot = {
   role: {
@@ -14,12 +15,21 @@ type StoresSnapshot = {
 };
 
 function formatCompass(values: ReturnType<typeof useCompassStore.getState>["values"]) {
-  // Makes a row-per-quadrant record so console.table is nice
+  // Makes a row-per-quadrant record with labels so console.table is nice
+  const formatDimension = (prop: PropKey) => {
+    const result: Record<string, number> = {};
+    values[prop].forEach((score, idx) => {
+      const label = COMPONENTS[prop]?.[idx]?.short ?? `${prop}[${idx}]`;
+      result[label] = score;
+    });
+    return result;
+  };
+
   return {
-    what: [...values.what],
-    whence: [...values.whence],
-    how: [...values.how],
-    whither: [...values.whither],
+    what: formatDimension('what'),
+    whence: formatDimension('whence'),
+    how: formatDimension('how'),
+    whither: formatDimension('whither'),
   };
 }
 
