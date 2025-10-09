@@ -104,98 +104,60 @@ export async function presentEventData(
   const { day } = useDilemmaStore.getState();
   const isFirstDay = day === 1;
 
-  console.log(`[Presenter] Starting presentation for Day ${day}${isFirstDay ? ' (first day - no analysis)' : ''}`);
-
   // ========== STEP 0: ResourceBar (always visible) ==========
   setPresentationStep(0);
-  console.log("[Presenter] Step 0: ResourceBar");
   await delay(800); // Let resource bar settle
 
   // ========== STEP 1: SupportList (initial values) ==========
   setPresentationStep(1);
-  console.log("[Presenter] Step 1: SupportList (initial)");
   await delay(1500); // Let user see initial support values
 
   // ========== STEP 2: Support Changes Animation (Day 2+ only) ==========
-  // This step applies support deltas FIRST, then advances presentation step
-  // When step advances, SupportList re-renders with new percent values from store
-  // SupportList animates counter from old → new values (1000ms RAF animation)
-  // Delta pills, trend arrows, and explanation notes appear simultaneously
   if (!isFirstDay && collectedData.supportEffects && collectedData.supportEffects.length > 0) {
-    console.log(`[Presenter] Step 2: Support effects found - ${collectedData.supportEffects.length} deltas to apply`);
-    console.log("[Presenter] Step 2: Applying support deltas and triggering animation (Day 2+)");
-
-    // 1. Apply deltas to store FIRST - updates global state (supportPeople, supportMiddle, supportMom)
+    // Apply deltas to store FIRST - updates global state
     applySupportDeltas(collectedData.supportEffects);
 
-    // 2. Small delay to ensure Zustand store updates propagate before re-render
-    //    Without this, setPresentationStep might trigger re-render before store fully updates
-    //    This ensures buildSupportItems() reads fresh values (e.g., 35% instead of 50%)
+    // Small delay to ensure Zustand store updates propagate
     await delay(50);
 
-    // 3. Advance step to 2 - triggers EventScreen3 re-render
-    //    buildSupportItems() now reads updated values from store + adds delta/trend/note
-    //    SupportList receives new percent prop and animates from old → new value
+    // Advance step to 2 - triggers EventScreen3 re-render with animated counters
     setPresentationStep(2);
 
-    // 4. Wait for animations to complete:
-    //    - Counter animates from old to new percent (1000ms)
-    //    - Delta pill scales in (250ms)
-    //    - Trend arrow starts bobbing
-    //    - Note text appears
-    //    Total: 2500ms to see counter animation + read notes
-    await delay(2500); // Give user time to see counter animation and read explanation
-  } else if (isFirstDay) {
-    console.log("[Presenter] Step 2: SKIPPED (Day 1 - no previous choice)");
-  } else {
-    console.warn(`[Presenter] Step 2: SKIPPED - Missing support effects! Has effects: ${!!collectedData.supportEffects}, Length: ${collectedData.supportEffects?.length || 0}`);
+    // Wait for animations to complete (counter, delta pill, trend arrow, note text)
+    await delay(2500);
+  } else if (!isFirstDay) {
+    console.warn(`[Presenter] ⚠️ Day ${day}: Missing support effects (expected for Day 2+)`);
   }
 
   // ========== STEP 3: NewsTicker (shows immediately with placeholder) ==========
   setPresentationStep(3);
-  console.log("[Presenter] Step 3: NewsTicker (with placeholder 'News items incoming...')");
   await delay(0); // No delay - NewsTicker just needs to mount
 
   // ========== STEP 4: DilemmaCard ==========
   setPresentationStep(4);
-  console.log("[Presenter] Step 4: DilemmaCard");
+  await delay(300); // Let DilemmaCard render and animate in
 
-  // Small delay to let DilemmaCard render and animate in
-  await delay(300);
-
-  // Trigger narration AFTER the card is visible (EventScreen3 passes startNarrationIfReady)
+  // Trigger narration AFTER the card is visible
   if (onDilemmaRevealed) {
-    console.log("[Presenter] Triggering dilemma narration");
     onDilemmaRevealed();
   }
 
   await delay(1200); // Let user start reading dilemma
 
   // ========== STEP 4A: Compass Pills (Day 2+ only) ==========
-  // Pills overlay on top of existing content, no step advancement needed
+  // Pills are handled by EventScreen3's visibility logic (data-based, not step-based)
+  // Apply compass deltas to store when available
   if (!isFirstDay && collectedData.compassPills && collectedData.compassPills.length > 0) {
-    console.log("[Presenter] Step 4A: Compass pills (Day 2+)");
-
-    // Apply deltas to store
     applyCompassDeltas(collectedData.compassPills);
-
-    // Pills overlay appears automatically via CompassPillsOverlay component
-    // No need to advance step - it overlays on top of existing content
-    // Wait for pills to appear and auto-collapse (they collapse after 2s)
-    await delay(2500); // Let user see compass pills
-  } else if (isFirstDay) {
-    console.log("[Presenter] Step 4A: SKIPPED (Day 1 - no previous choice)");
+    await delay(2500); // Wait for pills to appear and auto-collapse
   }
 
   // ========== STEP 5: MirrorCard ==========
   setPresentationStep(5);
-  console.log("[Presenter] Step 5: MirrorCard");
   await delay(1500); // Let user read mirror text
 
   // ========== STEP 6: ActionDeck (final) ==========
   setPresentationStep(6);
-  console.log("[Presenter] Step 6: ActionDeck - presentation complete, player can interact");
-
   // Presentation complete - player can now choose an action
 }
 
@@ -230,11 +192,6 @@ export function buildSupportItems(
 }> {
   const { supportPeople, supportMiddle, supportMom } = useDilemmaStore.getState();
   const { analysis } = useRoleStore.getState();
-
-  console.log(`[buildSupportItems] Step: ${presentationStep}, Values from store: people=${supportPeople}, middle=${supportMiddle}, mom=${supportMom}`);
-  if (initialValues) {
-    console.log(`[buildSupportItems] Initial values (before deltas): people=${initialValues.people}, middle=${initialValues.middle}, mom=${initialValues.mom}`);
-  }
 
   // Get middle entity info from analysis
   const playerIndex = typeof analysis?.playerIndex === "number" ? analysis.playerIndex : 0;

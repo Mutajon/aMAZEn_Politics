@@ -181,12 +181,9 @@ async function fetchDilemma(): Promise<Dilemma> {
   const { useLightDilemma } = useSettingsStore.getState();
   const { day, supportPeople, supportMiddle, supportMom, setSupportPeople, setSupportMiddle, setSupportMom, updateSubjectStreak } = useDilemmaStore.getState();
 
-  console.log(`[fetchDilemma] Using ${useLightDilemma ? 'LIGHT' : 'HEAVY'} API (day ${day})`);
-
   if (useLightDilemma) {
     // ===== LIGHT API =====
     const snapshot = buildLightSnapshot();
-    console.log("[fetchDilemma] Light API request:", snapshot);
 
     const response = await fetch("/api/dilemma-light", {
       method: "POST",
@@ -199,7 +196,6 @@ async function fetchDilemma(): Promise<Dilemma> {
     }
 
     const data: LightDilemmaResponse = await response.json();
-    console.log("[fetchDilemma] Light API response:", data);
 
     // Validate required fields
     if (!data.title || !data.description || !Array.isArray(data.actions) || data.actions.length !== 3) {
@@ -213,12 +209,6 @@ async function fetchDilemma(): Promise<Dilemma> {
       const newPeople = Math.max(0, Math.min(100, supportPeople + people.delta));
       const newMom = Math.max(0, Math.min(100, supportMom + mom.delta));
       const newMiddle = Math.max(0, Math.min(100, supportMiddle + holders.delta));
-
-      console.log("[fetchDilemma] Applying support shifts:", {
-        people: `${supportPeople} → ${newPeople} (${people.delta > 0 ? '+' : ''}${people.delta})`,
-        mom: `${supportMom} → ${newMom} (${mom.delta > 0 ? '+' : ''}${mom.delta})`,
-        middle: `${supportMiddle} → ${newMiddle} (${holders.delta > 0 ? '+' : ''}${holders.delta})`
-      });
 
       setSupportPeople(newPeople);
       setSupportMom(newMom);
@@ -242,7 +232,6 @@ async function fetchDilemma(): Promise<Dilemma> {
   } else {
     // ===== HEAVY API =====
     const snapshot = buildSnapshot();
-    console.log("[fetchDilemma] Heavy API request (snapshot size:", JSON.stringify(snapshot).length, "chars)");
 
     const response = await fetch("/api/dilemma", {
       method: "POST",
@@ -255,7 +244,6 @@ async function fetchDilemma(): Promise<Dilemma> {
     }
 
     const data = await response.json();
-    console.log("[fetchDilemma] Heavy API response:", data);
 
     // Validate required fields
     if (!data.title || !data.description || !Array.isArray(data.actions) || data.actions.length !== 3) {
@@ -510,8 +498,6 @@ export function useEventDataCollector() {
   } : null;
 
   const collectData = useCallback(async () => {
-    console.log('[Collector] 🚀 Starting 3-phase sequential collection...');
-
     // Clear ALL state immediately
     setPhase1Data(null);
     setPhase2Data(null);
@@ -520,16 +506,12 @@ export function useEventDataCollector() {
     setCollectionError(null);
 
     const { day, lastChoice } = useDilemmaStore.getState();
-    console.log(`[Collector] Day: ${day}, Has lastChoice: ${!!lastChoice}`);
 
     try {
       // ========================================================================
       // PHASE 1: Critical Path - Dilemma ONLY
       // ========================================================================
-      console.log('[Collector] 📋 PHASE 1: Fetching dilemma (critical path)...');
-
       const dilemmaResponse = await fetchDilemma();
-      console.log(`[Collector] ✅ PHASE 1 complete: ${dilemmaResponse.title}`);
 
       // Extract dilemma data
       const dilemma: Dilemma = {
@@ -552,10 +534,6 @@ export function useEventDataCollector() {
           ? dilemmaResponse.supportEffects
           : null;
 
-      if (supportEffects) {
-        console.log(`[Collector] ✅ Support effects included: ${supportEffects.length} effects`);
-      }
-
       // Build Phase 1 data
       const p1: Phase1Data = {
         dilemma,
@@ -564,7 +542,6 @@ export function useEventDataCollector() {
       };
 
       // CRITICAL: Set Phase 1 data immediately - triggers UI render!
-      console.log('[Collector] 🎯 PHASE 1 data ready - UI can show content NOW');
       setPhase1Data(p1);
 
       // Update global dilemma store for narration
@@ -572,23 +549,17 @@ export function useEventDataCollector() {
 
       // CRITICAL: Mark collecting as done NOW - UI can render!
       setIsCollecting(false);
-      console.log('[Collector] ✅ Phase 1 complete - UI renders immediately!');
 
       // Notify listeners that data is ready (for loading progress animation)
       if (onReadyCallbackRef.current) {
-        console.log('[Collector] 🎯 Triggering onReady callback');
         onReadyCallbackRef.current();
       }
-
-      console.log('[Collector] 📋 Phase 2/3 will continue in background...');
 
       // ========================================================================
       // PHASE 2: Secondary Data - Compass + Dynamic Params (Day 2+ only)
       // NON-BLOCKING: Runs in background after Phase 1 shows
       // ========================================================================
       if (day > 1 && lastChoice) {
-        console.log('[Collector] 📋 PHASE 2: Starting background fetch (compass + dynamic)...');
-
         Promise.allSettled([
           fetchCompassPills(lastChoice),
           fetchDynamicParams(lastChoice)
@@ -599,36 +570,27 @@ export function useEventDataCollector() {
             const dynamicParams: DynamicParam[] | null =
               dynamicResult.status === "fulfilled" ? dynamicResult.value : null;
 
-            console.log(`[Collector] ✅ PHASE 2 complete (background): ${compassPills?.length || 0} compass, ${dynamicParams?.length || 0} params`);
+            console.log(`[Collector] 💊 Phase 2: ${compassPills?.length || 0} compass pills, ${dynamicParams?.length || 0} params`);
 
             // Set Phase 2 data - triggers PlayerStatusStrip update
             setPhase2Data({ compassPills, dynamicParams });
           })
           .catch(error => {
-            console.warn('[Collector] ⚠️ Phase 2 failed (background):', error);
-            // UI already showing, so just skip Phase 2 data
+            console.warn('[Collector] ⚠️ Phase 2 failed:', error);
           });
-      } else {
-        console.log('[Collector] ⏭️ PHASE 2 skipped (Day 1)');
       }
 
       // ========================================================================
       // PHASE 3: Tertiary Data - Mirror Dialogue
       // NON-BLOCKING: Runs in background after Phase 1 shows
       // ========================================================================
-      console.log('[Collector] 📋 PHASE 3: Starting background fetch (mirror)...');
-
       fetchMirrorText(dilemma)
         .then(mirrorText => {
-          console.log('[Collector] ✅ PHASE 3 complete (background): Mirror dialogue received');
-
           // Set Phase 3 data - triggers MirrorCard text replacement
           setPhase3Data({ mirrorText });
-          console.log('[Collector] 🎉 All phases complete! Data fully loaded.');
         })
         .catch(error => {
-          console.warn('[Collector] ⚠️ Phase 3 failed (background):', error);
-          // Fallback text already set in collectedData construction
+          console.warn('[Collector] ⚠️ Phase 3 (mirror) failed:', error);
         });
 
       // Function returns immediately after Phase 1 completes
@@ -659,7 +621,6 @@ export function useEventDataCollector() {
 
   // Register callback for ready notification
   const registerOnReady = useCallback((callback: () => void) => {
-    console.log('[Collector] Registering onReady callback');
     onReadyCallbackRef.current = callback;
   }, []);
 

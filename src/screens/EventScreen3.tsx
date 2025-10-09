@@ -82,21 +82,23 @@ export default function EventScreen3(_props: Props) {
   // Convert collected compassPills to CompassEffectPing format with unique IDs
   const compassPings: CompassEffectPing[] = useMemo(() => {
     if (!collectedData?.compassPills) return [];
-    return collectedData.compassPills.map((pill, i) => ({
+    const pills = collectedData.compassPills.map((pill, i) => ({
       id: `${Date.now()}-${i}`,
       prop: pill.prop,
       idx: pill.idx,
       delta: pill.delta
     }));
+    if (pills.length > 0) {
+      console.log(`[EventScreen3] 💊 CompassPings populated: ${pills.length} pills`, pills);
+    }
+    return pills;
   }, [collectedData?.compassPills]);
 
   // ========================================================================
   // EFFECT 0: Register progress callback with data collector
   // ========================================================================
   useEffect(() => {
-    console.log('[EventScreen3] Registering progress callback with data collector');
     registerOnReady(() => {
-      console.log('[EventScreen3] Data ready - triggering progress catchup animation');
       notifyReady();
     });
   }, [registerOnReady, notifyReady]);
@@ -109,34 +111,22 @@ export default function EventScreen3(_props: Props) {
   const lastCollectedDayRef = useRef<number>(0);
 
   useEffect(() => {
-    console.log(`[EventScreen3] Effect running - phase: ${phase}, day: ${day}, ref: ${collectionTriggeredRef.current}, lastDay: ${lastCollectedDayRef.current}, isCollecting: ${isCollecting}, error: ${collectionError}`);
-
     if (phase === 'collecting') {
       // Reset ref if we're on a new day
       if (day !== lastCollectedDayRef.current) {
-        console.log(`[EventScreen3] 🔄 New day detected (${lastCollectedDayRef.current} → ${day}), resetting ref`);
         collectionTriggeredRef.current = false;
         lastCollectedDayRef.current = day;
-
-        // Reset and start progress for new day
         resetProgress();
         startProgress();
-        console.log('[EventScreen3] 🎯 Started loading progress for new day');
       }
 
       // Only trigger if we haven't already triggered for this day
       if (!collectionTriggeredRef.current && !isCollecting && !collectionError) {
-        console.log(`[EventScreen3] ✅ Phase is collecting - triggering data collection for day ${day}`);
         collectionTriggeredRef.current = true;
         collectData();
-      } else {
-        console.log(`[EventScreen3] ⏸️ Collection blocked - ref: ${collectionTriggeredRef.current}, isCollecting: ${isCollecting}, error: ${collectionError}`);
       }
     } else {
       // Reset flag when leaving collecting phase
-      if (collectionTriggeredRef.current) {
-        console.log('[EventScreen3] 🔄 Resetting collection trigger ref (leaving collecting phase)');
-      }
       collectionTriggeredRef.current = false;
     }
   }, [phase, isCollecting, collectionError, day, collectData, startProgress, resetProgress]);
@@ -153,13 +143,10 @@ export default function EventScreen3(_props: Props) {
         middle: supportMiddle,
         mom: supportMom
       });
-      console.log('[EventScreen3] 📸 Captured initial support values at Step 1:', { supportPeople, supportMiddle, supportMom });
     }
 
     // Clear after Step 2 completes (at Step 3+) so animation doesn't reset
-    // This ensures SupportCard displays final percent value, not initial value
     if (presentationStep >= 3 && initialSupportValues) {
-      console.log('[EventScreen3] 🧹 Clearing initial support values at Step', presentationStep);
       setInitialSupportValues(null);
     }
   }, [presentationStep, initialSupportValues]);
@@ -169,7 +156,6 @@ export default function EventScreen3(_props: Props) {
   // ========================================================================
   useEffect(() => {
     if (isReady && canShowDilemma && !isCollecting && phase === 'collecting' && collectedData) {
-      console.log('[EventScreen3] ✅ Data ready - starting presentation sequence');
       setPhase('presenting');
 
       // Run presentation sequence with narration callback
@@ -179,27 +165,27 @@ export default function EventScreen3(_props: Props) {
         () => startNarrationIfReady(true) // Trigger narration when dilemma card is revealed
       )
         .then(() => {
-          console.log('[EventScreen3] Presentation complete - advancing to interacting phase');
           setPhase('interacting');
         })
         .catch(error => {
-          console.error('[EventScreen3] Presentation error:', error);
+          console.error('[EventScreen3] ❌ Presentation error:', error);
         });
     }
   }, [isReady, canShowDilemma, isCollecting, phase, collectedData, startNarrationIfReady, setPresentationStep]);
 
   // ========================================================================
-  // EFFECT 4: Control compass pills visibility based on presentation step
-  // Pills appear at Step 4+ (after dilemma shown) and before Step 6 (action deck)
+  // EFFECT 4: Control compass pills visibility (data-based, not step-based)
+  // Pills show during interacting phase when they arrive (Phase 2 completes async)
   // ========================================================================
   useEffect(() => {
-    const shouldShow = presentationStep >= 4 && presentationStep < 6 && day > 1 && compassPings.length > 0;
+    // Show pills when we're interacting AND pills data exists AND it's Day 2+
+    const shouldShow = phase === 'interacting' && compassPings.length > 0 && day > 1;
 
     if (shouldShow !== showCompassPills) {
-      console.log(`[EventScreen3] Compass pills visibility: ${shouldShow} (step: ${presentationStep}, day: ${day}, pills: ${compassPings.length})`);
+      console.log(`[EventScreen3] 💊 Pills visibility: ${shouldShow} (phase: ${phase}, day: ${day}, pills: ${compassPings.length})`);
       setShowCompassPills(shouldShow);
     }
-  }, [presentationStep, day, compassPings.length, showCompassPills]);
+  }, [phase, day, compassPings.length, showCompassPills]);
 
   // ========================================================================
   // ACTION HANDLERS
@@ -209,8 +195,6 @@ export default function EventScreen3(_props: Props) {
    * Handle action confirmation - delegates ALL logic to EventDataCleaner
    */
   const handleConfirm = async (id: string) => {
-    console.log('[EventScreen3] Action confirmed:', id);
-
     // Find the action card
     const actionsForDeck = collectedData?.dilemma
       ? actionsToDeckCards(collectedData.dilemma.actions)
@@ -218,19 +202,17 @@ export default function EventScreen3(_props: Props) {
     const actionCard = actionsForDeck.find(a => a.id === id);
 
     if (!actionCard) {
-      console.error('[EventScreen3] Action not found:', id);
+      console.error('[EventScreen3] ❌ Action not found:', id);
       return;
     }
 
     // Advance to cleaning phase
     setPhase('cleaning');
-    console.log('[EventScreen3] Entering cleaning phase');
 
     // Run cleaner (handles: save choice, update budget, coin animation, advance day)
     await cleanAndAdvanceDay(actionCard, clearFlights);
 
     // After cleaning complete, reset to collecting phase for next day
-    console.log('[EventScreen3] Cleaning complete - resetting to collecting phase');
     setPhase('collecting');
     setPresentationStep(-1);
     setInitialSupportValues(null); // Clear for next day
@@ -241,7 +223,6 @@ export default function EventScreen3(_props: Props) {
    * Handle custom action suggestion
    */
   const handleSuggest = (text?: string) => {
-    console.log('[EventScreen3] Suggest your own:', text);
     // ActionDeck handles suggestion validation internally
     // This handler is just for EventScreen3 to be notified
   };
@@ -250,7 +231,6 @@ export default function EventScreen3(_props: Props) {
   // RENDER: Loading State (collecting phase)
   // ========================================================================
   if (phase === 'collecting' || isCollecting) {
-    console.log('[EventScreen3] Rendering loading overlay with progress:', progress);
     return (
       <CollectorLoadingOverlay
         progress={progress} // Real-time progress with auto-increment and catchup animation
@@ -263,12 +243,10 @@ export default function EventScreen3(_props: Props) {
   // RENDER: Error State (dilemma failed - no fallback)
   // ========================================================================
   if (collectionError) {
-    console.log('[EventScreen3] Rendering error screen:', collectionError);
     return (
       <DilemmaLoadError
         error={collectionError}
         onRetry={() => {
-          console.log('[EventScreen3] Retry requested - restarting collection');
           setPhase('collecting');
           collectData();
         }}

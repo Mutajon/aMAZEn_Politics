@@ -1,5 +1,6 @@
 // src/components/event/CompassPillsOverlay.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import type { CompassEffectPing } from "../MiniCompass";
 import { COMPONENTS, PALETTE } from "../../data/compass-data";
 
@@ -60,15 +61,22 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
       )}
 
       {!loading && hasPills && (
-        <>
+        <AnimatePresence mode="wait">
           {expanded ? (
             // Expanded stack of pills (clicking any pill collapses)
-            <div className="pointer-events-auto flex flex-col items-center gap-2">
-              {effectPills.map((p) => {
+            <motion.div
+              key="pills-expanded"
+              className="pointer-events-auto flex flex-col items-center gap-2"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              {effectPills.map((p, index) => {
                 const label = COMPONENTS[p.prop][p.idx]?.short ?? "";
                 const bg = (PALETTE as any)[p.prop]?.base ?? "#fff";
                 return (
-                  <button
+                  <motion.button
                     key={p.id}
                     type="button"
                     onClick={() => setExpanded(false)}
@@ -82,42 +90,64 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
                     }}
                     aria-label={`${p.delta > 0 ? "+" : ""}${p.delta} ${label}`}
                     title="Hide"
+                    // Staggered spring animation - each pill appears in quick succession
+                    initial={{ opacity: 0, scale: 0.3, y: -20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.8, y: 10 }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 400,
+                      damping: 25,
+                      delay: index * 0.08, // 80ms stagger between pills
+                    }}
                   >
                     {`${p.delta > 0 ? "+" : ""}${p.delta} ${label}`}
-                  </button>
+                  </motion.button>
                 );
               })}
-            </div>
+            </motion.div>
           ) : (
-          // Collapsed small "+" button (re-expands) — top-center, center sits on top edge
-<button
-  type="button"
-  onClick={() => setExpanded(true)}
-  className="
-    pointer-events-auto
-    absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2
-    inline-flex items-center justify-center
-    w-7 h-7 rounded-full
-    text-white text-sm font-bold
-    focus:outline-none
-    border border-white/30
-  "
-  aria-label="Show effects"
-  title="Show effects"
-  style={{
-    // Fallback gradient (in case conic isn't supported)
-    background: "linear-gradient(135deg, #ef4444, #3b82f6)",
-    // Four quadrants: red, green, blue, yellow
-    backgroundImage:
-      "conic-gradient(#ef4444 0 90deg, #10b981 90deg 180deg, #3b82f6 180deg 270deg, #f59e0b 270deg 360deg)",
-    boxShadow: "0 6px 18px rgba(0,0,0,0.35)",
-  }}
->
-  +
-</button>
-
+            // Collapsed small "+" button (re-expands) — top-center, center sits on top edge
+            <motion.button
+              key="pills-collapsed"
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="
+                pointer-events-auto
+                absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2
+                inline-flex items-center justify-center
+                w-7 h-7 rounded-full
+                text-white text-sm font-bold
+                focus:outline-none
+                border border-white/30
+              "
+              aria-label="Show effects"
+              title="Show effects"
+              style={{
+                // Fallback gradient (in case conic isn't supported)
+                background: "linear-gradient(135deg, #ef4444, #3b82f6)",
+                // Four quadrants: red, green, blue, yellow
+                backgroundImage:
+                  "conic-gradient(#ef4444 0 90deg, #10b981 90deg 180deg, #3b82f6 180deg 270deg, #f59e0b 270deg 360deg)",
+                boxShadow: "0 6px 18px rgba(0,0,0,0.35)",
+              }}
+              // Spring animation for collapse button appearance
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.5 }}
+              transition={{
+                type: "spring",
+                stiffness: 350,
+                damping: 20,
+              }}
+              // Subtle hover animation
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              +
+            </motion.button>
           )}
-        </>
+        </AnimatePresence>
       )}
     </div>
   );
