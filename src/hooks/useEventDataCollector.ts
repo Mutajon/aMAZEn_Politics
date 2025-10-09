@@ -624,6 +624,41 @@ export function useEventDataCollector() {
     onReadyCallbackRef.current = callback;
   }, []);
 
+  /**
+   * Restore collected data from snapshot (for navigation preservation)
+   * Bypasses collection and directly sets all phase data
+   */
+  const restoreCollectedData = useCallback((data: CollectedData) => {
+    console.log('[Collector] 📸 Restoring from snapshot:', data);
+
+    // Reconstruct phase data from legacy format
+    setPhase1Data({
+      dilemma: data.dilemma,
+      supportEffects: data.supportEffects,
+      newsItems: data.newsItems || []
+    });
+
+    setPhase2Data({
+      compassPills: data.compassPills,
+      dynamicParams: data.dynamicParams
+    });
+
+    setPhase3Data({
+      mirrorText: data.mirrorText
+    });
+
+    setIsCollecting(false);
+    setCollectionError(null);
+
+    // Update global dilemma store
+    useDilemmaStore.setState({ current: data.dilemma });
+
+    // Notify ready callback immediately
+    if (onReadyCallbackRef.current) {
+      onReadyCallbackRef.current();
+    }
+  }, []);
+
   return {
     // New progressive API
     phase1Data,
@@ -639,6 +674,9 @@ export function useEventDataCollector() {
     isReady: isFullyReady(),
 
     // Progress callback API
-    registerOnReady
+    registerOnReady,
+
+    // Snapshot restoration API
+    restoreCollectedData
   };
 }

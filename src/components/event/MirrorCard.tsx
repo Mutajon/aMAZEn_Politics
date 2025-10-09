@@ -5,6 +5,7 @@
 
 import React, { useMemo, useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { HelpCircle } from "lucide-react";
 import { mirrorBubbleTheme as T } from "../../theme/mirrorBubbleTheme";
 
 /* ====================== TUNABLES (EDIT HERE) ====================== */
@@ -51,9 +52,10 @@ export type MirrorCardProps = {
   text: string;      // 1–2 sentences
   italic?: boolean;
   className?: string;
+  onExploreClick?: () => void; // NEW: Callback for explore button
 };
 
-export default function MirrorCard({ text, italic = true, className }: MirrorCardProps) {
+export default function MirrorCard({ text, italic = true, className, onExploreClick }: MirrorCardProps) {
   // Always use character-level splitting for smooth shimmer effect
   const segments = useMemo(() => splitGraphemes(text), [text]);
 
@@ -147,6 +149,27 @@ export default function MirrorCard({ text, italic = true, className }: MirrorCar
           }}
           loading="lazy"
         />
+
+        {/* Explore button - top-right corner */}
+        {onExploreClick && (
+          <motion.button
+            onClick={onExploreClick}
+            className="
+              absolute top-2 right-2 z-20
+              w-8 h-8 rounded-full
+              bg-white/20 hover:bg-white/30
+              backdrop-blur-sm border border-white/40
+              flex items-center justify-center
+              transition-colors cursor-pointer
+            "
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            title="Explore your compass values"
+            aria-label="Explore compass values"
+          >
+            <HelpCircle className="w-5 h-5 text-white" />
+          </motion.button>
+        )}
       </div>
     </motion.div>
   );

@@ -32,12 +32,13 @@ import { AnimatePresence } from "framer-motion";
 import { bgStyle } from "../lib/ui";
 import { Building2, Heart, Users } from "lucide-react";
 import type { CompassEffectPing } from "../components/MiniCompass";
+import { saveEventScreenSnapshot, loadEventScreenSnapshot, clearEventScreenSnapshot } from "../lib/eventScreenSnapshot";
 
 type Props = {
   push: (path: string) => void;
 };
 
-export default function EventScreen3(_props: Props) {
+export default function EventScreen3({ push }: Props) {
   // Global state (read only - single source of truth)
   const { day, totalDays, budget } = useDilemmaStore();
   const { character } = useRoleStore();
@@ -50,7 +51,8 @@ export default function EventScreen3(_props: Props) {
     collectionError,
     collectData,
     isReady,           // Legacy flag (same as phase1Ready now)
-    registerOnReady    // Callback registration for progress notification
+    registerOnReady,   // Callback registration for progress notification
+    restoreCollectedData // Restore from snapshot
   } = useEventDataCollector();
 
   // Narration integration - prepares TTS when dilemma loads, provides canShowDilemma flag
@@ -79,6 +81,9 @@ export default function EventScreen3(_props: Props) {
   // Compass pills state (for visual display during Step 4A)
   const [showCompassPills, setShowCompassPills] = useState(false);
 
+  // Snapshot restoration flag (prevents collection when restored)
+  const [restoredFromSnapshot, setRestoredFromSnapshot] = useState(false);
+
   // Convert collected compassPills to CompassEffectPing format with unique IDs
   const compassPings: CompassEffectPing[] = useMemo(() => {
     if (!collectedData?.compassPills) return [];
@@ -95,7 +100,36 @@ export default function EventScreen3(_props: Props) {
   }, [collectedData?.compassPills]);
 
   // ========================================================================
-  // EFFECT 0: Register progress callback with data collector
+  // EFFECT 0A: Restore from snapshot if available (runs once on mount)
+  // ========================================================================
+  useEffect(() => {
+    if (restoredFromSnapshot) return; // Already restored
+
+    const snapshot = loadEventScreenSnapshot();
+    if (snapshot) {
+      console.log('[EventScreen3] 📸 Restoring from snapshot');
+
+      // Restore phase and presentation state
+      setPhase(snapshot.phase);
+      setPresentationStep(snapshot.presentationStep);
+
+      // Restore collected data through collector
+      restoreCollectedData(snapshot.collectedData);
+
+      // Clear snapshot (one-time use)
+      clearEventScreenSnapshot();
+
+      // Mark as restored
+      setRestoredFromSnapshot(true);
+
+      // Notify progress system that we're ready
+      notifyReady();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
+
+  // ========================================================================
+  // EFFECT 0B: Register progress callback with data collector
   // ========================================================================
   useEffect(() => {
     registerOnReady(() => {
@@ -111,6 +145,9 @@ export default function EventScreen3(_props: Props) {
   const lastCollectedDayRef = useRef<number>(0);
 
   useEffect(() => {
+    // Skip collection if restored from snapshot
+    if (restoredFromSnapshot) return;
+
     if (phase === 'collecting') {
       // Reset ref if we're on a new day
       if (day !== lastCollectedDayRef.current) {
@@ -129,7 +166,7 @@ export default function EventScreen3(_props: Props) {
       // Reset flag when leaving collecting phase
       collectionTriggeredRef.current = false;
     }
-  }, [phase, isCollecting, collectionError, day, collectData, startProgress, resetProgress]);
+  }, [phase, isCollecting, collectionError, day, collectData, startProgress, resetProgress, restoredFromSnapshot]);
 
   // ========================================================================
   // EFFECT 2: Capture and clear initial support values for animation
@@ -227,6 +264,27 @@ export default function EventScreen3(_props: Props) {
     // This handler is just for EventScreen3 to be notified
   };
 
+  /**
+   * Handle navigation to Mirror Screen with state preservation
+   */
+  const handleNavigateToMirror = () => {
+    if (!collectedData) {
+      console.warn('[EventScreen3] Cannot navigate to mirror - no collected data');
+      return;
+    }
+
+    // Save snapshot before navigation
+    saveEventScreenSnapshot({
+      phase,
+      presentationStep,
+      collectedData,
+      timestamp: Date.now()
+    });
+
+    console.log('[EventScreen3] 📸 Snapshot saved, navigating to /mirror');
+    push('/mirror');
+  };
+
   // ========================================================================
   // RENDER: Loading State (collecting phase)
   // ========================================================================
@@ -320,7 +378,10 @@ export default function EventScreen3(_props: Props) {
           {/* Step 5+: MirrorCard with Compass Pills Overlay (was Step 6) */}
           {presentationStep >= 5 && collectedData && (
             <div className="relative">
-              <MirrorCard text={collectedData.mirrorText} />
+              <MirrorCard
+                text={collectedData.mirrorText}
+                onExploreClick={handleNavigateToMirror}
+              />
               {/* Compass Pills Overlay - appears at Step 4A (Day 2+) */}
               {showCompassPills && (
                 <CompassPillsOverlay

@@ -15,6 +15,7 @@ import type { PushFn } from "../lib/router";
 import { bgStyle } from "../lib/ui";
 import { useMirrorTop3 } from "../hooks/useMirrorTop3";
 import { PROPERTIES, PALETTE, type PropKey } from "../data/compass-data";
+import { hasEventScreenSnapshot } from "../lib/eventScreenSnapshot";
 
 const MIRROR_SRC = "/assets/images/mirror.png";
 
@@ -23,6 +24,9 @@ type Props = { push: PushFn };
 export default function MirrorScreen({ push }: Props) {
   const top3ByDimension = useMirrorTop3();
   const [selectedDef, setSelectedDef] = useState<{ prop: PropKey; short: string; full: string } | null>(null);
+
+  // Check if we came from EventScreen (snapshot exists)
+  const cameFromEvent = hasEventScreenSnapshot();
 
   // Section titles for each dimension
   const sectionTitles: Record<PropKey, string> = {
@@ -39,9 +43,15 @@ export default function MirrorScreen({ push }: Props) {
         <div className="mb-6">
           <button
             className="rounded-xl px-4 py-2 bg-white/10 hover:bg-white/20 text-white/90 transition-colors"
-            onClick={() => push("/event")}
+            onClick={() => {
+              if (cameFromEvent) {
+                push("/event"); // Will restore snapshot
+              } else {
+                window.history.back(); // Fallback
+              }
+            }}
           >
-            ← Back
+            ← Back{cameFromEvent ? " to Event" : ""}
           </button>
         </div>
 

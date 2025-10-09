@@ -89,7 +89,8 @@ switchToGPT()        # Switch to OpenAI GPT for dilemmas + mirror dialogue (DEFA
 │   │   ├── supportAnalysis.ts   # Support change calculations
 │   │   ├── eventConfirm.ts      # Action confirmation pipeline
 │   │   ├── mirrorDilemma.ts     # Mirror dialogue generation
-│   │   └── narration.ts         # TTS text processing
+│   │   ├── narration.ts         # TTS text processing
+│   │   └── eventScreenSnapshot.ts # EventScreen state preservation for navigation
 │   ├── screens/
 │   │   ├── EventScreen3.tsx     # Main gameplay screen
 │   │   ├── RoleSelectionScreen.tsx
@@ -249,6 +250,31 @@ switchToGPT()     // Switch back to OpenAI GPT (default)
    - Political compass values
 
 **AI Call Optimization**: Predefined roles eliminate **2 AI calls** per playthrough (role analysis + name generation), providing instant loading and consistent experience.
+
+### EventScreen ↔ MirrorScreen Navigation
+
+The game supports seamless navigation between EventScreen and MirrorScreen with state preservation:
+
+**User Flow:**
+1. Player is on EventScreen viewing a dilemma
+2. Clicks "?" button on MirrorCard → navigates to MirrorScreen
+3. Explores compass values (top 3 per dimension)
+4. Clicks "Back to Event" → returns to exact same EventScreen state
+
+**Technical Implementation:**
+- **Snapshot System** (`src/lib/eventScreenSnapshot.ts`): Saves EventScreen state to sessionStorage
+- **State Preserved**: phase, presentationStep, collectedData (dilemma, mirror text, support effects, etc.)
+- **Restoration Logic**: EventScreen restores from snapshot on mount (Effect 0A)
+- **Collection Skip**: Restored screens skip data collection (prevents reload)
+- **Time-Limited**: Snapshots expire after 30 minutes (prevents stale state)
+- **One-Time Use**: Snapshot cleared after restoration
+
+**Key Files:**
+- `src/lib/eventScreenSnapshot.ts` - Snapshot save/load/clear utilities
+- `src/screens/EventScreen3.tsx` - Save on navigate, restore on mount
+- `src/components/event/MirrorCard.tsx` - "?" explore button
+- `src/screens/MirrorScreen.tsx` - Smart back button ("Back to Event" vs "Back")
+- `src/hooks/useEventDataCollector.ts` - `restoreCollectedData()` method
 
 ### Action Confirmation Pipeline
 
