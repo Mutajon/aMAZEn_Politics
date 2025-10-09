@@ -21,6 +21,20 @@ npm run server:dev   # Backend with nodemon auto-restart
 npm run preview      # Preview production build
 ```
 
+### Browser Console Commands (AI Provider Switching)
+```javascript
+switchToClaude()     # Switch to Anthropic Claude for dilemmas + mirror dialogue
+switchToGPT()        # Switch to OpenAI GPT for dilemmas + mirror dialogue (DEFAULT)
+```
+
+**Usage:**
+1. Open browser console (F12)
+2. Run command: `switchToClaude()` or `switchToGPT()`
+3. Setting persists across sessions
+4. Next dilemma/mirror will use selected provider
+
+**Note:** Models are configured in `.env` - restart server after changing model versions.
+
 ## Project Structure
 
 ```
@@ -158,31 +172,58 @@ This is a political simulation game with AI-powered content generation, built as
 - `/api/tts` - Text-to-speech generation
 
 **AI Model Configuration**: Uses environment variables for different specialized models:
+
+**OpenAI Models (DEFAULT):**
 - `MODEL_VALIDATE` - Role validation
 - `MODEL_ANALYZE` - Political analysis
-- `MODEL_DILEMMA` - Dilemma generation (OpenAI)
-- `MODEL_DILEMMA_ANTHROPIC` - Dilemma generation (Anthropic Claude)
-- `MODEL_MIRROR` - Mirror dialogue (OpenAI)
-- `MODEL_MIRROR_ANTHROPIC` - Mirror dialogue (Anthropic Claude)
+- `MODEL_DILEMMA` - Dilemma generation (default: `gpt-5`)
+- `MODEL_MIRROR` - Mirror dialogue (default: `gpt-5`)
 - `IMAGE_MODEL` - Avatar generation
 - `TTS_MODEL` - Text-to-speech
 
-**Multi-Provider Support**: Both dilemma-light and mirror-summary APIs support OpenAI and Anthropic:
-- Toggle via `useLightDilemmaAnthropic` setting in `settingsStore`
-- Default: OpenAI (GPT-5 for both dilemmas and mirror dialogue)
-- Switch models using browser console commands:
-  - `switchToClaude()` - Use Anthropic Claude (model from `.env`) for **both** dilemmas and mirror dialogue
-  - `switchToGPT()` - Use OpenAI GPT (model from `.env`) for **both** dilemmas and mirror dialogue
-- Server routes to correct API based on `useAnthropic` flag in request
-- Affected endpoints: `/api/dilemma-light`, `/api/mirror-summary`
-- **Model Configuration**: Models are read from `.env` at server startup (no hardcoded fallbacks)
-  - **REQUIRED**: Set `MODEL_DILEMMA_ANTHROPIC` and `MODEL_MIRROR_ANTHROPIC` in `.env` to use Claude
-  - Change `.env` values and restart server (`npm run dev`) to use different models
-  - Examples:
-    - `MODEL_DILEMMA_ANTHROPIC=claude-3-5-haiku-latest` (fast, cheap)
-    - `MODEL_DILEMMA_ANTHROPIC=claude-3-5-sonnet-20241022` (balanced)
-    - `MODEL_DILEMMA_ANTHROPIC=claude-3-opus-20240229` (powerful, expensive)
-  - See `.env.example` for full configuration template
+**Anthropic Models (OPTIONAL):**
+- `MODEL_DILEMMA_ANTHROPIC` - Dilemma generation (Claude, no default - must set in `.env`)
+- `MODEL_MIRROR_ANTHROPIC` - Mirror dialogue (Claude, no default - must set in `.env`)
+
+### Multi-Provider AI Support
+
+Both `/api/dilemma-light` and `/api/mirror-summary` endpoints support **dual providers**:
+
+**Default Provider: OpenAI GPT** ✅
+- Used automatically on first launch
+- No additional configuration needed (beyond `OPENAI_API_KEY`)
+- Models: `MODEL_DILEMMA` and `MODEL_MIRROR` from `.env`
+
+**Alternative Provider: Anthropic Claude** (opt-in)
+- Requires setup in `.env`:
+  ```bash
+  MODEL_DILEMMA_ANTHROPIC=claude-3-5-haiku-latest
+  MODEL_MIRROR_ANTHROPIC=claude-3-5-haiku-latest
+  ```
+- Switch via browser console: `switchToClaude()`
+- Available Claude models:
+  - `claude-3-5-haiku-latest` - Fast, cost-effective
+  - `claude-3-5-sonnet-20241022` - Balanced quality/speed
+  - `claude-3-opus-20240229` - Most capable, expensive
+
+**Switching Between Providers:**
+
+Open browser console (F12) and run:
+```javascript
+switchToClaude()  // Switch to Anthropic Claude
+switchToGPT()     // Switch back to OpenAI GPT (default)
+```
+
+- Setting persists across browser sessions
+- Affects **both** dilemma generation and mirror dialogue
+- Next dilemma/mirror will use selected provider
+- No page reload needed
+
+**Configuration Details:**
+- Models read from `.env` at server startup (no hardcoded fallbacks)
+- Restart server (`npm run dev`) after changing `.env` model values
+- See `.env.example` for complete configuration template
+- Server logs show which provider is being used per request
 
 ### Game Flow Architecture
 
