@@ -288,7 +288,8 @@ export default function EventScreen3({ push }: Props) {
   // ========================================================================
   // RENDER: Loading State (collecting phase)
   // ========================================================================
-  if (phase === 'collecting' || isCollecting) {
+  // Don't show loading overlay if we're restoring from snapshot
+  if ((phase === 'collecting' || isCollecting) && !restoredFromSnapshot) {
     return (
       <CollectorLoadingOverlay
         progress={progress} // Real-time progress with auto-increment and catchup animation
