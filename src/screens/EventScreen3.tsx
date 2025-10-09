@@ -192,6 +192,9 @@ export default function EventScreen3({ push }: Props) {
   // EFFECT 3: Advance to presenting when data ready
   // ========================================================================
   useEffect(() => {
+    // Skip presentation if restored from snapshot
+    if (restoredFromSnapshot) return;
+
     if (isReady && canShowDilemma && !isCollecting && phase === 'collecting' && collectedData) {
       setPhase('presenting');
 
@@ -208,7 +211,7 @@ export default function EventScreen3({ push }: Props) {
           console.error('[EventScreen3] ❌ Presentation error:', error);
         });
     }
-  }, [isReady, canShowDilemma, isCollecting, phase, collectedData, startNarrationIfReady, setPresentationStep]);
+  }, [isReady, canShowDilemma, isCollecting, phase, collectedData, startNarrationIfReady, setPresentationStep, restoredFromSnapshot]);
 
   // ========================================================================
   // EFFECT 4: Control compass pills visibility (data-based, not step-based)
@@ -381,7 +384,12 @@ export default function EventScreen3({ push }: Props) {
             <div className="relative">
               <MirrorCard
                 text={collectedData.mirrorText}
-                onExploreClick={handleNavigateToMirror}
+                onExploreClick={
+                  // Show button only when fully loaded (interacting phase, after Step 5, Day 2+)
+                  phase === 'interacting' && presentationStep >= 5 && day > 1
+                    ? handleNavigateToMirror
+                    : undefined
+                }
               />
               {/* Compass Pills Overlay - appears at Step 4A (Day 2+) */}
               {showCompassPills && (
@@ -427,6 +435,11 @@ export default function EventScreen3({ push }: Props) {
   // ========================================================================
   // RENDER: Fallback
   // ========================================================================
+  // Don't show fallback if we're restoring from snapshot (data will be available momentarily)
+  if (restoredFromSnapshot) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center" style={bgStyle}>
       <p className="text-white">Unknown phase: {phase}</p>

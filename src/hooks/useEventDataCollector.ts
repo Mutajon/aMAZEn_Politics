@@ -650,8 +650,9 @@ export function useEventDataCollector() {
     setIsCollecting(false);
     setCollectionError(null);
 
-    // Update global dilemma store
-    useDilemmaStore.setState({ current: data.dilemma });
+    // ✅ DON'T update dilemma store - it's already there from before navigation!
+    // Updating it would trigger narration re-preparation in useEventNarration
+    // useDilemmaStore.setState({ current: data.dilemma });
 
     // Notify ready callback immediately
     if (onReadyCallbackRef.current) {
