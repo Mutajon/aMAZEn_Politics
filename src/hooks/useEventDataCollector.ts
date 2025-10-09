@@ -432,6 +432,7 @@ async function fetchNews(): Promise<TickerItem[]> {
 async function fetchMirrorText(dilemma: Dilemma): Promise<string> {
   const { values: compassValues } = useCompassStore.getState();
   const { dilemmaHistory } = useDilemmaStore.getState();
+  const { useLightDilemmaAnthropic } = useSettingsStore.getState();
 
   // Calculate top 3 compass components with names (not indices)
   // NO threshold filtering - just sort and take top 3
@@ -455,7 +456,8 @@ async function fetchMirrorText(dilemma: Dilemma): Promise<string> {
       }))
     },
     // OPTIMIZED: Only last 2 days of history (not full 7 days)
-    dilemmaHistory: dilemmaHistory.slice(-2)
+    dilemmaHistory: dilemmaHistory.slice(-2),
+    useAnthropic: useLightDilemmaAnthropic
   };
 
   try {

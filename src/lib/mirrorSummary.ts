@@ -1,6 +1,7 @@
 // src/lib/mirrorSummary.ts
 import { COMPONENTS, PROPERTIES, type PropKey } from "../data/compass-data";
 import type { CompassValues } from "../store/compassStore";
+import { useSettingsStore } from "../store/settingsStore";
 
 type TopItem = { prop: PropKey; idx: number; label: string; score: number };
 
@@ -9,6 +10,7 @@ export async function generateMirrorSummary(
   opts: { useAI?: boolean; apiPath?: string; topN?: number } = {}
 ): Promise<string> {
   const { useAI = true, apiPath = "/api/mirror-summary", topN = 2 } = opts;
+  const { useLightDilemmaAnthropic } = useSettingsStore.getState();
 
   const overall = topComponents(values, topN);
   const whatTop = topByProp(values, "what", topN);
@@ -23,6 +25,7 @@ export async function generateMirrorSummary(
           topWhat: whatTop.map(minify),
           topWhence: whenceTop.map(minify),
           topOverall: overall.map(minify),
+          useAnthropic: useLightDilemmaAnthropic,
         }),
       });
       if (resp.ok) {

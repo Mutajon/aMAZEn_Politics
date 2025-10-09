@@ -71,6 +71,7 @@ export type LightDilemmaRequest = {
     choiceSummary: string;
   };
   debug?: boolean;
+  useAnthropic?: boolean;
 };
 
 export type SupportShift = {

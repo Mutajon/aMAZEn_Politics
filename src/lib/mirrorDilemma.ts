@@ -47,7 +47,8 @@ function topOverallWithNames(comp: any, k = 2): Array<{ name: string; strength: 
 }
 
 export async function requestMirrorDilemmaLine(dilemma?: Dilemma | null): Promise<string> {
-  const debug = useSettingsStore.getState().debugMode;
+  const { debugMode, useLightDilemmaAnthropic } = useSettingsStore.getState();
+  const debug = debugMode;
   try {
     const comp = useCompassStore.getState().values;
     const {
@@ -95,6 +96,7 @@ export async function requestMirrorDilemmaLine(dilemma?: Dilemma | null): Promis
       middleName,
       day,
       totalDays,
+      useAnthropic: useLightDilemmaAnthropic,
     };
 
     if (debug) console.log("[mirror-dilemma] → POST /api/mirror-summary", payload);

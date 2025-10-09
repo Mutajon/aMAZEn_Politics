@@ -2,14 +2,19 @@
 import "dotenv/config";
 import express from "express";
 import bodyParser from "body-parser";
+import Anthropic from "@anthropic-ai/sdk";
 
 const app = express();
 app.use(bodyParser.json());
 
 // -------------------- Model & API config --------------------
 const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
+const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || "";
 const CHAT_URL = "https://api.openai.com/v1/chat/completions";
 const IMAGE_URL = "https://api.openai.com/v1/images/generations";
+
+// Initialize Anthropic client
+const anthropic = ANTHROPIC_KEY ? new Anthropic({ apiKey: ANTHROPIC_KEY }) : null;
 
 // One default text model + per-task overrides from .env
 const CHAT_MODEL_DEFAULT = process.env.CHAT_MODEL || "gpt-5-mini";
@@ -17,10 +22,12 @@ const MODEL_VALIDATE = process.env.MODEL_VALIDATE || CHAT_MODEL_DEFAULT;
 const MODEL_NAMES    = process.env.MODEL_NAMES    || CHAT_MODEL_DEFAULT;
 const MODEL_ANALYZE  = process.env.MODEL_ANALYZE  || CHAT_MODEL_DEFAULT;
 const MODEL_MIRROR   = process.env.MODEL_MIRROR   || CHAT_MODEL_DEFAULT;
+const MODEL_MIRROR_ANTHROPIC = process.env.MODEL_MIRROR_ANTHROPIC || "claude-3-5-haiku-latest";
 // Dilemma models (no generation here yet — just configuration)
 // Cheap default now; premium can be used later on demand.
 const MODEL_DILEMMA = process.env.MODEL_DILEMMA || CHAT_MODEL_DEFAULT;
 const MODEL_DILEMMA_PREMIUM = process.env.MODEL_DILEMMA_PREMIUM || "gpt-5";
+const MODEL_DILEMMA_ANTHROPIC = process.env.MODEL_DILEMMA_ANTHROPIC || "claude-3-5-haiku-latest";
 
 
 // Image model
@@ -223,6 +230,32 @@ async function aiText({ system, user, model = CHAT_MODEL_DEFAULT, temperature })
   }
 }
 
+// -------------------- Anthropic AI Text Helper --------------------
+async function aiTextAnthropic({ system, user, model = MODEL_DILEMMA_ANTHROPIC, temperature = 1 }) {
+  if (!anthropic) {
+    throw new Error("Anthropic client not initialized - check ANTHROPIC_API_KEY");
+  }
+
+  try {
+    const response = await anthropic.messages.create({
+      model: model,
+      max_tokens: 4096,
+      temperature: temperature,
+      system: system,
+      messages: [
+        { role: "user", content: user }
+      ]
+    });
+
+    // Extract text from response
+    const textContent = response.content.find(block => block.type === 'text');
+    return textContent?.text?.trim() || "";
+  } catch (e) {
+    console.error(`[server] aiTextAnthropic error with model ${model}:`, e?.message || e);
+    throw e;
+  }
+}
+
 // -------------------- Health check --------------------------
 app.get("/api/_ping", (_req, res) => {
   res.json({
@@ -234,12 +267,13 @@ app.get("/api/_ping", (_req, res) => {
       names: MODEL_NAMES,
       analyze: MODEL_ANALYZE,
       mirror: MODEL_MIRROR,
+      mirrorAnthropic: MODEL_MIRROR_ANTHROPIC,
       image: IMAGE_MODEL,
       tts: TTS_MODEL,
       ttsVoice: TTS_VOICE,
       dilemma: MODEL_DILEMMA,
       dilemmaPremium: MODEL_DILEMMA_PREMIUM,
- 
+      dilemmaAnthropic: MODEL_DILEMMA_ANTHROPIC,
     },
   });
 });
@@ -535,6 +569,7 @@ app.post("/api/generate-avatar", async (req, res) => {
 // -------------------- Mirror summary (uses AI) ---------------
 app.post("/api/mirror-summary", async (req, res) => {
   try {
+    const useAnthropic = !!req.body?.useAnthropic;
     const topWhat    = Array.isArray(req.body?.topWhat)    ? req.body.topWhat    : [];
     const topWhence  = Array.isArray(req.body?.topWhence)  ? req.body.topWhence  : [];
     const topOverall = Array.isArray(req.body?.topOverall) ? req.body.topOverall : [];
@@ -542,6 +577,7 @@ app.post("/api/mirror-summary", async (req, res) => {
 
     // DEBUG LOGGING
     console.log("\n[mirror-summary] ===== REQUEST DEBUG =====");
+    console.log(`[mirror-summary] Using provider: ${useAnthropic ? 'ANTHROPIC (Claude)' : 'OPENAI (GPT)'}`);
     console.log("[mirror-summary] topWhat:", JSON.stringify(topWhat));
     console.log("[mirror-summary] topWhence:", JSON.stringify(topWhence));
     console.log("[mirror-summary] topOverall:", JSON.stringify(topOverall));
@@ -737,7 +773,9 @@ app.post("/api/mirror-summary", async (req, res) => {
     }
 
     // tiny retry wrapper
-    const tryOnce = () => aiText({ system, user, model: MODEL_MIRROR });
+    const tryOnce = () => useAnthropic
+      ? aiTextAnthropic({ system, user, model: MODEL_MIRROR_ANTHROPIC })
+      : aiText({ system, user, model: MODEL_MIRROR });
     let text = await tryOnce();
     let isFallback = false;
 
@@ -1293,11 +1331,17 @@ app.post("/api/dilemma-light", async (req, res) => {
     console.log("🚀 [LIGHT API] /api/dilemma-light called");
     console.log("========================================\n");
 
-    const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
-    if (!OPENAI_KEY) return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
-
     const debug = !!req.body?.debug;
+    const useAnthropic = !!req.body?.useAnthropic;
     console.log("[/api/dilemma-light] Request payload:", JSON.stringify(req.body, null, 2));
+    console.log(`[/api/dilemma-light] Using provider: ${useAnthropic ? 'ANTHROPIC (Claude)' : 'OPENAI (GPT)'}`);
+
+    // Validate API keys
+    if (useAnthropic) {
+      if (!ANTHROPIC_KEY) return res.status(500).json({ error: "Missing ANTHROPIC_API_KEY" });
+    } else {
+      if (!OPENAI_KEY) return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
+    }
 
     // Extract minimal payload
     const role = String(req.body?.role || "").trim() || "Unicorn King";
@@ -1314,15 +1358,22 @@ app.post("/api/dilemma-light", async (req, res) => {
       console.log("[/api/dilemma-light] User prompt length:", userPrompt.length);
     }
 
-    // Call AI with JSON mode
+    // Call AI with JSON mode (route to correct provider)
     let raw = null;
     try {
-      const responseText = await aiText({
-        system: systemPrompt,
-        user: userPrompt,
-        model: MODEL_DILEMMA, // Use existing dilemma model config
-        temperature: 1
-      });
+      const responseText = useAnthropic
+        ? await aiTextAnthropic({
+            system: systemPrompt,
+            user: userPrompt,
+            model: MODEL_DILEMMA_ANTHROPIC,
+            temperature: 1
+          })
+        : await aiText({
+            system: systemPrompt,
+            user: userPrompt,
+            model: MODEL_DILEMMA,
+            temperature: 1
+          });
 
       raw = safeParseJSON(responseText);
 

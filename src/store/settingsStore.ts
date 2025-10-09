@@ -41,6 +41,11 @@ type SettingsState = {
   useLightDilemma: boolean;
   setUseLightDilemma: (v: boolean) => void;
   toggleUseLightDilemma: () => void;
+
+  // --- NEW: Use Anthropic (Claude) for light dilemma API ---
+  useLightDilemmaAnthropic: boolean;
+  setUseLightDilemmaAnthropic: (v: boolean) => void;
+  toggleUseLightDilemmaAnthropic: () => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -85,10 +90,15 @@ export const useSettingsStore = create<SettingsState>()(
       useLightDilemma: true,
       setUseLightDilemma: (v) => set({ useLightDilemma: v }),
       toggleUseLightDilemma: () => set({ useLightDilemma: !get().useLightDilemma }),
+
+      // NEW: Use Anthropic (Claude) for light dilemma API (default OFF)
+      useLightDilemmaAnthropic: false,
+      setUseLightDilemmaAnthropic: (v) => set({ useLightDilemmaAnthropic: v }),
+      toggleUseLightDilemmaAnthropic: () => set({ useLightDilemmaAnthropic: !get().useLightDilemmaAnthropic }),
     }),
     {
       // Bump key so no stale objects hide the new fields
-      name: "settings-v6",
+      name: "settings-v7",
       partialize: (s) => ({
         generateImages: s.generateImages,
         narrationEnabled: s.narrationEnabled,
@@ -99,6 +109,7 @@ export const useSettingsStore = create<SettingsState>()(
         dilemmasSubject: s.dilemmasSubject,
         enableModifiers: s.enableModifiers,
         useLightDilemma: s.useLightDilemma,
+        useLightDilemmaAnthropic: s.useLightDilemmaAnthropic,
       }),
     }
   )

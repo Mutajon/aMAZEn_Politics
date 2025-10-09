@@ -667,7 +667,7 @@ export function buildSnapshot(): DilemmaRequest {
  * Much simpler than buildSnapshot() - only role, system, streak, and previous choice
  */
 export function buildLightSnapshot(): LightDilemmaRequest {
-  const { debugMode } = useSettingsStore.getState();
+  const { debugMode, useLightDilemmaAnthropic } = useSettingsStore.getState();
   const { day, lastChoice, current, subjectStreak } = useDilemmaStore.getState();
   const roleState = useRoleStore.getState();
 
@@ -696,7 +696,8 @@ export function buildLightSnapshot(): LightDilemmaRequest {
     system,
     subjectStreak: subjectStreak || null,
     previous,
-    debug: debugMode
+    debug: debugMode,
+    useAnthropic: useLightDilemmaAnthropic
   };
 
   if (debugMode) {

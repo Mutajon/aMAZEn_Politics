@@ -8,7 +8,7 @@
 //
 // Uses: useEventDataCollector, presentEventData, buildSupportItems, cleanAndAdvanceDay
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useSettingsStore } from "../store/settingsStore";
@@ -24,12 +24,14 @@ import SupportList from "../components/event/SupportList";
 import { NewsTicker, buildDynamicParamsTickerItems } from "../components/event/NewsTicker";
 import DilemmaCard from "../components/event/DilemmaCard";
 import MirrorCard from "../components/event/MirrorCard";
+import CompassPillsOverlay from "../components/event/CompassPillsOverlay";
 import ActionDeck, { type ActionCard } from "../components/event/ActionDeck";
 import { actionsToDeckCards } from "../components/event/actionVisuals";
 import { useCoinFlights, CoinFlightOverlay } from "../components/event/CoinFlightSystem";
 import { AnimatePresence } from "framer-motion";
 import { bgStyle } from "../lib/ui";
 import { Building2, Heart, Users } from "lucide-react";
+import type { CompassEffectPing } from "../components/MiniCompass";
 
 type Props = {
   push: (path: string) => void;
@@ -73,6 +75,20 @@ export default function EventScreen3(_props: Props) {
 
   // Coin flight system (persists across all phases)
   const { flights, triggerCoinFlight, clearFlights } = useCoinFlights();
+
+  // Compass pills state (for visual display during Step 4A)
+  const [showCompassPills, setShowCompassPills] = useState(false);
+
+  // Convert collected compassPills to CompassEffectPing format with unique IDs
+  const compassPings: CompassEffectPing[] = useMemo(() => {
+    if (!collectedData?.compassPills) return [];
+    return collectedData.compassPills.map((pill, i) => ({
+      id: `${Date.now()}-${i}`,
+      prop: pill.prop,
+      idx: pill.idx,
+      delta: pill.delta
+    }));
+  }, [collectedData?.compassPills]);
 
   // ========================================================================
   // EFFECT 0: Register progress callback with data collector
@@ -171,6 +187,19 @@ export default function EventScreen3(_props: Props) {
         });
     }
   }, [isReady, canShowDilemma, isCollecting, phase, collectedData, startNarrationIfReady, setPresentationStep]);
+
+  // ========================================================================
+  // EFFECT 4: Control compass pills visibility based on presentation step
+  // Pills appear at Step 4+ (after dilemma shown) and before Step 6 (action deck)
+  // ========================================================================
+  useEffect(() => {
+    const shouldShow = presentationStep >= 4 && presentationStep < 6 && day > 1 && compassPings.length > 0;
+
+    if (shouldShow !== showCompassPills) {
+      console.log(`[EventScreen3] Compass pills visibility: ${shouldShow} (step: ${presentationStep}, day: ${day}, pills: ${compassPings.length})`);
+      setShowCompassPills(shouldShow);
+    }
+  }, [presentationStep, day, compassPings.length, showCompassPills]);
 
   // ========================================================================
   // ACTION HANDLERS
@@ -310,9 +339,19 @@ export default function EventScreen3(_props: Props) {
             />
           )}
 
-          {/* Step 5+: MirrorCard (was Step 6) */}
+          {/* Step 5+: MirrorCard with Compass Pills Overlay (was Step 6) */}
           {presentationStep >= 5 && collectedData && (
-            <MirrorCard text={collectedData.mirrorText} />
+            <div className="relative">
+              <MirrorCard text={collectedData.mirrorText} />
+              {/* Compass Pills Overlay - appears at Step 4A (Day 2+) */}
+              {showCompassPills && (
+                <CompassPillsOverlay
+                  effectPills={compassPings}
+                  loading={false}
+                  color="#7de8ff"
+                />
+              )}
+            </div>
           )}
 
           {/* Step 6: ActionDeck (was Step 7) */}

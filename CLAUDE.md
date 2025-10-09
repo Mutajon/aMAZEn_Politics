@@ -38,6 +38,7 @@ npm run preview      # Preview production build
 │   │   │   ├── NewsTicker.tsx   # Satirical news reactions (DISABLED - code kept for future)
 │   │   │   ├── EventContent.tsx # Main event UI rendering (extracted from EventScreen)
 │   │   │   ├── EventSupportManager.tsx # Support analysis logic
+│   │   │   ├── CompassPillsOverlay.tsx # Compass pills display with expand/collapse
 │   │   │   ├── CollectorLoadingOverlay.tsx # Progressive loading overlay with real-time progress
 │   │   │   └── DilemmaLoadError.tsx # Error screen for failed data collection
 │   │   ├── PowerDistributionContent.tsx # Power distribution UI rendering (extracted from PowerDistributionScreen)
@@ -159,10 +160,21 @@ This is a political simulation game with AI-powered content generation, built as
 **AI Model Configuration**: Uses environment variables for different specialized models:
 - `MODEL_VALIDATE` - Role validation
 - `MODEL_ANALYZE` - Political analysis
-- `MODEL_DILEMMA` - Dilemma generation
-- `MODEL_MIRROR` - Mirror dialogue
+- `MODEL_DILEMMA` - Dilemma generation (OpenAI)
+- `MODEL_DILEMMA_ANTHROPIC` - Dilemma generation (Anthropic Claude)
+- `MODEL_MIRROR` - Mirror dialogue (OpenAI)
+- `MODEL_MIRROR_ANTHROPIC` - Mirror dialogue (Anthropic Claude)
 - `IMAGE_MODEL` - Avatar generation
 - `TTS_MODEL` - Text-to-speech
+
+**Multi-Provider Support**: Both dilemma-light and mirror-summary APIs support OpenAI and Anthropic:
+- Toggle via `useLightDilemmaAnthropic` setting in `settingsStore`
+- Default: OpenAI (GPT-5 for both dilemmas and mirror dialogue)
+- Switch models using browser console commands:
+  - `switchToClaudeHaiku()` - Use Claude 3.5 Haiku for **both** dilemmas and mirror dialogue
+  - `switchToGPT5()` - Use GPT-5 for **both** dilemmas and mirror dialogue
+- Server routes to correct API based on `useAnthropic` flag in request
+- Affected endpoints: `/api/dilemma-light`, `/api/mirror-summary`
 
 ### Game Flow Architecture
 
@@ -272,6 +284,40 @@ The EventScreen uses a **unified progressive loading overlay** that provides rea
 - Only reaches 100% when `notifyReady()` triggers catchup animation
 - Uses `requestAnimationFrame` for smooth 60fps animations
 - Cleanup on unmount prevents memory leaks
+
+### Compass Pills Visual Feedback System
+
+EventScreen3 displays **compass pills** to show how player actions affect their political values:
+
+**Architecture:**
+- **Data Collection** - `useEventDataCollector` fetches compass analysis via `/api/compass-analyze` in Phase 2 (Day 2+ only)
+- **Visual Component** - `CompassPillsOverlay` displays animated pills with expand/collapse functionality
+- **Presentation Timing** - Pills appear at Step 4A (after dilemma shown, during mirror reveal)
+
+**Display Flow (Day 2+):**
+```
+Player confirms action (Day 1) → cleanAndAdvanceDay() →
+Phase 2: fetchCompassPills(lastChoice) → compassPills collected →
+Step 4: DilemmaCard shown →
+Step 4A: Compass deltas applied to store + Pills appear (2.5s) →
+Step 5: MirrorCard revealed (pills still visible) →
+Pills auto-collapse to "+" button after 2s →
+User can click "+" to re-expand pills
+```
+
+**Key Features:**
+- ✅ **Day-aware** - Only shows on Day 2+ (no previous action on Day 1)
+- ✅ **Positioned above MirrorCard** - Overlays with absolute positioning
+- ✅ **Auto-collapse** - Pills show for 2s, then collapse to small "+" button
+- ✅ **User-expandable** - Clicking "+" re-expands, clicking pill collapses
+- ✅ **Color-coded** - Each dimension (what/whence/how/whither) has unique color
+- ✅ **Delta display** - Shows "+2 Liberty", "-1 Evidence", etc.
+
+**Technical Details:**
+- Pills converted from `CompassPill[]` to `CompassEffectPing[]` format with unique IDs
+- Visibility controlled by: `presentationStep >= 4 && presentationStep < 6 && day > 1`
+- Store updates happen before visual display (via `eventDataPresenter.applyCompassDeltas`)
+- Component shared with MiniCompass (same visual language across app)
 
 ### Political Compass System
 
