@@ -80,7 +80,8 @@ switchToGPT()        # Switch to OpenAI GPT for dilemmas + mirror dialogue (DEFA
 │   │   ├── usePowerDistributionState.ts # PowerDistributionScreen state management
 │   │   ├── usePowerDistributionAnalysis.ts # AI analysis and political system classification
 │   │   ├── useActionDeckState.ts # ActionDeck state management and animations
-│   │   └── useActionSuggestion.ts # Action suggestion validation logic
+│   │   ├── useActionSuggestion.ts # Action suggestion validation logic
+│   │   └── useMirrorTop3.ts     # Extract top 3 compass components per dimension
 │   ├── lib/
 │   │   ├── router.ts            # Hash-based routing system
 │   │   ├── dilemma.ts           # Dilemma type definitions
@@ -98,6 +99,7 @@ switchToGPT()        # Switch to OpenAI GPT for dilemmas + mirror dialogue (DEFA
 │   │   ├── NameScreen.tsx       # Character creation
 │   │   ├── PowerDistributionScreen.tsx # Power holder analysis and editing (optimized, 67 lines)
 │   │   ├── DifficultyScreen.tsx # Difficulty level selection (conditional on enableModifiers)
+│   │   ├── MirrorScreen.tsx     # Top 3 compass values per dimension display
 │   │   └── HighscoreScreen.tsx
 │   ├── store/
 │   │   ├── roleStore.ts         # Role, analysis, character data
@@ -128,6 +130,8 @@ This is a political simulation game with AI-powered content generation, built as
 - `/compass-quiz` → Compass questionnaire
 - `/name` → Character creation with AI avatar generation
 - `/event` → Daily dilemma gameplay screen
+- `/mirror` → Mirror screen showing top 3 compass values per dimension
+- `/compass-vis` → Full compass visualization (interactive)
 - `/highscores` → Game results
 
 **State Management**: Zustand stores in `src/store/`:

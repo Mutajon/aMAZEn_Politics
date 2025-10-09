@@ -18,6 +18,7 @@ import DifficultyScreen from "./screens/DifficultyScreen";
 import { useEnsureMirroredAvatarOnce } from "./hooks/useEnsureMirroredAvatarOnce";
 import EventScreen3 from "./screens/EventScreen3";
 import HighscoreScreen from "./screens/HighscoreScreen";
+import MirrorScreen from "./screens/MirrorScreen";
 if (import.meta.env.DEV) {
   import("./dev/storesDebug").then(m => m.attachStoresDebug());
 }
@@ -40,6 +41,7 @@ export default function App() {
 
   if (route === "/name") return <NameScreen push={push} />;
   if (route === "/compass-vis") return <CompassVisScreen push={push} />;
+  if (route === "/mirror") return <MirrorScreen push={push} />;
   if (route === "/debug-mini") return <MiniCompassDebugScreen push={push} />;
   if (route === "/background-intro") return <BackgroundIntroScreen push={push} />;
   if (route === "/event") return <EventScreen3 push={push} />;
