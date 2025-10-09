@@ -10,12 +10,13 @@
 // Used by: EventScreen3
 // Dependencies: dilemmaStore, roleStore, compassStore
 
-import { useState, useCallback } from "react";
-import { useDilemmaStore, buildSnapshot } from "../store/dilemmaStore";
+import { useState, useCallback, useRef } from "react";
+import { useDilemmaStore, buildSnapshot, buildLightSnapshot } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
+import { useSettingsStore } from "../store/settingsStore";
 import { COMPONENTS, type PropKey } from "../data/compass-data";
-import type { Dilemma, DilemmaAction } from "../lib/dilemma";
+import type { Dilemma, DilemmaAction, LightDilemmaResponse } from "../lib/dilemma";
 import type { TickerItem } from "../components/event/NewsTicker";
 
 // ============================================================================
@@ -173,32 +174,97 @@ function topOverallWithNames(compassValues: any, k = 3): Array<{ name: string; s
 }
 
 /**
- * Fetch dilemma from API
+ * Fetch dilemma from API (uses light or heavy API based on settings)
  * REQUIRED - throws error if fails (no fallback)
  */
 async function fetchDilemma(): Promise<Dilemma> {
-  const snapshot = buildSnapshot();
+  const { useLightDilemma } = useSettingsStore.getState();
+  const { day, supportPeople, supportMiddle, supportMom, setSupportPeople, setSupportMiddle, setSupportMom, updateSubjectStreak } = useDilemmaStore.getState();
 
-  const response = await fetch("/api/dilemma", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(snapshot)
-  });
+  console.log(`[fetchDilemma] Using ${useLightDilemma ? 'LIGHT' : 'HEAVY'} API (day ${day})`);
 
-  if (!response.ok) {
-    throw new Error(`Dilemma API failed: ${response.status}`);
+  if (useLightDilemma) {
+    // ===== LIGHT API =====
+    const snapshot = buildLightSnapshot();
+    console.log("[fetchDilemma] Light API request:", snapshot);
+
+    const response = await fetch("/api/dilemma-light", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(snapshot)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Light Dilemma API failed: ${response.status}`);
+    }
+
+    const data: LightDilemmaResponse = await response.json();
+    console.log("[fetchDilemma] Light API response:", data);
+
+    // Validate required fields
+    if (!data.title || !data.description || !Array.isArray(data.actions) || data.actions.length !== 3) {
+      throw new Error("Invalid dilemma response: missing required fields");
+    }
+
+    // Apply support shifts if they exist (Day 2+)
+    if (data.supportShift && day > 1) {
+      const { people, mom, holders } = data.supportShift;
+
+      const newPeople = Math.max(0, Math.min(100, supportPeople + people.delta));
+      const newMom = Math.max(0, Math.min(100, supportMom + mom.delta));
+      const newMiddle = Math.max(0, Math.min(100, supportMiddle + holders.delta));
+
+      console.log("[fetchDilemma] Applying support shifts:", {
+        people: `${supportPeople} → ${newPeople} (${people.delta > 0 ? '+' : ''}${people.delta})`,
+        mom: `${supportMom} → ${newMom} (${mom.delta > 0 ? '+' : ''}${mom.delta})`,
+        middle: `${supportMiddle} → ${newMiddle} (${holders.delta > 0 ? '+' : ''}${holders.delta})`
+      });
+
+      setSupportPeople(newPeople);
+      setSupportMom(newMom);
+      setSupportMiddle(newMiddle);
+
+      // Store support effects in the dilemma object for the collector
+      (data as any).supportEffects = [
+        { id: "people", delta: people.delta, explain: people.why },
+        { id: "mom", delta: mom.delta, explain: mom.why },
+        { id: "middle", delta: holders.delta, explain: holders.why }
+      ];
+    }
+
+    // Update subject streak
+    if (data.topic) {
+      updateSubjectStreak(data.topic);
+    }
+
+    return data;
+
+  } else {
+    // ===== HEAVY API =====
+    const snapshot = buildSnapshot();
+    console.log("[fetchDilemma] Heavy API request (snapshot size:", JSON.stringify(snapshot).length, "chars)");
+
+    const response = await fetch("/api/dilemma", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(snapshot)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Dilemma API failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("[fetchDilemma] Heavy API response:", data);
+
+    // Validate required fields
+    if (!data.title || !data.description || !Array.isArray(data.actions) || data.actions.length !== 3) {
+      throw new Error("Invalid dilemma response: missing required fields");
+    }
+
+    // Return the full response to preserve supportEffects for Day 2+
+    return data;
   }
-
-  const data = await response.json();
-
-  // Validate required fields
-  if (!data.title || !data.description || !Array.isArray(data.actions) || data.actions.length !== 3) {
-    throw new Error("Invalid dilemma response: missing required fields");
-  }
-
-  // Return the full response to preserve supportEffects for Day 2+
-  // The collector will extract what it needs
-  return data;
 }
 
 /**
@@ -422,6 +488,9 @@ export function useEventDataCollector() {
   const [isCollecting, setIsCollecting] = useState(false);
   const [collectionError, setCollectionError] = useState<string | null>(null);
 
+  // Progress callback - using ref to avoid re-renders
+  const onReadyCallbackRef = useRef<(() => void) | null>(null);
+
   // Backward compatibility - reconstruct legacy CollectedData format
   const collectedData: CollectedData | null = phase1Data ? {
     ...phase1Data,
@@ -440,13 +509,13 @@ export function useEventDataCollector() {
 
   const collectData = useCallback(async () => {
     console.log('[Collector] 🚀 Starting 3-phase sequential collection...');
-    setIsCollecting(true);
-    setCollectionError(null);
 
-    // Reset all phases
+    // Clear ALL state immediately
     setPhase1Data(null);
     setPhase2Data(null);
     setPhase3Data(null);
+    setIsCollecting(true);
+    setCollectionError(null);
 
     const { day, lastChoice } = useDilemmaStore.getState();
     console.log(`[Collector] Day: ${day}, Has lastChoice: ${!!lastChoice}`);
@@ -502,6 +571,13 @@ export function useEventDataCollector() {
       // CRITICAL: Mark collecting as done NOW - UI can render!
       setIsCollecting(false);
       console.log('[Collector] ✅ Phase 1 complete - UI renders immediately!');
+
+      // Notify listeners that data is ready (for loading progress animation)
+      if (onReadyCallbackRef.current) {
+        console.log('[Collector] 🎯 Triggering onReady callback');
+        onReadyCallbackRef.current();
+      }
+
       console.log('[Collector] 📋 Phase 2/3 will continue in background...');
 
       // ========================================================================
@@ -557,7 +633,7 @@ export function useEventDataCollector() {
       // Phase 2/3 continue running in background
 
     } catch (error: any) {
-      console.error("[Collector] ❌ Collection failed:", error);
+      console.error('[Collector] ❌ Collection failed:', error);
       setCollectionError(`Collection failed: ${error.message}`);
       setIsCollecting(false);
     }
@@ -579,6 +655,12 @@ export function useEventDataCollector() {
     return true;
   }, [phase1Data]);
 
+  // Register callback for ready notification
+  const registerOnReady = useCallback((callback: () => void) => {
+    console.log('[Collector] Registering onReady callback');
+    onReadyCallbackRef.current = callback;
+  }, []);
+
   return {
     // New progressive API
     phase1Data,
@@ -593,6 +675,7 @@ export function useEventDataCollector() {
     collectData,
     isReady: isFullyReady(),
 
-    // Remove collectionProgress - no longer meaningful with sequential loading
+    // Progress callback API
+    registerOnReady
   };
 }

@@ -36,6 +36,11 @@ type SettingsState = {
   enableModifiers: boolean;
   setEnableModifiers: (v: boolean) => void;
   toggleEnableModifiers: () => void;
+
+  // --- NEW: Use light dilemma API (faster, minimal payload) ---
+  useLightDilemma: boolean;
+  setUseLightDilemma: (v: boolean) => void;
+  toggleUseLightDilemma: () => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -75,10 +80,15 @@ export const useSettingsStore = create<SettingsState>()(
       enableModifiers: false,
       setEnableModifiers: (v) => set({ enableModifiers: v }),
       toggleEnableModifiers: () => set({ enableModifiers: !get().enableModifiers }),
+
+      // NEW: Use light dilemma API (default ON for faster gameplay)
+      useLightDilemma: true,
+      setUseLightDilemma: (v) => set({ useLightDilemma: v }),
+      toggleUseLightDilemma: () => set({ useLightDilemma: !get().useLightDilemma }),
     }),
     {
       // Bump key so no stale objects hide the new fields
-      name: "settings-v5",
+      name: "settings-v6",
       partialize: (s) => ({
         generateImages: s.generateImages,
         narrationEnabled: s.narrationEnabled,
@@ -88,6 +98,7 @@ export const useSettingsStore = create<SettingsState>()(
         dilemmasSubjectEnabled: s.dilemmasSubjectEnabled,
         dilemmasSubject: s.dilemmasSubject,
         enableModifiers: s.enableModifiers,
+        useLightDilemma: s.useLightDilemma,
       }),
     }
   )

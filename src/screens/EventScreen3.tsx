@@ -12,16 +12,16 @@ import { useEffect, useState, useRef } from "react";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useSettingsStore } from "../store/settingsStore";
-import { useEventDataCollector, type DynamicParam } from "../hooks/useEventDataCollector";
+import { useEventDataCollector } from "../hooks/useEventDataCollector";
 import { useEventNarration } from "../hooks/useEventNarration";
+import { useLoadingProgress } from "../hooks/useLoadingProgress";
 import { presentEventData, buildSupportItems } from "../lib/eventDataPresenter";
 import { cleanAndAdvanceDay } from "../lib/eventDataCleaner";
 import CollectorLoadingOverlay from "../components/event/CollectorLoadingOverlay";
 import DilemmaLoadError from "../components/event/DilemmaLoadError";
 import ResourceBar from "../components/event/ResourceBar";
 import SupportList from "../components/event/SupportList";
-import { NewsTicker } from "../components/event/NewsTicker";
-import PlayerStatusStrip, { type ParamItem } from "../components/event/PlayerStatusStrip";
+import { NewsTicker, buildDynamicParamsTickerItems } from "../components/event/NewsTicker";
 import DilemmaCard from "../components/event/DilemmaCard";
 import MirrorCard from "../components/event/MirrorCard";
 import ActionDeck, { type ActionCard } from "../components/event/ActionDeck";
@@ -29,68 +29,7 @@ import { actionsToDeckCards } from "../components/event/actionVisuals";
 import { useCoinFlights, CoinFlightOverlay } from "../components/event/CoinFlightSystem";
 import { AnimatePresence } from "framer-motion";
 import { bgStyle } from "../lib/ui";
-import {
-  AlertTriangle,
-  Building2,
-  Users,
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  Shield,
-  Flame,
-  Heart,
-  Zap,
-  Target,
-  Flag,
-  Award,
-  Activity,
-  Briefcase,
-  Globe,
-  Home,
-  MessageSquare,
-  FileText,
-  Scale
-} from "lucide-react";
-
-// Icon mapper for dynamic parameters
-const ICON_MAP: Record<string, any> = {
-  AlertTriangle,
-  Building: Building2,
-  Building2,
-  Users,
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  Shield,
-  Flame,
-  Heart,
-  Zap,
-  Target,
-  Flag,
-  Award,
-  Activity,
-  Briefcase,
-  Globe,
-  Home,
-  MessageSquare,
-  FileText,
-  Scale
-};
-
-/**
- * Convert dynamic parameters from collector (icon: string) to PlayerStatusStrip format (icon: ReactNode)
- */
-function convertDynamicParamsToParamItems(params: DynamicParam[]): ParamItem[] {
-  return params.map(p => {
-    const IconComponent = ICON_MAP[p.icon] || AlertTriangle;
-    return {
-      id: p.id,
-      icon: <IconComponent className="w-3.5 h-3.5" strokeWidth={2.2} />,
-      text: p.text,
-      tone: p.tone
-    };
-  });
-}
+import { Building2, Heart, Users } from "lucide-react";
 
 type Props = {
   push: (path: string) => void;
@@ -98,25 +37,25 @@ type Props = {
 
 export default function EventScreen3(_props: Props) {
   // Global state (read only - single source of truth)
-  const { day, totalDays, budget, supportPeople, supportMiddle, supportMom } = useDilemmaStore();
-  const { analysis, character } = useRoleStore();
+  const { day, totalDays, budget } = useDilemmaStore();
+  const { character } = useRoleStore();
   const showBudget = useSettingsStore((s) => s.showBudget);
 
   // Data collection (progressive 3-phase loading)
   const {
-    phase1Data,        // Available immediately (~1-2s) - dilemma + support
-    phase2Data,        // Available later (~3-4s) - compass + dynamic params
-    phase3Data,        // Available last (~5-6s) - mirror text
-    phase1Ready,       // NEW: Show content as soon as Phase 1 completes!
     collectedData,     // Legacy format (for presenter compatibility)
     isCollecting,
     collectionError,
     collectData,
-    isReady            // Legacy flag (same as phase1Ready now)
+    isReady,           // Legacy flag (same as phase1Ready now)
+    registerOnReady    // Callback registration for progress notification
   } = useEventDataCollector();
 
   // Narration integration - prepares TTS when dilemma loads, provides canShowDilemma flag
   const { canShowDilemma, startNarrationIfReady } = useEventNarration();
+
+  // Loading progress (auto-increments, smooth catchup animation)
+  const { progress, start: startProgress, reset: resetProgress, notifyReady } = useLoadingProgress();
 
   // Phase tracking
   const [phase, setPhase] = useState<'collecting' | 'presenting' | 'interacting' | 'cleaning'>('collecting');
@@ -136,6 +75,17 @@ export default function EventScreen3(_props: Props) {
   const { flights, triggerCoinFlight, clearFlights } = useCoinFlights();
 
   // ========================================================================
+  // EFFECT 0: Register progress callback with data collector
+  // ========================================================================
+  useEffect(() => {
+    console.log('[EventScreen3] Registering progress callback with data collector');
+    registerOnReady(() => {
+      console.log('[EventScreen3] Data ready - triggering progress catchup animation');
+      notifyReady();
+    });
+  }, [registerOnReady, notifyReady]);
+
+  // ========================================================================
   // EFFECT 1: Trigger collection when phase changes TO 'collecting'
   // Uses a ref to track if we've already collected for this phase cycle
   // ========================================================================
@@ -151,11 +101,16 @@ export default function EventScreen3(_props: Props) {
         console.log(`[EventScreen3] 🔄 New day detected (${lastCollectedDayRef.current} → ${day}), resetting ref`);
         collectionTriggeredRef.current = false;
         lastCollectedDayRef.current = day;
+
+        // Reset and start progress for new day
+        resetProgress();
+        startProgress();
+        console.log('[EventScreen3] 🎯 Started loading progress for new day');
       }
 
       // Only trigger if we haven't already triggered for this day
       if (!collectionTriggeredRef.current && !isCollecting && !collectionError) {
-        console.log('[EventScreen3] ✅ Phase is collecting - triggering data collection for day', day);
+        console.log(`[EventScreen3] ✅ Phase is collecting - triggering data collection for day ${day}`);
         collectionTriggeredRef.current = true;
         collectData();
       } else {
@@ -168,7 +123,7 @@ export default function EventScreen3(_props: Props) {
       }
       collectionTriggeredRef.current = false;
     }
-  }, [phase, isCollecting, collectionError, day]);
+  }, [phase, isCollecting, collectionError, day, collectData, startProgress, resetProgress]);
 
   // ========================================================================
   // EFFECT 2: Capture and clear initial support values for animation
@@ -194,14 +149,11 @@ export default function EventScreen3(_props: Props) {
   }, [presentationStep, initialSupportValues]);
 
   // ========================================================================
-  // EFFECT 3: Advance to presenting when data ready AND narration ready
+  // EFFECT 3: Advance to presenting when data ready
   // ========================================================================
   useEffect(() => {
-    console.log(`[EventScreen3] EFFECT 3 - isReady: ${isReady}, canShowDilemma: ${canShowDilemma}, phase: ${phase}, hasData: ${!!collectedData}`);
-
-    // Wait for BOTH data collection AND narration preparation
-    if (isReady && canShowDilemma && phase === 'collecting' && collectedData && !isCollecting) {
-      console.log('[EventScreen3] ✅ All data + narration ready - starting presentation sequence');
+    if (isReady && canShowDilemma && !isCollecting && phase === 'collecting' && collectedData) {
+      console.log('[EventScreen3] ✅ Data ready - starting presentation sequence');
       setPhase('presenting');
 
       // Run presentation sequence with narration callback
@@ -218,7 +170,7 @@ export default function EventScreen3(_props: Props) {
           console.error('[EventScreen3] Presentation error:', error);
         });
     }
-  }, [isReady, canShowDilemma, phase, collectedData, isCollecting]);
+  }, [isReady, canShowDilemma, isCollecting, phase, collectedData, startNarrationIfReady, setPresentationStep]);
 
   // ========================================================================
   // ACTION HANDLERS
@@ -269,12 +221,10 @@ export default function EventScreen3(_props: Props) {
   // RENDER: Loading State (collecting phase)
   // ========================================================================
   if (phase === 'collecting' || isCollecting) {
-    console.log('[EventScreen3] Rendering loading overlay');
+    console.log('[EventScreen3] Rendering loading overlay with progress:', progress);
     return (
       <CollectorLoadingOverlay
-        day={day}
-        totalDays={totalDays}
-        progress={undefined} // No progress tracking with sequential loading
+        progress={progress} // Real-time progress with auto-increment and catchup animation
         message="Gathering political intelligence..."
       />
     );
@@ -298,25 +248,9 @@ export default function EventScreen3(_props: Props) {
   }
 
   // ========================================================================
-  // RENDER: Data Not Ready (safety check - only when NOT collecting)
-  // ========================================================================
-  if (phase !== 'collecting' && (!collectedData || !isReady)) {
-    console.log('[EventScreen3] Data not ready - showing error');
-    return (
-      <DilemmaLoadError
-        error="Data collection incomplete"
-        onRetry={() => {
-          setPhase('collecting');
-          collectData();
-        }}
-      />
-    );
-  }
-
-  // ========================================================================
   // RENDER: Presenting/Interacting/Cleaning Phase
   // ========================================================================
-  if (phase === 'presenting' || phase === 'interacting' || phase === 'cleaning') {
+  if (collectedData && (phase === 'presenting' || phase === 'interacting' || phase === 'cleaning')) {
     // Calculate derived values
     const daysLeft = totalDays - day + 1;
 
@@ -338,15 +272,23 @@ export default function EventScreen3(_props: Props) {
       ? actionsToDeckCards(collectedData.dilemma.actions)
       : [];
 
+    // Build ticker items from dynamic parameters
+    const isFirstDay = day === 1;
+    const tickerItems = buildDynamicParamsTickerItems(
+      collectedData?.dynamicParams || null,
+      isFirstDay
+    );
+
     return (
       <div className="min-h-screen p-6 pb-24" style={bgStyle}>
         <div className="max-w-3xl mx-auto space-y-3">
-          {/* Step 0+: ResourceBar (always visible) */}
+          {/* Step 0+: ResourceBar (always visible) with avatar */}
           {presentationStep >= 0 && (
             <ResourceBar
               budget={budget}
               daysLeft={daysLeft}
               showBudget={showBudget}
+              avatarSrc={character?.avatarUrl || null}
             />
           )}
 
@@ -355,34 +297,26 @@ export default function EventScreen3(_props: Props) {
             <SupportList items={supportItems} />
           )}
 
-          {/* Step 3+: NewsTicker - DISABLED (keeping code for future use) */}
-          {/* {presentationStep >= 3 && collectedData && (
-            <NewsTicker items={collectedData.newsItems} />
-          )} */}
-
-          {/* Step 4+: PlayerStatusStrip */}
-          {presentationStep >= 4 && collectedData && (
-            <PlayerStatusStrip
-              avatarSrc={character?.avatarUrl || null}
-              params={convertDynamicParamsToParamItems(collectedData.dynamicParams || [])}
-            />
+          {/* Step 3+: NewsTicker - Shows placeholder "News items incoming..." until dynamicParams ready */}
+          {presentationStep >= 3 && (
+            <NewsTicker items={tickerItems} />
           )}
 
-          {/* Step 5+: DilemmaCard */}
-          {presentationStep >= 5 && collectedData && (
+          {/* Step 4+: DilemmaCard (was Step 5) */}
+          {presentationStep >= 4 && collectedData && (
             <DilemmaCard
               title={collectedData.dilemma.title}
               description={collectedData.dilemma.description}
             />
           )}
 
-          {/* Step 6+: MirrorCard */}
-          {presentationStep >= 6 && collectedData && (
+          {/* Step 5+: MirrorCard (was Step 6) */}
+          {presentationStep >= 5 && collectedData && (
             <MirrorCard text={collectedData.mirrorText} />
           )}
 
-          {/* Step 7: ActionDeck (3 AI choices + Suggest Your Own) */}
-          {presentationStep >= 7 && phase === 'interacting' && (
+          {/* Step 6: ActionDeck (was Step 7) */}
+          {presentationStep >= 6 && phase === 'interacting' && (
             <ActionDeck
               actions={actionsForDeck}
               showBudget={showBudget}

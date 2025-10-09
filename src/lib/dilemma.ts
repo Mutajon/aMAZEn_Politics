@@ -13,6 +13,7 @@ export type Dilemma = {
   actions: [DilemmaAction, DilemmaAction, DilemmaAction];
   topic?: string;
   source?: string;
+  supportEffects?: any; // Added dynamically by light API for Day 2+ support shifts
 };
 
 export type DilemmaHistoryEntry = {
@@ -51,4 +52,38 @@ export type DilemmaRequest = {
 
   // NEW: let the server log only when your Debug mode is ON
   debug?: boolean;
+};
+
+// -------------------- Light Dilemma API Types --------------------
+
+export type SubjectStreak = {
+  subject: string;
+  count: number;
+};
+
+export type LightDilemmaRequest = {
+  role: string;
+  system: string;
+  subjectStreak: SubjectStreak | null;
+  previous?: {
+    title: string;
+    choiceTitle: string;
+    choiceSummary: string;
+  };
+  debug?: boolean;
+};
+
+export type SupportShift = {
+  people: { delta: number; why: string };
+  mom: { delta: number; why: string };
+  holders: { delta: number; why: string };
+};
+
+export type LightDilemmaResponse = {
+  title: string;
+  description: string;
+  actions: [DilemmaAction, DilemmaAction, DilemmaAction];
+  topic: string;
+  supportShift: SupportShift | null;
+  isFallback?: boolean;
 };

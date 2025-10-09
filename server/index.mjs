@@ -1200,9 +1200,249 @@ function safeParseJSON(text) {
   }
 }
 
+// -------------------- Light Dilemma Prompt Helpers (Ultra-Minimal) ---------------------------
+
+/**
+ * Build system prompt for light dilemma API - static, cacheable
+ * Combines dilemma generation + support analysis into single output
+ */
+function buildLightSystemPrompt() {
+  return `You write short, punchy political situations for a choice-based mobile game.
+
+STYLE
+- Plain modern English. Never say "dilemma".
+- Title ≤ 60 chars. Description 2–3 sentences. In-world tone (press leaks, memos, calls).
+- Be concrete about the real issue; name actors/institutions. Avoid generic "a bill" or "a reform".
+- Absolutely NO numbers in titles/descriptions/summaries or explanations. Numeric values may appear only in JSON fields.
+
+SYSTEM FEEL (CRITICAL)
+- Let the political system shape both the situation and the actions.
+- Monarchy/Autocracy: unilateral verbs (decree, appoint, dissolve), resistance may exist but ruler can act.
+- Parliamentary/Representative: coalition/committees/whips; bargaining and oversight.
+- Direct democracy: votes/petitions/referendum; outcomes can diverge from the leader's preference.
+- Strong judiciary/media/unions can constrain.
+
+CONTINUITY
+- If subject streak ≥ 3: pivot to a different subject, but tie back to the last choice's consequences.
+- Else (< 3): follow up logically on the last choice within the setting and system.
+
+ACTIONS
+- Exactly three, mutually conflicting strategies: assertive control; negotiated/consultative; principled restraint/rights.
+- Each summary is ONE sentence, ~15–20 words, with NO numbers.
+- Provide cost from {0, ±50, ±100, ±150, ±200, ±250}. Costs are numeric but must not appear in text.
+
+SUPPORT SHIFT (only if previous choice exists)
+- Output percentage deltas for three entities based on the last choice: people, mom, power holders (not the player).
+- Each delta is an integer in [-20..20]. Typical magnitudes: ±5 small, ±10 medium, ±20 rare extremes.
+- Keep shifts varied and logical (a pro-people act usually helps people, etc.).
+- Add a very short explanation for each:
+  * people.why → civic/social reasoning.
+  * mom.why → personal voice, first person ("I…"), like a mother to her child.
+  * holders.why → institutional/political logic.
+- Explanations must be number-free.
+
+OUTPUT (STRICT JSON)
+{"title":"","description":"","actions":[
+ {"id":"a","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"},
+ {"id":"b","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"},
+ {"id":"c","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}
+],
+"topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture",
+"supportShift": null | {
+  "people":  {"delta":0,"why":""},
+  "mom":     {"delta":0,"why":""},
+  "holders": {"delta":0,"why":""}
+}}
+Return ONLY that JSON. If there is no previous choice, set "supportShift": null.`;
+}
+
+/**
+ * Build user prompt for light dilemma API - minimal dynamic context
+ */
+function buildLightUserPrompt({ role, system, subjectStreak, previous }) {
+  const parts = [
+    `ROLE & SETTING: ${role}`,
+    `SYSTEM: ${system}`,
+    '',
+  ];
+
+  // Subject streak
+  if (subjectStreak && subjectStreak.subject) {
+    parts.push(`SUBJECT STREAK: ${subjectStreak.subject} = ${subjectStreak.count}`);
+  } else {
+    parts.push('SUBJECT STREAK: none');
+  }
+
+  // Previous choice (only if exists)
+  if (previous && previous.title) {
+    parts.push(`PREVIOUS: ${previous.title} — ${previous.choiceTitle}: ${previous.choiceSummary}`);
+  } else {
+    parts.push('PREVIOUS: none (first day)');
+  }
+
+  parts.push('');
+  parts.push('TASK: Write one concrete situation anchored in ROLE+SETTING with three system-appropriate responses.');
+
+  return parts.join('\n');
+}
+
+// -------------------- Light Dilemma API Endpoint ---------------------------
+app.post("/api/dilemma-light", async (req, res) => {
+  try {
+    console.log("\n========================================");
+    console.log("🚀 [LIGHT API] /api/dilemma-light called");
+    console.log("========================================\n");
+
+    const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
+    if (!OPENAI_KEY) return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
+
+    const debug = !!req.body?.debug;
+    console.log("[/api/dilemma-light] Request payload:", JSON.stringify(req.body, null, 2));
+
+    // Extract minimal payload
+    const role = String(req.body?.role || "").trim() || "Unicorn King";
+    const system = String(req.body?.system || "").trim() || "Divine Right Monarchy";
+    const subjectStreak = req.body?.subjectStreak || null;
+    const previous = req.body?.previous || null;
+
+    // Build light prompts
+    const systemPrompt = buildLightSystemPrompt();
+    const userPrompt = buildLightUserPrompt({ role, system, subjectStreak, previous });
+
+    if (debug) {
+      console.log("[/api/dilemma-light] System prompt length:", systemPrompt.length);
+      console.log("[/api/dilemma-light] User prompt length:", userPrompt.length);
+    }
+
+    // Call AI with JSON mode
+    let raw = null;
+    try {
+      const responseText = await aiText({
+        system: systemPrompt,
+        user: userPrompt,
+        model: MODEL_DILEMMA, // Use existing dilemma model config
+        temperature: 1
+      });
+
+      raw = safeParseJSON(responseText);
+
+      if (debug) console.log("[/api/dilemma-light] AI response parsed:", raw);
+    } catch (e) {
+      console.error("[/api/dilemma-light] AI call failed:", e?.message || e);
+    }
+
+    // Fallback if AI fails
+    let usedFallback = false;
+    if (!raw || !raw.title || !Array.isArray(raw.actions)) {
+      console.log("[/api/dilemma-light] Using fallback dilemma");
+      raw = {
+        title: "First Night in the Palace",
+        description: "As the seals change hands, a restless city watches. Advisors split: display resolve now, or earn trust with patience.",
+        actions: [
+          { id: "a", title: "Impose Curfew", summary: "Restrict movement after dusk with visible patrols.", cost: -150, iconHint: "security" },
+          { id: "b", title: "Address the Nation", summary: "Speak live tonight to calm fears and set the tone.", cost: -50, iconHint: "speech" },
+          { id: "c", title: "Open Negotiations", summary: "Invite opposition figures for mediated talks.", cost: 50, iconHint: "diplomacy" }
+        ],
+        topic: "Security",
+        supportShift: null
+      };
+      usedFallback = true;
+    }
+
+    // Normalize action costs using existing logic
+    const clampInt = (n, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(n) || 0)));
+
+    function snapCost(rawNum) {
+      const sign = rawNum >= 0 ? 1 : -1;
+      const abs = Math.abs(Math.round(Number(rawNum) || 0));
+      const ladder = [0, 50, 100, 150, 200, 250];
+      const nearest = ladder.reduce((best, v) => (Math.abs(abs - v) < Math.abs(abs - best) ? v : best), 0);
+      return clampInt(sign * nearest, -250, 250);
+    }
+
+    // Process actions
+    const allowedHints = new Set(["security", "speech", "diplomacy", "money", "tech", "heart", "scale"]);
+    let actions = Array.isArray(raw?.actions) ? raw.actions.slice(0, 3) : [];
+    actions = actions.map((a, idx) => {
+      const id = ["a", "b", "c"][idx] || "a";
+      const title = String(a?.title || `Option ${idx + 1}`).slice(0, 80);
+      const summary = String(a?.summary || "").slice(0, 180);
+      const iconHint = allowedHints.has(String(a?.iconHint)) ? String(a?.iconHint) : "speech";
+      const cost = snapCost(a?.cost);
+
+      return { id, title, summary, cost, iconHint };
+    });
+
+    while (actions.length < 3) {
+      const i = actions.length;
+      actions.push({
+        id: ["a", "b", "c"][i] || "a",
+        title: `Option ${i + 1}`,
+        summary: "A reasonable alternative.",
+        cost: 0,
+        iconHint: "speech"
+      });
+    }
+
+    // Extract title, description, topic
+    const title = String(raw?.title || "").slice(0, 120) || "A Difficult Choice";
+    const description = String(raw?.description || "").slice(0, 500);
+    const validTopics = ["Economy", "Security", "Diplomacy", "Rights", "Infrastructure", "Environment", "Health", "Education", "Justice", "Culture"];
+    const topic = validTopics.includes(String(raw?.topic || "")) ? String(raw.topic) : "Security";
+
+    // Extract support shift (already in correct format from AI)
+    let supportShift = null;
+    if (raw?.supportShift && typeof raw.supportShift === "object" && raw.supportShift !== null) {
+      const ss = raw.supportShift;
+
+      // Validate structure
+      if (ss.people && ss.mom && ss.holders &&
+          typeof ss.people.delta === "number" &&
+          typeof ss.mom.delta === "number" &&
+          typeof ss.holders.delta === "number") {
+
+        supportShift = {
+          people: {
+            delta: Math.max(-20, Math.min(20, Math.round(ss.people.delta))),
+            why: String(ss.people.why || "").slice(0, 140)
+          },
+          mom: {
+            delta: Math.max(-20, Math.min(20, Math.round(ss.mom.delta))),
+            why: String(ss.mom.why || "").slice(0, 140)
+          },
+          holders: {
+            delta: Math.max(-20, Math.min(20, Math.round(ss.holders.delta))),
+            why: String(ss.holders.why || "").slice(0, 140)
+          }
+        };
+      }
+    }
+
+    const result = {
+      title,
+      description,
+      actions,
+      topic,
+      supportShift,
+      isFallback: usedFallback
+    };
+
+    if (debug) console.log("[/api/dilemma-light] Final result:", result);
+    return res.json(result);
+
+  } catch (e) {
+    console.error("Error in /api/dilemma-light:", e?.message || e);
+    return res.status(502).json({ error: "dilemma-light failed" });
+  }
+});
+
 // -------------------- Dilemma (AI, minimal prompt) ---------------------------
 app.post("/api/dilemma", async (req, res) => {
   try {
+    console.log("\n========================================");
+    console.log("⚠️  [HEAVY API] /api/dilemma called (old version)");
+    console.log("========================================\n");
+
     const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
     if (!OPENAI_KEY) return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
 

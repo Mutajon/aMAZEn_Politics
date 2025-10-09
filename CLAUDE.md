@@ -37,12 +37,14 @@ npm run preview      # Preview production build
 │   │   │   ├── SupportList.tsx  # Support level tracking
 │   │   │   ├── NewsTicker.tsx   # Satirical news reactions (DISABLED - code kept for future)
 │   │   │   ├── EventContent.tsx # Main event UI rendering (extracted from EventScreen)
-│   │   │   └── EventSupportManager.tsx # Support analysis logic
+│   │   │   ├── EventSupportManager.tsx # Support analysis logic
+│   │   │   ├── CollectorLoadingOverlay.tsx # Progressive loading overlay with real-time progress
+│   │   │   └── DilemmaLoadError.tsx # Error screen for failed data collection
 │   │   ├── PowerDistributionContent.tsx # Power distribution UI rendering (extracted from PowerDistributionScreen)
 │   │   ├── PowerDistributionIcons.tsx   # Icon utilities for power holders
 │   │   ├── InnerCompass.tsx     # Compass visualization core
 │   │   ├── MiniCompass.tsx      # Compact compass display
-│   │   ├── LoadingOverlay.tsx   # Loading states
+│   │   ├── LoadingOverlay.tsx   # Legacy loading overlay (not used in EventScreen3)
 │   │   └── MirrorBubble.tsx     # Mirror dialogue UI
 │   ├── data/
 │   │   ├── compass-data.ts      # 40-component political compass definitions
@@ -58,6 +60,8 @@ npm run preview      # Preview production build
 │   │   ├── useEventEffects.ts   # EventScreen side effects (news, mirror, auto-loading)
 │   │   ├── useEventNarration.ts # EventScreen TTS/narration logic
 │   │   ├── useEventActions.ts   # EventScreen action handlers (confirm, suggest)
+│   │   ├── useEventDataCollector.ts # Data collection with 3-phase progressive loading
+│   │   ├── useLoadingProgress.ts # Progressive loading progress (auto-increment, catchup animation)
 │   │   ├── usePowerDistributionState.ts # PowerDistributionScreen state management
 │   │   ├── usePowerDistributionAnalysis.ts # AI analysis and political system classification
 │   │   ├── useActionDeckState.ts # ActionDeck state management and animations
@@ -114,8 +118,8 @@ This is a political simulation game with AI-powered content generation, built as
 **State Management**: Zustand stores in `src/store/`:
 - `roleStore` - Selected role, political analysis, character data
 - `compassStore` - 4-dimensional political compass values (what/whence/how/whither)
-- `dilemmaStore` - Current dilemma, choices, resources, support levels
-- `settingsStore` - Game settings and preferences
+- `dilemmaStore` - Current dilemma, choices, resources, support levels, subject streak tracking
+- `settingsStore` - Game settings (narration, budget visibility, debug mode, `useLightDilemma` toggle, etc.)
 - `mirrorQuizStore` - Compass assessment progress
 
 **Key UI Components**:
@@ -132,6 +136,7 @@ This is a political simulation game with AI-powered content generation, built as
 - `useEventEffects` - Side effects (news fetching, mirror dialogue, auto-loading)
 - `useEventNarration` - TTS preparation and playback logic
 - `useEventActions` - Action confirmation pipeline and news updates
+- `useLoadingProgress` - Progressive loading progress (auto-increment, smooth catchup animation)
 - `usePowerDistributionState` - Power distribution state management (holders, political system, UI state)
 - `usePowerDistributionAnalysis` - AI role analysis, system classification, and data processing
 - `useActionDeckState` - Action deck state management (selection, confirmation flow, animations)
@@ -143,10 +148,11 @@ This is a political simulation game with AI-powered content generation, built as
 - `/api/validate-role` - Validates user role input
 - `/api/analyze-role` - Generates political system analysis
 - `/api/generate-avatar` - Creates character avatars
-- `/api/dilemma` - Generates daily political dilemmas (enhanced with NewDilemmaLogic.md rules)
-- `/api/support-analyze` - Analyzes political support changes
+- `/api/dilemma` - Generates daily political dilemmas (enhanced with NewDilemmaLogic.md rules) - HEAVY VERSION
+- `/api/dilemma-light` - Generates dilemmas with integrated support analysis (fast, minimal payload) - **DEFAULT**
+- `/api/support-analyze` - Analyzes political support changes (used by heavy API only)
 - `/api/compass-analyze` - Maps text to political compass values (OPTIMIZED: 81% token reduction)
-- `/api/news-ticker` - Generates satirical news reactions
+- `/api/news-ticker` - Generates satirical news reactions (DISABLED by default)
 - `/api/mirror-summary` - Creates personality summaries
 - `/api/tts` - Text-to-speech generation
 
@@ -224,6 +230,48 @@ The system runs two AI analyses simultaneously using `Promise.allSettled()`:
 - News ticker updates with satirical reactions
 
 This architecture ensures **immediate visual feedback** while **rich AI analysis happens in the background**, maintaining game responsiveness while providing deep political simulation.
+
+### Progressive Loading System
+
+The EventScreen uses a **unified progressive loading overlay** that provides real-time feedback during data collection:
+
+**Architecture:**
+- **useLoadingProgress hook** - Auto-increments progress from 0→100% at 1%/second
+- **CollectorLoadingOverlay component** - Displays real-time progress with smooth animations
+- **useEventDataCollector hook** - Emits ready notification when dilemma data arrives
+- **EventScreen3** - Wires everything together for seamless UX
+
+**Loading Flow:**
+
+1. **Day 1 Initial Load:**
+   ```
+   EventScreen mounts → Phase='collecting' → startProgress() →
+   Progress auto-increments (1%, 2%, 3%...) →
+   Server responds (~15-20s) → notifyReady() →
+   Progress animates current% → 100% over 1 second →
+   Overlay fades → Dilemma presents sequentially
+   ```
+
+2. **After Action Confirmation:**
+   ```
+   Player confirms action → Coin animation → Phase='cleaning' →
+   cleanAndAdvanceDay() → Phase='collecting' → resetProgress() →
+   startProgress() → Auto-increment starts →
+   Server responds → notifyReady() → Smooth catchup → Overlay fades
+   ```
+
+**Key Features:**
+- ✅ **Single unified overlay** - Same component reused across all loading cycles
+- ✅ **Real-time progress** - Visible feedback every second
+- ✅ **Smooth catchup animation** - When server responds, animates remaining distance over 1 second using ease-out cubic
+- ✅ **Server-aware** - Waits for actual API response, not just time estimate
+- ✅ **Reset-friendly** - Cleanly resets for Day 1, Day 2, Day 3, etc.
+
+**Technical Details:**
+- Progress never reaches 100% via auto-increment (caps at 99%)
+- Only reaches 100% when `notifyReady()` triggers catchup animation
+- Uses `requestAnimationFrame` for smooth 60fps animations
+- Cleanup on unmount prevents memory leaks
 
 ### Political Compass System
 
@@ -322,6 +370,19 @@ This architecture enables better React performance optimizations (memoization, s
   - **Premium model**: Uses temperature 0.7 (balanced creativity) instead of 0.9
   - **Result**: Better specificity, fewer generic outputs, lower costs
   - Focus on engaging, game-changing consequences only (casualties, international reactions, resignations, protests)
+
+- ~~Light Dilemma API~~ ✅ **COMPLETED** - 85%+ token reduction + faster response times
+  - **New `/api/dilemma-light` endpoint**: Ultra-minimal payload (~200 tokens vs ~3000+ tokens)
+  - **Single-call architecture**: Dilemma + support analysis in ONE API call (not 2+)
+  - **Integrated support shifts**: AI returns support deltas with explanations directly
+  - **Subject streak tracking**: Automatically varies topics after 3+ consecutive same-subject dilemmas
+  - **Minimal context**: Only sends role, system, subject streak, and previous choice
+  - **"Holders → Middle" mapping**: Server uses generic "holders" term, client maps to "middle" entity
+  - **Default mode**: Light API is now default (toggle via `useLightDilemma` setting)
+  - **Backwards compatible**: Heavy API (`/api/dilemma`) remains available for comparison
+  - **Types**: New `LightDilemmaRequest`, `LightDilemmaResponse`, `SubjectStreak` types in `dilemma.ts`
+  - **Store changes**: Added subject streak tracking and `loadNextLight()` in `dilemmaStore.ts`
+  - **Result**: ~60 seconds → ~15-20 seconds per dilemma load (3-4x faster)
 
 **React Performance Optimizations**:
 - Add `React.memo()` to frequently re-rendering components

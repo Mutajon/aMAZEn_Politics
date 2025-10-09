@@ -109,12 +109,12 @@ export async function presentEventData(
   // ========== STEP 0: ResourceBar (always visible) ==========
   setPresentationStep(0);
   console.log("[Presenter] Step 0: ResourceBar");
-  await delay(800); // Increased from 300ms - let resource bar settle
+  await delay(800); // Let resource bar settle
 
   // ========== STEP 1: SupportList (initial values) ==========
   setPresentationStep(1);
   console.log("[Presenter] Step 1: SupportList (initial)");
-  await delay(1500); // Increased from 500ms - let user see initial support values
+  await delay(1500); // Let user see initial support values
 
   // ========== STEP 2: Support Changes Animation (Day 2+ only) ==========
   // This step applies support deltas FIRST, then advances presentation step
@@ -144,26 +144,21 @@ export async function presentEventData(
     //    - Trend arrow starts bobbing
     //    - Note text appears
     //    Total: 2500ms to see counter animation + read notes
-    await delay(2500); // Increased from 1200ms - give user time to see counter animation and read explanation
+    await delay(2500); // Give user time to see counter animation and read explanation
   } else if (isFirstDay) {
     console.log("[Presenter] Step 2: SKIPPED (Day 1 - no previous choice)");
   } else {
     console.warn(`[Presenter] Step 2: SKIPPED - Missing support effects! Has effects: ${!!collectedData.supportEffects}, Length: ${collectedData.supportEffects?.length || 0}`);
   }
 
-  // ========== STEP 3: (NewsTicker disabled - skip immediately) ==========
+  // ========== STEP 3: NewsTicker (shows immediately with placeholder) ==========
   setPresentationStep(3);
-  console.log("[Presenter] Step 3: NewsTicker disabled, advancing immediately");
-  await delay(0); // No delay - NewsTicker removed from display
+  console.log("[Presenter] Step 3: NewsTicker (with placeholder 'News items incoming...')");
+  await delay(0); // No delay - NewsTicker just needs to mount
 
-  // ========== STEP 4: PlayerStatusStrip ==========
+  // ========== STEP 4: DilemmaCard ==========
   setPresentationStep(4);
-  console.log("[Presenter] Step 4: PlayerStatusStrip");
-  await delay(2000); // Increased from 300ms - let user see dynamic parameters
-
-  // ========== STEP 5: DilemmaCard ==========
-  setPresentationStep(5);
-  console.log("[Presenter] Step 5: DilemmaCard");
+  console.log("[Presenter] Step 4: DilemmaCard");
 
   // Small delay to let DilemmaCard render and animate in
   await delay(300);
@@ -176,10 +171,10 @@ export async function presentEventData(
 
   await delay(1200); // Let user start reading dilemma
 
-  // ========== STEP 5A: Compass Pills (Day 2+ only) ==========
+  // ========== STEP 4A: Compass Pills (Day 2+ only) ==========
   // Pills overlay on top of existing content, no step advancement needed
   if (!isFirstDay && collectedData.compassPills && collectedData.compassPills.length > 0) {
-    console.log("[Presenter] Step 5A: Compass pills (Day 2+)");
+    console.log("[Presenter] Step 4A: Compass pills (Day 2+)");
 
     // Apply deltas to store
     applyCompassDeltas(collectedData.compassPills);
@@ -187,19 +182,19 @@ export async function presentEventData(
     // Pills overlay appears automatically via CompassPillsOverlay component
     // No need to advance step - it overlays on top of existing content
     // Wait for pills to appear and auto-collapse (they collapse after 2s)
-    await delay(2500); // Increased from 300ms - let user see compass pills
+    await delay(2500); // Let user see compass pills
   } else if (isFirstDay) {
-    console.log("[Presenter] Step 5A: SKIPPED (Day 1 - no previous choice)");
+    console.log("[Presenter] Step 4A: SKIPPED (Day 1 - no previous choice)");
   }
 
-  // ========== STEP 6: MirrorCard ==========
-  setPresentationStep(6);
-  console.log("[Presenter] Step 6: MirrorCard");
-  await delay(1500); // Increased from 400ms - let user read mirror text
+  // ========== STEP 5: MirrorCard ==========
+  setPresentationStep(5);
+  console.log("[Presenter] Step 5: MirrorCard");
+  await delay(1500); // Let user read mirror text
 
-  // ========== STEP 7: ActionDeck (final) ==========
-  setPresentationStep(7);
-  console.log("[Presenter] Step 7: ActionDeck - presentation complete, player can interact");
+  // ========== STEP 6: ActionDeck (final) ==========
+  setPresentationStep(6);
+  console.log("[Presenter] Step 6: ActionDeck - presentation complete, player can interact");
 
   // Presentation complete - player can now choose an action
 }

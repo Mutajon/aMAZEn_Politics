@@ -1,7 +1,7 @@
 // src/store/dilemmaStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Dilemma, DilemmaRequest, DilemmaAction, DilemmaHistoryEntry } from "../lib/dilemma";
+import type { Dilemma, DilemmaRequest, DilemmaAction, DilemmaHistoryEntry, SubjectStreak, LightDilemmaRequest, LightDilemmaResponse } from "../lib/dilemma";
 import { useSettingsStore } from "./settingsStore";
 import { useRoleStore } from "./roleStore";
 import { useCompassStore } from "./compassStore"; // <-- A) use compass values (0..10)
@@ -52,6 +52,9 @@ type DilemmaState = {
   recentTopics: string[];
   topicCounts: Record<string, number>;
 
+  // Subject streak tracking (Light API)
+  subjectStreak: SubjectStreak | null;
+
   // Game resources and support (0-100 for support)
   budget: number;
   supportPeople: number;
@@ -84,6 +87,9 @@ type DilemmaState = {
 
   // Topic tracking methods
   addDilemmaTopic: (topic: string) => void;
+
+  // Subject streak tracking methods (Light API)
+  updateSubjectStreak: (topic: string) => void;
 
   // Dilemma history methods
   addHistoryEntry: (entry: DilemmaHistoryEntry) => void;
@@ -121,6 +127,9 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
   recentTopics: [],
   topicCounts: {},
 
+  // Subject streak tracking (Light API)
+  subjectStreak: null,
+
   // Game resources and support
   budget: 1500,
   supportPeople: 50,
@@ -137,42 +146,55 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
       dlog("loadNext: skipped (already in flight)");
       return;
     }
-  
+
     loadNextInFlight = true;
     set({ loading: true, error: null });
-  
+
     try {
-      const snapshot = buildSnapshot(); // buildSnapshot already logs
-      // dlog("snapshot ->", snapshot); // ← remove this to avoid duplicate logs
-  
+      // Check if we should use light API (default: true)
+      const { useLightDilemma } = useSettingsStore.getState();
+
+      console.log(`[dilemmaStore.loadNext] API Mode: ${useLightDilemma ? 'LIGHT ✅' : 'HEAVY ⚠️'}`);
+
       let d: Dilemma | null = null;
-      try {
-        const r = await fetch("/api/dilemma", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(snapshot),
-        });
-        if (r.ok) {
-            const raw = await r.json();
-            // Keep the public fields the component expects:
-            d = { title: raw.title, description: raw.description, actions: raw.actions } as Dilemma;
-            // Carry a private marker for UI gating (no type change required):
-            (d as any)._isFallback = !!raw.isFallback;
-            dlog("server /api/dilemma ->", raw);
-          } else {
-          
-          const t = await r.text();
-          dlog("server /api/dilemma FAILED:", r.status, t);
+
+      if (useLightDilemma) {
+        // Use fast light API
+        console.log("[dilemmaStore.loadNext] Calling LIGHT API via loadNextLight()");
+        dlog("loadNext: using LIGHT API");
+        d = await loadNextLight();
+      } else {
+        // Use full heavy API
+        console.log("[dilemmaStore.loadNext] Calling HEAVY API");
+        dlog("loadNext: using HEAVY API");
+        const snapshot = buildSnapshot();
+
+        try {
+          const r = await fetch("/api/dilemma", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(snapshot),
+          });
+          if (r.ok) {
+              const raw = await r.json();
+              d = { title: raw.title, description: raw.description, actions: raw.actions } as Dilemma;
+              (d as any)._isFallback = !!raw.isFallback;
+              dlog("server /api/dilemma ->", raw);
+            } else {
+            const t = await r.text();
+            dlog("server /api/dilemma FAILED:", r.status, t);
+          }
+        } catch (e: any) {
+          dlog("server /api/dilemma network error:", e?.message || e);
         }
-      } catch (e: any) {
-        dlog("server /api/dilemma network error:", e?.message || e);
       }
-  
+
+      // Fallback to local mock if both APIs failed
       if (!d) {
-        d = localMock(snapshot.day);
+        d = localMock(get().day);
         dlog("fallback mock ->", d);
       }
-  
+
       const prev = get().current;
       set((s) => ({
         current: d!,
@@ -250,6 +272,7 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
       },
       recentTopics: [],
       topicCounts: {},
+      subjectStreak: null,
       budget: 1500,
       supportPeople: 50,
       supportMiddle: 50,
@@ -382,6 +405,22 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
       recentTopics: newRecentTopics,
       topicCounts: newTopicCounts,
     });
+  },
+
+  // Subject streak tracking (Light API)
+  updateSubjectStreak(topic) {
+    const { subjectStreak } = get();
+
+    if (!subjectStreak || subjectStreak.subject !== topic) {
+      // New subject - reset streak
+      dlog("updateSubjectStreak -> new subject:", topic);
+      set({ subjectStreak: { subject: topic, count: 1 } });
+    } else {
+      // Same subject - increment count
+      const newCount = subjectStreak.count + 1;
+      dlog("updateSubjectStreak -> increment:", topic, "count:", newCount);
+      set({ subjectStreak: { subject: topic, count: newCount } });
+    }
   },
 
   // Dilemma history methods
@@ -622,8 +661,135 @@ export function buildSnapshot(): DilemmaRequest {
 
     return snap;
   }
-  
-  
+
+/**
+ * Build minimal snapshot for light dilemma API
+ * Much simpler than buildSnapshot() - only role, system, streak, and previous choice
+ */
+export function buildLightSnapshot(): LightDilemmaRequest {
+  const { debugMode } = useSettingsStore.getState();
+  const { day, lastChoice, current, subjectStreak } = useDilemmaStore.getState();
+  const roleState = useRoleStore.getState();
+
+  // Extract role (combine role name with any setting context)
+  const role = typeof roleState.selectedRole === "string" && roleState.selectedRole.trim()
+    ? roleState.selectedRole.trim()
+    : "Unicorn King";
+
+  // Extract political system
+  const system = typeof roleState.analysis?.systemName === "string" && roleState.analysis.systemName.trim()
+    ? roleState.analysis.systemName.trim()
+    : "Divine Right Monarchy";
+
+  // Build previous choice data (only for day 2+)
+  let previous: LightDilemmaRequest['previous'] | undefined = undefined;
+  if (day > 1 && lastChoice && current) {
+    previous = {
+      title: current.title,
+      choiceTitle: lastChoice.title,
+      choiceSummary: lastChoice.summary
+    };
+  }
+
+  const request: LightDilemmaRequest = {
+    role,
+    system,
+    subjectStreak: subjectStreak || null,
+    previous,
+    debug: debugMode
+  };
+
+  if (debugMode) {
+    console.log('[buildLightSnapshot] Built light request:', request);
+  }
+
+  return request;
+}
+
+/**
+ * Load next dilemma using the light API (fast, minimal payload)
+ * Includes integrated support shift analysis in the response
+ */
+async function loadNextLight(): Promise<Dilemma | null> {
+  const { debugMode } = useSettingsStore.getState();
+  const { day, supportPeople, supportMiddle, supportMom, setSupportPeople, setSupportMiddle, setSupportMom, updateSubjectStreak } = useDilemmaStore.getState();
+
+  try {
+    const snapshot = buildLightSnapshot();
+
+    const r = await fetch("/api/dilemma-light", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(snapshot),
+    });
+
+    if (!r.ok) {
+      const t = await r.text();
+      console.error("[loadNextLight] API failed:", r.status, t);
+      return null;
+    }
+
+    const raw: LightDilemmaResponse = await r.json();
+
+    if (debugMode) {
+      console.log("[loadNextLight] Response received:", raw);
+    }
+
+    // Apply support shifts if they exist (Day 2+)
+    if (raw.supportShift && day > 1) {
+      const { people, mom, holders } = raw.supportShift;
+
+      // Apply deltas with clamping to 0-100
+      const newPeople = Math.max(0, Math.min(100, supportPeople + people.delta));
+      const newMom = Math.max(0, Math.min(100, supportMom + mom.delta));
+      const newMiddle = Math.max(0, Math.min(100, supportMiddle + holders.delta)); // KEY: holders → middle
+
+      setSupportPeople(newPeople);
+      setSupportMom(newMom);
+      setSupportMiddle(newMiddle);
+
+      if (debugMode) {
+        console.log("[loadNextLight] Support shifts applied:", {
+          people: `${supportPeople} → ${newPeople} (${people.delta > 0 ? '+' : ''}${people.delta})`,
+          mom: `${supportMom} → ${newMom} (${mom.delta > 0 ? '+' : ''}${mom.delta})`,
+          middle: `${supportMiddle} → ${newMiddle} (${holders.delta > 0 ? '+' : ''}${holders.delta})`
+        });
+        console.log("[loadNextLight] Support reasons:", {
+          people: people.why,
+          mom: mom.why,
+          holders: holders.why
+        });
+      }
+    }
+
+    // Update subject streak tracking
+    if (raw.topic) {
+      updateSubjectStreak(raw.topic);
+    }
+
+    // Build Dilemma object (same format as standard API)
+    const dilemma: Dilemma = {
+      title: raw.title,
+      description: raw.description,
+      actions: raw.actions
+    };
+
+    // Carry private marker for UI gating
+    (dilemma as any)._isFallback = !!raw.isFallback;
+
+    if (debugMode) {
+      console.log("[loadNextLight] Dilemma created:", dilemma);
+    }
+
+    return dilemma;
+
+  } catch (e: any) {
+    console.error("[loadNextLight] Error:", e?.message || e);
+    return null;
+  }
+}
+
+
 
 function localMock(day: number): Dilemma {
   const dilemma: any = {

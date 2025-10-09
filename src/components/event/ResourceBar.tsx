@@ -1,16 +1,17 @@
 // src/components/event/ResourceBar.tsx
-// Restored visuals + animated budget counter + anchor for coin flights.
+// Restored visuals + animated budget counter + anchor for coin flights + player avatar
 
-import React from "react";
-import { Hourglass, Coins } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { Hourglass, Coins, User } from "lucide-react";
 
 type Props = {
   daysLeft: number;
   budget: number;
   showBudget?: boolean; // defaults to true
+  avatarSrc?: string | null;
 };
 
-export default function ResourceBar({ daysLeft, budget, showBudget = true }: Props) {
+export default function ResourceBar({ daysLeft, budget, showBudget = true, avatarSrc }: Props) {
   // --- Animated counter: prev -> budget over 2s (ease-out) ---
   const [displayBudget, setDisplayBudget] = React.useState(budget);
   const prevRef = React.useRef(budget);
@@ -43,6 +44,17 @@ export default function ResourceBar({ daysLeft, budget, showBudget = true }: Pro
     };
   }, [budget]);
 
+  // --- Avatar URL normalization (from PlayerStatusStrip) ---
+  const [imgError, setImgError] = useState(false);
+
+  const resolvedSrc = useMemo(() => {
+    const src = (avatarSrc || "").trim();
+    if (!src) return "";
+    if (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("data:")) return src;
+    if (src.startsWith("/")) return src;
+    return `/${src}`;
+  }, [avatarSrc]);
+
   return (
     <div className="w-full flex items-center justify-between gap-3">
       <ResourcePill
@@ -66,6 +78,29 @@ export default function ResourceBar({ daysLeft, budget, showBudget = true }: Pro
           iconTextClass="text-amber-200" // ← original: light gold icon
         />
       )}
+      {/* Avatar Pill */}
+      <div
+        className="shrink-0 rounded-xl overflow-hidden ring-1 ring-white/15 bg-white/5"
+        style={{ width: 100, height: 100, minWidth: 100 }}
+        aria-label="Player portrait"
+        title={resolvedSrc || undefined}
+      >
+        {resolvedSrc && !imgError ? (
+          <img
+            src={resolvedSrc}
+            alt="Player"
+            className="w-full h-full object-cover"
+            width={100}
+            height={100}
+            loading="lazy"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <User className="w-8 h-8 text-white/80" strokeWidth={2.2} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -87,7 +122,7 @@ function ResourcePill({
     <div
       className={[
         "flex-1 min-w-0",
-        "px-3 py-2 rounded-2xl",
+        "px-3 py-3 rounded-2xl",  // Increased from py-2 to py-3 for better vertical alignment with avatar
         "bg-white/10 border border-white/15 shadow-sm",
         "backdrop-blur-sm",
         "text-white",
