@@ -22,12 +22,12 @@ const MODEL_VALIDATE = process.env.MODEL_VALIDATE || CHAT_MODEL_DEFAULT;
 const MODEL_NAMES    = process.env.MODEL_NAMES    || CHAT_MODEL_DEFAULT;
 const MODEL_ANALYZE  = process.env.MODEL_ANALYZE  || CHAT_MODEL_DEFAULT;
 const MODEL_MIRROR   = process.env.MODEL_MIRROR   || CHAT_MODEL_DEFAULT;
-const MODEL_MIRROR_ANTHROPIC = process.env.MODEL_MIRROR_ANTHROPIC || "claude-3-5-haiku-latest";
+const MODEL_MIRROR_ANTHROPIC = process.env.MODEL_MIRROR_ANTHROPIC || ""; // No fallback - must be set in .env
 // Dilemma models (no generation here yet — just configuration)
 // Cheap default now; premium can be used later on demand.
 const MODEL_DILEMMA = process.env.MODEL_DILEMMA || CHAT_MODEL_DEFAULT;
 const MODEL_DILEMMA_PREMIUM = process.env.MODEL_DILEMMA_PREMIUM || "gpt-5";
-const MODEL_DILEMMA_ANTHROPIC = process.env.MODEL_DILEMMA_ANTHROPIC || "claude-3-5-haiku-latest";
+const MODEL_DILEMMA_ANTHROPIC = process.env.MODEL_DILEMMA_ANTHROPIC || ""; // No fallback - must be set in .env
 
 
 // Image model
@@ -233,7 +233,11 @@ async function aiText({ system, user, model = CHAT_MODEL_DEFAULT, temperature })
 // -------------------- Anthropic AI Text Helper --------------------
 async function aiTextAnthropic({ system, user, model = MODEL_DILEMMA_ANTHROPIC, temperature = 1 }) {
   if (!anthropic) {
-    throw new Error("Anthropic client not initialized - check ANTHROPIC_API_KEY");
+    throw new Error("Anthropic client not initialized - check ANTHROPIC_API_KEY in .env");
+  }
+
+  if (!model || model === "") {
+    throw new Error("Anthropic model not configured - set MODEL_DILEMMA_ANTHROPIC or MODEL_MIRROR_ANTHROPIC in .env");
   }
 
   try {

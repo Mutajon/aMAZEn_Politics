@@ -175,9 +175,14 @@ This is a political simulation game with AI-powered content generation, built as
   - `switchToGPT()` - Use OpenAI GPT (model from `.env`) for **both** dilemmas and mirror dialogue
 - Server routes to correct API based on `useAnthropic` flag in request
 - Affected endpoints: `/api/dilemma-light`, `/api/mirror-summary`
-- **Model Configuration**: Models are read from `.env` at server startup
+- **Model Configuration**: Models are read from `.env` at server startup (no hardcoded fallbacks)
+  - **REQUIRED**: Set `MODEL_DILEMMA_ANTHROPIC` and `MODEL_MIRROR_ANTHROPIC` in `.env` to use Claude
   - Change `.env` values and restart server (`npm run dev`) to use different models
-  - Example: Change `MODEL_DILEMMA_ANTHROPIC=claude-3-5-sonnet-20241022` for a different Claude model
+  - Examples:
+    - `MODEL_DILEMMA_ANTHROPIC=claude-3-5-haiku-latest` (fast, cheap)
+    - `MODEL_DILEMMA_ANTHROPIC=claude-3-5-sonnet-20241022` (balanced)
+    - `MODEL_DILEMMA_ANTHROPIC=claude-3-opus-20240229` (powerful, expensive)
+  - See `.env.example` for full configuration template
 
 ### Game Flow Architecture
 
