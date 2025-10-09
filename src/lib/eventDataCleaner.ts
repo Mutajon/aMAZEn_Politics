@@ -94,9 +94,34 @@ export async function cleanAndAdvanceDay(
   console.log('[Cleaner] Coin flights cleared');
 
   // ========================================================================
-  // STEP 5: Advance to next day
+  // STEP 5: Add history entry (BEFORE advancing day)
   // ========================================================================
-  const { day: currentDay, nextDay } = useDilemmaStore.getState();
+  const { current, day: currentDay, addHistoryEntry } = useDilemmaStore.getState();
+
+  if (current) {
+    // Capture support values BEFORE advancing day
+    const { supportPeople, supportMiddle, supportMom } = useDilemmaStore.getState();
+
+    addHistoryEntry({
+      day: currentDay,
+      dilemmaTitle: current.title,
+      dilemmaDescription: current.description,
+      choiceId: selectedAction.id as 'a' | 'b' | 'c',
+      choiceTitle: selectedAction.title,
+      choiceSummary: selectedAction.summary,
+      supportPeople,
+      supportMiddle,
+      supportMom
+    });
+    console.log(`[Cleaner] History entry added for Day ${currentDay}`);
+  } else {
+    console.warn('[Cleaner] No current dilemma - skipping history entry');
+  }
+
+  // ========================================================================
+  // STEP 6: Advance to next day
+  // ========================================================================
+  const { nextDay } = useDilemmaStore.getState();
   nextDay();
 
   const { day: newDay } = useDilemmaStore.getState();

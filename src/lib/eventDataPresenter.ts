@@ -151,10 +151,10 @@ export async function presentEventData(
     console.warn(`[Presenter] Step 2: SKIPPED - Missing support effects! Has effects: ${!!collectedData.supportEffects}, Length: ${collectedData.supportEffects?.length || 0}`);
   }
 
-  // ========== STEP 3: NewsTicker ==========
+  // ========== STEP 3: (NewsTicker disabled - skip immediately) ==========
   setPresentationStep(3);
-  console.log("[Presenter] Step 3: NewsTicker");
-  await delay(2000); // Increased from 800ms - let user read news items
+  console.log("[Presenter] Step 3: NewsTicker disabled, advancing immediately");
+  await delay(0); // No delay - NewsTicker removed from display
 
   // ========== STEP 4: PlayerStatusStrip ==========
   setPresentationStep(4);
@@ -214,15 +214,18 @@ export async function presentEventData(
  *
  * @param presentationStep - Current step (affects whether deltas are shown)
  * @param collectedData - Collected data (for deltas and notes)
+ * @param initialValues - Support values captured at Step 1 (before deltas applied) for animation baseline
  * @returns Array of support items
  */
 export function buildSupportItems(
   presentationStep: number,
-  collectedData: CollectedData | null
+  collectedData: CollectedData | null,
+  initialValues?: { people: number; middle: number; mom: number } | null
 ): Array<{
   id: string;
   name: string;
   percent: number;
+  initialPercent?: number; // NEW: For animation start point (value before delta applied)
   delta?: number | null;
   trend?: "up" | "down" | null;
   note?: string | null;
@@ -234,6 +237,9 @@ export function buildSupportItems(
   const { analysis } = useRoleStore.getState();
 
   console.log(`[buildSupportItems] Step: ${presentationStep}, Values from store: people=${supportPeople}, middle=${supportMiddle}, mom=${supportMom}`);
+  if (initialValues) {
+    console.log(`[buildSupportItems] Initial values (before deltas): people=${initialValues.people}, middle=${initialValues.middle}, mom=${initialValues.mom}`);
+  }
 
   // Get middle entity info from analysis
   const playerIndex = typeof analysis?.playerIndex === "number" ? analysis.playerIndex : 0;
@@ -266,6 +272,7 @@ export function buildSupportItems(
       id: "people",
       name: "The People",
       percent: supportPeople,
+      initialPercent: initialValues?.people, // Animation starts from this value
       delta: peopleEffect.delta,
       trend: peopleEffect.trend,
       note: peopleEffect.note,
@@ -277,6 +284,7 @@ export function buildSupportItems(
       id: "middle",
       name: middleEntity.name,
       percent: supportMiddle,
+      initialPercent: initialValues?.middle, // Animation starts from this value
       delta: middleEffect.delta,
       trend: middleEffect.trend,
       note: middleEffect.note,
@@ -288,6 +296,7 @@ export function buildSupportItems(
       id: "mom",
       name: "Mom",
       percent: supportMom,
+      initialPercent: initialValues?.mom, // Animation starts from this value
       delta: momEffect.delta,
       trend: momEffect.trend,
       note: momEffect.note,

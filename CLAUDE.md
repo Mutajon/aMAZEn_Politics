@@ -35,7 +35,7 @@ npm run preview      # Preview production build
 │   │   │   ├── DilemmaCard.tsx  # Main dilemma presentation
 │   │   │   ├── ResourceBar.tsx  # Money/budget display
 │   │   │   ├── SupportList.tsx  # Support level tracking
-│   │   │   ├── NewsTicker.tsx   # Satirical news reactions
+│   │   │   ├── NewsTicker.tsx   # Satirical news reactions (DISABLED - code kept for future)
 │   │   │   ├── EventContent.tsx # Main event UI rendering (extracted from EventScreen)
 │   │   │   └── EventSupportManager.tsx # Support analysis logic
 │   │   ├── PowerDistributionContent.tsx # Power distribution UI rendering (extracted from PowerDistributionScreen)
@@ -294,6 +294,34 @@ This architecture enables better React performance optimizations (memoization, s
   - Saves ~549 tokens per compass analysis
   - Tested: ~90% accuracy maintained across diverse action types
   - Impact: ~11,500 tokens saved per 7-day game
+
+- ~~API Payload Optimization~~ ✅ **COMPLETED** - 43.5% token reduction (5,400 → 3,050 tokens per day)
+  - **Compass values**: Top 3 per dimension only (40 values → 12 values) = ~300 tokens saved
+  - **Dilemma history**: Last 2 days only (not full 7 days) = ~400 tokens saved
+  - **lastChoice trimmed**: Only title + summary (no cost/iconHint) = ~50 tokens saved
+  - **Mirror payload optimized**: Top 3 compass values, last 2 days history, no action costs = ~550 tokens saved
+  - **NewsTicker disabled**: Code kept for future, removed from network = ~800 tokens saved
+  - Total savings: **~2,350 tokens per day (43.5% reduction)**
+
+- ~~Dynamic Parameters Validation~~ ✅ **COMPLETED** - Enhanced restrictions to avoid redundancy
+  - NEVER mention support levels (shown in SupportList)
+  - NEVER mention budget changes (shown in ResourceBar)
+  - NEVER mention trivial events ("3 coalition MPs appeased", "1 judicial review filed")
+
+- ~~Dilemma Generation API~~ ✅ **COMPLETED** - 40-50% token reduction + quality improvements
+  - **Token optimization**: Reduced from ~2000-2500 tokens to ~1000-1200 tokens per request
+  - **SPECIFICITY ENFORCER**: Forces concrete details (numbers, names, levers) instead of vague placeholders
+  - **Modular prompt architecture**: 6 helper functions in `server/index.mjs`:
+    - `buildCoreStylePrompt()` - Static writing rules (cached, ~250 tokens)
+    - `buildDynamicContextPrompt()` - Compact context builder (only last 2 history, top 3 topics, top 5 compass)
+    - `buildOutputSchemaPrompt()` - Minimal JSON schema (~100 tokens)
+    - `validateDilemmaResponse()` - Quality validation (structure, lengths, sentence counts)
+    - `hasGenericPhrasing()` - Detects vague terms like "controversial bill", "major reform"
+    - `safeParseJSON()` - Safe JSON parsing with fallback
+  - **Quality validation**: Two-pass system with focused repair instructions
+  - **Premium model**: Uses temperature 0.7 (balanced creativity) instead of 0.9
+  - **Result**: Better specificity, fewer generic outputs, lower costs
+  - Focus on engaging, game-changing consequences only (casualties, international reactions, resignations, protests)
 
 **React Performance Optimizations**:
 - Add `React.memo()` to frequently re-rendering components

@@ -102,14 +102,17 @@ export default function EventScreen3(_props: Props) {
   const { analysis, character } = useRoleStore();
   const showBudget = useSettingsStore((s) => s.showBudget);
 
-  // Data collection
+  // Data collection (progressive 3-phase loading)
   const {
-    collectedData,
+    phase1Data,        // Available immediately (~1-2s) - dilemma + support
+    phase2Data,        // Available later (~3-4s) - compass + dynamic params
+    phase3Data,        // Available last (~5-6s) - mirror text
+    phase1Ready,       // NEW: Show content as soon as Phase 1 completes!
+    collectedData,     // Legacy format (for presenter compatibility)
     isCollecting,
     collectionError,
-    collectionProgress,
     collectData,
-    isReady
+    isReady            // Legacy flag (same as phase1Ready now)
   } = useEventDataCollector();
 
   // Narration integration - prepares TTS when dilemma loads, provides canShowDilemma flag
@@ -120,6 +123,14 @@ export default function EventScreen3(_props: Props) {
 
   // Presentation step tracking (controls what's visible)
   const [presentationStep, setPresentationStep] = useState<number>(-1);
+
+  // Initial support values (captured at Step 1 BEFORE Step 2 applies deltas)
+  // Used as animation baseline so counter animates from old→new (e.g., 50→35 on Day 2)
+  const [initialSupportValues, setInitialSupportValues] = useState<{
+    people: number;
+    middle: number;
+    mom: number;
+  } | null>(null);
 
   // Coin flight system (persists across all phases)
   const { flights, triggerCoinFlight, clearFlights } = useCoinFlights();
@@ -160,10 +171,33 @@ export default function EventScreen3(_props: Props) {
   }, [phase, isCollecting, collectionError, day]);
 
   // ========================================================================
-  // EFFECT 2: Advance to presenting when data ready AND narration ready
+  // EFFECT 2: Capture and clear initial support values for animation
   // ========================================================================
   useEffect(() => {
-    console.log(`[EventScreen3] EFFECT 2 - isReady: ${isReady}, canShowDilemma: ${canShowDilemma}, phase: ${phase}, hasData: ${!!collectedData}`);
+    // Capture at Step 1 (before Step 2 applies deltas)
+    if (presentationStep === 1 && !initialSupportValues) {
+      const { supportPeople, supportMiddle, supportMom } = useDilemmaStore.getState();
+      setInitialSupportValues({
+        people: supportPeople,
+        middle: supportMiddle,
+        mom: supportMom
+      });
+      console.log('[EventScreen3] 📸 Captured initial support values at Step 1:', { supportPeople, supportMiddle, supportMom });
+    }
+
+    // Clear after Step 2 completes (at Step 3+) so animation doesn't reset
+    // This ensures SupportCard displays final percent value, not initial value
+    if (presentationStep >= 3 && initialSupportValues) {
+      console.log('[EventScreen3] 🧹 Clearing initial support values at Step', presentationStep);
+      setInitialSupportValues(null);
+    }
+  }, [presentationStep, initialSupportValues]);
+
+  // ========================================================================
+  // EFFECT 3: Advance to presenting when data ready AND narration ready
+  // ========================================================================
+  useEffect(() => {
+    console.log(`[EventScreen3] EFFECT 3 - isReady: ${isReady}, canShowDilemma: ${canShowDilemma}, phase: ${phase}, hasData: ${!!collectedData}`);
 
     // Wait for BOTH data collection AND narration preparation
     if (isReady && canShowDilemma && phase === 'collecting' && collectedData && !isCollecting) {
@@ -218,6 +252,7 @@ export default function EventScreen3(_props: Props) {
     console.log('[EventScreen3] Cleaning complete - resetting to collecting phase');
     setPhase('collecting');
     setPresentationStep(-1);
+    setInitialSupportValues(null); // Clear for next day
     // Collection will be triggered by effect watching phase/day
   };
 
@@ -239,7 +274,7 @@ export default function EventScreen3(_props: Props) {
       <CollectorLoadingOverlay
         day={day}
         totalDays={totalDays}
-        progress={collectionProgress}
+        progress={undefined} // No progress tracking with sequential loading
         message="Gathering political intelligence..."
       />
     );
@@ -285,8 +320,8 @@ export default function EventScreen3(_props: Props) {
     // Calculate derived values
     const daysLeft = totalDays - day + 1;
 
-    // Build support items with deltas
-    const rawSupportItems = buildSupportItems(presentationStep, collectedData);
+    // Build support items with deltas and initial values for animation
+    const rawSupportItems = buildSupportItems(presentationStep, collectedData, initialSupportValues);
 
     // Add icons to support items
     const supportItems = rawSupportItems.map(item => ({
@@ -320,10 +355,10 @@ export default function EventScreen3(_props: Props) {
             <SupportList items={supportItems} />
           )}
 
-          {/* Step 3+: NewsTicker */}
-          {presentationStep >= 3 && collectedData && (
+          {/* Step 3+: NewsTicker - DISABLED (keeping code for future use) */}
+          {/* {presentationStep >= 3 && collectedData && (
             <NewsTicker items={collectedData.newsItems} />
-          )}
+          )} */}
 
           {/* Step 4+: PlayerStatusStrip */}
           {presentationStep >= 4 && collectedData && (

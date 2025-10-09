@@ -503,6 +503,37 @@ function flattenCompass(vals: any): Record<string, number> {
   return out;
 }
 
+/**
+ * Flatten compass values with top 3 optimization
+ * Sorts all values by magnitude, sends ONLY top 3 per dimension
+ * Reduces token usage by ~300 tokens (40 keys → ~12 keys)
+ *
+ * Example input:  { what: [0, 0, 4, 0, 0, 2, 0, 0, 0, 0] }
+ * Example output: { what2: 4, what5: 2 } (only 2 keys, not 10!)
+ */
+function flattenCompassOptimized(vals: any): Record<string, number> {
+  const out: Record<string, number> = {};
+
+  for (const k of ["what", "whence", "how", "whither"] as const) {
+    const arr = Array.isArray(vals?.[k]) ? vals[k] : [];
+
+    // Sort by value descending, take top 3 with their indices
+    const top3 = arr
+      .map((v, i) => ({ v: Number(v) || 0, i }))
+      .sort((a, b) => b.v - a.v) // Highest first
+      .slice(0, 3) // Take only top 3
+      .filter(x => x.v > 0); // Skip zeros (optional but saves tokens)
+
+    // Add only these 3 values to output (not all 10!)
+    top3.forEach(({ v, i }) => {
+      const clamped = Math.max(0, Math.min(10, Math.round(v)));
+      out[`${k}${i}`] = clamped;
+    });
+  }
+
+  return out; // Returns ~12 keys instead of 40!
+}
+
 export function buildSnapshot(): DilemmaRequest {
     const { debugMode, dilemmasSubjectEnabled, dilemmasSubject } =
       useSettingsStore.getState();
@@ -535,9 +566,9 @@ export function buildSnapshot(): DilemmaRequest {
         ? roleState.analysis!.playerIndex
         : null;
 
-    // Compass values (flattened 0..10 map)
+    // OPTIMIZED: Compass values with top 3 per dimension (reduces ~300 tokens)
     const compassRaw = useCompassStore.getState().values;
-    const compassValues = flattenCompass(compassRaw);
+    const compassValues = flattenCompassOptimized(compassRaw);
 
     // Enhanced context for intelligent dilemma generation (NewDilemmaLogic.md compliance)
     const enhancedContext = analyzeEnhancedContext();
@@ -564,8 +595,12 @@ export function buildSnapshot(): DilemmaRequest {
         mom: supportMom
       },
 
-      // NEW: Send last choice for follow-up dilemmas (Rule 4c, Rule 25b.iii)
-      lastChoice: lastChoice || null,
+      // OPTIMIZED: Trim lastChoice (only title + summary, no cost/iconHint)
+      lastChoice: lastChoice ? {
+        title: lastChoice.title,
+        summary: lastChoice.summary
+        // Omit: id, cost, iconHint (not needed by server)
+      } as any : null,
 
       // NEW: Send topic tracking for diversity (Rule #9)
       recentTopics: recentTopics || [],
@@ -574,8 +609,8 @@ export function buildSnapshot(): DilemmaRequest {
       // NEW: Send enhanced context analysis
       enhancedContext: enhancedContext || null,
 
-      // NEW: Send full dilemma history for better AI context
-      dilemmaHistory: dilemmaHistory || [],
+      // OPTIMIZED: Only last 2 days of history (reduces ~400 tokens)
+      dilemmaHistory: (dilemmaHistory || []).slice(-2),
 
       debug: debugMode,
     };

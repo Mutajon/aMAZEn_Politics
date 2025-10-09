@@ -172,9 +172,9 @@ async function aiText({ system, user, model = CHAT_MODEL_DEFAULT, temperature })
         { role: "user", content: user },
       ],
     };
-    // Only include temperature if it is exactly 1; otherwise omit entirely.
-    if (typeof temperature === "number" && temperature === 1) {
-      body.temperature = 1;
+    // Include temperature if provided (not just if === 1)
+    if (typeof temperature === "number") {
+      body.temperature = temperature;
     }
 
     const resp = await fetch(CHAT_URL, {
@@ -1073,6 +1073,133 @@ function analyzeSystemType(systemName) {
   };
 }
 
+// -------------------- Dilemma Prompt Helpers (Optimized) ---------------------------
+// Compact, token-efficient prompt builders for /api/dilemma
+
+/**
+ * Static core writing style - cached across requests (no context needed)
+ */
+function buildCoreStylePrompt() {
+  return `You write short, punchy political situations for a choice-based mobile game.
+- Never use the word "dilemma".
+- Title ≤ 60 chars. Description 2–3 sentences. Mature, gripping, in-world.
+- Natural language (no bullets). Feels like live politics (calls, memos, press, leaks).
+- Plain modern English—no specialist jargon. Prefer "high court", "parliament", "council".
+- Democratic systems feel like pluralism and checks: rivals push back, media probes, courts constrain.
+
+SPECIFICITY ENFORCER (CRITICAL):
+- Name or precisely tag the issue (e.g., "ban on foreign-funded political ads", "port workers' strike").
+- Name at least one real actor type (minister, union, court chamber, party faction, watchdog).
+- Include one concrete lever: draft order, emergency grant, curfew timing, budget freeze, seat allocation.
+- Avoid placeholders like "a controversial bill", "major reform", "general unrest", "the policy".
+- Keep title, description, and action summaries focused on WHAT/WHO/WHY using qualitative terms.
+- Save precise numbers for the generated dynamic parameters (which show measurable outcomes).
+- Example: "Night curfew with police patrols" NOT "21:00–06:00 dispersal orders and ₪150m freeze".
+
+ACTIONS:
+- Exactly three, mutually conflicting.
+- Each summary must be ONE sentence, 15–20 words, directly executable by a leader.
+- Cost sign: negative = spend/outflow, positive = revenue/inflow.
+- Magnitudes: 0, ±50, ±100, ±150, ±200, ±250. Reserve +300..+500 only for broad tax/windfall/aid.`;
+}
+
+/**
+ * Build tightly-scoped dynamic context (token-optimized)
+ */
+function buildDynamicContextPrompt(ctx) {
+  const {
+    role, systemName, systemAnalysis, day, totalDays, isFirst, isLast,
+    lastChoice, dilemmaHistory = [], recentTopics = [], topicCounts = {},
+    supports = {}
+  } = ctx;
+
+  // Last 2 history items only
+  const lastTwo = (dilemmaHistory || []).slice(-2);
+
+  // Low support groups (simplified)
+  const lowSupport = [];
+  if (supports.people && supports.people < 25) lowSupport.push(`people:${supports.people}%`);
+  if (supports.middle && supports.middle < 25) lowSupport.push(`middle:${supports.middle}%`);
+  if (supports.mom && supports.mom < 25) lowSupport.push(`mom:${supports.mom}%`);
+
+  return `
+SYSTEM & ROLE
+- System: ${systemName}
+- Feel: ${systemAnalysis?.feel || ''}
+- Framing: ${systemAnalysis?.dilemmaFraming || ''}
+- Role: ${role}
+- Day: ${day} of ${totalDays}${isFirst ? ' (FIRST)' : isLast ? ' (LAST)' : ''}
+
+RECENT DECISION${lastChoice?.title ? ' (PRIMARY DRIVER)' : ''}
+${lastChoice?.title ? `- Player last acted: "${lastChoice.title}" — ${lastChoice.summary || ''}` : '- n/a'}
+
+HISTORY${lastTwo.length > 0 ? ' (SECONDARY)' : ''}
+${lastTwo.length > 0 ? lastTwo.map(d => `- Day ${d.day}: "${d.dilemmaTitle}" → ${d.choiceTitle}`).join('\n') : '- n/a'}
+
+LOW SUPPORT GROUPS
+${lowSupport.length > 0 ? `- ${lowSupport.join(', ')} - these groups may demand concessions or take action` : '- none'}
+
+TOPIC DIVERSITY
+${recentTopics.length > 0 ? `- Recent: ${recentTopics.slice(0, 3).join(', ')} - avoid repeating unless continuity requires it` : '- n/a'}
+${Object.keys(topicCounts).length > 0 ? `- Counts: ${Object.entries(topicCounts).sort((a,b) => b[1] - a[1]).slice(0, 3).map(([k,v]) => `${k}:${v}`).join(', ')}` : ''}
+`.trim();
+}
+
+/**
+ * Compact JSON output schema
+ */
+function buildOutputSchemaPrompt() {
+  return `Return STRICT JSON only:
+{"title":"","description":"","actions":[
+  {"id":"a","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"},
+  {"id":"b","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"},
+  {"id":"c","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}
+],"topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}`;
+}
+
+/**
+ * Lightweight validation for dilemma response quality
+ */
+function validateDilemmaResponse(raw, obj) {
+  if (!obj || typeof obj !== "object") return { valid: false, reason: "Invalid JSON" };
+  if (!obj.title || !obj.description) return { valid: false, reason: "Missing title/description" };
+  if (!Array.isArray(obj.actions) || obj.actions.length !== 3) return { valid: false, reason: "Need exactly 3 actions" };
+
+  if (obj.title.length > 60) return { valid: false, reason: "Title too long" };
+
+  // Check action summaries (just one sentence, no word count)
+  for (const a of obj.actions) {
+    if (!a?.summary) return { valid: false, reason: "Missing action summary" };
+
+    // One sentence = exactly one period at end (split should give ["content", ""])
+    const parts = a.summary.split('.');
+    if (parts.length !== 2 || parts[1].trim() !== '') {
+      return { valid: false, reason: `Action summary not exactly one sentence: "${a.summary}"` };
+    }
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Check if response contains generic/vague phrasing
+ */
+function hasGenericPhrasing(text) {
+  const s = (text || "").toLowerCase();
+  return /controversial bill|major bill|general unrest|\bthe policy\b|broad reform|significant change|important decision|major reform|the situation|the issue|the matter/.test(s);
+}
+
+/**
+ * Safely parse JSON with fallback
+ */
+function safeParseJSON(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
 // -------------------- Dilemma (AI, minimal prompt) ---------------------------
 app.post("/api/dilemma", async (req, res) => {
   try {
@@ -1128,237 +1255,109 @@ app.post("/api/dilemma", async (req, res) => {
     // Analyze political system type for appropriate feel
     const systemAnalysis = analyzeSystemType(systemName);
 
-        // Build enhanced system prompt based on available context
-        let systemParts = [
-          "You write **short, punchy political situations** for a choice-based mobile game.",
-          "",
-          "STYLE & TONE",
-          "- Do NOT use the word 'dilemma'.",
-          "- Keep title ≤ 60 chars; description 2–3 sentences, mature and engaging.",
-          "- Natural language (no bullet points), feels like in-world events, demands, questions or follow-ups from real actors.",
-          "",
-          ANTI_JARGON_RULES, // CRITICAL: Plain language, no obscure historical terms
-          "",
-          "POLITICAL SYSTEM FEEL (CRITICAL)",
-          `- System: ${systemName}`,
-          `- Type: ${systemAnalysis.type}`,
-          `- Feel: ${systemAnalysis.feel}`,
-          `- Framing: ${systemAnalysis.dilemmaFraming}`,
-          "- IMPORTANT: Make player FEEL what it's like to operate in this system. The system's nature should be evident in how situations arise and how choices work.",
-          ""
-        ];
+        // ===================================================================
+        // OPTIMIZED PROMPT BUILDING (using helper functions)
+        // Token reduction: ~50% (2000-2500 → 1000-1200 tokens)
+        // ===================================================================
+        const system = buildCoreStylePrompt() + "\n\n" + buildDynamicContextPrompt({
+          role,
+          systemName,
+          systemAnalysis,
+          day,
+          totalDays,
+          isFirst,
+          isLast,
+          lastChoice,
+          dilemmaHistory: dilemmaHistory?.slice(-2), // Last 2 only
+          recentTopics: recentTopics?.slice(0, 3), // Top 3 only
+          topicCounts,
+          enhancedContext,
+          supports,
+          settings
+        }) + "\n\n" + buildOutputSchemaPrompt();
 
-        // Add first/last day special handling
-        if (isFirst) {
-          systemParts.push(
-            "FIRST DAY SPECIAL RULE",
-            "- Frame situation as immediate challenge arising from leadership transition",
-            "- Show player taking power in a moment of crisis or opportunity",
-            "- Establish the political system's feel from the start",
-            "- Example: 'Advisors split on how to handle the restless city watching your ascension'",
-            ""
-          );
-        } else if (isLast) {
-          systemParts.push(
-            "LAST DAY SPECIAL RULE",
-            "- Create high-stakes climax that pays off recent tensions and choices",
-            "- Reference cumulative effects of player's previous decisions",
-            "- Offer a defining moment that tests player's core values",
-            "- Make this situation memorable and consequential - the culmination of their rule",
-            ""
-          );
-        }
-
-        systemParts.push(
-          "WORLD FIT & CONTEXT",
-          "- If a focus topic is provided, center the situation on it.",
-          "- Consider the player's **top Compass components** (list provided)."
-        );
-
-        // Add enhanced context rules if available
-        if (enhancedContext) {
-          systemParts.push(
-            "",
-            "INTELLIGENT CONTEXTUAL GENERATION (NewDilemmaLogic.md)"
-          );
-
-          // Follow-up to previous choice
-          if (lastChoice && lastChoice.title) {
-            systemParts.push(
-              "",
-              "RESPONSE TO PREVIOUS CHOICE (PRIMARY FOCUS)",
-              `- Previous action: "${lastChoice.title}" - ${lastChoice.summary}`,
-              "- Create a natural consequence or follow-up event showing realistic political cause-and-effect",
-              "- Other power holders may respond if their interests were affected"
-            );
-          }
-
-          // Historical context (full game history)
-          if (dilemmaHistory && dilemmaHistory.length > 0) {
-            systemParts.push(
-              "",
-              "HISTORICAL CONTEXT (SECONDARY CONSIDERATION)",
-              "- You have access to the complete history of decisions from previous days",
-              "- PRIMARY FOCUS: The last choice (most recent decision) - this is the most important",
-              "- SECONDARY: Overall pattern from history (player's governing style, recurring themes)",
-              "- Use history to:",
-              "  * Create natural continuity and consequences",
-              "  * Reference past decisions when relevant (but not forced)",
-              "  * Avoid feeling repetitive or disconnected",
-              "  * Build escalating tension based on cumulative choices",
-              "- DO NOT make every dilemma a direct callback - most should feel fresh while being contextually aware",
-              ""
-            );
-
-            // Add formatted history
-            systemParts.push("DECISION HISTORY:");
-            dilemmaHistory.forEach(entry => {
-              systemParts.push(
-                `Day ${entry.day}: "${entry.dilemmaTitle}" → Choice: "${entry.choiceTitle}" (Support: People ${entry.supportPeople}%, Middle ${entry.supportMiddle}%, Mom ${entry.supportMom}%)`
-              );
-            });
-          }
-
-          // Support crisis handling
-          const hasSupportCrisis = enhancedContext.lowSupportEntities?.length > 0 || enhancedContext.criticalSupportEntities?.length > 0;
-          if (hasSupportCrisis) {
-            systemParts.push(
-              "",
-              "SUPPORT CRISIS HANDLING (PRIORITY)"
-            );
-
-            if (enhancedContext.lowSupportEntities?.includes("people") && supports.people < 25) {
-              systemParts.push(`- The People are desperate (support: ${supports.people}%). They may attempt extreme action to get player's attention.`);
-            }
-            if (enhancedContext.lowSupportEntities?.includes("middle") && supports.middle < 25) {
-              const middleName = enhancedContext.powerHolders?.find(h => !h.isPlayer)?.name || "Main power holder";
-              systemParts.push(`- ${middleName} is desperate (support: ${supports.middle}%). They may threaten or act against player.`);
-            }
-            if (enhancedContext.lowSupportEntities?.includes("mom") && supports.mom < 25) {
-              systemParts.push(`- Personal allies are wavering (support: ${supports.mom}%). They may withdraw support or demand concessions.`);
-            }
-
-            if (enhancedContext.criticalSupportEntities?.includes("people") && supports.people < 20) {
-              systemParts.push(`- CRITICAL: The People support at ${supports.people}% - generate EXTREME event from their direction!`);
-            }
-            if (enhancedContext.criticalSupportEntities?.includes("middle") && supports.middle < 20) {
-              const middleName = enhancedContext.powerHolders?.find(h => !h.isPlayer)?.name || "Main power holder";
-              systemParts.push(`- CRITICAL: ${middleName} support at ${supports.middle}% - generate EXTREME event from their direction!`);
-            }
-            if (enhancedContext.criticalSupportEntities?.includes("mom") && supports.mom < 20) {
-              systemParts.push(`- CRITICAL: Allies support at ${supports.mom}% - generate EXTREME event from their direction!`);
-            }
-          }
-
-          // Topic diversity
-          if (recentTopics.length > 0) {
-            systemParts.push(
-              "",
-              "TOPIC DIVERSITY (Rule #9)",
-              `- Recent topics (avoid repeating): ${recentTopics.slice(0, 3).join(", ")}`,
-              "- RULE: Maximum 3 consecutive situations on same topic",
-              "- Choose a fresh topic unless dramatic continuity requires it"
-            );
-
-            if (topicCounts && Object.keys(topicCounts).length > 0) {
-              const mostUsed = Object.entries(topicCounts)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 3)
-                .map(([topic, count]) => `${topic} (${count}x)`)
-                .join(", ");
-              systemParts.push(`- Most used topics: ${mostUsed}`);
-            }
-          }
-
-          // Compass tensions
-          if (enhancedContext.compassTensions && enhancedContext.compassTensions.length > 0) {
-            systemParts.push(
-              "",
-              "COMPASS TENSIONS TO EXPLORE",
-              ...enhancedContext.compassTensions.map(tension => `- ${tension}: Create situation that forces choice between these values`)
-            );
-
-            if (enhancedContext.topCompassComponents && enhancedContext.topCompassComponents.length > 0) {
-              const topValues = enhancedContext.topCompassComponents.slice(0, 5).map(c => c.name).join(", ");
-              systemParts.push(`- Top player values: ${topValues}`, "- Design scenarios that test these specific values in meaningful ways");
-            }
-          }
-
-          // Power holder response logic
-          if (enhancedContext.powerHolders && enhancedContext.powerHolders.length > 0) {
-            systemParts.push(
-              "",
-              "POWER HOLDER DYNAMICS",
-              `- Player power: ${enhancedContext.playerPowerPercent}%`,
-              ""
-            );
-
-            const nonPlayerHolders = enhancedContext.powerHolders.filter(h => !h.isPlayer);
-            if (nonPlayerHolders.length > 0) {
-              systemParts.push("Non-player power holders:");
-              nonPlayerHolders.forEach(h => {
-                systemParts.push(`  - ${h.name}: ${h.percent}% power`);
-              });
-            }
-
-            if (lastChoice && lastChoice.title) {
-              systemParts.push(
-                "",
-                "PREVIOUS ACTION ANALYSIS:",
-                `- Player chose: "${lastChoice.title}"`,
-                "- Consider: Did this threaten any power holder's interests?",
-                "- If yes, AND they have sufficient power (>15%), they should respond",
-                "- Response should match their power level (higher power = stronger response)",
-                "- If player has >70% power, resistance may be futile (but assassination attempts possible)"
-              );
-            }
-          }
-        }
-
-        systemParts.push(
-          "",
-          "OUTPUT SHAPE (STRICT JSON)",
-          '{"title":"","description":"","actions":[{"id":"a","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}],' +
-          '{"id":"b","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}],' +
-          '{"id":"c","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}],' +
-          '"topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}',
-          "",
-          "ACTION SUMMARY LENGTH (CRITICAL)",
-          "- MUST be ONE sentence only",
-          "- Maximum 15-20 words",
-          "- Clear, direct, actionable description",
-          "- Example: 'Restrict movement after dusk with visible patrols.'",
-          "",
-          "COSTS (SIGN & MAGNITUDE)",
-          "- SIGN: Negative=spend/outflow. Positive=revenue/inflow.",
-          "- Magnitudes: 0, ±50, ±100, ±150, ±200, ±250.",
-          "- Reserve +300..+500 ONLY for broad tax/windfall/aid cases."
-        );
-
-        const system = systemParts.join("\n");
-        
-
-    // Build enhanced user prompt (simpler now since system prompt has detailed rules)
-    let userParts = [
+    // Build compact user prompt
+    const user = [
       `ROLE: ${role}`,
-      `POLITICAL SYSTEM: ${systemName}`,
+      `SYSTEM: ${systemName}`,
       focusLine,
-      `DAY: ${day} of ${totalDays} (${isFirst ? "first" : isLast ? "last" : "mid-campaign"})`,
-      `TOP COMPASS COMPONENTS (0..10): ${topCompass.join(", ") || "n/a"}`,
+      `DAY: ${day}/${totalDays}${isFirst ? " (FIRST)" : isLast ? " (LAST)" : ""}`,
+      `TOP COMPASS: ${topCompass.join(", ") || "n/a"}`,
       "",
-      "TASK: Produce exactly one short situation with exactly three conflicting ways to respond.",
-      "Return STRICT JSON ONLY in the shape specified."
-    ];
+      "Return STRICT JSON only."
+    ].filter(part => part.trim()).join("\n");
 
-    const user = userParts.filter(part => part.trim()).join("\n");
+    // ----- Call AI with premium model + quality validation -----
+    let raw = null;
+    let attempt = 0;
+    const maxAttempts = 2;
 
-    // ----- Call model WITHOUT fallback so we can detect failure
-    let raw = await aiJSON({ system, user, model: MODEL_DILEMMA, temperature: 0.9, fallback: null });
+    while (attempt < maxAttempts && !raw) {
+      attempt++;
 
-    // One light retry
-    if (!raw || !raw.title || !Array.isArray(raw.actions)) {
-      await new Promise(r => setTimeout(r, 500));
-      raw = await aiJSON({ system, user, model: MODEL_DILEMMA, temperature: 0.9, fallback: null });
+      try {
+        const responseText = await aiText({
+          system,
+          user,
+          model: MODEL_DILEMMA,
+          temperature: 1  // gpt-5 only supports temperature = 1
+        });
+
+        const parsed = safeParseJSON(responseText);
+        const validation = validateDilemmaResponse(responseText, parsed);
+
+        if (!validation.valid) {
+          console.log(`[/api/dilemma] ⚠️  Attempt ${attempt} validation failed: ${validation.reason}`);
+
+          if (attempt < maxAttempts) {
+            // Single-pass repair attempt
+            const repairPrompt = `Previous response was invalid: ${validation.reason}\n\nFix ONLY that issue. Return complete JSON.`;
+            const repaired = await aiText({
+              system,
+              user: user + "\n\n" + repairPrompt,
+              model: MODEL_DILEMMA,
+              temperature: 1  // gpt-5 only supports temperature = 1
+            });
+
+            const reparsed = safeParseJSON(repaired);
+            const revalidation = validateDilemmaResponse(repaired, reparsed);
+
+            if (revalidation.valid && !hasGenericPhrasing(repaired)) {
+              raw = reparsed;
+              console.log(`[/api/dilemma] ✅ Repair successful on attempt ${attempt}`);
+            }
+          }
+        } else if (hasGenericPhrasing(responseText)) {
+          console.log(`[/api/dilemma] ⚠️  Attempt ${attempt} has generic phrasing`);
+
+          if (attempt < maxAttempts) {
+            // Specificity repair
+            const repairPrompt = `Response contains vague placeholders like "controversial bill" or "major reform".\n\nREPLACE with specific details: exact bill name, concrete numbers, named actors, precise levers.\n\nReturn complete JSON with specificity fixes.`;
+            const repaired = await aiText({
+              system,
+              user: user + "\n\n" + repairPrompt,
+              model: MODEL_DILEMMA,
+              temperature: 1  // gpt-5 only supports temperature = 1
+            });
+
+            const reparsed = safeParseJSON(repaired);
+            if (validateDilemmaResponse(repaired, reparsed).valid && !hasGenericPhrasing(repaired)) {
+              raw = reparsed;
+              console.log(`[/api/dilemma] ✅ Specificity repair successful on attempt ${attempt}`);
+            }
+          }
+        } else {
+          // Success!
+          raw = parsed;
+          console.log(`[/api/dilemma] ✅ Valid response on attempt ${attempt}`);
+        }
+      } catch (e) {
+        console.error(`[/api/dilemma] ❌ Attempt ${attempt} error:`, e?.message || e);
+      }
+
+      if (!raw && attempt < maxAttempts) {
+        await new Promise(r => setTimeout(r, 500)); // Brief pause before retry
+      }
     }
 
     let usedFallback = false;
@@ -1503,10 +1502,36 @@ app.post("/api/dilemma", async (req, res) => {
           "OUTPUT: STRICT JSON ARRAY ONLY (ALWAYS exactly 3 items - one for each group).",
           "Each item: { id: 'people|middle|mom', level: 'low|medium|large|extreme', polarity: 'positive|negative', explain: 'ONE SHORT SENTENCE' }",
           "",
-          "CRITICAL: Base support changes on how the NEW SITUATION describes reactions.",
-          "If the new situation says 'public loves this' → people support INCREASES",
-          "If the new situation says '" + middleName + " in uproar' → middle support DECREASES",
-          "If the new situation says 'loyalists proud' → mom support INCREASES",
+          "CRITICAL EVALUATION APPROACH:",
+          "Evaluate the PREVIOUS ACTION's impact on each group's interests and values:",
+          "",
+          "1. MATERIAL INTERESTS: Did the action help or harm this group economically/materially?",
+          "   - Spending on public services → positive for people",
+          "   - Saving money, pragmatic choices → often positive for middle (fiscal responsibility)",
+          "   - Actions showing competence → positive for mom (proud of capable child)",
+          "",
+          "2. VALUES ALIGNMENT: Did it align with or contradict their priorities?",
+          "   - Freedom/participation → positive for people",
+          "   - Stability/order → positive for middle (establishment)",
+          "   - Safety/wisdom → positive for mom (protective parent)",
+          "",
+          "3. RESPECT & ENGAGEMENT: Did it show respect or disregard for their concerns?",
+          "   - Addressing people directly → positive for people",
+          "   - Working with institutions → positive for middle",
+          "   - Showing caution/care → positive for mom",
+          "",
+          "The NEW SITUATION may describe reactions, but these should CONFIRM your analysis of the action's merit, not replace it.",
+          "Most actions have MIXED results (some groups benefit, others lose).",
+          "",
+          "BALANCED OUTCOMES - IMPORTANT:",
+          "- Most choices produce MIXED results (some groups up, some down)",
+          "- All negative is RARE (only for universally harmful choices)",
+          "- All positive is RARE (only for brilliant or popular moves)",
+          "- Typical patterns:",
+          "  * Populist action: +10 people, -5 middle, +5 mom",
+          "  * Pragmatic action: +5 people, +10 middle, +5 mom",
+          "  * Bold action: +5 people, -10 middle, -5 mom (mom worried)",
+          "  * Cautious action: -5 people (boring), +5 middle (stable), +10 mom (safe)",
           "",
           "STYLE RULES for `explain`:",
           "- Keep it vivid and specific; 8–18 words; no hashtags/emojis.",
@@ -1792,22 +1817,41 @@ Generate 1-3 contextually relevant dynamic parameters that show the immediate co
 
 ${ANTI_JARGON_RULES}
 
-CRITICAL RESTRICTIONS - NEVER mention these topics:
-- Support levels (people support, middle entity support, mom support)
-- Budget changes or money (the player already sees budget separately)
-- General approval ratings
+CRITICAL RESTRICTIONS (ABSOLUTELY ENFORCED):
 
-FOCUS ON these types of consequences:
-- Casualties, deaths, or injuries (specific numbers)
-- International reactions (countries condemning/praising, sanctions, etc.)
-- Resignations or appointments (ministers, officials, etc.)
-- Protests or demonstrations (number of protesters, arrests, etc.)
-- Economic indicators (inflation, GDP, unemployment - NOT budget)
-- Policy outcomes (laws passed, treaties signed, etc.)
-- Infrastructure changes (buildings constructed/destroyed, etc.)
-- Military outcomes (fighters neutralized, territory gained/lost, etc.)
+1. NEVER mention support levels or approval:
+   - NO "People support rising" or "Public approval up"
+   - NO "Middle entity support" or "Legislature backing"
+   - NO "Allies satisfied" or "Mom proud"
+   - Support is shown separately - avoid 100% redundancy
 
-EXAMPLES (follow this exact format):
+2. NEVER mention budget, money, or treasury:
+   - NO "Budget decreased" or "Treasury depleted"
+   - NO "Funds low" or "Revenue increased"
+   - Budget is shown separately - avoid 100% redundancy
+
+3. NEVER mention trivial or vague events:
+   - NO "Scene at plaza" or "Mood shifts"
+   - NO "Atmosphere tense" or "Feelings mixed"
+   - Each parameter must be CONCRETE and SIGNIFICANT
+
+4. FOCUS ON these engaging, game-changing consequences:
+   ✅ Casualties: "40 militia fighters neutralized", "14 civilians dead"
+   ✅ International reactions: "12 countries condemn action", "UN resolution pending"
+   ✅ Political changes: "5 ministers resign", "Opposition calls vote"
+   ✅ Protests: "3,000 protesters arrested", "Riots in 4 cities"
+   ✅ Economic indicators: "Inflation up 15%", "Unemployment hits 18%"
+   ✅ Policy outcomes: "Treaty signed with 3 nations", "Law passes 65-35"
+   ✅ Infrastructure: "3 hospitals under construction", "Dam project halted"
+   ✅ Military: "Territory gained in north", "2 bases captured"
+
+5. Each parameter must be:
+   - Specific (numbers, locations, entities)
+   - Interesting (player wants to know this)
+   - Non-redundant (not shown elsewhere)
+   - Consequences-focused (what happened due to action)
+
+GOOD EXAMPLES (follow this exact format):
 - "40 militia fighters neutralized"
 - "14 civilians dead"
 - "12 countries issue condemnation"
@@ -1815,6 +1859,14 @@ EXAMPLES (follow this exact format):
 - "Inflation up 15%"
 - "5 ministers resign"
 - "3 hospitals under construction"
+
+BAD EXAMPLES (NEVER generate these):
+- "3 coalition MPs appeased" (support-related, redundant)
+- "1 judicial review filed" (trivial, not engaging)
+- "People support rising" (support-related, redundant)
+- "Budget decreased" (budget-related, redundant)
+- "Scene at plaza" (vague, trivial)
+- "Mood shifts positive" (vague, not specific)
 
 Choose appropriate icons from: Users, TrendingUp, TrendingDown, Shield, AlertTriangle, Heart, Building, Globe, Leaf, Zap, Target, Scale, Flag, Crown, Activity, etc.
 

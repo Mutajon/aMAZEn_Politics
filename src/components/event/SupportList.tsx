@@ -36,7 +36,8 @@ const ICON_BADGE_BG: Record<string, string> = {
 export type SupportItem = {
   id: string; // "people" | "middle" | "mom" (used to pick badge color)
   name: string;
-  percent: number;                 // 0..100 (target value)
+  percent: number;                 // 0..100 (target value - AFTER delta applied)
+  initialPercent?: number;         // 0..100 (initial value - BEFORE delta applied, for animation baseline)
   /** kept for compat; not used for bg now */
   accentClass?: string;
   icon?: React.ReactNode;          // optional custom icon
@@ -87,6 +88,7 @@ function SupportCard({
     id,
     name,
     percent,
+    initialPercent,
     icon,
     delta = null,
     trend = null,
@@ -94,11 +96,15 @@ function SupportCard({
     moodVariant = "civic",
   } = item;
 
-  // Smoothly animate displayed percent to `percent`
+  // Smoothly animate displayed percent from initialPercent → percent
+  // If initialPercent is provided, use it as the animation baseline (value before delta applied)
+  // Otherwise, use current percent (no animation needed)
   const pctTarget = clampPercent(percent);
-  const [pctDisplay, setPctDisplay] = useState<number>(pctTarget);
+  const pctInitial = initialPercent !== undefined ? clampPercent(initialPercent) : pctTarget;
+
+  const [pctDisplay, setPctDisplay] = useState<number>(pctInitial);
   const rafRef = useRef<number | null>(null);
-  const prevTargetRef = useRef<number>(pctTarget);
+  const prevTargetRef = useRef<number>(pctInitial);
 
   useEffect(() => {
     if (!animatePercent) {
@@ -112,6 +118,15 @@ function SupportCard({
     const from = prevTargetRef.current;
     const to = pctTarget;
     const duration = Math.max(0, animateDurationMs);
+
+    // Only animate if values are different
+    if (from === to) {
+      setPctDisplay(to);
+      prevTargetRef.current = to;
+      return;
+    }
+
+    console.log(`[SupportCard:${id}] Animating percent: ${from} → ${to} (${to - from >= 0 ? '+' : ''}${to - from})`);
 
     const tick = (t: number) => {
       const elapsed = t - start;
@@ -132,7 +147,7 @@ function SupportCard({
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     };
-  }, [pctTarget, animatePercent, animateDurationMs]);
+  }, [pctTarget, animatePercent, animateDurationMs, id]);
 
   const showDelta = typeof delta === "number" && delta !== 0;
   const showTrend = trend === "up" || trend === "down";

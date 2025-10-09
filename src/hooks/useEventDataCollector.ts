@@ -41,18 +41,26 @@ export type DynamicParam = {
   tone: "up" | "down" | "neutral";
 };
 
-export type CollectedData = {
-  // Core data (always present)
+// PHASE 1: Critical data - must load before showing anything
+export type Phase1Data = {
   dilemma: Dilemma;
-  mirrorText: string;
-  newsItems: TickerItem[];
+  supportEffects: SupportEffect[] | null; // Included in dilemma response on Day 2+
+  newsItems: TickerItem[]; // Empty array (disabled)
+};
 
-  // Day 2+ only (null on Day 1)
-  supportEffects: SupportEffect[] | null;
+// PHASE 2: Secondary data - loads in background while user reads
+export type Phase2Data = {
   compassPills: CompassPill[] | null;
   dynamicParams: DynamicParam[] | null;
+};
 
-  // Status tracking
+// PHASE 3: Tertiary data - loads in background while user reads
+export type Phase3Data = {
+  mirrorText: string;
+};
+
+// Legacy type for backward compatibility (deprecated)
+export type CollectedData = Phase1Data & Phase2Data & Phase3Data & {
   status: {
     dilemmaReady: boolean;
     mirrorReady: boolean;
@@ -61,8 +69,6 @@ export type CollectedData = {
     compassReady: boolean;
     dynamicReady: boolean;
   };
-
-  // Error tracking (for debugging)
   errors: {
     dilemma?: Error;
     mirror?: Error;
@@ -78,10 +84,52 @@ export type CollectedData = {
 // ============================================================================
 
 /**
+ * Get top 3 compass values from a dimension array (for API payload optimization)
+ * Sorts by value descending, returns sparse array with top 3 values at their original indices
+ *
+ * @param arr - Full compass dimension array (10 values)
+ * @returns Sparse array with only top 3 values, rest are 0 (maintains index alignment)
+ *
+ * Example: [8.5, 2.1, 7.2, 1.5, 6.1, 0.5, 3.2, 1.0, 0.8, 0.3]
+ *       → [8.5, 0, 7.2, 0, 6.1, 0, 0, 0, 0, 0]
+ */
+function getTop3CompassValues(arr: number[] | undefined): number[] {
+  if (!Array.isArray(arr) || arr.length === 0) return [];
+
+  // Create array of [value, originalIndex] pairs
+  const indexed = arr.map((v, i) => ({ v: Number(v) || 0, i }));
+
+  // Sort by value descending, take top 3
+  const top3 = indexed.sort((a, b) => b.v - a.v).slice(0, 3);
+
+  // Build sparse result array - only top 3 values at original indices
+  const result = new Array(arr.length).fill(0);
+  top3.forEach(({ v, i }) => { result[i] = v; });
+
+  return result;
+}
+
+/**
+ * Build optimized compass payload with top 3 values per dimension
+ * Reduces token usage by ~300 tokens (40 values → 12 values)
+ */
+function buildOptimizedCompassPayload(compassValues: any): any {
+  if (!compassValues) return { what: [], whence: [], how: [], whither: [] };
+
+  return {
+    what: getTop3CompassValues(compassValues?.what),
+    whence: getTop3CompassValues(compassValues?.whence),
+    how: getTop3CompassValues(compassValues?.how),
+    whither: getTop3CompassValues(compassValues?.whither)
+  };
+}
+
+/**
  * Get top K compass values with names and strengths (not indices)
  * Returns value names for natural language mirror recommendations
+ * NO threshold filtering - just sort and take top K
  */
-function topKWithNames(arr: number[] | undefined, prop: PropKey, k = 2): Array<{ name: string; strength: number }> {
+function topKWithNames(arr: number[] | undefined, prop: PropKey, k = 3): Array<{ name: string; strength: number }> {
   if (!Array.isArray(arr)) return [];
   return arr
     .map((v, i) => ({
@@ -89,7 +137,7 @@ function topKWithNames(arr: number[] | undefined, prop: PropKey, k = 2): Array<{
       i,
       name: COMPONENTS[prop]?.[i]?.short || `${prop} #${i + 1}`,
     }))
-    .filter(x => x.v > 0) // Only non-zero values
+    // NO threshold filter - just sort by value
     .sort((a, b) => b.v - a.v)
     .slice(0, k)
     .map(x => ({ name: x.name, strength: Math.round(x.v * 10) / 10 }));
@@ -97,8 +145,9 @@ function topKWithNames(arr: number[] | undefined, prop: PropKey, k = 2): Array<{
 
 /**
  * Get top overall values across all compass dimensions
+ * NO threshold filtering - just sort and take top K
  */
-function topOverallWithNames(compassValues: any, k = 2): Array<{ name: string; strength: number; dimension: PropKey }> {
+function topOverallWithNames(compassValues: any, k = 3): Array<{ name: string; strength: number; dimension: PropKey }> {
   const allValues: Array<{ v: number; name: string; dimension: PropKey }> = [];
 
   (["what", "whence", "how", "whither"] as PropKey[]).forEach((prop) => {
@@ -113,7 +162,7 @@ function topOverallWithNames(compassValues: any, k = 2): Array<{ name: string; s
   });
 
   return allValues
-    .filter(x => x.v > 0) // Only non-zero values
+    // NO threshold filter - just sort by value
     .sort((a, b) => b.v - a.v)
     .slice(0, k)
     .map(x => ({
@@ -316,11 +365,13 @@ async function fetchNews(): Promise<TickerItem[]> {
  */
 async function fetchMirrorText(dilemma: Dilemma): Promise<string> {
   const { values: compassValues } = useCompassStore.getState();
+  const { dilemmaHistory } = useDilemmaStore.getState();
 
-  // Calculate top compass components with names (not indices)
-  const topWhat = topKWithNames(compassValues?.what, "what", 2);
-  const topWhence = topKWithNames(compassValues?.whence, "whence", 2);
-  const topOverall = topOverallWithNames(compassValues, 2);
+  // Calculate top 3 compass components with names (not indices)
+  // NO threshold filtering - just sort and take top 3
+  const topWhat = topKWithNames(compassValues?.what, "what", 3);
+  const topWhence = topKWithNames(compassValues?.whence, "whence", 3);
+  const topOverall = topOverallWithNames(compassValues, 3);
 
   const payload = {
     topWhat,
@@ -329,13 +380,16 @@ async function fetchMirrorText(dilemma: Dilemma): Promise<string> {
     dilemma: {
       title: dilemma.title,
       description: dilemma.description,
+      // OPTIMIZED: Remove cost from actions (not needed by mirror)
       actions: dilemma.actions.map(a => ({
         id: a.id,
         title: a.title,
-        summary: a.summary,
-        cost: a.cost
+        summary: a.summary
+        // Omit: cost (not needed for mirror analysis)
       }))
-    }
+    },
+    // OPTIMIZED: Only last 2 days of history (not full 7 days)
+    dilemmaHistory: dilemmaHistory.slice(-2)
   };
 
   try {
@@ -360,67 +414,53 @@ async function fetchMirrorText(dilemma: Dilemma): Promise<string> {
 // ============================================================================
 
 export function useEventDataCollector() {
-  const [collectedData, setCollectedData] = useState<CollectedData | null>(null);
+  // Progressive state - data arrives in 3 phases
+  const [phase1Data, setPhase1Data] = useState<Phase1Data | null>(null);
+  const [phase2Data, setPhase2Data] = useState<Phase2Data | null>(null);
+  const [phase3Data, setPhase3Data] = useState<Phase3Data | null>(null);
+
   const [isCollecting, setIsCollecting] = useState(false);
   const [collectionError, setCollectionError] = useState<string | null>(null);
-  const [collectionProgress, setCollectionProgress] = useState(0);
+
+  // Backward compatibility - reconstruct legacy CollectedData format
+  const collectedData: CollectedData | null = phase1Data ? {
+    ...phase1Data,
+    ...(phase2Data || { compassPills: null, dynamicParams: null }),
+    ...(phase3Data || { mirrorText: "The mirror squints, light pooling in the glass..." }),
+    status: {
+      dilemmaReady: !!phase1Data,
+      mirrorReady: !!phase3Data,
+      newsReady: false, // Always false (disabled)
+      supportReady: !!phase1Data,
+      compassReady: !!phase2Data,
+      dynamicReady: !!phase2Data
+    },
+    errors: {}
+  } : null;
 
   const collectData = useCallback(async () => {
-    console.log('[Collector] 🚀 Starting data collection...');
+    console.log('[Collector] 🚀 Starting 3-phase sequential collection...');
     setIsCollecting(true);
     setCollectionError(null);
-    setCollectionProgress(0);
 
-    const { day, lastChoice} = useDilemmaStore.getState();
+    // Reset all phases
+    setPhase1Data(null);
+    setPhase2Data(null);
+    setPhase3Data(null);
+
+    const { day, lastChoice } = useDilemmaStore.getState();
     console.log(`[Collector] Day: ${day}, Has lastChoice: ${!!lastChoice}`);
-    const errors: CollectedData["errors"] = {};
 
     try {
       // ========================================================================
-      // PHASE 1: Independent Parallel Requests
+      // PHASE 1: Critical Path - Dilemma ONLY
       // ========================================================================
-      console.log('[Collector] 📋 Phase 1: Starting parallel requests...');
-      setCollectionProgress(10); // Starting requests
+      console.log('[Collector] 📋 PHASE 1: Fetching dilemma (critical path)...');
 
-      const phase1Tasks: Promise<any>[] = [
-        fetchDilemma(),  // [0] Required - Day 2+ includes supportEffects in response
-        fetchNews(),     // [1] Optional
-      ];
+      const dilemmaResponse = await fetchDilemma();
+      console.log(`[Collector] ✅ PHASE 1 complete: ${dilemmaResponse.title}`);
 
-      // Day 2+ only: Add analysis of previous choice (compass + dynamic params)
-      // NOTE: Support analysis now comes FROM the dilemma API response on Day 2+
-      const totalTasks = day > 1 && lastChoice ? 5 : 3; // Phase 1 (2-4) + Phase 2 (1)
-      if (day > 1 && lastChoice) {
-        console.log('[Collector] 📊 Day 2+ detected - adding compass/dynamic analysis');
-        phase1Tasks.push(
-          fetchCompassPills(lastChoice),     // [2] (was [3])
-          fetchDynamicParams(lastChoice)     // [3] (was [4])
-        );
-      }
-
-      console.log(`[Collector] 🔄 Awaiting ${phase1Tasks.length} parallel requests...`);
-      setCollectionProgress(25); // Requests sent
-      const phase1Results = await Promise.allSettled(phase1Tasks);
-      console.log('[Collector] ✅ Phase 1 complete');
-      setCollectionProgress(60); // Phase 1 done
-
-      // ========================================================================
-      // Extract Phase 1 Results
-      // ========================================================================
-      console.log('[Collector] 📦 Extracting Phase 1 results...');
-
-      // DILEMMA (REQUIRED - stop if failed)
-      if (phase1Results[0].status === "rejected") {
-        const error = phase1Results[0].reason;
-        console.error('[Collector] ❌ Dilemma fetch FAILED:', error);
-        setCollectionError(`Failed to load dilemma: ${error.message}`);
-        setIsCollecting(false);
-        return;
-      }
-      const dilemmaResponse = phase1Results[0].value as any; // Can include supportEffects on Day 2+
-      console.log('[Collector] ✅ Dilemma received:', dilemmaResponse.title);
-
-      // Extract dilemma data (always present)
+      // Extract dilemma data
       const dilemma: Dilemma = {
         title: dilemmaResponse.title,
         description: dilemmaResponse.description,
@@ -428,7 +468,7 @@ export function useEventDataCollector() {
       };
 
       // Verify dilemma completeness
-      if (!dilemma || !dilemma.title || !dilemma.description || dilemma.actions?.length !== 3) {
+      if (!dilemma.title || !dilemma.description || dilemma.actions?.length !== 3) {
         console.error('[Collector] ❌ Invalid dilemma data');
         setCollectionError("Invalid dilemma data received");
         setIsCollecting(false);
@@ -436,165 +476,123 @@ export function useEventDataCollector() {
       }
 
       // Extract supportEffects from dilemma response (Day 2+ only)
-      let supportEffects: SupportEffect[] | null = null;
-      if (day > 1 && dilemmaResponse.supportEffects) {
-        supportEffects = dilemmaResponse.supportEffects;
-        console.log(`[Collector] ✅ Support effects from dilemma: ${supportEffects?.length || 0} effects`);
+      const supportEffects: SupportEffect[] | null =
+        (day > 1 && dilemmaResponse.supportEffects)
+          ? dilemmaResponse.supportEffects
+          : null;
+
+      if (supportEffects) {
+        console.log(`[Collector] ✅ Support effects included: ${supportEffects.length} effects`);
       }
 
-      // NEWS (Optional - use fallback)
-      let newsItems: TickerItem[] = [];
-      if (phase1Results[1].status === "fulfilled") {
-        newsItems = phase1Results[1].value;
-        console.log(`[Collector] ✅ News received: ${newsItems.length} items`);
-      } else {
-        console.warn('[Collector] ⚠️ News fetch failed, using fallback');
-        errors.news = phase1Results[1].reason;
-      }
-
-      // Day 2+ results (Optional - use null fallback)
-      let compassPills: CompassPill[] | null = null;
-      let dynamicParams: DynamicParam[] | null = null;
-
-      if (day > 1 && lastChoice) {
-        console.log('[Collector] 📊 Processing Day 2+ analysis results...');
-
-        // SUPPORT - Now extracted from dilemma response above (no longer a separate API call)
-        if (!supportEffects || supportEffects.length === 0) {
-          console.warn('[Collector] ⚠️ Support effects missing from dilemma response');
-          errors.support = "Support effects not included in dilemma response";
-        } else {
-          console.log(`[Collector] ✅ Support analysis: ${supportEffects.length} effects`);
-        }
-
-        // COMPASS (now at index [2], was [3])
-        if (phase1Results[2]?.status === "fulfilled") {
-          compassPills = phase1Results[2].value;
-          console.log(`[Collector] ✅ Compass analysis: ${compassPills?.length || 0} pills`);
-        } else if (phase1Results[2]) {
-          console.warn('[Collector] ⚠️ Compass analysis failed');
-          errors.compass = phase1Results[2].reason;
-        }
-
-        // DYNAMIC (now at index [3], was [4])
-        if (phase1Results[3]?.status === "fulfilled") {
-          dynamicParams = phase1Results[3].value;
-          console.log(`[Collector] ✅ Dynamic params: ${dynamicParams?.length || 0} params`);
-        } else if (phase1Results[3]) {
-          console.warn('[Collector] ⚠️ Dynamic params failed');
-          errors.dynamic = phase1Results[3].reason;
-        }
-      }
-
-      // ========================================================================
-      // PHASE 2: Dependent Request (needs dilemma from Phase 1)
-      // ========================================================================
-      console.log('[Collector] 📋 Phase 2: Fetching mirror dialogue...');
-      setCollectionProgress(70); // Starting Phase 2
-
-      const phase2Results = await Promise.allSettled([
-        fetchMirrorText(dilemma)  // Requires dilemma context
-      ]);
-
-      setCollectionProgress(85); // Phase 2 done
-
-      // MIRROR (Optional - use fallback)
-      let mirrorText = "The mirror squints, light pooling in the glass...";
-      if (phase2Results[0].status === "fulfilled") {
-        mirrorText = phase2Results[0].value;
-        console.log('[Collector] ✅ Mirror dialogue received');
-      } else {
-        console.warn('[Collector] ⚠️ Mirror dialogue failed, using fallback');
-        errors.mirror = phase2Results[0].reason;
-      }
-
-      // ========================================================================
-      // Build & Store Collected Data
-      // ========================================================================
-      console.log('[Collector] 🏗️ Building collected data structure...');
-      setCollectionProgress(95); // Building data
-
-      const data: CollectedData = {
+      // Build Phase 1 data
+      const p1: Phase1Data = {
         dilemma,
-        mirrorText,
-        newsItems,
         supportEffects,
-        compassPills,
-        dynamicParams,
-        status: {
-          dilemmaReady: true,
-          mirrorReady: !!mirrorText,
-          newsReady: newsItems.length > 0,
-          supportReady: day > 1 ? supportEffects !== null : true,
-          compassReady: day > 1 ? compassPills !== null : true,
-          dynamicReady: day > 1 ? dynamicParams !== null : true
-        },
-        errors
+        newsItems: [] // Disabled
       };
 
-      console.log('[Collector] 💾 Storing collected data to state');
-      setCollectedData(data);
+      // CRITICAL: Set Phase 1 data immediately - triggers UI render!
+      console.log('[Collector] 🎯 PHASE 1 data ready - UI can show content NOW');
+      setPhase1Data(p1);
 
-      // IMPORTANT: Update global dilemma store so useEventNarration can prepare TTS
-      // EventScreen3 doesn't use the global store for display, but narration hook needs it
-      console.log('[Collector] 📢 Updating global dilemmaStore.current for narration');
+      // Update global dilemma store for narration
       useDilemmaStore.setState({ current: dilemma });
 
-      setCollectionProgress(100); // Complete!
+      // CRITICAL: Mark collecting as done NOW - UI can render!
       setIsCollecting(false);
-      console.log('[Collector] 🎉 Collection complete! Ready for presentation.');
+      console.log('[Collector] ✅ Phase 1 complete - UI renders immediately!');
+      console.log('[Collector] 📋 Phase 2/3 will continue in background...');
+
+      // ========================================================================
+      // PHASE 2: Secondary Data - Compass + Dynamic Params (Day 2+ only)
+      // NON-BLOCKING: Runs in background after Phase 1 shows
+      // ========================================================================
+      if (day > 1 && lastChoice) {
+        console.log('[Collector] 📋 PHASE 2: Starting background fetch (compass + dynamic)...');
+
+        Promise.allSettled([
+          fetchCompassPills(lastChoice),
+          fetchDynamicParams(lastChoice)
+        ])
+          .then(([compassResult, dynamicResult]) => {
+            const compassPills: CompassPill[] | null =
+              compassResult.status === "fulfilled" ? compassResult.value : null;
+            const dynamicParams: DynamicParam[] | null =
+              dynamicResult.status === "fulfilled" ? dynamicResult.value : null;
+
+            console.log(`[Collector] ✅ PHASE 2 complete (background): ${compassPills?.length || 0} compass, ${dynamicParams?.length || 0} params`);
+
+            // Set Phase 2 data - triggers PlayerStatusStrip update
+            setPhase2Data({ compassPills, dynamicParams });
+          })
+          .catch(error => {
+            console.warn('[Collector] ⚠️ Phase 2 failed (background):', error);
+            // UI already showing, so just skip Phase 2 data
+          });
+      } else {
+        console.log('[Collector] ⏭️ PHASE 2 skipped (Day 1)');
+      }
+
+      // ========================================================================
+      // PHASE 3: Tertiary Data - Mirror Dialogue
+      // NON-BLOCKING: Runs in background after Phase 1 shows
+      // ========================================================================
+      console.log('[Collector] 📋 PHASE 3: Starting background fetch (mirror)...');
+
+      fetchMirrorText(dilemma)
+        .then(mirrorText => {
+          console.log('[Collector] ✅ PHASE 3 complete (background): Mirror dialogue received');
+
+          // Set Phase 3 data - triggers MirrorCard text replacement
+          setPhase3Data({ mirrorText });
+          console.log('[Collector] 🎉 All phases complete! Data fully loaded.');
+        })
+        .catch(error => {
+          console.warn('[Collector] ⚠️ Phase 3 failed (background):', error);
+          // Fallback text already set in collectedData construction
+        });
+
+      // Function returns immediately after Phase 1 completes
+      // Phase 2/3 continue running in background
 
     } catch (error: any) {
-      console.error("[Collector] ❌ Unexpected error:", error);
+      console.error("[Collector] ❌ Collection failed:", error);
       setCollectionError(`Collection failed: ${error.message}`);
       setIsCollecting(false);
-      setCollectionProgress(0);
     }
   }, []);
 
-  // Comprehensive verification: ALL required data must be present before triggering presenter
+  // Phase 1 ready check - only needs dilemma to show content!
+  const phase1Ready = useCallback(() => {
+    return !!phase1Data &&
+           !!phase1Data.dilemma &&
+           !!phase1Data.dilemma.title &&
+           !!phase1Data.dilemma.description &&
+           phase1Data.dilemma.actions?.length === 3;
+  }, [phase1Data]);
+
+  // Legacy check for backward compatibility (waits for all phases)
   const isFullyReady = useCallback(() => {
-    if (!collectedData) return false;
-
-    const { day } = useDilemmaStore.getState();
-
-    // REQUIRED for all days
-    if (!collectedData.dilemma) return false;
-    if (!collectedData.dilemma.title) return false;
-    if (!collectedData.dilemma.description) return false;
-    if (collectedData.dilemma.actions?.length !== 3) return false;
-
-    // Mirror and news are optional (have fallbacks) but should be verified
-    if (!collectedData.mirrorText) return false;
-    // newsItems can be empty array, that's ok
-
-    // Day 2+ REQUIRED data verification
-    if (day > 1) {
-      const { lastChoice } = useDilemmaStore.getState();
-      if (!lastChoice) return false; // Should have previous choice on Day 2+
-
-      // Day 2+ requires support, compass, and dynamic analysis to be ready
-      // These must be true (data successfully loaded), not just defined
-      // If they're false, it means data failed to load or hasn't loaded yet
-      if (!collectedData.status.supportReady) return false;
-      if (!collectedData.status.compassReady) return false;
-      if (!collectedData.status.dynamicReady) return false;
-
-      // Also verify the actual data arrays exist (double-check)
-      if (!collectedData.supportEffects || collectedData.supportEffects.length === 0) return false;
-      if (!collectedData.compassPills || collectedData.compassPills.length === 0) return false;
-      // dynamicParams can be empty, that's ok
-    }
-
+    if (!phase1Data) return false;
+    // Phase 2/3 are optional - don't block on them
     return true;
-  }, [collectedData]);
+  }, [phase1Data]);
 
   return {
-    collectedData,        // ← Temp saved for EventDataPresenter
+    // New progressive API
+    phase1Data,
+    phase2Data,
+    phase3Data,
+    phase1Ready: phase1Ready(),
+
+    // Legacy API (backward compatibility)
+    collectedData,
     isCollecting,
     collectionError,
-    collectionProgress,   // ← Progress percentage (0-100)
     collectData,
-    isReady: isFullyReady()  // ← Reliable counter - only true when ALL data present
+    isReady: isFullyReady(),
+
+    // Remove collectionProgress - no longer meaningful with sequential loading
   };
 }
