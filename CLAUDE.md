@@ -253,28 +253,56 @@ switchToGPT()     // Switch back to OpenAI GPT (default)
 
 ### EventScreen ↔ MirrorScreen Navigation
 
-The game supports seamless navigation between EventScreen and MirrorScreen with state preservation:
+The game supports seamless navigation between EventScreen and MirrorScreen with state preservation.
 
-**User Flow:**
+**Intended User Flow:**
 1. Player is on EventScreen viewing a dilemma
 2. Clicks "?" button on MirrorCard → navigates to MirrorScreen
 3. Explores compass values (top 3 per dimension)
 4. Clicks "Back to Event" → returns to exact same EventScreen state
 
-**Technical Implementation:**
+**Current Status: PARTIALLY WORKING (Known Issues)**
+
+⚠️ **Issues Remaining (as of 2025-10-10):**
+1. "Unknown phase: interacting" error still appears briefly when returning from MirrorScreen
+2. Narration re-triggers and plays dilemma again on restoration
+3. Mirror text appears to reload (possible duplicate API request)
+4. User reports the screen shows error, plays narration in background, then eventually shows content
+
+**Technical Implementation (Snapshot System):**
+- **Core Concept**: Use single boolean flag (`restoredFromSnapshot`) to gate all effects and prevent re-execution
 - **Snapshot System** (`src/lib/eventScreenSnapshot.ts`): Saves EventScreen state to sessionStorage
 - **State Preserved**: phase, presentationStep, collectedData (dilemma, mirror text, support effects, etc.)
 - **Restoration Logic**: EventScreen restores from snapshot on mount (Effect 0A)
-- **Collection Skip**: Restored screens skip data collection (prevents reload)
-- **Time-Limited**: Snapshots expire after 30 minutes (prevents stale state)
-- **One-Time Use**: Snapshot cleared after restoration
+- **Boolean Gates Implemented**:
+  - ✅ Collection effect (Effect 1) checks `restoredFromSnapshot`
+  - ✅ Presentation effect (Effect 3) checks `restoredFromSnapshot`
+  - ✅ Loading overlay checks `!restoredFromSnapshot`
+  - ✅ Fallback render checks `!restoredFromSnapshot`
+  - ✅ Button conditional: `phase === 'interacting' && presentationStep >= 5 && day > 1`
+
+**Problem Analysis:**
+- Restoration flag is set correctly
+- Snapshot saves and loads correctly
+- BUT: Something in the effect dependency chain or render cycle is still triggering re-execution
+- Hypothesis: Timing issue where effects run before `restoredFromSnapshot` flag takes effect
+- Alternative hypothesis: Missing check in another effect or the narration hook itself
+
+**Next Steps to Fix:**
+1. Add more granular logging to trace exact execution order
+2. Consider moving restoration EARLIER in component lifecycle (before other effects register)
+3. Investigate useEventNarration hook - might need its own restoration check
+4. Consider adding restoration flag to narration effect dependencies
+5. Review if presentEventData() is being called somehow despite guards
+6. Check if phase transitions are triggering unwanted side effects
 
 **Key Files:**
 - `src/lib/eventScreenSnapshot.ts` - Snapshot save/load/clear utilities
-- `src/screens/EventScreen3.tsx` - Save on navigate, restore on mount
-- `src/components/event/MirrorCard.tsx` - "?" explore button
+- `src/screens/EventScreen3.tsx` - Save on navigate, restore on mount, boolean gates
+- `src/components/event/MirrorCard.tsx` - "?" explore button (conditional on phase/step/day)
 - `src/screens/MirrorScreen.tsx` - Smart back button ("Back to Event" vs "Back")
 - `src/hooks/useEventDataCollector.ts` - `restoreCollectedData()` method
+- `src/hooks/useEventNarration.ts` - TTS preparation (possible trigger source)
 
 ### Action Confirmation Pipeline
 

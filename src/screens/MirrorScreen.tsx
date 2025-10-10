@@ -15,7 +15,7 @@ import type { PushFn } from "../lib/router";
 import { bgStyle } from "../lib/ui";
 import { useMirrorTop3 } from "../hooks/useMirrorTop3";
 import { PROPERTIES, PALETTE, type PropKey } from "../data/compass-data";
-import { hasEventScreenSnapshot } from "../lib/eventScreenSnapshot";
+import { hasEventScreenSnapshot, getMirrorReturnRoute, clearMirrorReturnRoute } from "../lib/eventScreenSnapshot";
 
 const MIRROR_SRC = "/assets/images/mirror.png";
 
@@ -25,8 +25,21 @@ export default function MirrorScreen({ push }: Props) {
   const top3ByDimension = useMirrorTop3();
   const [selectedDef, setSelectedDef] = useState<{ prop: PropKey; short: string; full: string } | null>(null);
 
-  // Check if we came from EventScreen (snapshot exists)
+  // Check if we came from EventScreen (snapshot exists) or another screen (return route saved)
   const cameFromEvent = hasEventScreenSnapshot();
+  const returnRoute = getMirrorReturnRoute();
+
+  // Determine back button behavior
+  const handleBack = () => {
+    if (cameFromEvent) {
+      push("/event"); // Will restore snapshot
+    } else if (returnRoute) {
+      clearMirrorReturnRoute();
+      push(returnRoute); // Return to saved route (e.g., /compass-quiz)
+    } else {
+      window.history.back(); // Fallback
+    }
+  };
 
   // Section titles for each dimension
   const sectionTitles: Record<PropKey, string> = {
@@ -43,15 +56,9 @@ export default function MirrorScreen({ push }: Props) {
         <div className="mb-6">
           <button
             className="rounded-xl px-4 py-2 bg-white/10 hover:bg-white/20 text-white/90 transition-colors"
-            onClick={() => {
-              if (cameFromEvent) {
-                push("/event"); // Will restore snapshot
-              } else {
-                window.history.back(); // Fallback
-              }
-            }}
+            onClick={handleBack}
           >
-            ← Back{cameFromEvent ? " to Event" : ""}
+            ← Back{cameFromEvent ? " to Event" : returnRoute ? " to Quiz" : ""}
           </button>
         </div>
 

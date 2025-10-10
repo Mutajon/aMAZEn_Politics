@@ -8,13 +8,14 @@ import { resolveLabel } from "../data/compass-data";
 import { pickQuiz } from "../data/mirror-quiz-pool";
 import { useRoleStore } from "../store/roleStore";
 import { useSettingsStore } from "../store/settingsStore";
-import MiniCompass from "../components/MiniCompass";
 import { useCompassFX } from "../hooks/useCompassFX";
 import { generateMirrorSummary } from "../lib/mirrorSummary";
 import { useMirrorQuizStore } from "../store/mirrorQuizStore";
 import MirrorBubble from "../components/MirrorBubble";
 import { mirrorBubbleTheme as T } from "../theme/mirrorBubbleTheme";
+import { saveMirrorReturnRoute } from "../lib/eventScreenSnapshot";
 import MirrorBubbleTyping from "../components/MirrorBubbleTyping";
+import { COMPONENTS, PALETTE } from "../data/compass-data";
 
 
 /** placeholder avatar for images OFF */
@@ -99,9 +100,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   }
 
   /** Layout */
-  const RING_SIZE = 260;
   const MIRROR_SIZE = 120;
-  const INNER_RADIUS = MIRROR_SIZE / 2 + 10;
   const CARD = 154;
 
   // Mirror-bubble-like options
@@ -126,25 +125,55 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ type: "spring", stiffness: 220, damping: 18 }}
             className="relative self-start"
-            style={{ width: RING_SIZE, height: RING_SIZE }}
+            style={{ width: MIRROR_SIZE, height: MIRROR_SIZE }}
           >
-            <MiniCompass
-              size={RING_SIZE}
-              innerRadius={INNER_RADIUS}
-              values={values}
-              lengthScale={0.7}
-              rotate
-              rotationSpeedSec={60}
-              effectPills={pings}
-            />
             <img
               src={MIRROR_SRC}
               alt="Mystic mirror"
               width={MIRROR_SIZE}
               height={MIRROR_SIZE}
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full object-cover pointer-events-none"
-              style={{ zIndex: 30 }}
+              className="rounded-full object-cover"
             />
+
+            {/* Compass Pills Overlay - displays pings above mirror image */}
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center" style={{ zIndex: 40 }}>
+              <AnimatePresence>
+                {pings.map((p, i) => {
+                  const color = (PALETTE as any)[p.prop]?.base ?? "#fff";
+                  const label = COMPONENTS[p.prop][p.idx]?.short ?? "";
+                  const topPx = MIRROR_SIZE / 2 - i * 28; // Stack vertically
+                  const delay = i * 0.15; // Stagger animation
+
+                  return (
+                    <motion.div
+                      key={p.id}
+                      initial={{ opacity: 0, y: 0, scale: 0.3 }}
+                      animate={{ opacity: 1, y: -20, scale: 1 }}
+                      exit={{ opacity: 0, y: -20, scale: 0.98 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 25,
+                        delay
+                      }}
+                      className="absolute rounded-full px-2 py-1 text-xs font-semibold shadow-lg"
+                      style={{
+                        left: "50%",
+                        top: topPx,
+                        transform: "translate(-50%, -50%)",
+                        background: color,
+                        color: "#0b1335",
+                        border: "1.5px solid rgba(255,255,255,0.9)",
+                        boxShadow: "0 6px 18px rgba(0,0,0,0.25)",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {`${p.delta > 0 ? "+" : ""}${p.delta} ${label}`}
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
           </motion.div>
 
           <motion.div
@@ -254,10 +283,14 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
           Go to sleep
         </button>
         <button
-          onClick={() => push("/compass-vis")}
+          onClick={() => {
+            // Save current route so MirrorScreen knows where to return
+            saveMirrorReturnRoute("/compass-quiz");
+            push("/mirror");
+          }}
           className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/15 text-white hover:bg-white/25 border border-white/30"
         >
-          See your compass
+          Examine mirror
         </button>
       </div>
     )}

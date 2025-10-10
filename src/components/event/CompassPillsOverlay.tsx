@@ -107,14 +107,14 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
               })}
             </motion.div>
           ) : (
-            // Collapsed small "+" button (re-expands) — top-center, center sits on top edge
+            // Collapsed small "+" button (re-expands) — top-center, aligned with MirrorCard top edge
             <motion.button
               key="pills-collapsed"
               type="button"
               onClick={() => setExpanded(true)}
               className="
                 pointer-events-auto
-                absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2
+                absolute left-1/2 -translate-x-1/2 -translate-y-1/2
                 inline-flex items-center justify-center
                 w-7 h-7 rounded-full
                 text-white text-sm font-bold
@@ -124,6 +124,8 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
               aria-label="Show effects"
               title="Show effects"
               style={{
+                // Position at MirrorCard's top edge (accounting for its my-2 margin = 0.5rem = 8px)
+                top: "8px",
                 // Fallback gradient (in case conic isn't supported)
                 background: "linear-gradient(135deg, #ef4444, #3b82f6)",
                 // Four quadrants: red, green, blue, yellow

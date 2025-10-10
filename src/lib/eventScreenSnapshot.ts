@@ -84,3 +84,33 @@ export function clearEventScreenSnapshot(): void {
 export function hasEventScreenSnapshot(): boolean {
   return loadEventScreenSnapshot() !== null;
 }
+
+// ============================================================================
+// RETURN ROUTE TRACKING (for MirrorQuizScreen → MirrorScreen navigation)
+// ============================================================================
+
+const RETURN_ROUTE_KEY = 'mirror-return-route';
+
+/**
+ * Save the route to return to after viewing MirrorScreen
+ * Used when navigating from MirrorQuizScreen to MirrorScreen
+ */
+export function saveMirrorReturnRoute(route: string): void {
+  sessionStorage.setItem(RETURN_ROUTE_KEY, route);
+  console.log('[MirrorReturnRoute] 📍 Saved return route:', route);
+}
+
+/**
+ * Get the route to return to after viewing MirrorScreen
+ * Returns null if no return route is saved
+ */
+export function getMirrorReturnRoute(): string | null {
+  return sessionStorage.getItem(RETURN_ROUTE_KEY);
+}
+
+/**
+ * Clear the saved return route
+ */
+export function clearMirrorReturnRoute(): void {
+  sessionStorage.removeItem(RETURN_ROUTE_KEY);
+}
