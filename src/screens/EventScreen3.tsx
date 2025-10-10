@@ -43,6 +43,7 @@ export default function EventScreen3({ push }: Props) {
   const { day, totalDays, budget } = useDilemmaStore();
   const { character } = useRoleStore();
   const showBudget = useSettingsStore((s) => s.showBudget);
+  const debugMode = useSettingsStore((s) => s.debugMode);
 
   // Data collection (progressive 3-phase loading)
   const {
@@ -268,25 +269,65 @@ export default function EventScreen3({ push }: Props) {
   };
 
   /**
-   * Handle navigation to Mirror Screen with state preservation
+   * Debug: Jump to final day (day 7) with random previous choice
+   * Useful for testing epic finale and game conclusion
    */
-  const handleNavigateToMirror = () => {
-    if (!collectedData) {
-      console.warn('[EventScreen3] Cannot navigate to mirror - no collected data');
+  const jumpToFinalDay = () => {
+    if (!collectedData?.dilemma?.actions || collectedData.dilemma.actions.length === 0) {
+      console.warn('[EventScreen3] Cannot jump - no actions available');
       return;
     }
 
-    // Save snapshot before navigation
-    saveEventScreenSnapshot({
-      phase,
-      presentationStep,
-      collectedData,
-      timestamp: Date.now()
+    // Pick random action from current dilemma
+    const actions = collectedData.dilemma.actions;
+    const randomIndex = Math.floor(Math.random() * actions.length);
+    const randomAction = actions[randomIndex];
+
+    console.log('[EventScreen3] 🚀 Jumping to final day with random choice:', randomAction.title);
+
+    // Save this as last choice
+    const { setLastChoice, setBudget } = useDilemmaStore.getState();
+    setLastChoice({
+      id: randomAction.id as 'a' | 'b' | 'c',
+      title: randomAction.title,
+      summary: randomAction.summary,
+      cost: randomAction.cost
     });
 
-    console.log('[EventScreen3] 📸 Snapshot saved, navigating to /mirror');
-    push('/mirror');
+    // Apply budget change immediately (so it's reflected in the context)
+    const currentBudget = useDilemmaStore.getState().budget;
+    setBudget(currentBudget + randomAction.cost);
+
+    // Set day to 7 directly (daysLeft will be 1)
+    useDilemmaStore.setState({ day: 7 });
+
+    // Reset phase to trigger fresh collection for day 7
+    setPhase('collecting');
+    setPresentationStep(-1);
+    setInitialSupportValues(null);
   };
+
+  /**
+   * Handle navigation to Mirror Screen with state preservation
+   * TEMPORARILY DISABLED - navigation bugs prevent safe return
+   */
+  // const handleNavigateToMirror = () => {
+  //   if (!collectedData) {
+  //     console.warn('[EventScreen3] Cannot navigate to mirror - no collected data');
+  //     return;
+  //   }
+  //
+  //   // Save snapshot before navigation
+  //   saveEventScreenSnapshot({
+  //     phase,
+  //     presentationStep,
+  //     collectedData,
+  //     timestamp: Date.now()
+  //   });
+  //
+  //   console.log('[EventScreen3] 📸 Snapshot saved, navigating to /mirror');
+  //   push('/mirror');
+  // };
 
   // ========================================================================
   // RENDER: Loading State (collecting phase)
@@ -353,6 +394,17 @@ export default function EventScreen3({ push }: Props) {
 
     return (
       <div className="min-h-screen p-6 pb-24" style={bgStyle}>
+        {/* Debug: Jump to Final Day button */}
+        {debugMode && day < 7 && phase === 'interacting' && (
+          <button
+            onClick={jumpToFinalDay}
+            className="fixed top-4 right-4 px-3 py-2 text-xs bg-red-900/80 border border-red-500/50 text-red-200 rounded hover:bg-red-800/80 transition-colors z-50"
+            title="Debug: Skip to final day with random choice"
+          >
+            🚀 Jump to Final Day
+          </button>
+        )}
+
         <div className="max-w-3xl mx-auto space-y-3">
           {/* Step 0+: ResourceBar (always visible) with avatar */}
           {presentationStep >= 0 && (
@@ -410,12 +462,7 @@ export default function EventScreen3({ push }: Props) {
             <div className="relative">
               <MirrorCard
                 text={collectedData.mirrorText}
-                onExploreClick={
-                  // Show button only when fully loaded (interacting phase, after Step 5, Day 2+)
-                  phase === 'interacting' && presentationStep >= 5 && day > 1
-                    ? handleNavigateToMirror
-                    : undefined
-                }
+                // onExploreClick temporarily removed - navigation bugs prevent safe return to EventScreen
               />
               {/* Compass Pills Overlay - appears at Step 4A (Day 2+) */}
               {showCompassPills && (

@@ -212,8 +212,10 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
   
 
   nextDay() {
-    const { day, totalDays } = get();
-    const v = Math.min(totalDays, day + 1);
+    const { day } = get();
+    // Remove Math.min cap - allow day to exceed totalDays for conclusion screen (day 8)
+    // This enables daysLeft to reach 0, triggering game conclusion mode
+    const v = day + 1;
     dlog("nextDay ->", v);
     // Note: Keep lastChoice intact so EventScreen3 collector can analyze it on the next day
     // lastChoice will be naturally overwritten when the player makes their next choice

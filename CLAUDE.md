@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-### Primary Development
+### Terminal Commands (npm scripts)
+
+#### Primary Development
 ```bash
 npm run dev          # Start concurrent frontend (Vite) + backend (Express) development
 npm run build        # Build production frontend
@@ -13,7 +15,7 @@ npm run lint         # Run ESLint on TypeScript files
 npm run format       # Format code with Prettier
 ```
 
-### Individual Services
+#### Individual Services
 ```bash
 npm run vite         # Frontend only (Vite dev server on port 5173)
 npm run server       # Backend only (Express server on port 3001)
@@ -21,7 +23,9 @@ npm run server:dev   # Backend with nodemon auto-restart
 npm run preview      # Preview production build
 ```
 
-### Browser Console Commands (AI Provider Switching)
+### Browser Console Commands (Debug & Testing)
+
+#### AI Provider Switching
 ```javascript
 switchToClaude()     # Switch to Anthropic Claude for dilemmas + mirror dialogue
 switchToGPT()        # Switch to OpenAI GPT for dilemmas + mirror dialogue (DEFAULT)
@@ -34,6 +38,30 @@ switchToGPT()        # Switch to OpenAI GPT for dilemmas + mirror dialogue (DEFA
 4. Next dilemma/mirror will use selected provider
 
 **Note:** Models are configured in `.env` - restart server after changing model versions.
+
+#### Debug Mode Controls
+```javascript
+enableDebug()        # Enable debug mode (shows "Jump to Final Day" button)
+disableDebug()       # Disable debug mode
+toggleDebug()        # Toggle debug mode on/off
+```
+
+**Usage:**
+1. Open browser console (F12)
+2. Run command: `enableDebug()`
+3. Refresh page (F5)
+4. Debug features will appear (e.g., "🚀 Jump to Final Day" button in EventScreen)
+
+**Debug Features:**
+- **Jump to Final Day Button**: Appears in top-right of EventScreen on days 1-6 (when interacting phase is active)
+  - Randomly picks one of the current 3 actions
+  - Sets it as the previous choice
+  - Jumps directly to day 7 (daysLeft=1, final dilemma with epic mode)
+  - Useful for testing epic finale and game conclusion
+  - After confirming day 7 choice, advances to day 8 (daysLeft=0, conclusion screen)
+- **Extra Console Logs**: Additional logging from various systems
+
+**Note:** Debug mode state persists in localStorage until disabled.
 
 ## Project Structure
 
@@ -261,7 +289,14 @@ The game supports seamless navigation between EventScreen and MirrorScreen with 
 3. Explores compass values (top 3 per dimension)
 4. Clicks "Back to Event" → returns to exact same EventScreen state
 
-**Current Status: PARTIALLY WORKING (Known Issues)**
+**Current Status: TEMPORARILY DISABLED (Known Issues)**
+
+⚠️ **"?" Button Removed (2025-10-10):**
+- Question mark button on MirrorCard has been **temporarily removed** from EventScreen
+- Players cannot currently navigate EventScreen → MirrorScreen via in-game button
+- Removal prevents players from getting stuck due to navigation bugs
+- Button will be restored after issues 1-4 below are resolved
+- **MirrorQuizScreen → MirrorScreen navigation still works correctly**
 
 ⚠️ **Issues Remaining (as of 2025-10-10):**
 1. "Unknown phase: interacting" error still appears briefly when returning from MirrorScreen
