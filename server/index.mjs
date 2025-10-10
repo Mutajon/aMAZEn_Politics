@@ -1371,18 +1371,19 @@ function buildConclusionSystemPrompt() {
 
 Your task:
 1. Analyze support shifts from their final choice (as normal)
-2. Generate a SINGLE PARAGRAPH (3-5 sentences) describing the IMMEDIATE AFTERMATH of their decision
-   - What happened right after they made this choice?
-   - What were the immediate consequences?
+2. Generate EXACTLY TWO SENTENCES describing the IMMEDIATE AFTERMATH of their decision
+   - First sentence: What happened right after they made this choice?
+   - Second sentence: What were the immediate consequences?
    - Keep it focused on THIS decision, not their entire tenure
    - DO NOT summarize the whole game
    - DO NOT discuss legacy or long-term fate
    - DO NOT list faction reactions (support deltas already show that)
+   - STRICT LIMIT: Must be exactly 2 sentences (not more, not less)
 
 Return JSON:
 {
   "title": "The Aftermath",
-  "description": "[Single paragraph, 3-5 sentences about immediate consequences]",
+  "description": "[EXACTLY 2 sentences describing immediate aftermath]",
   "actions": [],
   "topic": "Conclusion",
   "supportShift": {
