@@ -540,9 +540,27 @@ export function useEventDataCollector() {
         actions: dilemmaResponse.actions
       };
 
-      // Verify dilemma completeness
-      if (!dilemma.title || !dilemma.description || dilemma.actions?.length !== 3) {
-        console.error('[Collector] ❌ Invalid dilemma data');
+      // Verify dilemma completeness (context-aware for game conclusion)
+      const isGameEnd = dilemmaResponse.isGameEnd || false;
+
+      if (!dilemma.title || !dilemma.description) {
+        console.error('[Collector] ❌ Invalid dilemma data: missing title or description');
+        setCollectionError("Invalid dilemma data received");
+        setIsCollecting(false);
+        return;
+      }
+
+      // Normal dilemma must have 3 actions
+      if (!isGameEnd && dilemma.actions?.length !== 3) {
+        console.error('[Collector] ❌ Invalid dilemma data: expected 3 actions for normal dilemma');
+        setCollectionError("Invalid dilemma data received");
+        setIsCollecting(false);
+        return;
+      }
+
+      // Game conclusion must have 0 actions
+      if (isGameEnd && dilemma.actions?.length !== 0) {
+        console.error('[Collector] ❌ Invalid dilemma data: game conclusion must have empty actions');
         setCollectionError("Invalid dilemma data received");
         setIsCollecting(false);
         return;
