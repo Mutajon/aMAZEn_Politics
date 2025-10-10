@@ -32,25 +32,24 @@ const useStrict = import.meta.env.MODE !== "development";
 
 // Debug mode toggle commands
 (window as any).enableDebug = () => {
-  localStorage.setItem('debugMode', 'true');
-  console.log('✅ Debug mode enabled. Refresh page to see changes.');
+  useSettingsStore.getState().setDebugMode(true);
+  console.log('✅ Debug mode enabled immediately (no refresh needed).');
   console.log('🎯 Features: "Jump to Final Day" button, extra console logs');
 };
 
 (window as any).disableDebug = () => {
-  localStorage.removeItem('debugMode');
-  console.log('❌ Debug mode disabled. Refresh page to see changes.');
+  useSettingsStore.getState().setDebugMode(false);
+  console.log('❌ Debug mode disabled immediately (no refresh needed).');
 };
 
 (window as any).toggleDebug = () => {
-  const current = localStorage.getItem('debugMode') === 'true';
-  if (current) {
-    localStorage.removeItem('debugMode');
-    console.log('❌ Debug mode disabled. Refresh page to see changes.');
-  } else {
-    localStorage.setItem('debugMode', 'true');
-    console.log('✅ Debug mode enabled. Refresh page to see changes.');
+  const current = useSettingsStore.getState().debugMode;
+  useSettingsStore.getState().setDebugMode(!current);
+  if (!current) {
+    console.log('✅ Debug mode enabled immediately (no refresh needed).');
     console.log('🎯 Features: "Jump to Final Day" button, extra console logs');
+  } else {
+    console.log('❌ Debug mode disabled immediately (no refresh needed).');
   }
 };
 

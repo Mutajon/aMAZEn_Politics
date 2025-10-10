@@ -1252,10 +1252,9 @@ function buildLightSystemPrompt() {
   return `You write short, punchy political situations for a choice-based mobile game.
 
 STYLE
-- Plain modern English. Never say "dilemma".
+- Natural engaging languag. Avoid jargon, never say "dilemma".
 - Title ≤ 60 chars. Description 2–3 sentences. In-world tone (press leaks, memos, calls).
-- Be concrete about the real issue; name actors/institutions. Avoid generic "a bill" or "a reform".
-- Absolutely NO numbers in titles/descriptions/summaries or explanations. Numeric values may appear only in JSON fields.
+- Present real concrete issues. Avoid generic "a bill" or "a reform".
 
 SYSTEM FEEL (CRITICAL)
 - Let the political system shape both the situation and the actions.
@@ -1271,7 +1270,7 @@ CONTINUITY
 ACTIONS
 - Exactly three, mutually conflicting strategies: assertive control; negotiated/consultative; principled restraint/rights.
 - Each summary is ONE sentence, ~15–20 words, with NO numbers.
-- Provide cost from {0, ±50, ±100, ±150, ±200, ±250}. Costs are numeric but must not appear in text.
+- Provide cost from {0, ±50, ±100, ±150, ±200, ±250}. default negative cost, unless action that clearly generates income.
 
 SUPPORT SHIFT (only if previous choice exists)
 - Output percentage deltas for three entities based on the last choice: people, mom, power holders (not the player).
@@ -1281,7 +1280,7 @@ SUPPORT SHIFT (only if previous choice exists)
   * people.why → civic/social reasoning.
   * mom.why → personal voice, first person ("I…"), like a mother to her child.
   * holders.why → institutional/political logic.
-- Explanations must be number-free.
+
 
 OUTPUT (STRICT JSON)
 {"title":"","description":"","actions":[

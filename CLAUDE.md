@@ -49,8 +49,8 @@ toggleDebug()        # Toggle debug mode on/off
 **Usage:**
 1. Open browser console (F12)
 2. Run command: `enableDebug()`
-3. Refresh page (F5)
-4. Debug features will appear (e.g., "🚀 Jump to Final Day" button in EventScreen)
+3. Debug features appear immediately (no refresh needed)
+4. Look for "🚀 Jump to Final Day" button in top-right of EventScreen
 
 **Debug Features:**
 - **Jump to Final Day Button**: Appears in top-right of EventScreen on days 1-6 (when interacting phase is active)
@@ -61,7 +61,7 @@ toggleDebug()        # Toggle debug mode on/off
   - After confirming day 7 choice, advances to day 8 (daysLeft=0, conclusion screen)
 - **Extra Console Logs**: Additional logging from various systems
 
-**Note:** Debug mode state persists in localStorage until disabled.
+**Note:** Debug mode state persists in Zustand store (persisted to localStorage).
 
 ## Project Structure
 
