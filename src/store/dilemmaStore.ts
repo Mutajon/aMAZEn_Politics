@@ -578,6 +578,9 @@ export function buildSnapshot(): DilemmaRequest {
       useSettingsStore.getState();
     const { day, totalDays, lastChoice, supportPeople, supportMiddle, supportMom, recentTopics, topicCounts, dilemmaHistory } = useDilemmaStore.getState();
 
+    // Calculate days left (for epic finale and game conclusion)
+    const daysLeft = totalDays - day + 1;
+
     // --- role/system from the role store (trimmed) ---
     const roleState = useRoleStore.getState();
 
@@ -625,6 +628,7 @@ export function buildSnapshot(): DilemmaRequest {
       settings: { dilemmasSubjectEnabled, dilemmasSubject },
       day,
       totalDays,
+      daysLeft,
       previous: { isFirst: day === 1, isLast: day === totalDays },
 
       // NEW: Send current support values for crisis detection (Rule 4d.vi, Rule 25b.ii)
@@ -668,8 +672,11 @@ export function buildSnapshot(): DilemmaRequest {
  */
 export function buildLightSnapshot(): LightDilemmaRequest {
   const { debugMode, useLightDilemmaAnthropic } = useSettingsStore.getState();
-  const { day, lastChoice, current, subjectStreak } = useDilemmaStore.getState();
+  const { day, totalDays, lastChoice, current, subjectStreak } = useDilemmaStore.getState();
   const roleState = useRoleStore.getState();
+
+  // Calculate days left (for epic finale and game conclusion)
+  const daysLeft = totalDays - day + 1;
 
   // Extract role (combine role name with any setting context)
   const role = typeof roleState.selectedRole === "string" && roleState.selectedRole.trim()
@@ -694,6 +701,7 @@ export function buildLightSnapshot(): LightDilemmaRequest {
   const request: LightDilemmaRequest = {
     role,
     system,
+    daysLeft,
     subjectStreak: subjectStreak || null,
     previous,
     debug: debugMode,

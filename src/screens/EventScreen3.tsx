@@ -323,6 +323,9 @@ export default function EventScreen3({ push }: Props) {
     // Calculate derived values
     const daysLeft = totalDays - day + 1;
 
+    // Game end detection - empty actions array signals conclusion
+    const isGameEnd = Array.isArray(collectedData.dilemma.actions) && collectedData.dilemma.actions.length === 0;
+
     // Build support items with deltas and initial values for animation
     const rawSupportItems = buildSupportItems(presentationStep, collectedData, initialSupportValues);
 
@@ -371,16 +374,39 @@ export default function EventScreen3({ push }: Props) {
             <NewsTicker items={tickerItems} />
           )}
 
-          {/* Step 4+: DilemmaCard (was Step 5) */}
+          {/* Step 4+: DilemmaCard OR Aftermath (game ending) */}
           {presentationStep >= 4 && collectedData && (
-            <DilemmaCard
-              title={collectedData.dilemma.title}
-              description={collectedData.dilemma.description}
-            />
+            <>
+              {isGameEnd ? (
+                // Game conclusion - show aftermath card
+                <div className="bg-gray-900/70 backdrop-blur-sm border border-amber-500/30 rounded-lg p-6 shadow-xl">
+                  <h2 className="text-2xl font-bold text-amber-400 mb-4">
+                    {collectedData.dilemma.title}
+                  </h2>
+                  <p className="text-lg text-gray-200 leading-relaxed mb-6 whitespace-pre-wrap">
+                    {collectedData.dilemma.description}
+                  </p>
+                  {phase === 'interacting' && (
+                    <button
+                      onClick={() => push('/highscores')}
+                      className="w-full px-6 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-amber-500/50"
+                    >
+                      View Final Results
+                    </button>
+                  )}
+                </div>
+              ) : (
+                // Normal dilemma card
+                <DilemmaCard
+                  title={collectedData.dilemma.title}
+                  description={collectedData.dilemma.description}
+                />
+              )}
+            </>
           )}
 
-          {/* Step 5+: MirrorCard with Compass Pills Overlay (was Step 6) */}
-          {presentationStep >= 5 && collectedData && (
+          {/* Step 5+: MirrorCard with Compass Pills Overlay (skip if game end) */}
+          {!isGameEnd && presentationStep >= 5 && collectedData && (
             <div className="relative">
               <MirrorCard
                 text={collectedData.mirrorText}
@@ -402,8 +428,8 @@ export default function EventScreen3({ push }: Props) {
             </div>
           )}
 
-          {/* Step 6: ActionDeck (was Step 7) */}
-          {presentationStep >= 6 && phase === 'interacting' && (
+          {/* Step 6: ActionDeck (skip if game end) */}
+          {!isGameEnd && presentationStep >= 6 && phase === 'interacting' && (
             <ActionDeck
               actions={actionsForDeck}
               showBudget={showBudget}

@@ -1328,6 +1328,55 @@ function buildLightUserPrompt({ role, system, subjectStreak, previous }) {
   return parts.join('\n');
 }
 
+/**
+ * Build epic finale section to append to system prompt when daysLeft === 1
+ * Only sent on the final day to avoid wasting tokens
+ */
+function buildEpicFinaleSection() {
+  return `
+🎯 EPIC FINALE MODE:
+This is the player's FINAL dilemma (last day before game ends).
+- Make it HIGH STAKES with lasting consequences
+- Make it CLIMACTIC and game-changing
+- This should feel like the CULMINATION of their tenure
+- Still follow all other rules (specificity, brevity, realistic)
+`.trim();
+}
+
+/**
+ * Build conclusion system prompt for game ending (daysLeft === 0)
+ * Replaces the normal system prompt entirely
+ */
+function buildConclusionSystemPrompt() {
+  return `You are generating the FINAL SCREEN after the player made their last decision.
+
+Your task:
+1. Analyze support shifts from their final choice (as normal)
+2. Generate a SINGLE PARAGRAPH (3-5 sentences) describing the IMMEDIATE AFTERMATH of their decision
+   - What happened right after they made this choice?
+   - What were the immediate consequences?
+   - Keep it focused on THIS decision, not their entire tenure
+   - DO NOT summarize the whole game
+   - DO NOT discuss legacy or long-term fate
+   - DO NOT list faction reactions (support deltas already show that)
+
+Return JSON:
+{
+  "title": "The Aftermath",
+  "description": "[Single paragraph, 3-5 sentences about immediate consequences]",
+  "actions": [],
+  "topic": "Conclusion",
+  "supportShift": {
+    "people": { "delta": <number>, "why": "<reason>" },
+    "mom": { "delta": <number>, "why": "<reason>" },
+    "holders": { "delta": <number>, "why": "<reason>" }
+  }
+}
+
+${ANTI_JARGON_RULES}
+`.trim();
+}
+
 // -------------------- Light Dilemma API Endpoint ---------------------------
 app.post("/api/dilemma-light", async (req, res) => {
   try {
@@ -1350,11 +1399,30 @@ app.post("/api/dilemma-light", async (req, res) => {
     // Extract minimal payload
     const role = String(req.body?.role || "").trim() || "Unicorn King";
     const system = String(req.body?.system || "").trim() || "Divine Right Monarchy";
+    const daysLeft = Number(req.body?.daysLeft ?? 1);
     const subjectStreak = req.body?.subjectStreak || null;
     const previous = req.body?.previous || null;
 
-    // Build light prompts
-    const systemPrompt = buildLightSystemPrompt();
+    if (debug) {
+      console.log(`[/api/dilemma-light] daysLeft: ${daysLeft}`);
+    }
+
+    // Build prompts dynamically based on daysLeft
+    let systemPrompt;
+
+    if (daysLeft === 0) {
+      // CONCLUSION MODE - different prompt entirely
+      console.log("[/api/dilemma-light] 🏁 CONCLUSION MODE - Generating game ending");
+      systemPrompt = buildConclusionSystemPrompt();
+    } else if (daysLeft === 1) {
+      // EPIC MODE - base prompt + epic section
+      console.log("[/api/dilemma-light] 🎯 EPIC FINALE MODE - Generating final dilemma");
+      systemPrompt = buildLightSystemPrompt() + "\n\n" + buildEpicFinaleSection();
+    } else {
+      // NORMAL MODE - base prompt only
+      systemPrompt = buildLightSystemPrompt();
+    }
+
     const userPrompt = buildLightUserPrompt({ role, system, subjectStreak, previous });
 
     if (debug) {
@@ -1415,28 +1483,37 @@ app.post("/api/dilemma-light", async (req, res) => {
       return clampInt(sign * nearest, -250, 250);
     }
 
-    // Process actions
+    // Process actions (skip normalization if daysLeft === 0, as actions should be empty)
     const allowedHints = new Set(["security", "speech", "diplomacy", "money", "tech", "heart", "scale"]);
-    let actions = Array.isArray(raw?.actions) ? raw.actions.slice(0, 3) : [];
-    actions = actions.map((a, idx) => {
-      const id = ["a", "b", "c"][idx] || "a";
-      const title = String(a?.title || `Option ${idx + 1}`).slice(0, 80);
-      const summary = String(a?.summary || "").slice(0, 180);
-      const iconHint = allowedHints.has(String(a?.iconHint)) ? String(a?.iconHint) : "speech";
-      const cost = snapCost(a?.cost);
+    let actions = [];
 
-      return { id, title, summary, cost, iconHint };
-    });
+    if (daysLeft === 0) {
+      // Game conclusion - actions should be empty array
+      actions = [];
+      if (debug) console.log("[/api/dilemma-light] Conclusion mode - empty actions array");
+    } else {
+      // Normal/epic mode - process actions as usual
+      actions = Array.isArray(raw?.actions) ? raw.actions.slice(0, 3) : [];
+      actions = actions.map((a, idx) => {
+        const id = ["a", "b", "c"][idx] || "a";
+        const title = String(a?.title || `Option ${idx + 1}`).slice(0, 80);
+        const summary = String(a?.summary || "").slice(0, 180);
+        const iconHint = allowedHints.has(String(a?.iconHint)) ? String(a?.iconHint) : "speech";
+        const cost = snapCost(a?.cost);
 
-    while (actions.length < 3) {
-      const i = actions.length;
-      actions.push({
-        id: ["a", "b", "c"][i] || "a",
-        title: `Option ${i + 1}`,
-        summary: "A reasonable alternative.",
-        cost: 0,
-        iconHint: "speech"
+        return { id, title, summary, cost, iconHint };
       });
+
+      while (actions.length < 3) {
+        const i = actions.length;
+        actions.push({
+          id: ["a", "b", "c"][i] || "a",
+          title: `Option ${i + 1}`,
+          summary: "A reasonable alternative.",
+          cost: 0,
+          iconHint: "speech"
+        });
+      }
     }
 
     // Extract title, description, topic
@@ -1479,7 +1556,8 @@ app.post("/api/dilemma-light", async (req, res) => {
       actions,
       topic,
       supportShift,
-      isFallback: usedFallback
+      isFallback: usedFallback,
+      isGameEnd: daysLeft === 0 // Mark game conclusion
     };
 
     if (debug) console.log("[/api/dilemma-light] Final result:", result);
@@ -1512,6 +1590,7 @@ app.post("/api/dilemma", async (req, res) => {
     const settings    = req.body?.settings || {};
     const day         = Number(req.body?.day || 1);
     const totalDays   = Number(req.body?.totalDays || 7);
+    const daysLeft    = Number(req.body?.daysLeft ?? (totalDays - day + 1));
     const isFirst     = !!req.body?.previous?.isFirst;
     const isLast      = !!req.body?.previous?.isLast;
     const compassFlat = req.body?.compassValues || {};
@@ -1527,13 +1606,20 @@ app.post("/api/dilemma", async (req, res) => {
     if (debug) {
       const compassKeys = compassFlat ? Object.keys(compassFlat).length : 0;
       console.log("[/api/dilemma] IN:", {
-        role, systemName, day, totalDays, compassKeys,
+        role, systemName, day, totalDays, daysLeft, compassKeys,
         hasEnhancedContext: !!enhancedContext,
         hasLastChoice: !!lastChoice,
         recentTopicsCount: recentTopics.length,
         topicCountsKeys: Object.keys(topicCounts).length,
         dilemmaHistoryCount: dilemmaHistory.length
       });
+    }
+
+    // Log mode based on daysLeft
+    if (daysLeft === 0) {
+      console.log("[/api/dilemma] 🏁 CONCLUSION MODE - Generating game ending");
+    } else if (daysLeft === 1) {
+      console.log("[/api/dilemma] 🎯 EPIC FINALE MODE - Generating final dilemma");
     }
     
     // Best-effort nudge only
@@ -1551,25 +1637,51 @@ app.post("/api/dilemma", async (req, res) => {
     const systemAnalysis = analyzeSystemType(systemName);
 
         // ===================================================================
-        // OPTIMIZED PROMPT BUILDING (using helper functions)
+        // DYNAMIC PROMPT BUILDING based on daysLeft
         // Token reduction: ~50% (2000-2500 → 1000-1200 tokens)
         // ===================================================================
-        const system = buildCoreStylePrompt() + "\n\n" + buildDynamicContextPrompt({
-          role,
-          systemName,
-          systemAnalysis,
-          day,
-          totalDays,
-          isFirst,
-          isLast,
-          lastChoice,
-          dilemmaHistory: dilemmaHistory?.slice(-2), // Last 2 only
-          recentTopics: recentTopics?.slice(0, 3), // Top 3 only
-          topicCounts,
-          enhancedContext,
-          supports,
-          settings
-        }) + "\n\n" + buildOutputSchemaPrompt();
+        let system;
+
+        if (daysLeft === 0) {
+          // CONCLUSION MODE - use conclusion prompt (like light API)
+          system = buildConclusionSystemPrompt();
+        } else if (daysLeft === 1) {
+          // EPIC MODE - base prompt + epic section
+          system = buildCoreStylePrompt() + "\n\n" + buildDynamicContextPrompt({
+            role,
+            systemName,
+            systemAnalysis,
+            day,
+            totalDays,
+            isFirst,
+            isLast,
+            lastChoice,
+            dilemmaHistory: dilemmaHistory?.slice(-2), // Last 2 only
+            recentTopics: recentTopics?.slice(0, 3), // Top 3 only
+            topicCounts,
+            enhancedContext,
+            supports,
+            settings
+          }) + "\n\n" + buildEpicFinaleSection() + "\n\n" + buildOutputSchemaPrompt();
+        } else {
+          // NORMAL MODE - base prompt only
+          system = buildCoreStylePrompt() + "\n\n" + buildDynamicContextPrompt({
+            role,
+            systemName,
+            systemAnalysis,
+            day,
+            totalDays,
+            isFirst,
+            isLast,
+            lastChoice,
+            dilemmaHistory: dilemmaHistory?.slice(-2), // Last 2 only
+            recentTopics: recentTopics?.slice(0, 3), // Top 3 only
+            topicCounts,
+            enhancedContext,
+            supports,
+            settings
+          }) + "\n\n" + buildOutputSchemaPrompt();
+        }
 
     // Build compact user prompt
     const user = [
@@ -1711,7 +1823,18 @@ app.post("/api/dilemma", async (req, res) => {
 
     const allowedHints = new Set(["security","speech","diplomacy","money","tech","heart","scale"]);
 
-    let actions = Array.isArray(raw?.actions) ? raw.actions.slice(0, 3) : [];
+    let actions = [];
+
+    // Skip action processing if daysLeft === 0 (game conclusion)
+    if (daysLeft === 0) {
+      actions = [];
+      if (debug) console.log("[/api/dilemma] Conclusion mode - empty actions array");
+    } else {
+      actions = Array.isArray(raw?.actions) ? raw.actions.slice(0, 3) : [];
+    }
+
+    // Only process actions if not in conclusion mode
+    if (daysLeft > 0) {
     actions = actions.map((a, idx) => {
       const id = (["a","b","c"][idx] || "a");
       const t  = String(a?.title || `Option ${idx + 1}`).slice(0, 80);
@@ -1754,6 +1877,7 @@ app.post("/api/dilemma", async (req, res) => {
       const i = actions.length;
       actions.push({ id: ["a","b","c"][i] || "a", title: `Option ${i + 1}`, summary: "A reasonable alternative.", cost: 0, iconHint: "speech" });
     }
+    } // End of daysLeft > 0 check
 
     // Ensure topic is always returned (NewDilemmaLogic.md Rule #9)
     const validTopics = ["Economy", "Security", "Diplomacy", "Rights", "Infrastructure", "Environment", "Health", "Education", "Justice", "Culture"];
@@ -1908,6 +2032,7 @@ app.post("/api/dilemma", async (req, res) => {
       actions,
       topic,
       isFallback: usedFallback,
+      isGameEnd: daysLeft === 0, // Mark game conclusion
       ...(supportEffects !== null && { supportEffects }) // Only include if Day 2+
     };
 

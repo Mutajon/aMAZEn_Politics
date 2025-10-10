@@ -10,7 +10,7 @@ export type DilemmaAction = {
 export type Dilemma = {
   title: string;
   description: string;
-  actions: [DilemmaAction, DilemmaAction, DilemmaAction];
+  actions: [DilemmaAction, DilemmaAction, DilemmaAction] | []; // Empty array when isGameEnd
   topic?: string;
   source?: string;
   supportEffects?: any; // Added dynamically by light API for Day 2+ support shifts
@@ -40,6 +40,7 @@ export type DilemmaRequest = {
   };
   day: number;
   totalDays: number;
+  daysLeft: number; // totalDays - day + 1 (used for epic finale and game conclusion)
   previous?: {
     isFirst: boolean;
     isLast: boolean;
@@ -49,6 +50,7 @@ export type DilemmaRequest = {
   };
   supports?: { people?: number; mom?: number; middle?: number };
   dilemmaHistory?: DilemmaHistoryEntry[];  // Full game history for context
+  lastChoice?: { title: string; summary: string }; // Previous choice (trimmed for token efficiency)
 
   // NEW: let the server log only when your Debug mode is ON
   debug?: boolean;
@@ -64,6 +66,7 @@ export type SubjectStreak = {
 export type LightDilemmaRequest = {
   role: string;
   system: string;
+  daysLeft: number; // totalDays - day + 1 (used for epic finale and game conclusion)
   subjectStreak: SubjectStreak | null;
   previous?: {
     title: string;
@@ -83,8 +86,9 @@ export type SupportShift = {
 export type LightDilemmaResponse = {
   title: string;
   description: string;
-  actions: [DilemmaAction, DilemmaAction, DilemmaAction];
+  actions: [DilemmaAction, DilemmaAction, DilemmaAction] | []; // Empty array when isGameEnd
   topic: string;
   supportShift: SupportShift | null;
   isFallback?: boolean;
+  isGameEnd?: boolean; // True when daysLeft was 0 (game conclusion)
 };
