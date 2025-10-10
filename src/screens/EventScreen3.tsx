@@ -433,17 +433,17 @@ export default function EventScreen3({ push }: Props) {
                 // Game conclusion - show aftermath card
                 <div className="bg-gray-900/70 backdrop-blur-sm border border-amber-500/30 rounded-lg p-6 shadow-xl">
                   <h2 className="text-2xl font-bold text-amber-400 mb-4">
-                    {collectedData.dilemma.title}
+                    The Last Day
                   </h2>
                   <p className="text-lg text-gray-200 leading-relaxed mb-6 whitespace-pre-wrap">
                     {collectedData.dilemma.description}
                   </p>
                   {phase === 'interacting' && (
                     <button
-                      onClick={() => push('/highscores')}
+                      onClick={() => push('/aftermath')}
                       className="w-full px-6 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-amber-500/50"
                     >
-                      View Final Results
+                      View Aftermath
                     </button>
                   )}
                 </div>

@@ -19,6 +19,7 @@ import { useEnsureMirroredAvatarOnce } from "./hooks/useEnsureMirroredAvatarOnce
 import EventScreen3 from "./screens/EventScreen3";
 import HighscoreScreen from "./screens/HighscoreScreen";
 import MirrorScreen from "./screens/MirrorScreen";
+import AftermathScreen from "./screens/AftermathScreen";
 if (import.meta.env.DEV) {
   import("./dev/storesDebug").then(m => m.attachStoresDebug());
 }
@@ -46,6 +47,7 @@ export default function App() {
   if (route === "/background-intro") return <BackgroundIntroScreen push={push} />;
   if (route === "/event") return <EventScreen3 push={push} />;
   if (route === "/highscores") return <HighscoreScreen push={push} />;
+  if (route === "/aftermath") return <AftermathScreen />;
 
   
 
