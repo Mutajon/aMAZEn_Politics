@@ -198,8 +198,18 @@ async function fetchDilemma(): Promise<Dilemma> {
     const data: LightDilemmaResponse = await response.json();
 
     // Validate required fields
-    if (!data.title || !data.description || !Array.isArray(data.actions) || data.actions.length !== 3) {
+    if (!data.title || !data.description || !Array.isArray(data.actions)) {
       throw new Error("Invalid dilemma response: missing required fields");
+    }
+
+    // Allow empty actions array ONLY when isGameEnd is true
+    if (!data.isGameEnd && data.actions.length !== 3) {
+      throw new Error("Invalid dilemma response: expected 3 actions for normal dilemma");
+    }
+
+    // Game end must have empty actions
+    if (data.isGameEnd && data.actions.length !== 0) {
+      throw new Error("Invalid dilemma response: game end must have empty actions array");
     }
 
     // Apply support shifts if they exist (Day 2+)
@@ -246,8 +256,18 @@ async function fetchDilemma(): Promise<Dilemma> {
     const data = await response.json();
 
     // Validate required fields
-    if (!data.title || !data.description || !Array.isArray(data.actions) || data.actions.length !== 3) {
+    if (!data.title || !data.description || !Array.isArray(data.actions)) {
       throw new Error("Invalid dilemma response: missing required fields");
+    }
+
+    // Allow empty actions array ONLY when isGameEnd is true
+    if (!data.isGameEnd && data.actions.length !== 3) {
+      throw new Error("Invalid dilemma response: expected 3 actions for normal dilemma");
+    }
+
+    // Game end must have empty actions
+    if (data.isGameEnd && data.actions.length !== 0) {
+      throw new Error("Invalid dilemma response: game end must have empty actions array");
     }
 
     // Return the full response to preserve supportEffects for Day 2+
