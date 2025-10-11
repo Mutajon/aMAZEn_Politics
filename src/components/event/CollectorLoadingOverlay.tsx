@@ -11,6 +11,8 @@
 
 import { Hourglass } from "lucide-react";
 import { bgStyle } from "../../lib/ui";
+import { useRotatingLeader } from "../../hooks/useRotatingLeader";
+import LeaderProfileCard from "./LeaderProfileCard";
 
 type Props = {
   progress: number; // 0-100 real-time progress percentage (REQUIRED)
@@ -21,6 +23,8 @@ export default function CollectorLoadingOverlay({
   progress,
   message = "Gathering political intelligence..."
 }: Props) {
+  const { currentLeader, fadeState } = useRotatingLeader();
+
   return (
     <div className="min-h-screen flex items-center justify-center" style={bgStyle}>
       <div className="text-center">
@@ -41,10 +45,23 @@ export default function CollectorLoadingOverlay({
         </p>
 
         {/* Collection Progress Percentage */}
-        <div className="mb-6">
+        <div className="mb-10">
           <p className="text-6xl font-bold text-white/95 tabular-nums">
             {Math.round(progress)}%
           </p>
+        </div>
+
+        {/* Hall of Fame Section */}
+        <div className="mb-6 mt-8">
+          {/* Title */}
+          <h3 className="text-lg uppercase tracking-wide text-amber-300/90 mb-6">
+            Top Hall of Famers:
+          </h3>
+
+          {/* Leader Profile Card */}
+          <div className="min-h-[160px] flex items-center justify-center">
+            <LeaderProfileCard leader={currentLeader} fadeState={fadeState} />
+          </div>
         </div>
 
         {/* Pulsing dots */}
