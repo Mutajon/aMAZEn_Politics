@@ -2,6 +2,12 @@
 // Client helper: calls backend /api/compass-analyze, then applies effects
 // via useCompassFX (updates store + shows pills).
 //
+// ⚠️ DEPRECATED: This module is no longer used for action confirmation.
+// Compass analysis now happens only in Phase 2 data collection (useEventDataCollector).
+// This eliminates duplicate API calls and fixes the double-application bug.
+//
+// KEPT FOR: Potential future use cases (mirror quiz screen, manual analysis, etc.)
+//
 // OPTIMIZED: Removed cues parameter (81% token reduction)
 // - Server now has compact component definitions in system prompt
 // - No need to send 2,725 chars with every request

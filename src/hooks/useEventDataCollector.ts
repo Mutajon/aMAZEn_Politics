@@ -434,54 +434,69 @@ async function fetchNews(): Promise<TickerItem[]> {
 
 /**
  * Fetch mirror dialogue with dilemma context
- * REQUIRES: dilemma (from Phase 1)
- * Fallback: "The mirror squints, light pooling in the glass..."
+ * USES MIRROR LIGHT API: Top 2 "what" values + dilemma only
+ * CRITICAL: Always sorts current "what" values by strength descending before taking top 2
+ * Returns: 2-3 sentence dramatic sidekick advice (Mushu/Genie personality)
+ * Fallback: "The mirror squints… then grins mischievously."
  */
 async function fetchMirrorText(dilemma: Dilemma): Promise<string> {
   const { values: compassValues } = useCompassStore.getState();
-  const { dilemmaHistory } = useDilemmaStore.getState();
   const { useLightDilemmaAnthropic } = useSettingsStore.getState();
 
-  // Calculate top 3 compass components with names (not indices)
-  // NO threshold filtering - just sort and take top 3
-  const topWhat = topKWithNames(compassValues?.what, "what", 3);
-  const topWhence = topKWithNames(compassValues?.whence, "whence", 3);
-  const topOverall = topOverallWithNames(compassValues, 3);
+  // CRITICAL: Get current "what" values and sort by strength DESCENDING
+  // This ensures we ALWAYS get the top 2 strongest values at request time
+  const whatArray = Array.isArray(compassValues?.what) ? compassValues.what : [];
+
+  // Build array of [value, index, name] and sort by value descending
+  const sortedWhat = whatArray
+    .map((strength, idx) => ({
+      strength: Number(strength) || 0,
+      idx,
+      name: COMPONENTS.what?.[idx]?.short || `What #${idx + 1}`
+    }))
+    .filter(item => item.strength > 0) // Only include non-zero values
+    .sort((a, b) => b.strength - a.strength) // Sort DESCENDING by strength
+    .slice(0, 2) // Take top 2
+    .map(item => ({
+      name: item.name,
+      strength: Math.round(item.strength * 10) / 10
+    }));
+
+  // Validate we have at least 2 values
+  if (sortedWhat.length < 2) {
+    return "The mirror blinks—your values are still forming...";
+  }
 
   const payload = {
-    topWhat,
-    topWhence,
-    topOverall,
+    topWhat: sortedWhat, // Already sorted, top 2 guaranteed
     dilemma: {
       title: dilemma.title,
       description: dilemma.description,
-      // OPTIMIZED: Remove cost from actions (not needed by mirror)
       actions: dilemma.actions.map(a => ({
         id: a.id,
         title: a.title,
         summary: a.summary
-        // Omit: cost (not needed for mirror analysis)
       }))
     },
-    // OPTIMIZED: Only last 2 days of history (not full 7 days)
-    dilemmaHistory: dilemmaHistory.slice(-2),
     useAnthropic: useLightDilemmaAnthropic
   };
 
   try {
-    const response = await fetch("/api/mirror-summary", {
+    const response = await fetch("/api/mirror-light", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
 
-    if (!response.ok) return "The mirror squints, light pooling in the glass...";
+    if (!response.ok) {
+      return "The mirror's having a moment—try again!";
+    }
 
     const data = await response.json();
-    return data.summary || "The mirror squints, light pooling in the glass...";
+    return data.summary || "The mirror squints… then grins mischievously.";
   } catch (error) {
-    console.error("[Collector] Mirror dialogue failed:", error);
-    return "The mirror squints, light pooling in the glass...";
+    console.error("[Collector] Mirror light failed:", error);
+    return "The mirror's too hyped to talk right now!";
   }
 }
 

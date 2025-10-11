@@ -16,6 +16,7 @@ import type { FadeState } from "../../hooks/useRotatingLeader";
 
 type Props = {
   leader: HighscoreEntry | null;
+  rank: number; // 1-based rank from sorted highscore list
   fadeState: FadeState;
 };
 
@@ -42,16 +43,11 @@ function imgForLeader(name: string) {
  * │  (full text, no clamp)              │
  * └─────────────────────────────────────┘
  */
-export default function LeaderProfileCard({ leader, fadeState }: Props) {
+export default function LeaderProfileCard({ leader, rank, fadeState }: Props) {
   if (!leader) return null;
 
   // Calculate opacity based on fade state
   const opacity = fadeState === 'out' ? 0 : 1;
-
-  // Calculate rank (assuming entries are sorted by score in store)
-  // For display purposes, we'll use a simplified rank calculation
-  // Note: This is approximate since we don't have access to the full sorted list here
-  const rank = leader.score >= 3200 ? 1 : leader.score >= 3000 ? 2 : leader.score >= 2900 ? 3 : 4;
 
   return (
     <motion.div

@@ -9,7 +9,7 @@ import { pickQuiz } from "../data/mirror-quiz-pool";
 import { useRoleStore } from "../store/roleStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useCompassFX } from "../hooks/useCompassFX";
-import { generateMirrorSummary } from "../lib/mirrorSummary";
+import { generateMirrorQuizSummary } from "../lib/mirrorSummary";
 import { useMirrorQuizStore } from "../store/mirrorQuizStore";
 import MirrorBubble from "../components/MirrorBubble";
 import { mirrorBubbleTheme as T } from "../theme/mirrorBubbleTheme";
@@ -70,11 +70,11 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
     }
   }, [quiz.length, init, resetCompass]);
 
-  // once done, fetch a one-shot summary (GPT)
+  // once done, fetch a one-shot summary (Mirror Quiz Light API - Mushu/Genie personality)
   useEffect(() => {
     (async () => {
       if (done && !summary) {
-        const s = await generateMirrorSummary(values, { useAI: true, topN: 2 });
+        const s = await generateMirrorQuizSummary(values, { useAI: true });
         setSummary(s);
       }
     })();

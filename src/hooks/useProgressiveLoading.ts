@@ -139,7 +139,6 @@ export function useProgressiveLoading(props?: ProgressiveLoadingProps) {
   const runSequentialAnalysis = useCallback(async (
     supportValues: SupportValues,
     actionText?: string,
-    analyzeText?: (text: string) => Promise<unknown>,
     analyzeSupport?: (text: string) => Promise<any[]>,
     applySupportEffects?: (effects: any[]) => void,
     updateNewsAfterAction?: (actionData: any) => void
@@ -220,22 +219,14 @@ export function useProgressiveLoading(props?: ProgressiveLoadingProps) {
       console.error("[useProgressiveLoading] Dilemma generation failed:", error);
     }
 
-    // 5. Mirror & Compass Analysis
+    // 5. Mirror (compass analysis removed - now happens in Phase 2 data collection)
     setState(prev => ({ ...prev, currentStage: 'mirror', loadingCardPosition: 850 }));
-    if (actionText && analyzeText) {
-      try {
-        console.log("[useProgressiveLoading] Running compass analysis");
-        await analyzeText(actionText);
-        setState(prev => ({
-          ...prev,
-          completedStages: new Set([...prev.completedStages, 'mirror']),
-          loadingCardPosition: 950 // Push down after mirror reveals
-        }));
-        await new Promise(resolve => setTimeout(resolve, 800));
-      } catch (error) {
-        console.error("[useProgressiveLoading] Compass analysis failed:", error);
-      }
-    }
+    setState(prev => ({
+      ...prev,
+      completedStages: new Set([...prev.completedStages, 'mirror']),
+      loadingCardPosition: 950 // Push down after mirror reveals
+    }));
+    await new Promise(resolve => setTimeout(resolve, 400));
 
     // 6. Action Cards (final stage)
     setState(prev => ({ ...prev, currentStage: 'actions' }));
@@ -256,7 +247,6 @@ export function useProgressiveLoading(props?: ProgressiveLoadingProps) {
   const startProgressiveLoading = useCallback(async (
     supportValues: SupportValues,
     actionText?: string,
-    analyzeText?: (text: string) => Promise<unknown>,
     analyzeSupport?: (text: string) => Promise<any[]>,
     applySupportEffects?: (effects: any[]) => void,
     updateNewsAfterAction?: (actionData: any) => void
@@ -281,7 +271,6 @@ export function useProgressiveLoading(props?: ProgressiveLoadingProps) {
     await runSequentialAnalysis(
       supportValues,
       actionText,
-      analyzeText,
       analyzeSupport,
       applySupportEffects,
       updateNewsAfterAction

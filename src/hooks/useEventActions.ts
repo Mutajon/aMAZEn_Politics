@@ -1,14 +1,11 @@
 // src/hooks/useEventActions.ts
 // Enhanced action handlers for event screen with day progression integration.
-// Connects action confirmation to contextual dilemma generation flow.
+// Connects action confirmation to support analysis (compass analysis moved to Phase 2).
 
-import { useState } from "react";
 import { useSettingsStore } from "../store/settingsStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
-import { analyzeTextToCompass } from "../lib/compassMapping";
 import { runConfirmPipeline } from "../lib/eventConfirm";
 import { useEventSupportManager } from "../components/event/EventSupportManager";
-import type { FXEffect } from "./useCompassFX";
 import type { ActionCard } from "../components/event/ActionDeck";
 import type { SupportDeltas, SupportTrends, SupportNotes, Trio } from "./useEventState";
 
@@ -21,12 +18,10 @@ interface UseEventActionsProps {
   budget: number;
   setBudget: (budget: number | ((prev: number) => number)) => void;
   updateNewsAfterAction: (actionData: { title: string; summary: string; cost: number }) => void;
-  applyWithPings: (effects: FXEffect[]) => FXEffect[];
   enableProgressiveLoading?: boolean; // when true, uses new progressive loading flow
   startProgressiveLoading?: (
     supportValues: { people: number; middle: number; mom: number },
     actionText?: string,
-    analyzeText?: (text: string) => Promise<unknown>,
     analyzeSupport?: (text: string) => Promise<any[]>,
     applySupportEffects?: (effects: any[]) => void,
     updateNewsAfterAction?: (actionData: any) => void
@@ -42,15 +37,10 @@ export function useEventActions({
   budget,
   setBudget,
   updateNewsAfterAction,
-  applyWithPings,
   enableProgressiveLoading = true, // Enable new progressive loading flow by default
   startProgressiveLoading,
 }: UseEventActionsProps) {
   const showBudget = useSettingsStore((s) => s.showBudget);
-
-  // Show spinner while we wait for the /api/compass-analyze response
-  const [compassLoading, setCompassLoading] = useState(false);
-
 
   // Support manager hook
   const { analyzeSupportWrapper, applySupportEffects } = useEventSupportManager({
@@ -60,9 +50,6 @@ export function useEventActions({
     setSupportTrends,
     setSupportNotes,
   });
-
-  // Adapter for the pipeline: call analyzer and resolve
-  const analyzeText = (t: string) => analyzeTextToCompass(t, applyWithPings).then(() => undefined);
 
   const handleConfirm = async (id: string, actionsForDeck: ActionCard[]) => {
     const a = actionsForDeck.find((x) => x.id === id);
@@ -96,7 +83,6 @@ export function useEventActions({
       await startProgressiveLoading(
         supportValues,
         actionText,
-        analyzeText,
         analyzeSupportWrapper,
         applySupportEffects,
         updateNewsAfterAction
@@ -130,9 +116,6 @@ export function useEventActions({
         {
           showBudget,
           setBudget,
-          analyzeText,
-          onAnalyzeStart: () => setCompassLoading(true),
-          onAnalyzeDone: () => setCompassLoading(false),
           analyzeSupport: analyzeSupportWrapper,
           applySupportEffects,
         }
@@ -167,7 +150,6 @@ export function useEventActions({
       await startProgressiveLoading(
         supportValues,
         actionText,
-        analyzeText,
         analyzeSupportWrapper,
         applySupportEffects,
         updateNewsAfterAction
@@ -201,9 +183,6 @@ export function useEventActions({
         {
           showBudget,
           setBudget,
-          analyzeText,
-          onAnalyzeStart: () => setCompassLoading(true),
-          onAnalyzeDone: () => setCompassLoading(false),
           analyzeSupport: analyzeSupportWrapper,
           applySupportEffects,
         }
@@ -221,6 +200,5 @@ export function useEventActions({
   return {
     handleConfirm,
     handleSuggest,
-    compassLoading,
   };
 }

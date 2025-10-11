@@ -49,15 +49,15 @@ const OUTER_MARGIN_Y  = "my-2";
 /* ================================================================= */
 
 export type MirrorCardProps = {
-  text: string;      // 1–2 sentences
+  text: string;      // 1 sentence (Mirror Light API)
   italic?: boolean;
   className?: string;
   onExploreClick?: () => void; // NEW: Callback for explore button
 };
 
 export default function MirrorCard({ text, italic = true, className, onExploreClick }: MirrorCardProps) {
-  // Always use character-level splitting for smooth shimmer effect
-  const segments = useMemo(() => splitGraphemes(text), [text]);
+  // Use word-level splitting to prevent mid-word line breaks while maintaining shimmer effect
+  const segments = useMemo(() => splitWords(text), [text]);
 
   // Track typewriter reveal completion
   const [typewriterComplete, setTypewriterComplete] = useState(!TYPEWRITER_ENABLED);
@@ -191,7 +191,11 @@ function MagicShimmer({
   return (
     <span>
       {segments.map((seg, i) => {
+        // Handle newlines
         if (seg === "\n") return <br key={`br-${i}`} />;
+
+        // Handle whitespace (spaces, tabs) - render directly without animation
+        if (/^\s+$/.test(seg)) return <span key={`space-${i}`}>{seg}</span>;
 
         // Typewriter: reveal character by character
         const typewriterDelay = TYPEWRITER_ENABLED
@@ -242,7 +246,7 @@ function MagicShimmer({
                   }
             }
           >
-            {seg === " " ? "\u00A0" : seg}
+            {seg}
           </motion.span>
         );
       })}
@@ -252,13 +256,15 @@ function MagicShimmer({
 
 /* -------------------- Utilities -------------------- */
 
-function splitGraphemes(str: string): string[] {
-  try {
-    const seg = new (Intl as any).Segmenter(undefined, { granularity: "grapheme" });
-    return Array.from(seg.segment(str), (s: any) => s.segment as string);
-  } catch {
-    return Array.from(str);
-  }
+/**
+ * Split text by words and whitespace while preserving newlines
+ * This prevents mid-word line breaks while maintaining shimmer animation
+ * Returns array of words and whitespace segments
+ */
+function splitWords(str: string): string[] {
+  // Split by spaces/tabs but keep the delimiters and preserve newlines
+  // Regex: capture sequences of non-whitespace OR sequences of whitespace
+  return str.split(/(\s+)/).filter(Boolean);
 }
 
 /* -------------------- Demo helper export (important) -------------------- */

@@ -23,7 +23,7 @@ export default function CollectorLoadingOverlay({
   progress,
   message = "Gathering political intelligence..."
 }: Props) {
-  const { currentLeader, fadeState } = useRotatingLeader();
+  const { currentLeader, currentRank, fadeState } = useRotatingLeader();
 
   return (
     <div className="min-h-screen flex items-center justify-center" style={bgStyle}>
@@ -60,7 +60,7 @@ export default function CollectorLoadingOverlay({
 
           {/* Leader Profile Card */}
           <div className="min-h-[160px] flex items-center justify-center">
-            <LeaderProfileCard leader={currentLeader} fadeState={fadeState} />
+            <LeaderProfileCard leader={currentLeader} rank={currentRank} fadeState={fadeState} />
           </div>
         </div>
 

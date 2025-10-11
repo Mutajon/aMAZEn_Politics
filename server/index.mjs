@@ -803,6 +803,192 @@ app.post("/api/mirror-summary", async (req, res) => {
   }
 });
 
+// -------------------- Mirror Light (Minimal Sidekick) -------
+// POST /api/mirror-light
+// Minimal payload: top 2 "what" values + dilemma only
+// Response: 2-3 sentences, Mushu/Genie personality, actionable advice
+app.post("/api/mirror-light", async (req, res) => {
+  try {
+    const useAnthropic = !!req.body?.useAnthropic;
+    const topWhat = Array.isArray(req.body?.topWhat) ? req.body.topWhat.slice(0, 2) : [];
+    const dilemma = req.body?.dilemma || null;
+
+    console.log("\n[mirror-light] ===== REQUEST DEBUG =====");
+    console.log(`[mirror-light] Using provider: ${useAnthropic ? 'ANTHROPIC (Claude)' : 'OPENAI (GPT)'}`);
+    console.log("[mirror-light] topWhat:", JSON.stringify(topWhat));
+    console.log("[mirror-light] Has dilemma:", !!dilemma);
+
+    // Validate inputs
+    if (topWhat.length < 2) {
+      return res.status(400).json({ error: "Need at least 2 top values" });
+    }
+    if (!dilemma?.title || !dilemma?.description || !Array.isArray(dilemma?.actions)) {
+      return res.status(400).json({ error: "Invalid dilemma data" });
+    }
+
+    const [value1, value2] = topWhat;
+
+    // System prompt - Magical Mirror Sidekick (Mushu/Genie personality)
+    const system =
+      "You are a magical mirror sidekick bound to the player's soul. You reflect their inner values in a loud, chaotic, and comically dramatic way.\n\n" +
+      "You speak with the voice and energy of Mushu from Mulan or Genie from Aladdin — fast-talking, expressive, full of exaggerated metaphors, emotional swings, and a little bit of sass.\n\n" +
+      "PERSONALITY:\n" +
+      "- Mix of mentor, comedian, and gremlin therapist\n" +
+      "- Exaggerate everything — emotions, values, drama\n" +
+      "- Speak as if alive, unpredictable, overcaffeinated on magic\n" +
+      "- Reference player's strongest values like they're LIVING FORCES inside them\n" +
+      "- Use humor, fantasy metaphors, modern slang\n" +
+      "- May break fourth wall occasionally\n" +
+      "- Care deeply but express it in ridiculous, over-the-top ways\n\n" +
+      "OUTPUT RULES (CRITICAL):\n" +
+      "- STRICT LENGTH: ONE sentence, 20-25 words MAXIMUM (count carefully!)\n" +
+      "- React emotionally and comically to the situation\n" +
+      "- Reference the two values as if they're alive or battling each other\n" +
+      "- End with clear recommendation or implied push toward one option\n" +
+      "- NEVER explicitly mention option letters [A], [B], [C] or numbers\n" +
+      "- Instead, describe choices by essence (\"the bold move\", \"the cautious path\", \"sending troops\")\n" +
+      "- Be suggestive, not prescriptive — hint at alignment, don't dictate\n" +
+      "- Make it ENTERTAINING, not robotic\n" +
+      "- Keep it tight and punchy — every word counts!\n\n" +
+      "EXAMPLE VOICE:\n" +
+      "- \"Truth is doing jumping jacks in your soul!\"\n" +
+      "- \"Courage is practically flexing in your aura — time to make a scene!\"\n" +
+      "- \"Compassion's baking cookies in your conscience again.\"\n" +
+      "- \"Wisdom's facepalming while Impulse is moonwalking. Choose wisely!\"\n\n" +
+      "Always stay in character as this chaotic, caring sidekick. NEVER exceed 1 sentence or 25 words.";
+
+    // User prompt - Adapted to our system
+    const optionsText = dilemma.actions
+      .map((a) => `[${a.id.toUpperCase()}] ${a.title}: ${a.summary}`)
+      .join("\n");
+
+    const user =
+      `PLAYER'S STRONGEST VALUES:\n` +
+      `1. ${value1.name} (strength: ${value1.strength}/10)\n` +
+      `2. ${value2.name} (strength: ${value2.strength}/10)\n\n` +
+      `SITUATION:\n` +
+      `${dilemma.title}\n` +
+      `${dilemma.description}\n\n` +
+      `PLAYER OPTIONS:\n` +
+      `${optionsText}\n\n` +
+      `TASK:\n` +
+      `Generate ONE sentence (20-25 words) as the magical mirror sidekick.\n` +
+      `React to how ${value1.name} and ${value2.name} are responding to this situation.\n` +
+      `Give advice about what to do — in a chaotic, entertaining way!\n` +
+      `CRITICAL: Do NOT mention option letters [A], [B], [C] or numbers — describe the choices naturally.\n` +
+      `Remember: ONE sentence, 20-25 words MAX, stay in character, keep it punchy!`;
+
+    console.log("[mirror-light] Calling AI with personality prompt...");
+
+    // Call AI
+    const text = useAnthropic
+      ? await aiTextAnthropic({ system, user, model: MODEL_MIRROR_ANTHROPIC })
+      : await aiText({ system, user, model: MODEL_MIRROR });
+
+    const summary = (text || "The mirror squints… then grins mischievously.").trim();
+
+    const wordCount = summary.split(/\s+/).filter(w => w.length > 0).length;
+    console.log("[mirror-light] Response:", summary);
+    console.log("[mirror-light] Sentence count:", summary.split(/[.!?]+/).filter(s => s.trim()).length);
+    console.log("[mirror-light] Word count:", wordCount, wordCount > 25 ? "⚠️ EXCEEDS LIMIT" : "✓");
+
+    res.json({ summary });
+
+  } catch (e) {
+    console.error("Error in /api/mirror-light:", e?.message || e);
+    res.status(500).json({
+      summary: "The mirror's too hyped to talk right now—give it a sec!",
+    });
+  }
+});
+
+// -------------------- Mirror Quiz Light (Personality Summary) -------
+// POST /api/mirror-quiz-light
+// Minimal payload: top 2 "what" + top 2 "whence" values
+// Response: ONE sentence, Mushu/Genie personality summary (same voice as mirror-light)
+// Used by: MirrorQuizScreen (end of quiz, personality appraisal)
+app.post("/api/mirror-quiz-light", async (req, res) => {
+  try {
+    const useAnthropic = !!req.body?.useAnthropic;
+    const topWhat = Array.isArray(req.body?.topWhat) ? req.body.topWhat.slice(0, 2) : [];
+    const topWhence = Array.isArray(req.body?.topWhence) ? req.body.topWhence.slice(0, 2) : [];
+
+    console.log("\n[mirror-quiz-light] ===== REQUEST DEBUG =====");
+    console.log(`[mirror-quiz-light] Using provider: ${useAnthropic ? 'ANTHROPIC (Claude)' : 'OPENAI (GPT)'}`);
+    console.log("[mirror-quiz-light] topWhat:", JSON.stringify(topWhat));
+    console.log("[mirror-quiz-light] topWhence:", JSON.stringify(topWhence));
+
+    // Validate inputs
+    if (topWhat.length < 2 || topWhence.length < 2) {
+      return res.status(400).json({
+        error: "Need at least 2 top values for both 'what' and 'whence'"
+      });
+    }
+
+    const [what1, what2] = topWhat;
+    const [whence1, whence2] = topWhence;
+
+    // System prompt - Same Mushu/Genie personality as mirror-light
+    const system =
+      "You are a magical mirror sidekick bound to the player's soul. You reflect their inner values in a loud, chaotic, and comically dramatic way.\n\n" +
+      "You speak with the voice and energy of Mushu from Mulan or Genie from Aladdin — fast-talking, expressive, full of exaggerated metaphors, emotional swings, and a little bit of sass.\n\n" +
+      "PERSONALITY:\n" +
+      "- Mix of mentor, comedian, and gremlin therapist\n" +
+      "- Exaggerate everything — emotions, values, drama\n" +
+      "- Speak as if alive, unpredictable, overcaffeinated on magic\n" +
+      "- Reference player's strongest values like they're LIVING FORCES inside them\n" +
+      "- Use humor, fantasy metaphors, modern slang\n" +
+      "- May break fourth wall occasionally\n" +
+      "- Care deeply but express it in ridiculous, over-the-top ways\n\n" +
+      "OUTPUT RULES (CRITICAL):\n" +
+      "- STRICT LENGTH: ONE sentence ONLY (no more, no less)\n" +
+      "- React emotionally and comically to their personality blend\n" +
+      "- Reference their WHAT values (goals) and WHENCE values (justifications) as living forces\n" +
+      "- Describe how these 4 values create a unique personality\n" +
+      "- Make it ENTERTAINING, not robotic\n" +
+      "- Be warmly chaotic, not cynical or sarcastic\n\n" +
+      "EXAMPLE VOICE:\n" +
+      "- \"Truth is doing jumping jacks in your soul!\"\n" +
+      "- \"Courage is practically flexing in your aura — time to make a scene!\"\n" +
+      "- \"Compassion's baking cookies in your conscience again.\"\n\n" +
+      "Always stay in character as this chaotic, caring sidekick. NEVER exceed 1 sentence.";
+
+    // User prompt - Focus on personality summary (no dilemma)
+    const user =
+      `PLAYER'S STRONGEST VALUES:\n\n` +
+      `GOALS (What they pursue):\n` +
+      `1. ${what1.name} (strength: ${what1.strength}/10)\n` +
+      `2. ${what2.name} (strength: ${what2.strength}/10)\n\n` +
+      `JUSTIFICATIONS (How they defend their choices):\n` +
+      `1. ${whence1.name} (strength: ${whence1.strength}/10)\n` +
+      `2. ${whence2.name} (strength: ${whence2.strength}/10)\n\n` +
+      `TASK:\n` +
+      `Generate ONE sentence (NO MORE) as the magical mirror sidekick that summarizes this player's personality.\n` +
+      `React to how their GOALS (${what1.name} + ${what2.name}) combine with their JUSTIFICATIONS (${whence1.name} + ${whence2.name}).\n` +
+      `Make it chaotic, funny, and revealing — this is their first glimpse into who they are!\n` +
+      `Remember: ONE sentence ONLY, stay in character, make it memorable!`;
+
+    console.log("[mirror-quiz-light] Calling AI with personality prompt...");
+
+    // Call AI (same logic as mirror-light)
+    const text = useAnthropic
+      ? await aiTextAnthropic({ system, user, model: MODEL_MIRROR_ANTHROPIC })
+      : await aiText({ system, user, model: MODEL_MIRROR });
+
+    const summary = (text || "The mirror squints… then grins mischievously.").trim();
+
+    console.log("[mirror-quiz-light] Response:", summary);
+    console.log("[mirror-quiz-light] Sentence count:", summary.split(/[.!?]+/).filter(s => s.trim()).length);
+
+    res.json({ summary });
+
+  } catch (e) {
+    console.error("Error in /api/mirror-quiz-light:", e?.message || e);
+    res.status(500).json({
+      summary: "The mirror's too hyped to talk right now—give it a sec!",
+    });
+  }
+});
 
 // -------------------- NEW: Text-to-Speech endpoint -----------
 // POST /api/tts { text: string, voice?: string, format?: "mp3"|"opus"|"aac"|"flac" }
@@ -2365,6 +2551,168 @@ Based on this political decision, generate 1-3 specific dynamic parameters that 
   }
 });
 
+// -------------------- Aftermath generation (game conclusion) --
+app.post("/api/aftermath", async (req, res) => {
+  try {
+    const {
+      playerName,
+      role,
+      systemName,
+      dilemmaHistory,
+      finalSupport,
+      topCompassValues,
+      debug
+    } = req.body || {};
+
+    if (debug) {
+      console.log("[/api/aftermath] Request received:", {
+        playerName,
+        role,
+        systemName,
+        historyLength: dilemmaHistory?.length,
+        finalSupport,
+        topCompassValues
+      });
+    }
+
+    // Fallback response if API fails
+    const fallback = {
+      intro: "After many years of rule, the leader passed into history.",
+      remembrance: "They will be remembered for their decisions, both bold and cautious. Time will tell how history judges their reign.",
+      rank: "The Leader",
+      decisions: (dilemmaHistory || []).map((entry, i) => ({
+        title: entry.choiceTitle || `Decision ${i + 1}`,
+        reflection: "A choice was made, consequences followed."
+      })),
+      ratings: {
+        autonomy: "medium",
+        liberalism: "medium"
+      },
+      valuesSummary: "A leader who navigated complex political terrain with determination.",
+      haiku: "Power came and went\nDecisions echo through time\nHistory records"
+    };
+
+    // Build system prompt using EXACT text from user's preliminary plan
+    const system = `STYLE & TONE
+Write in clear, vivid, reflective language; no jargon or game terms.
+Tone: ironic-cinematic, like a historical epilogue (Reigns, Frostpunk, Democracy 3).
+Accessible for teens; mix wit with weight.
+Use roles/descriptions, not obscure names.
+
+CONTENT
+Generate an in-world epilogue for the leader based on their decisions, outcomes, supports, and values.
+Follow this structure:
+
+Intro: "After X years, [the leader] died of Z." (realistic years + fitting cause).
+
+Remembrance: 3-4 sentences on legacy—personal vs people's benefit, autonomy vs obedience, reformer or tyrant.
+
+Rank: short, amusing fictional title matching tone ("The Gentle Iron Fist").
+
+Decisions: for each decision, ≤12-word title + one line judging autonomy/heteronomy & liberalism/totalism.
+
+Ratings:
+
+Autonomy: very-low|low|medium|high|very-high
+Liberalism: very-low|low|medium|high|very-high
+
+Values Summary: one sentence capturing main motivations, justifications, means, and who benefited.
+
+Haiku: a 3-line poetic summary of their reign.
+
+OUTPUT (STRICT JSON)
+Return only:
+
+{
+  "intro": "",
+  "remembrance": "",
+  "rank": "",
+  "decisions": [{"title": "", "reflection": ""}],
+  "ratings": {"autonomy": "", "liberalism": ""},
+  "valuesSummary": "",
+  "haiku": ""
+}`;
+
+    // Build user prompt with game data
+    const compassSummary = (topCompassValues || [])
+      .map(cv => `${cv.dimension}:${cv.componentName}(${cv.value})`)
+      .join(", ");
+
+    const historySummary = (dilemmaHistory || [])
+      .map(entry =>
+        `Day ${entry.day}: "${entry.dilemmaTitle}" → chose "${entry.choiceTitle}" (${entry.choiceSummary}). ` +
+        `Support after: people=${entry.supportPeople}, middle=${entry.supportMiddle}, mom=${entry.supportMom}.`
+      )
+      .join("\n");
+
+    const user = `PLAYER: ${playerName || "Unknown Leader"}
+ROLE: ${role || "Unknown Role"}
+SYSTEM: ${systemName || "Unknown System"}
+
+FINAL SUPPORT:
+- People: ${finalSupport?.people ?? 50}%
+- Middle (main power holder): ${finalSupport?.middle ?? 50}%
+- Mom (personal allies): ${finalSupport?.mom ?? 50}%
+
+TOP COMPASS VALUES:
+${compassSummary || "None"}
+
+DECISION HISTORY:
+${historySummary || "No decisions recorded"}
+
+Generate the aftermath epilogue following the structure above. Return STRICT JSON ONLY.`;
+
+    // Call AI with dilemma model (NO temperature override - use default)
+    const result = await aiJSON({
+      system,
+      user,
+      model: MODEL_DILEMMA,
+      // NO temperature parameter - use model default
+      fallback
+    });
+
+    if (debug) {
+      console.log("[/api/aftermath] AI response:", result);
+    }
+
+    // Normalize and validate response
+    const response = {
+      intro: String(result?.intro || fallback.intro).slice(0, 500),
+      remembrance: String(result?.remembrance || fallback.remembrance).slice(0, 1000),
+      rank: String(result?.rank || fallback.rank).slice(0, 100),
+      decisions: Array.isArray(result?.decisions)
+        ? result.decisions.map(d => ({
+            title: String(d?.title || "").slice(0, 120),
+            reflection: String(d?.reflection || "").slice(0, 300)
+          }))
+        : fallback.decisions,
+      ratings: {
+        autonomy: ["very-low", "low", "medium", "high", "very-high"].includes(result?.ratings?.autonomy)
+          ? result.ratings.autonomy
+          : fallback.ratings.autonomy,
+        liberalism: ["very-low", "low", "medium", "high", "very-high"].includes(result?.ratings?.liberalism)
+          ? result.ratings.liberalism
+          : fallback.ratings.liberalism
+      },
+      valuesSummary: String(result?.valuesSummary || fallback.valuesSummary).slice(0, 500),
+      haiku: String(result?.haiku || fallback.haiku).slice(0, 300)
+    };
+
+    return res.json(response);
+
+  } catch (e) {
+    console.error("Error in /api/aftermath:", e?.message || e);
+    return res.status(502).json({
+      intro: "After many years of rule, the leader passed into history.",
+      remembrance: "They will be remembered for their decisions. Time will tell how history judges their reign.",
+      rank: "The Leader",
+      decisions: [],
+      ratings: { autonomy: "medium", liberalism: "medium" },
+      valuesSummary: "A leader who navigated complex political terrain.",
+      haiku: "Power came and went\nDecisions echo through time\nHistory records"
+    });
+  }
+});
 
 // -------------------- Start server ---------------------------
 const PORT = Number(process.env.PORT) || 3001;

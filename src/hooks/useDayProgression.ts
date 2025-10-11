@@ -178,26 +178,10 @@ export function useDayProgression(props?: DayProgressionProps) {
     }
   }, [setAnalysisComplete]);
 
-  // Enhanced compass analysis with day progression context
-  const runCompassAnalysis = useCallback(async (actionText: string, analyzeText?: (text: string) => Promise<unknown>) => {
-    try {
-      if (analyzeText) {
-        console.log("[useDayProgression] Running compass analysis for:", actionText);
-        await analyzeText(actionText);
-        console.log("[useDayProgression] Compass analysis complete");
-      }
-      setAnalysisComplete('compass');
-    } catch (error) {
-      console.error("[useDayProgression] Failed to analyze compass:", error);
-      setAnalysisComplete('compass');
-    }
-  }, [setAnalysisComplete]);
-
   // Parallel analysis pipeline
   const runAnalysisPipeline = useCallback(async (
     supportValues: SupportValues,
     actionText?: string,
-    analyzeText?: (text: string) => Promise<unknown>,
     analyzeSupport?: (text: string) => Promise<any[]>,
     applySupportEffects?: (effects: any[]) => void
   ) => {
@@ -211,14 +195,15 @@ export function useDayProgression(props?: DayProgressionProps) {
       updateContextualNews(), // News updates
     ];
 
-    // Add support and compass analyses if we have the action text and functions
+    // Add support analysis if we have the action text and functions
+    // NOTE: Compass analysis removed - now happens in Phase 2 data collection
     if (actionText) {
       analyses.push(runSupportAnalysis(actionText, analyzeSupport, applySupportEffects));
-      analyses.push(runCompassAnalysis(actionText, analyzeText));
+      setAnalysisComplete('compass'); // Mark compass as complete immediately (no longer analyzed here)
     } else {
-      // If no action text, mark them as complete immediately
+      // If no action text, mark both as complete immediately
       analyses.push(Promise.resolve().then(() => setAnalysisComplete('support')));
-      analyses.push(Promise.resolve().then(() => setAnalysisComplete('compass')));
+      setAnalysisComplete('compass');
     }
 
     // Run all analyses in parallel
@@ -227,13 +212,13 @@ export function useDayProgression(props?: DayProgressionProps) {
     // Log any failed analyses
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        const analysisNames = ['dynamic', 'contextualDilemma', 'mirror', 'news', 'support', 'compass'];
+        const analysisNames = ['dynamic', 'contextualDilemma', 'mirror', 'news', 'support'];
         console.warn(`[useDayProgression] Analysis failed: ${analysisNames[index]}`, result.reason);
       }
     });
 
     console.log("[useDayProgression] Analysis pipeline complete");
-  }, [generateParameters, generateContextualDilemma, generateContextualMirrorRecommendation, updateContextualNews, setAnalysisComplete, runSupportAnalysis, runCompassAnalysis]);
+  }, [generateParameters, generateContextualDilemma, generateContextualMirrorRecommendation, updateContextualNews, setAnalysisComplete, runSupportAnalysis]);
 
   // Animate day counter with rotating effect
   const animateDayCounter = useCallback(async () => {
@@ -272,7 +257,6 @@ export function useDayProgression(props?: DayProgressionProps) {
   const startDayProgressionFlow = useCallback(async (
     supportValues: SupportValues,
     actionText?: string,
-    analyzeText?: (text: string) => Promise<unknown>,
     analyzeSupport?: (text: string) => Promise<any[]>,
     applySupportEffects?: (effects: any[]) => void
   ) => {
@@ -288,7 +272,7 @@ export function useDayProgression(props?: DayProgressionProps) {
     console.log("[useDayProgression] Parameters reset");
 
     // 3. Run parallel analysis pipeline
-    await runAnalysisPipeline(supportValues, actionText, analyzeText, analyzeSupport, applySupportEffects);
+    await runAnalysisPipeline(supportValues, actionText, analyzeSupport, applySupportEffects);
     console.log("[useDayProgression] Analysis pipeline completed");
 
     // 4. All analyses are complete, proceed with day transition

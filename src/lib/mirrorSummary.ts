@@ -89,7 +89,60 @@ function localSummary({ whatTop, whenceTop, overall }: { whatTop: TopItem[]; whe
   const j = whenceTop[0]?.label ? soften(whenceTop[0].label) : null;
 
   if (!w && !j) return "The mirror blinks—too little to go on… for now.";
-  if (w && !j)  return `Well now… it looks like you’re driven by ${w}. The glint in your eye gives it away.`;
+  if (w && !j)  return `Well now… it looks like you're driven by ${w}. The glint in your eye gives it away.`;
   if (!w && j)  return `Curious—you mainly justify things through ${j}. The mirror takes note.`;
   return `Well, well… you seem driven by ${w}, and you mostly justify it through ${j}. The mirror is amused.`;
+}
+
+/**
+ * Generate personality summary using Mirror Quiz Light API
+ * Uses Mushu/Genie personality (same as event screen mirror)
+ * Takes top 2 "what" + top 2 "whence" values
+ * Returns ONE sentence dramatic personality summary
+ *
+ * Used by: MirrorQuizScreen (end of quiz assessment)
+ * API: /api/mirror-quiz-light
+ */
+export async function generateMirrorQuizSummary(
+  values: CompassValues,
+  opts: { useAI?: boolean } = {}
+): Promise<string> {
+  const { useAI = true } = opts;
+  const { useLightDilemmaAnthropic } = useSettingsStore.getState();
+
+  // Get top 2 for both dimensions
+  const whatTop = topByProp(values, "what", 2);
+  const whenceTop = topByProp(values, "whence", 2);
+
+  // Validate we have at least 2 values in each dimension
+  if (whatTop.length < 2 || whenceTop.length < 2) {
+    return "The mirror blinks—your values are still forming...";
+  }
+
+  if (useAI) {
+    try {
+      const resp = await fetch("/api/mirror-quiz-light", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topWhat: whatTop.map(minify),
+          topWhence: whenceTop.map(minify),
+          useAnthropic: useLightDilemmaAnthropic,
+        }),
+      });
+
+      if (resp.ok) {
+        const j = await resp.json();
+        const s = String(j?.summary || "").trim();
+        if (s) return s;
+      }
+    } catch (error) {
+      console.error("[Mirror Quiz Light] Failed:", error);
+    }
+  }
+
+  // Fallback: Simple local summary with Mushu/Genie energy
+  const w1 = whatTop[0]?.label || "mystery";
+  const w2 = whatTop[1]?.label || "enigma";
+  return `Well, well! ${w1} and ${w2} are dancing in your conscience—the mirror is intrigued!`;
 }

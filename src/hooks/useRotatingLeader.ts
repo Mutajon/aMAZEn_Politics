@@ -17,6 +17,7 @@ export type FadeState = 'in' | 'visible' | 'out';
 
 export type RotatingLeaderState = {
   currentLeader: HighscoreEntry | null;
+  currentRank: number; // 1-based rank from highscore list
   fadeState: FadeState;
 };
 
@@ -43,27 +44,31 @@ function shuffleArray<T>(array: T[]): T[] {
  *
  * Usage:
  * ```tsx
- * const { currentLeader, fadeState } = useRotatingLeader();
+ * const { currentLeader, currentRank, fadeState } = useRotatingLeader();
  * ```
  */
 export function useRotatingLeader(): RotatingLeaderState {
   const entries = useHighscoreStore((s) => s.entries);
 
-  // Get top 20 leaders by score, shuffle once on mount
-  const shuffledLeaders = useMemo(() => {
-    const top20 = [...entries]
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 20);
-    return shuffleArray(top20);
+  // Get top 20 leaders by score with their ranks, then shuffle
+  const shuffledLeadersWithRanks = useMemo(() => {
+    const sorted = [...entries].sort((a, b) => b.score - a.score);
+    const top20WithRanks = sorted.slice(0, 20).map((leader, index) => ({
+      leader,
+      rank: index + 1, // 1-based rank
+    }));
+    return shuffleArray(top20WithRanks);
   }, [entries]);
 
   const [leaderIndex, setLeaderIndex] = useState(0);
   const [fadeState, setFadeState] = useState<FadeState>('in');
 
-  const currentLeader = shuffledLeaders[leaderIndex] || null;
+  const currentItem = shuffledLeadersWithRanks[leaderIndex] || null;
+  const currentLeader = currentItem?.leader || null;
+  const currentRank = currentItem?.rank || 0;
 
   useEffect(() => {
-    if (shuffledLeaders.length === 0) return;
+    if (shuffledLeadersWithRanks.length === 0) return;
 
     // Start with fade in
     setFadeState('in');
@@ -80,7 +85,7 @@ export function useRotatingLeader(): RotatingLeaderState {
 
     // After 12000ms (12s total), switch to next leader
     const cycleTimer = setTimeout(() => {
-      setLeaderIndex((prev) => (prev + 1) % shuffledLeaders.length);
+      setLeaderIndex((prev) => (prev + 1) % shuffledLeadersWithRanks.length);
       setFadeState('in'); // Start fade in for next leader
     }, 12000);
 
@@ -89,10 +94,11 @@ export function useRotatingLeader(): RotatingLeaderState {
       clearTimeout(fadeOutTimer);
       clearTimeout(cycleTimer);
     };
-  }, [leaderIndex, shuffledLeaders.length]);
+  }, [leaderIndex, shuffledLeadersWithRanks.length]);
 
   return {
     currentLeader,
+    currentRank,
     fadeState
   };
 }

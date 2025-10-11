@@ -1,7 +1,7 @@
 // src/lib/eventConfirm.ts
 // Centralized confirm pipeline used by EventScreen.
 // - Applies budget delta immediately (so coin+counter stay in sync).
-// - Triggers compass analysis and support analysis IN PARALLEL.
+// - Triggers support analysis (compass analysis moved to Phase 2 data collection).
 // - Keeps UI concerns out of EventScreen. No design changes here.
 
 import type { Dispatch, SetStateAction } from "react";
@@ -23,11 +23,6 @@ export type SupportEffect = { id: SupportEffectId; delta: number; explain: strin
 export type ConfirmContext = {
   showBudget: boolean;
   setBudget: Dispatch<SetStateAction<number>>;
-
-  // Compass analysis
-  analyzeText?: (text: string) => Promise<unknown>;
-  onAnalyzeStart?: () => void;
-  onAnalyzeDone?: () => void;
 
   // Support analysis
   analyzeSupport?: (text: string) => Promise<SupportEffect[]>;
@@ -58,38 +53,19 @@ export async function runConfirmPipeline(
     ctx.setBudget((b) => b + delta);
   }
 
-  // --- 3) Fire analyses in PARALLEL (if available) ---
-  const tasks: Promise<unknown>[] = [];
-
-  if (text && ctx.analyzeText) {
-    tasks.push(
-      (async () => {
-        try {
-          ctx.onAnalyzeStart?.();
-          await ctx.analyzeText!(text);
-        } finally {
-          ctx.onAnalyzeDone?.();
-        }
-      })()
-    );
-  }
-
+  // --- 3) Fire support analysis (if available) ---
+  // NOTE: Compass analysis removed - now happens in Phase 2 data collection
+  // This eliminates duplicate API calls and fixes double-application bug
   if (text && ctx.analyzeSupport && ctx.applySupportEffects) {
-    tasks.push(
-      (async () => {
-        try {
-          ctx.onSupportStart?.();
-          const effects = await ctx.analyzeSupport!(text);
-          ctx.applySupportEffects!(effects);
-        } finally {
-          ctx.onSupportDone?.();
-        }
-      })()
-    );
-  }
-
-  if (tasks.length) {
-    await Promise.allSettled(tasks); // do not block on either specifically
+    try {
+      ctx.onSupportStart?.();
+      const effects = await ctx.analyzeSupport!(text);
+      ctx.applySupportEffects!(effects);
+    } catch (error) {
+      console.error("[runConfirmPipeline] Support analysis failed:", error);
+    } finally {
+      ctx.onSupportDone?.();
+    }
   }
 
   return { delta };

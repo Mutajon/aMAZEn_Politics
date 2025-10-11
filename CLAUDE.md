@@ -78,7 +78,7 @@ toggleDebug()        # Toggle debug mode on/off
 │   │   │   ├── ResourceBar.tsx  # Money/budget display
 │   │   │   ├── SupportList.tsx  # Support level tracking
 │   │   │   ├── NewsTicker.tsx   # Satirical news reactions (DISABLED - code kept for future)
-│   │   │   ├── EventContent.tsx # Main event UI rendering (extracted from EventScreen)
+│   │   │   ├── EventContent.tsx # LEGACY/UNUSED - Old event UI rendering (candidate for deletion)
 │   │   │   ├── EventSupportManager.tsx # Support analysis logic
 │   │   │   ├── CompassPillsOverlay.tsx # Compass pills display with expand/collapse
 │   │   │   ├── CollectorLoadingOverlay.tsx # Progressive loading overlay with real-time progress
@@ -100,7 +100,7 @@ toggleDebug()        # Toggle debug mode on/off
 │   │   ├── useCompassFX.ts      # Compass animation effects
 │   │   ├── useRotatingText.ts   # Loading text animations
 │   │   ├── useEventState.ts     # EventScreen state management (support, budget, etc.)
-│   │   ├── useEventEffects.ts   # EventScreen side effects (news, mirror, auto-loading)
+│   │   ├── useEventEffects.ts   # LEGACY/UNUSED - EventScreen side effects (candidate for deletion)
 │   │   ├── useEventNarration.ts # EventScreen TTS/narration logic
 │   │   ├── useEventActions.ts   # EventScreen action handlers (confirm, suggest)
 │   │   ├── useEventDataCollector.ts # Data collection with 3-phase progressive loading
@@ -116,7 +116,7 @@ toggleDebug()        # Toggle debug mode on/off
 │   │   ├── compassMapping.ts    # Text → compass value analysis
 │   │   ├── supportAnalysis.ts   # Support change calculations
 │   │   ├── eventConfirm.ts      # Action confirmation pipeline
-│   │   ├── mirrorDilemma.ts     # Mirror dialogue generation
+│   │   ├── mirrorSummary.ts     # Mirror dialogue generation (quiz screen)
 │   │   ├── narration.ts         # TTS text processing
 │   │   └── eventScreenSnapshot.ts # EventScreen state preservation for navigation
 │   ├── screens/
@@ -201,7 +201,9 @@ This is a political simulation game with AI-powered content generation, built as
 - `/api/support-analyze` - Analyzes political support changes (used by heavy API only)
 - `/api/compass-analyze` - Maps text to political compass values (OPTIMIZED: 81% token reduction)
 - `/api/news-ticker` - Generates satirical news reactions (DISABLED by default)
-- `/api/mirror-summary` - Creates personality summaries
+- `/api/mirror-summary` - Creates cynical personality summaries (DEPRECATED - no longer used)
+- `/api/mirror-quiz-light` - Creates personality summary (quiz screen, Mushu/Genie personality, 1 sentence) - **NEW**
+- `/api/mirror-light` - Creates dramatic sidekick advice (event screen, Mushu/Genie personality, 1 sentence) - **NEW**
 - `/api/tts` - Text-to-speech generation
 
 **AI Model Configuration**: Uses environment variables for different specialized models:
@@ -220,7 +222,7 @@ This is a political simulation game with AI-powered content generation, built as
 
 ### Multi-Provider AI Support
 
-Both `/api/dilemma-light` and `/api/mirror-summary` endpoints support **dual providers**:
+The `/api/dilemma-light`, `/api/mirror-quiz-light`, and `/api/mirror-light` endpoints support **dual providers**:
 
 **Default Provider: OpenAI GPT** ✅
 - Used automatically on first launch
@@ -348,20 +350,8 @@ When a player confirms a choice in the EventScreen, the following sequence occur
 - **Coin Flight**: Animated coins fly between action card and budget counter based on cost direction
 - **Budget Update**: Budget counter updates immediately and synchronously via `setBudget()`
 
-#### 2. Parallel AI Analysis (via `runConfirmPipeline`)
-The system runs two AI analyses simultaneously using `Promise.allSettled()`:
-
-**A. Compass Analysis** (`/api/compass-analyze`):
-- Combines action text: `"${title}. ${summary}"`
-- AI analyzes against 40 compass components across 4 dimensions:
-  - **What** (goals): Truth, Liberty, Equality, Care, etc. (10 components)
-  - **Whence** (justification): Evidence, Tradition, Personal intuition, etc. (10 components)
-  - **How** (means): Law, Markets, Mobilization, Mutual Aid, etc. (10 components)
-  - **Whither** (recipients): Individual, Community, Nation, Global, etc. (10 components)
-- Results appear as animated "compass pills" showing political value shifts
-- Updates player's position in `compassStore`
-
-**B. Support Analysis** (`/api/support-analyze`):
+#### 2. Support Analysis (via `runConfirmPipeline`)
+**Support Analysis** (`/api/support-analyze`):
 - Analyzes impact on three constituencies using political context:
   - **"people"** - General public support
   - **"middle"** - Main power holder (from power distribution analysis)
@@ -370,20 +360,28 @@ The system runs two AI analyses simultaneously using `Promise.allSettled()`:
 - Returns support deltas with explanations
 - Updates support tracking with animated changes
 
+**Compass Analysis** (DEFERRED to Phase 2):
+- **NO LONGER happens during action confirmation** (optimization: eliminates duplicate API calls)
+- Compass analysis now happens ONLY in Phase 2 data collection (next day load)
+- Results appear as animated "compass pills" on the NEXT day
+- Updates player's position in `compassStore` when pills are displayed
+- This eliminates the double-application bug (values were being changed twice for the same action)
+
 #### 3. State Management
 - **Immediate**: Budget updates synchronously for responsive UI
-- **Parallel**: Compass and support analyses run independently
-- **Resilient**: Failed analyses don't block successful ones
-- **Responsive**: UI remains interactive during background processing
+- **Background**: Support analysis runs independently
+- **Deferred**: Compass analysis happens on next day load (Phase 2)
+- **Resilient**: Failed analyses don't block UI progression
+- **Responsive**: Action confirmation is 2-5 seconds faster (no compass analysis blocking)
 
 #### 4. Visual Feedback System
-- Compass pills animate in showing political shifts
-- Support bars animate to new levels with delta indicators
+- Support bars animate to new levels with delta indicators (immediate)
 - Coin flight effects provide immediate cost feedback
+- Compass pills appear on NEXT day showing "what your last choice did" (contextual timing)
 - Loading states show analysis progress independently
 - News ticker updates with satirical reactions
 
-This architecture ensures **immediate visual feedback** while **rich AI analysis happens in the background**, maintaining game responsiveness while providing deep political simulation.
+This architecture ensures **immediate visual feedback** and **faster action confirmation** while maintaining deep political simulation. Compass analysis is deferred to the next day load, providing better UX timing and eliminating duplicate API calls.
 
 ### Progressive Loading System
 
@@ -592,6 +590,44 @@ This architecture enables better React performance optimizations (memoization, s
 - Implement code splitting for different game screens
 - Lazy load heavy components
 - Optimize import statements
+
+### Code Cleanup Candidates
+
+The following files are legacy code from older architectures and are no longer used in production. They are safe to delete:
+
+**Dead Code (Not Used Anywhere):**
+- ~~`src/lib/mirrorDilemma.ts`~~ ✅ **DELETED 2025-10-11** - Legacy mirror text generation (replaced by `useEventDataCollector.ts → fetchMirrorText()`)
+- `src/hooks/useEventEffects.ts` - Old EventScreen side effects hook (replaced by EventScreen3 architecture)
+- `src/components/event/EventContent.tsx` - Old event UI rendering component (not imported by any screen)
+
+**Verification Before Deletion:**
+Before deleting the above files, confirm they are not imported anywhere:
+```bash
+# Check for any imports of these files
+grep -r "useEventEffects" src/
+grep -r "EventContent" src/screens/
+```
+
+**Mirror Text Generation (Current Architecture):**
+
+- **Quiz Screen:** `src/lib/mirrorSummary.ts` → `generateMirrorQuizSummary()` → `/api/mirror-quiz-light` (Mushu/Genie personality, 1 sentence)
+  - **Payload:** Top 2 "what" + top 2 "whence" values (4 total)
+  - **Purpose:** Personality summary after quiz completion
+  - **Style:** Chaotic, dramatic, caring (same as event screen)
+  - **Focus:** "Who you are" (goals + justifications blend)
+  - **Length:** Strict 1 sentence maximum
+  - **Token savings:** 85% reduction vs old mirror-summary (no history, no support data)
+
+- **Event Screen:** `src/hooks/useEventDataCollector.ts` → `fetchMirrorText()` → `/api/mirror-light` (Mushu/Genie sidekick, 1 sentence)
+  - **Key feature:** Always sorts "what" values by strength descending before taking top 2
+  - **Minimal payload:** Only top 2 "what" values + current dilemma (no history, no support data)
+  - **Purpose:** Actionable advice during gameplay
+  - **Style:** Chaotic, dramatic, caring (same as quiz screen)
+  - **Focus:** "What to do" (values vs situation)
+  - **Length:** Strict 1 sentence, 20-25 words maximum
+  - **Token savings:** 85% reduction vs old mirror-summary (~650 tokens saved per request)
+
+- **DEPRECATED:** `/api/mirror-summary` (old cynical personality, no longer used anywhere)
 
 ### Development Notes
 
