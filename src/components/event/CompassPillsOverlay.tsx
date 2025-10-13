@@ -13,7 +13,8 @@ type Props = {
 /** Spinner + stacked pills ABOVE the mirror card.
  *  - Shows pills for ~2s, then collapses to a small "+" button.
  *  - Clicking "+" expands; clicking any pill collapses again.
- *  - Container is pointer-events-none; only controls are clickable. */
+ *  - Container is pointer-events-none; only controls are clickable.
+ *  - Pills animate from/to button position for smooth spatial transitions. */
 export default function CompassPillsOverlay({ effectPills, loading, color }: Props) {
   // Track expand/collapse
   const [expanded, setExpanded] = useState<boolean>(true);
@@ -52,6 +53,10 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
   // Nothing to render?
   const hasPills = effectPills.length > 0;
 
+  // Define button position for animation reference (right edge, vertically centered)
+  // This is where pills will animate from/to
+  const buttonPosition = { x: 0, y: 0 }; // Relative to container center
+
   return (
     <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
       {loading && (
@@ -61,44 +66,67 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
       )}
 
       {!loading && hasPills && (
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="popLayout">
           {expanded ? (
             // Expanded stack of pills (clicking any pill collapses)
             <motion.div
               key="pills-expanded"
-              className="pointer-events-auto flex flex-col items-center gap-2"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
+              className="pointer-events-auto absolute flex flex-col items-center gap-2"
+              style={{
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+              }}
             >
               {effectPills.map((p, index) => {
                 const label = COMPONENTS[p.prop][p.idx]?.short ?? "";
                 const bg = (PALETTE as any)[p.prop]?.base ?? "#fff";
+
+                // Calculate vertical offset for stacked layout
+                const stackOffset = (index - effectPills.length / 2 + 0.5) * 32; // 32px per pill (height + gap)
+
                 return (
                   <motion.button
                     key={p.id}
                     type="button"
                     onClick={() => setExpanded(false)}
-                    className="rounded-full px-2 py-1 text-xs font-semibold focus:outline-none"
+                    className="rounded-full px-2 py-1 text-xs font-semibold focus:outline-none absolute"
                     style={{
                       background: bg,
                       color: "#0b1335",
                       border: "1.5px solid rgba(255,255,255,0.9)",
                       boxShadow: "0 6px 18px rgba(0,0,0,0.25)",
                       whiteSpace: "nowrap",
+                      top: "50%",
+                      left: "50%",
                     }}
                     aria-label={`${p.delta > 0 ? "+" : ""}${p.delta} ${label}`}
                     title="Hide"
-                    // Staggered spring animation - each pill appears in quick succession
-                    initial={{ opacity: 0, scale: 0.3, y: -20 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.8, y: 10 }}
+                    // Burst out from button position → stacked center position
+                    initial={{
+                      opacity: 0,
+                      scale: 0.1,
+                      x: buttonPosition.x,
+                      y: buttonPosition.y,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      scale: 1,
+                      x: -50, // Center horizontally (translate-x-1/2)
+                      y: stackOffset - 12, // Stack vertically, adjust for centering
+                    }}
+                    // Collapse toward button position with reverse stagger (last pill first)
+                    exit={{
+                      opacity: 0,
+                      scale: 0.1,
+                      x: buttonPosition.x,
+                      y: buttonPosition.y,
+                    }}
                     transition={{
                       type: "spring",
                       stiffness: 400,
                       damping: 25,
-                      delay: index * 0.08, // 80ms stagger between pills
+                      delay: expanded ? index * 0.08 : (effectPills.length - index - 1) * 0.06, // Forward stagger on expand, reverse on collapse
                     }}
                   >
                     {`${p.delta > 0 ? "+" : ""}${p.delta} ${label}`}
@@ -107,14 +135,14 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
               })}
             </motion.div>
           ) : (
-            // Collapsed small "+" button (re-expands) — top-center, aligned with MirrorCard top edge
+            // Collapsed small "+" button (re-expands) — right edge, centered vertically
             <motion.button
               key="pills-collapsed"
               type="button"
               onClick={() => setExpanded(true)}
               className="
                 pointer-events-auto
-                absolute left-1/2 -translate-x-1/2 -translate-y-1/2
+                absolute top-1/2 -translate-y-1/2 translate-x-1/2
                 inline-flex items-center justify-center
                 w-7 h-7 rounded-full
                 text-white text-sm font-bold
@@ -124,8 +152,8 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
               aria-label="Show effects"
               title="Show effects"
               style={{
-                // Position at MirrorCard's top edge (accounting for its my-2 margin = 0.5rem = 8px)
-                top: "8px",
+                // Position at MirrorCard's right edge (centered vertically)
+                right: "0px",
                 // Fallback gradient (in case conic isn't supported)
                 background: "linear-gradient(135deg, #ef4444, #3b82f6)",
                 // Four quadrants: red, green, blue, yellow
@@ -133,14 +161,23 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
                   "conic-gradient(#ef4444 0 90deg, #10b981 90deg 180deg, #3b82f6 180deg 270deg, #f59e0b 270deg 360deg)",
                 boxShadow: "0 6px 18px rgba(0,0,0,0.35)",
               }}
-              // Spring animation for collapse button appearance
+              // Button appearance with "catching pills" pulse animation
               initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.5 }}
+              animate={{
+                opacity: 1,
+                scale: [0.5, 1.15, 1], // Pulse up briefly when appearing (catching pills)
+              }}
+              exit={{
+                opacity: 0,
+                scale: [1, 1.2, 0.5], // Pulse up before disappearing (releasing pills)
+              }}
               transition={{
-                type: "spring",
-                stiffness: 350,
-                damping: 20,
+                opacity: { duration: 0.2 },
+                scale: {
+                  duration: 0.4,
+                  times: [0, 0.5, 1],
+                  ease: "easeOut",
+                },
               }}
               // Subtle hover animation
               whileHover={{ scale: 1.1 }}
