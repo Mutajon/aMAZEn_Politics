@@ -14,7 +14,7 @@
 // - server/index.mjs: POST /api/aftermath
 // - src/screens/FinalScoreScreen.tsx: navigates to final score
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAftermathData } from "../hooks/useAftermathData";
 import { useRoleStore } from "../store/roleStore";
 import { useLoadingProgress } from "../hooks/useLoadingProgress";
@@ -22,6 +22,13 @@ import CollectorLoadingOverlay from "../components/event/CollectorLoadingOverlay
 import { bgStyle } from "../lib/ui";
 import { PALETTE, type PropKey } from "../data/compass-data";
 import type { PushFn } from "../lib/router";
+import { useMirrorTop3 } from "../hooks/useMirrorTop3";
+import {
+  saveAftermathReturnRoute,
+  loadAftermathScreenSnapshot,
+  saveAftermathScreenSnapshot,
+  clearAftermathScreenSnapshot
+} from "../lib/eventScreenSnapshot";
 
 type Props = {
   push: PushFn;
@@ -48,27 +55,45 @@ function formatRating(level: string): string {
 }
 
 export default function AftermathScreen({ push }: Props) {
-  const { loading, error, data, fetchAftermathData } = useAftermathData();
+  const { loading, error, data, fetchAftermathData, restoreData } = useAftermathData();
   const { character } = useRoleStore();
   const { progress, start: startProgress, notifyReady } = useLoadingProgress();
+  const top3ByDimension = useMirrorTop3();
+  const [restoredFromSnapshot, setRestoredFromSnapshot] = useState(false);
 
-  // Fetch data on mount
+  // ========================================================================
+  // EFFECT 0A: RESTORATION FROM SNAPSHOT (on mount)
+  // ========================================================================
   useEffect(() => {
-    startProgress(); // Start progress animation
-    fetchAftermathData();
-  }, [fetchAftermathData, startProgress]);
+    const snapshot = loadAftermathScreenSnapshot();
+    if (snapshot) {
+      console.log('[AftermathScreen] 🔄 Restoring from snapshot');
+      restoreData(snapshot.data);
+      setRestoredFromSnapshot(true);
+      // Clear snapshot after successful restoration
+      clearAftermathScreenSnapshot();
+    }
+  }, [restoreData]);
 
-  // Notify progress when data ready
+  // Fetch data on mount (only if not restored)
   useEffect(() => {
-    if (data) {
+    if (!restoredFromSnapshot && !data) {
+      startProgress(); // Start progress animation
+      fetchAftermathData();
+    }
+  }, [fetchAftermathData, startProgress, restoredFromSnapshot, data]);
+
+  // Notify progress when data ready (only if not restored)
+  useEffect(() => {
+    if (data && !restoredFromSnapshot) {
       notifyReady();
     }
-  }, [data, notifyReady]);
+  }, [data, notifyReady, restoredFromSnapshot]);
 
   // ========================================================================
   // RENDER: Loading State
   // ========================================================================
-  if (loading && !data) {
+  if (loading && !data && !restoredFromSnapshot) {
     return (
       <CollectorLoadingOverlay
         progress={progress}
@@ -128,9 +153,32 @@ export default function AftermathScreen({ push }: Props) {
           <h2 className="text-xl font-bold text-amber-400 mb-4">
             You are remembered as
           </h2>
-          <p className="text-white/90 text-base leading-relaxed whitespace-pre-wrap">
-            {data.remembrance}
-          </p>
+          <div className="flex gap-6 items-start">
+            {/* Left: Portrait + Rank */}
+            <div className="flex flex-col items-center gap-3 flex-shrink-0">
+              {character?.avatarUrl && (
+                <img
+                  src={character.avatarUrl}
+                  alt="Player portrait"
+                  className="w-[160px] h-[160px] rounded-lg object-cover border border-white/20"
+                  onError={(e) => {
+                    // Hide on error
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              )}
+              <div className="px-3 py-1 rounded-md bg-amber-900/30 border border-amber-500/30">
+                <p className="text-amber-300 text-sm font-semibold text-center">
+                  {data.rank}
+                </p>
+              </div>
+            </div>
+
+            {/* Right: Remembrance Text */}
+            <p className="text-white/90 text-base leading-relaxed whitespace-pre-wrap flex-1">
+              {data.remembrance}
+            </p>
+          </div>
         </div>
 
         {/* Decision Breakdown Section */}
@@ -185,7 +233,7 @@ export default function AftermathScreen({ push }: Props) {
         </div>
 
         {/* Reflection Section (Compass Values + Summary) */}
-        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6">
+        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6 relative">
           <h2 className="text-xl font-bold text-amber-400 mb-4">
             Reflection
           </h2>
@@ -199,6 +247,9 @@ export default function AftermathScreen({ push }: Props) {
                 how: "HOW",
                 whither: "WHITHER"
               }[dimension];
+
+              // Get top value for this dimension
+              const topValue = top3ByDimension[dimension]?.[0];
 
               return (
                 <div
@@ -219,8 +270,7 @@ export default function AftermathScreen({ push }: Props) {
                   <div
                     className="text-white/90 font-medium"
                   >
-                    {/* This will show the dimension name for now - could extract actual top value */}
-                    Values tracked
+                    {topValue?.short || "—"}
                   </div>
                 </div>
               );
@@ -231,49 +281,46 @@ export default function AftermathScreen({ push }: Props) {
           <p className="text-white/80 text-base leading-relaxed">
             {data.valuesSummary}
           </p>
+
+          {/* Explore Values Button - Bottom Right Corner */}
+          <button
+            onClick={() => {
+              // Save snapshot before navigating
+              if (data) {
+                saveAftermathScreenSnapshot({
+                  data,
+                  timestamp: Date.now()
+                });
+              }
+              // Save return route
+              saveAftermathReturnRoute('/aftermath');
+              push('/mirror');
+            }}
+            className="absolute bottom-4 right-4 px-3 py-2 bg-white/10 hover:bg-white/20 text-white/90 text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+          >
+            <span>🔍</span>
+            <span>Explore Values</span>
+          </button>
         </div>
 
         {/* Tombstone Visual Section */}
         <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6">
-          <div className="flex gap-6 items-start">
-            {/* Left: Portrait + Rank */}
-            <div className="flex flex-col items-center gap-3">
-              {character?.avatarUrl && (
-                <img
-                  src={character.avatarUrl}
-                  alt="Player portrait"
-                  className="w-[80px] h-[80px] rounded-lg object-cover border border-white/20"
-                  onError={(e) => {
-                    // Hide on error
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
-                />
-              )}
-              <div className="px-3 py-1 rounded-md bg-amber-900/30 border border-amber-500/30">
-                <p className="text-amber-300 text-sm font-semibold text-center">
-                  {data.rank}
-                </p>
-              </div>
-            </div>
-
-            {/* Right: Tombstone with Haiku */}
-            <div className="flex-1 relative">
-              <img
-                src="/assets/images/tombStone.png"
-                alt="Tombstone"
-                className="w-full max-w-[300px] mx-auto opacity-80"
-              />
-              {/* Haiku Overlay */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <p
-                  className="text-amber-300 text-center font-serif italic text-sm px-8 whitespace-pre-line"
-                  style={{
-                    textShadow: "2px 2px 4px rgba(0, 0, 0, 0.8)"
-                  }}
-                >
-                  {data.haiku}
-                </p>
-              </div>
+          <div className="relative max-w-[300px] mx-auto">
+            <img
+              src="/assets/images/tombStone.png"
+              alt="Tombstone"
+              className="w-full opacity-80"
+            />
+            {/* Haiku Overlay */}
+            <div className="absolute inset-0 flex items-center justify-center px-12">
+              <p
+                className="text-amber-300 text-center font-serif italic text-sm whitespace-pre-line max-w-[200px]"
+                style={{
+                  textShadow: "2px 2px 4px rgba(0, 0, 0, 0.8)"
+                }}
+              >
+                {data.haiku}
+              </p>
             </div>
           </div>
         </div>

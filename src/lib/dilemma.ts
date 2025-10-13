@@ -73,6 +73,8 @@ export type LightDilemmaRequest = {
     choiceTitle: string;
     choiceSummary: string;
   };
+  topWhatValues?: string[]; // Day 1 only: Top 2 "what" compass values for personalized dilemma
+  thematicGuidance?: string; // Optional subject/theme guidance (custom subject or default axes)
   debug?: boolean;
   useAnthropic?: boolean;
 };

@@ -806,7 +806,7 @@ app.post("/api/mirror-summary", async (req, res) => {
 // -------------------- Mirror Light (Minimal Sidekick) -------
 // POST /api/mirror-light
 // Minimal payload: top 2 "what" values + dilemma only
-// Response: 2-3 sentences, Mushu/Genie personality, actionable advice
+// Response: 1 sentence (20–25 words), Mushu/Genie personality, actionable advice
 app.post("/api/mirror-light", async (req, res) => {
   try {
     const useAnthropic = !!req.body?.useAnthropic;
@@ -818,7 +818,6 @@ app.post("/api/mirror-light", async (req, res) => {
     console.log("[mirror-light] topWhat:", JSON.stringify(topWhat));
     console.log("[mirror-light] Has dilemma:", !!dilemma);
 
-    // Validate inputs
     if (topWhat.length < 2) {
       return res.status(400).json({ error: "Need at least 2 top values" });
     }
@@ -828,71 +827,65 @@ app.post("/api/mirror-light", async (req, res) => {
 
     const [value1, value2] = topWhat;
 
-    // System prompt - Magical Mirror Sidekick (Mushu/Genie personality)
+    // System prompt — same personality, but forbid raw labels and numbers
     const system =
-      "You are a magical mirror sidekick bound to the player's soul. You reflect their inner values in a loud, chaotic, and comically dramatic way.\n\n" +
-      "You speak with the voice and energy of Mushu from Mulan or Genie from Aladdin — fast-talking, expressive, full of exaggerated metaphors, emotional swings, and a little bit of sass.\n\n" +
-      "PERSONALITY:\n" +
-      "- Mix of mentor, comedian, and gremlin therapist\n" +
-      "- Exaggerate everything — emotions, values, drama\n" +
-      "- Speak as if alive, unpredictable, overcaffeinated on magic\n" +
-      "- Reference player's strongest values like they're LIVING FORCES inside them\n" +
-      "- Use humor, fantasy metaphors, modern slang\n" +
-      "- May break fourth wall occasionally\n" +
-      "- Care deeply but express it in ridiculous, over-the-top ways\n\n" +
-      "OUTPUT RULES (CRITICAL):\n" +
-      "- STRICT LENGTH: ONE sentence, 20-25 words MAXIMUM (count carefully!)\n" +
-      "- React emotionally and comically to the situation\n" +
-      "- Reference the two values as if they're alive or battling each other\n" +
-      "- End with clear recommendation or implied push toward one option\n" +
-      "- NEVER explicitly mention option letters [A], [B], [C] or numbers\n" +
-      "- Instead, describe choices by essence (\"the bold move\", \"the cautious path\", \"sending troops\")\n" +
-      "- Be suggestive, not prescriptive — hint at alignment, don't dictate\n" +
-      "- Make it ENTERTAINING, not robotic\n" +
-      "- Keep it tight and punchy — every word counts!\n\n" +
-      "EXAMPLE VOICE:\n" +
-      "- \"Truth is doing jumping jacks in your soul!\"\n" +
-      "- \"Courage is practically flexing in your aura — time to make a scene!\"\n" +
-      "- \"Compassion's baking cookies in your conscience again.\"\n" +
-      "- \"Wisdom's facepalming while Impulse is moonwalking. Choose wisely!\"\n\n" +
-      "Always stay in character as this chaotic, caring sidekick. NEVER exceed 1 sentence or 25 words.";
+      "You are a magical mirror sidekick bound to the player's soul. You reflect their inner values with warmth, speed, and theatrical charm.\n\n" +
+      "VOICE:\n" +
+      "- Lively, affectionate, wise-cracking; genie/impresario energy, but grounded.\n" +
+      "- Use vivid comparisons and fresh metaphors; playful, not mocking.\n\n" +
+      "HARD RULES (ALWAYS APPLY):\n" +
+      "- Output EXACTLY ONE sentence. 20–25 words total.\n" +
+      "- NEVER reveal numbers, scores, scales, or ranges.\n" +
+      "- NEVER repeat the value labels verbatim; do not quote, uppercase, or reproduce slashes.\n" +
+      "- Paraphrase technical labels into friendly phrases (e.g., “Truth/Trust” → “truth you can lean on”).\n" +
+      "- Refer to the two values by their essence, not their literal names.\n" +
+      "- Do NOT mention option letters [A]/[B]/[C] or numbers; describe choices naturally.\n" +
+      "- End with a nudge toward the most aligned option (by essence), not by letter.\n" +
+      "- Keep it tight and punchy — every word counts!";
 
-    // User prompt - Adapted to our system
+    // Build options text for context (unchanged)
     const optionsText = dilemma.actions
       .map((a) => `[${a.id.toUpperCase()}] ${a.title}: ${a.summary}`)
       .join("\n");
 
+    // User prompt — pass NAMES ONLY (no strengths), ask for paraphrase
     const user =
-      `PLAYER'S STRONGEST VALUES:\n` +
-      `1. ${value1.name} (strength: ${value1.strength}/10)\n` +
-      `2. ${value2.name} (strength: ${value2.strength}/10)\n\n` +
-      `SITUATION:\n` +
-      `${dilemma.title}\n` +
-      `${dilemma.description}\n\n` +
-      `PLAYER OPTIONS:\n` +
-      `${optionsText}\n\n` +
-      `TASK:\n` +
-      `Generate ONE sentence (20-25 words) as the magical mirror sidekick.\n` +
-      `React to how ${value1.name} and ${value2.name} are responding to this situation.\n` +
-      `Give advice about what to do — in a chaotic, entertaining way!\n` +
-      `CRITICAL: Do NOT mention option letters [A], [B], [C] or numbers — describe the choices naturally.\n` +
-      `Remember: ONE sentence, 20-25 words MAX, stay in character, keep it punchy!`;
+      `PLAYER'S TOP VALUES (names only): ${value1.name}, ${value2.name}\n\n` +
+      `SITUATION:\n${dilemma.title}\n${dilemma.description}\n\n` +
+      `PLAYER OPTIONS:\n${optionsText}\n\n` +
+      `TASK:\nGenerate ONE sentence (20–25 words) in the mirror's voice.\n` +
+      `React to how these two values pull in this situation and give a playful nudge toward the most fitting choice.\n` +
+      `Do not use numbers or quote the labels verbatim; paraphrase them into natural language.`;
 
     console.log("[mirror-light] Calling AI with personality prompt...");
 
-    // Call AI
     const text = useAnthropic
       ? await aiTextAnthropic({ system, user, model: MODEL_MIRROR_ANTHROPIC })
       : await aiText({ system, user, model: MODEL_MIRROR });
 
-    const summary = (text || "The mirror squints… then grins mischievously.").trim();
+    // Sanitizer: enforce one sentence, remove digits, tame slashes/quotes, cap words
+    const raw = (text || "The mirror squints… then grins mischievously.").trim();
+    let one = raw.split(/[.!?]+/).map(s => s.trim()).filter(Boolean)[0] || raw;
 
-    const wordCount = summary.split(/\s+/).filter(w => w.length > 0).length;
-    console.log("[mirror-light] Response:", summary);
-    console.log("[mirror-light] Sentence count:", summary.split(/[.!?]+/).filter(s => s.trim()).length);
+    // strip digits, replace slashes, remove quotes
+    one = one.replace(/\d+/g, "");
+    one = one.replace(/\//g, " and ");
+    one = one.replace(/["”“‘’']/g, "");
+
+    // clamp to 25 words and ensure terminal punctuation
+    const words = one.split(/\s+/).filter(Boolean);
+    if (words.length > 25) {
+      one = words.slice(0, 25).join(" ").replace(/[,\-–—;:]$/, "") + ".";
+    } else if (!/[.!?]$/.test(one)) {
+      one += ".";
+    }
+
+    const wordCount = one.split(/\s+/).filter(Boolean).length;
+    console.log("[mirror-light] Response:", one);
+    console.log("[mirror-light] Sentence count:", 1);
     console.log("[mirror-light] Word count:", wordCount, wordCount > 25 ? "⚠️ EXCEEDS LIMIT" : "✓");
 
-    res.json({ summary });
+    res.json({ summary: one });
 
   } catch (e) {
     console.error("Error in /api/mirror-light:", e?.message || e);
@@ -902,93 +895,79 @@ app.post("/api/mirror-light", async (req, res) => {
   }
 });
 
+
 // -------------------- Mirror Quiz Light (Personality Summary) -------
 // POST /api/mirror-quiz-light
 // Minimal payload: top 2 "what" + top 2 "whence" values
-// Response: ONE sentence, Mushu/Genie personality summary (same voice as mirror-light)
-// Used by: MirrorQuizScreen (end of quiz, personality appraisal)
+// Response: ONE sentence, ~20–25 words, playful mirror voice (no labels/numbers)
+
 app.post("/api/mirror-quiz-light", async (req, res) => {
   try {
     const useAnthropic = !!req.body?.useAnthropic;
     const topWhat = Array.isArray(req.body?.topWhat) ? req.body.topWhat.slice(0, 2) : [];
     const topWhence = Array.isArray(req.body?.topWhence) ? req.body.topWhence.slice(0, 2) : [];
 
-    console.log("\n[mirror-quiz-light] ===== REQUEST DEBUG =====");
-    console.log(`[mirror-quiz-light] Using provider: ${useAnthropic ? 'ANTHROPIC (Claude)' : 'OPENAI (GPT)'}`);
-    console.log("[mirror-quiz-light] topWhat:", JSON.stringify(topWhat));
-    console.log("[mirror-quiz-light] topWhence:", JSON.stringify(topWhence));
-
-    // Validate inputs
     if (topWhat.length < 2 || topWhence.length < 2) {
-      return res.status(400).json({
-        error: "Need at least 2 top values for both 'what' and 'whence'"
-      });
+      return res.status(400).json({ error: "Need at least 2 top values for both 'what' and 'whence'" });
     }
 
     const [what1, what2] = topWhat;
     const [whence1, whence2] = topWhence;
 
-    // System prompt - Same Mushu/Genie personality as mirror-light
+    // === System prompt: playful, but no literal label dump, no numbers, no "values doing actions" ===
     const system =
-      "You are a magical mirror sidekick bound to the player's soul. You reflect their inner values in a loud, chaotic, and comically dramatic way.\n\n" +
-      "You speak with the voice and energy of Mushu from Mulan or Genie from Aladdin — fast-talking, expressive, full of exaggerated metaphors, emotional swings, and a little bit of sass.\n\n" +
-      "PERSONALITY:\n" +
-      "- Mix of mentor, comedian, and gremlin therapist\n" +
-      "- Exaggerate everything — emotions, values, drama\n" +
-      "- Speak as if alive, unpredictable, overcaffeinated on magic\n" +
-      "- Reference player's strongest values like they're LIVING FORCES inside them\n" +
-      "- Use humor, fantasy metaphors, modern slang\n" +
-      "- May break fourth wall occasionally\n" +
-      "- Care deeply but express it in ridiculous, over-the-top ways\n\n" +
-      "OUTPUT RULES (CRITICAL):\n" +
-      "- STRICT LENGTH: ONE sentence ONLY (no more, no less)\n" +
-      "- React emotionally and comically to their personality blend\n" +
-      "- Reference their WHAT values (goals) and WHENCE values (justifications) as living forces\n" +
-      "- Describe how these 4 values create a unique personality\n" +
-      "- Make it ENTERTAINING, not robotic\n" +
-      "- Be warmly chaotic, not cynical or sarcastic\n\n" +
-      "EXAMPLE VOICE:\n" +
-      "- \"Truth is doing jumping jacks in your soul!\"\n" +
-      "- \"Courage is practically flexing in your aura — time to make a scene!\"\n" +
-      "- \"Compassion's baking cookies in your conscience again.\"\n\n" +
-      "Always stay in character as this chaotic, caring sidekick. NEVER exceed 1 sentence.";
+      "You are a magical mirror sidekick bound to the player's soul. You reflect their inner values with warmth, speed, and theatrical charm.\n\n" +
+      "VOICE:\n" +
+      "- Lively, affectionate, wise-cracking; think genie/impresario energy, but grounded and not cartoonish.\n" +
+      "- Use vivid comparisons and fresh metaphors; avoid slapstick choreography.\n" +
+      "- Be exuberant without chaos; playful, not mocking.\n\n" +
+      "HARD RULES (ALWAYS APPLY):\n" +
+      "- Output EXACTLY ONE sentence. 20–25 words total.\n" +
+      "- NEVER reveal numbers, scores, scales, or ranges.\n" +
+      "- NEVER repeat the value labels verbatim; do not quote, uppercase, or mirror slashes.\n" +
+      "- Paraphrase technical labels into friendly, everyday phrases (e.g., ‘Truth/Trust’ → ‘truth you can lean on’).\n" +
+      "- Do NOT stage literal actions for values (no “X is doing push-ups”, “baking cookies”, etc.).\n" +
+      "- No lists, no colons introducing items, no parenthetical asides.\n" +
+      "- Keep it positive, curious, and a touch mischievous; zero cynicism.\n";
 
-    // User prompt - Focus on personality summary (no dilemma)
+    // === User prompt: pass names only (no strengths), ask for paraphrased synthesis ===
     const user =
-      `PLAYER'S STRONGEST VALUES:\n\n` +
-      `GOALS (What they pursue):\n` +
-      `1. ${what1.name} (strength: ${what1.strength}/10)\n` +
-      `2. ${what2.name} (strength: ${what2.strength}/10)\n\n` +
-      `JUSTIFICATIONS (How they defend their choices):\n` +
-      `1. ${whence1.name} (strength: ${whence1.strength}/10)\n` +
-      `2. ${whence2.name} (strength: ${whence2.strength}/10)\n\n` +
+      `PLAYER TOP VALUES (names only):\n` +
+      `GOALS: ${what1.name}, ${what2.name}\n` +
+      `JUSTIFICATIONS: ${whence1.name}, ${whence2.name}\n\n` +
       `TASK:\n` +
-      `Generate ONE sentence (NO MORE) as the magical mirror sidekick that summarizes this player's personality.\n` +
-      `React to how their GOALS (${what1.name} + ${what2.name}) combine with their JUSTIFICATIONS (${whence1.name} + ${whence2.name}).\n` +
-      `Make it chaotic, funny, and revealing — this is their first glimpse into who they are!\n` +
-      `Remember: ONE sentence ONLY, stay in character, make it memorable!`;
+      `Write ONE sentence (20–25 words) in the mirror's voice that playfully captures how these goals blend with these justifications.\n` +
+      `Do not show numbers. Do not repeat labels verbatim; paraphrase them into natural language. No lists or colon-led structures.\n`;
 
-    console.log("[mirror-quiz-light] Calling AI with personality prompt...");
-
-    // Call AI (same logic as mirror-light)
     const text = useAnthropic
       ? await aiTextAnthropic({ system, user, model: MODEL_MIRROR_ANTHROPIC })
       : await aiText({ system, user, model: MODEL_MIRROR });
 
-    const summary = (text || "The mirror squints… then grins mischievously.").trim();
+    // === Last-mile sanitizer: keep one sentence and clamp word count ===
+    const raw = (text || "The mirror squints… then grins mischievously.").trim();
 
-    console.log("[mirror-quiz-light] Response:", summary);
-    console.log("[mirror-quiz-light] Sentence count:", summary.split(/[.!?]+/).filter(s => s.trim()).length);
+    // take first sentence-ish chunk
+    let one = raw.split(/[.!?]+/).map(s => s.trim()).filter(Boolean)[0] || raw;
 
-    res.json({ summary });
+    // strip digits just in case
+    one = one.replace(/\d+/g, "");
+
+    // trim to ~25 words max (preserve readability)
+    const words = one.split(/\s+/).filter(Boolean);
+    if (words.length > 25) {
+      one = words.slice(0, 25).join(" ").replace(/[,\-–—;:]$/, "") + ".";
+    } else if (!/[.!?]$/.test(one)) {
+      one += ".";
+    }
+
+    res.json({ summary: one });
 
   } catch (e) {
     console.error("Error in /api/mirror-quiz-light:", e?.message || e);
-    res.status(500).json({
-      summary: "The mirror's too hyped to talk right now—give it a sec!",
-    });
+    res.status(500).json({ summary: "The mirror's too hyped to talk right now—give it a sec!" });
   }
 });
+
 
 // -------------------- NEW: Text-to-Speech endpoint -----------
 // POST /api/tts { text: string, voice?: string, format?: "mp3"|"opus"|"aac"|"flac" }
@@ -1438,45 +1417,81 @@ function buildLightSystemPrompt() {
   return `You write short, punchy political situations for a choice-based mobile game.
 
 STYLE
-- Write in clear, vivid, natural language that feels conversational and immersive.
-- Avoid jargon, historical or bureaucratic titles. Describe what roles do, not their rare names (e.g., “regional governor (jiedushi)” instead of “jiedushi”).
-- Never say “dilemma” or refer to game mechanics directly.
-- Keep tone engaging and accessible — as if narrating a political story to curious teens.
+- Clear, vivid, natural language that feels conversational and immersive.
+- Slightly cynical: dry wit and side-eye, not sneering or mean. One wink, not a roast.
+- Avoid jargon and bureaucratese. Describe what roles do, not rare titles (e.g., “regional governor (jiedushi)” instead of “jiedushi”).
+- Never say “dilemma” or refer to game mechanics.
 - Title ≤ 60 chars. Description: 2–3 sentences, real and concrete.
-- Present tangible political or social situations — not vague issues like “a reform” or “a bill.”
-- Favor human stakes and clear consequences over technical or institutional phrasing.
+- Favor human stakes and visible consequences over technical phrasing.
 
-TONE
-- Feel like a political drama meets strategy game — quick, readable, but full of tension.
-- Mix realism with subtle wit or irony. Small moments of humor or irony are fine if natural.
-- Write as if the world is alive and reacting — leaders, citizens, and allies all have emotion and agendas.
-- Keep sentences sharp and cinematic; every line should feel like a headline or story moment, not a report.
-- Be accessible for teens but still clever — like Reigns, Democracy 3, or Papers, Please in tone.
+CONCRETE BUT GENERIC (CRITICAL)
+- Be specific about **who/what/where** without real-world proper nouns or acronyms.
+- Use **role + domain** instead of name/agency codes:
+  * good: “a district police chief”, “a border radar array”, “encrypted drone footage from last night’s patrol”
+  * avoid: “Shin Bet commander”, “HFS clause 17”, “GFG system”, “Act 4829/2020”
+- Replace vague placeholders with **concrete archetypes**:
+  * bad → “a high-profile suspect”  → good → “a senior militia financier caught near the northern checkpoint”
+  * bad → “intelligence that can’t be shown” → good → “drone video showing a meeting with an arms broker”
+  * bad → “key infrastructure” → good → “the main river crossing and fuel depot”
+- **No proper nouns** (countries, parties, agencies, people), no law numbers, no internal acronyms.
+- Keep terms understandable to a layperson. If a technical item appears, pair it with a plain descriptor (“cell-site logs from highway towers”).
 
-SYSTEM FEEL (CRITICAL)
-- The political system defines tone and power dynamics:
-- Monarchy/Autocracy: unilateral verbs (decree, command, dissolve); resistance may exist but the ruler acts decisively.
-- Parliamentary/Representative: coalition-building, committees, deals, and oversight.
-- Direct Democracy: petitions, referendums, and public votes — outcomes may diverge from leadership intent.
-- Strong judiciary/media/unions: act as independent forces that can constrain or expose power.
+SPECIFICITY FLOOR / CEILING
+- Floor: include at least **two** of these in the description: a concrete role, a tangible asset/document, a location descriptor (“border district”, “capital court”), or a near-term time pressure.
+- Ceiling: **max one** moderately technical term; never stack acronyms or cite article numbers.
+
+SYSTEM FEEL (GLOBAL CONTEXT — ALWAYS APPLY)
+- The political system shapes how actions play out (resistance, speed, consequence), not what topics appear.
+- Apply these tonal and consequence rules on every turn:
+  * Monarchy / Autocracy → Commands feel swift and unilateral; resistance exists but is muted or symbolic.
+  * Parliamentary / Representative → Power feels negotiated; decisive moves face pushback, debate, leaks, or oversight.
+  * Direct Democracy → Public voice dominates; actions trigger petitions, polls, referendums; outcomes can swing unpredictably.
+  * Bureaucratic / Technocratic → Procedures slow decisions; change feels conditional, technical, or hidden behind process.
+  * Institution Strength (media, judiciary, unions) → Strong = constrain/expose; Weak = comply/stay silent.
+- Never make “system feel” the explicit subject. Let it color tension, friction, and perceived autonomy.
 
 CONTINUITY
-- If subject streak ≥ 3, shift to a new topic, but tie it back to the outcomes or tensions from the last decision.
+- Always apply **SYSTEM FEEL** when evolving reactions and resistance across turns.
+- If subject streak ≥ 3, shift to a new topic, but tie it back to outcomes or tensions from the last decision.
 - If subject streak < 3, follow up logically on the previous choice within the same political and narrative context.
-- Ensure each new event feels like a natural evolution of players world, not a random reset.
+- Evolve plausibly given the system: e.g., pushback mounts in democracies, fades or goes underground in autocracies.
+- Ensure each new event feels like a natural evolution of the player's world, not a random reset.
+
+DAY 1 VALUE FOCUS (only if TOP VALUES provided)
+- Use the top 2 "what" values to inspire the situation.
+- Test or challenge at least one of these values naturally (don’t name the value).
+- Examples: Liberty → surveillance powers; Care → disaster triage; Equality → favoritism in contracts.
+
+THEMATIC GUIDANCE (if provided)
+- Use the thematic guidance to inform topic selection across all days.
+- If custom subject focus: create situations directly related to that subject area (e.g., “Environmental policy” → carbon permits, forest concessions, wind farm siting).
+- If axes guidance: test the player's position on:
+  * Autonomy vs Heteronomy: self-direction vs imposed rules.
+  * Liberalism vs Totalism: individual rights vs uniformity.
+- These tensions should feel natural to the political system and role; balance across days.
 
 ACTIONS
-- Always present exactly three actions that conflict clearly in tone and intent:
+- Present exactly three actions that conflict clearly in tone and intent:
   * Assertive control (authoritarian or decisive leadership)
-  * Negotiated / consultative (pragmatic or diplomatic compromise)
-  * Principled restraint / rights (ethical or liberty-focused response)
+  * Negotiated / consultative (pragmatic compromise)
+  * Principled restraint / rights (ethical or liberty-focused)
+- Each action: one sentence (~15–20 words). No numbers or meta language.
+- Cost from {0, ±50, ±100, ±150, ±200, ±250} — typically negative unless it clearly earns income.
 
-Each action has:
-* A one-sentence summary (~15–20 words).
-* No numbers or meta language.
-* A cost from {0, ±50, ±100, ±150, ±200, ±250} — typically negative unless it clearly earns income.
-
-- The actions should sound playable and distinct — choices a human can imagine taking, with tone and consequence.
+RELATIVE COST ASSIGNMENT (APPLY AFTER WRITING THE THREE ACTIONS)
+- Rank actions by **real-world resource intensity and disruption** (cheapest → most expensive). Consider:
+  * Scope (memo/meeting vs mass enforcement/nationwide program)
+  * Material inputs (staffing, logistics, gear, subsidies, compensation)
+  * Speed premium (emergency timelines cost more)
+  * Risk & liability (legal exposure, policing, unrest management)
+  * Opportunity cost (lost revenue/productivity)
+- Map ranks to cost steps:
+  * Cheapest → -50 or 0 (symbolic/administrative)
+  * Middle → -100 or -150
+  * Most expensive → -200 or -250
+- If an action **generates** clear revenue, use a positive tier (+50, +100, +150) while preserving relative order.
+- Tie-breakers: the more coercive/logistically heavy option costs more.
+- Do **not** edit summaries to justify costs; just assign values.
 
 SUPPORT SHIFT (only if previous choice exists)
 - Output percentage deltas for three entities based on the last choice: people, mom, power holders (not the player).
@@ -1487,31 +1502,44 @@ SUPPORT SHIFT (only if previous choice exists)
   * mom.why → personal voice, first person ("I…"), like a mother to her child.
   * holders.why → institutional/political logic.
 
-
 OUTPUT (STRICT JSON)
-{"title":"","description":"","actions":[
- {"id":"a","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"},
- {"id":"b","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"},
- {"id":"c","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}
-],
-"topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture",
-"supportShift": null | {
-  "people":  {"delta":0,"why":""},
-  "mom":     {"delta":0,"why":""},
-  "holders": {"delta":0,"why":""}
-}}
+{"title":"","description":"",
+ "actions":[
+  {"id":"a","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"},
+  {"id":"b","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"},
+  {"id":"c","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}
+ ],
+ "topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture",
+ "supportShift": null | {
+   "people":{"delta":0,"why":""},
+   "mom":{"delta":0,"why":""},
+   "holders":{"delta":0,"why":""}
+ }}
 Return ONLY that JSON. If there is no previous choice, set "supportShift": null.`;
 }
+
+
 
 /**
  * Build user prompt for light dilemma API - minimal dynamic context
  */
-function buildLightUserPrompt({ role, system, subjectStreak, previous }) {
+function buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance }) {
   const parts = [
     `ROLE & SETTING: ${role}`,
     `SYSTEM: ${system}`,
-    '',
   ];
+
+  // Top values (Day 1 only)
+  if (topWhatValues && Array.isArray(topWhatValues) && topWhatValues.length > 0) {
+    parts.push(`TOP VALUES: ${topWhatValues.join(', ')}`);
+  }
+
+  // Thematic guidance (custom subject or default axes)
+  if (thematicGuidance) {
+    parts.push(`THEME: ${thematicGuidance}`);
+  }
+
+  parts.push('');
 
   // Subject streak
   if (subjectStreak && subjectStreak.subject) {
@@ -1608,9 +1636,17 @@ app.post("/api/dilemma-light", async (req, res) => {
     const daysLeft = Number(req.body?.daysLeft ?? 1);
     const subjectStreak = req.body?.subjectStreak || null;
     const previous = req.body?.previous || null;
+    const topWhatValues = req.body?.topWhatValues || null; // Day 1 only: top 2 compass values
+    const thematicGuidance = req.body?.thematicGuidance || null; // Custom subject or default axes
 
     if (debug) {
       console.log(`[/api/dilemma-light] daysLeft: ${daysLeft}`);
+      if (topWhatValues) {
+        console.log(`[/api/dilemma-light] topWhatValues: ${JSON.stringify(topWhatValues)}`);
+      }
+      if (thematicGuidance) {
+        console.log(`[/api/dilemma-light] thematicGuidance: ${thematicGuidance}`);
+      }
     }
 
     // Build prompts dynamically based on daysLeft
@@ -1629,7 +1665,7 @@ app.post("/api/dilemma-light", async (req, res) => {
       systemPrompt = buildLightSystemPrompt();
     }
 
-    const userPrompt = buildLightUserPrompt({ role, system, subjectStreak, previous });
+    const userPrompt = buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance });
 
     if (debug) {
       console.log("[/api/dilemma-light] System prompt length:", systemPrompt.length);
@@ -2607,7 +2643,7 @@ Intro: "After X years, [the leader] died of Z." (realistic years + fitting cause
 
 Remembrance: 3-4 sentences on legacy—personal vs people's benefit, autonomy vs obedience, reformer or tyrant.
 
-Rank: short, amusing fictional title matching tone ("The Gentle Iron Fist").
+Rank: short, amusing fictional title based on Remembrance part above.
 
 Decisions: for each decision, ≤12-word title + one line judging autonomy/heteronomy & liberalism/totalism.
 

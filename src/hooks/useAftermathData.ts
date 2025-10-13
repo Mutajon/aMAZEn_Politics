@@ -136,10 +136,19 @@ export function useAftermathData() {
     }
   }, []);
 
+  // Method to restore data from snapshot (bypasses API call)
+  const restoreData = useCallback((restoredData: AftermathResponse) => {
+    console.log('[useAftermathData] 🔄 Restoring data from snapshot');
+    setData(restoredData);
+    setLoading(false);
+    setError(null);
+  }, []);
+
   return {
     loading,
     error,
     data,
-    fetchAftermathData
+    fetchAftermathData,
+    restoreData
   };
 }

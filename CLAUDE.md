@@ -278,8 +278,31 @@ switchToGPT()     // Switch back to OpenAI GPT (default)
    - Resources (money/budget)
    - Support from three constituencies: "people" (public), "middle" (main power holder), "mom" (personal allies)
    - Political compass values
+   - **Day 1 Personalization**: First dilemma is tailored to player's top 2 "what" compass values (e.g., if player values Liberty and Care, Day 1 might test those values with surveillance laws or welfare policy)
 
 **AI Call Optimization**: Predefined roles eliminate **2 AI calls** per playthrough (role analysis + name generation), providing instant loading and consistent experience.
+
+**Day 1 Dilemma Personalization**:
+- After compass assessment, player's top 2 "what" values are identified (e.g., "Liberty/Agency", "Care/Solidarity")
+- These values are sent ONLY on Day 1 API request (not Days 2-7, for token efficiency)
+- AI generates opening dilemma that tests or challenges at least one of these core values
+- Implementation: `getTop2WhatValues()` in [src/store/dilemmaStore.ts](src/store/dilemmaStore.ts) sorts compass values and extracts top 2
+- Request field: `topWhatValues?: string[]` in `LightDilemmaRequest` type
+- Server prompt includes "DAY 1 VALUE FOCUS" section with examples for each value type
+- Token cost: ~40 tokens added on Day 1 only (0.007% increase per playthrough)
+
+**Thematic Guidance System**:
+- Every dilemma request includes thematic guidance to ensure coherent topic selection
+- Two modes:
+  1. **Custom Subject** (user-defined): When `dilemmasSubjectEnabled = true` in settings, dilemmas focus on user's chosen subject (e.g., "Environmental policy" → carbon taxes, conservation, renewable energy)
+  2. **Default Axes** (automatic): When no custom subject, dilemmas explore fundamental political tensions:
+     - **Autonomy vs Heteronomy**: self-direction vs external control, individual choice vs imposed rules
+     - **Liberalism vs Totalism**: individual rights vs collective authority, pluralism vs uniformity
+- Implementation: `buildLightSnapshot()` checks settings and builds guidance string
+- Request field: `thematicGuidance?: string` in `LightDilemmaRequest` type
+- Server prompt includes "THEMATIC GUIDANCE" section explaining both modes
+- Token cost: ~25 tokens per request (0.004% increase per playthrough)
+- Settings: [src/store/settingsStore.ts](src/store/settingsStore.ts:28-33) (`dilemmasSubjectEnabled`, `dilemmasSubject`)
 
 ### EventScreen ↔ MirrorScreen Navigation
 
@@ -563,11 +586,14 @@ This architecture enables better React performance optimizations (memoization, s
   - **Integrated support shifts**: AI returns support deltas with explanations directly
   - **Subject streak tracking**: Automatically varies topics after 3+ consecutive same-subject dilemmas
   - **Minimal context**: Only sends role, system, subject streak, and previous choice
+  - **Day 1 personalization**: Sends top 2 "what" compass values on first day only (adds ~40 tokens)
+  - **Thematic guidance**: Sends custom subject OR default axes (autonomy/heteronomy, liberalism/totalism) on all days (adds ~25 tokens)
   - **"Holders → Middle" mapping**: Server uses generic "holders" term, client maps to "middle" entity
   - **Default mode**: Light API is now default (toggle via `useLightDilemma` setting)
   - **Backwards compatible**: Heavy API (`/api/dilemma`) remains available for comparison
   - **Types**: New `LightDilemmaRequest`, `LightDilemmaResponse`, `SubjectStreak` types in `dilemma.ts`
   - **Store changes**: Added subject streak tracking and `loadNextLight()` in `dilemmaStore.ts`
+  - **Helper functions**: `getTop2WhatValues()` sorts and extracts top compass values
   - **Result**: ~60 seconds → ~15-20 seconds per dilemma load (3-4x faster)
 
 **React Performance Optimizations**:

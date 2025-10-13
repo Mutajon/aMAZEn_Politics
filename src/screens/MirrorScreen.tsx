@@ -15,7 +15,13 @@ import type { PushFn } from "../lib/router";
 import { bgStyle } from "../lib/ui";
 import { useMirrorTop3 } from "../hooks/useMirrorTop3";
 import { PROPERTIES, PALETTE, type PropKey } from "../data/compass-data";
-import { hasEventScreenSnapshot, getMirrorReturnRoute, clearMirrorReturnRoute } from "../lib/eventScreenSnapshot";
+import {
+  hasEventScreenSnapshot,
+  getMirrorReturnRoute,
+  clearMirrorReturnRoute,
+  getAftermathReturnRoute,
+  clearAftermathReturnRoute
+} from "../lib/eventScreenSnapshot";
 
 const MIRROR_SRC = "/assets/images/mirror.png";
 
@@ -25,20 +31,33 @@ export default function MirrorScreen({ push }: Props) {
   const top3ByDimension = useMirrorTop3();
   const [selectedDef, setSelectedDef] = useState<{ prop: PropKey; short: string; full: string } | null>(null);
 
-  // Check if we came from EventScreen (snapshot exists) or another screen (return route saved)
+  // Check if we came from EventScreen (snapshot exists), AftermathScreen, or another screen (return route saved)
   const cameFromEvent = hasEventScreenSnapshot();
   const returnRoute = getMirrorReturnRoute();
+  const aftermathReturnRoute = getAftermathReturnRoute();
 
   // Determine back button behavior
   const handleBack = () => {
     if (cameFromEvent) {
       push("/event"); // Will restore snapshot
+    } else if (aftermathReturnRoute) {
+      clearAftermathReturnRoute();
+      // Note: Snapshot will be cleared by AftermathScreen AFTER restoration (line 74)
+      push(aftermathReturnRoute); // Return to Aftermath
     } else if (returnRoute) {
       clearMirrorReturnRoute();
       push(returnRoute); // Return to saved route (e.g., /compass-quiz)
     } else {
       window.history.back(); // Fallback
     }
+  };
+
+  // Determine back button label
+  const getBackButtonLabel = () => {
+    if (cameFromEvent) return " to Event";
+    if (aftermathReturnRoute) return " to Aftermath";
+    if (returnRoute) return " to Quiz";
+    return "";
   };
 
   // Section titles for each dimension
@@ -58,7 +77,7 @@ export default function MirrorScreen({ push }: Props) {
             className="rounded-xl px-4 py-2 bg-white/10 hover:bg-white/20 text-white/90 transition-colors"
             onClick={handleBack}
           >
-            ← Back{cameFromEvent ? " to Event" : returnRoute ? " to Quiz" : ""}
+            ← Back{getBackButtonLabel()}
           </button>
         </div>
 

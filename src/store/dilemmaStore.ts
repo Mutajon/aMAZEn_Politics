@@ -5,6 +5,7 @@ import type { Dilemma, DilemmaRequest, DilemmaAction, DilemmaHistoryEntry, Subje
 import { useSettingsStore } from "./settingsStore";
 import { useRoleStore } from "./roleStore";
 import { useCompassStore } from "./compassStore"; // <-- A) use compass values (0..10)
+import { COMPONENTS } from "../data/compass-data"; // <-- B) component definitions for value names
 
 // Prevent duplicate fetches (React StrictMode or fast double click)
 let loadNextInFlight = false;
@@ -669,11 +670,37 @@ export function buildSnapshot(): DilemmaRequest {
   }
 
 /**
+ * Get top 2 "what" compass values (sorted descending by value)
+ * Used on Day 1 to personalize initial dilemma generation
+ * Returns array like ["Liberty/Agency", "Care/Solidarity"]
+ */
+function getTop2WhatValues(): string[] {
+  const compassValues = useCompassStore.getState().values;
+  const whatValues = compassValues.what || [];
+  const whatComponents = COMPONENTS.what;
+
+  // Create array of { idx, short, value }
+  const withMetadata = whatValues.map((val, idx) => ({
+    idx,
+    short: whatComponents[idx]?.short ?? "",
+    value: Math.max(0, Math.min(10, Math.round(val))), // clamp 0-10
+  }));
+
+  // Sort by value descending, take top 2, extract short names
+  const top2 = withMetadata
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 2)
+    .map(item => item.short);
+
+  return top2;
+}
+
+/**
  * Build minimal snapshot for light dilemma API
  * Much simpler than buildSnapshot() - only role, system, streak, and previous choice
  */
 export function buildLightSnapshot(): LightDilemmaRequest {
-  const { debugMode, useLightDilemmaAnthropic } = useSettingsStore.getState();
+  const { debugMode, useLightDilemmaAnthropic, dilemmasSubjectEnabled, dilemmasSubject } = useSettingsStore.getState();
   const { day, totalDays, lastChoice, current, subjectStreak } = useDilemmaStore.getState();
   const roleState = useRoleStore.getState();
 
@@ -700,12 +727,34 @@ export function buildLightSnapshot(): LightDilemmaRequest {
     };
   }
 
+  // Get top 2 "what" values on Day 1 for personalized dilemma
+  let topWhatValues: string[] | undefined = undefined;
+  if (day === 1) {
+    topWhatValues = getTop2WhatValues();
+    if (debugMode) {
+      console.log('[buildLightSnapshot] Day 1 - Top what values:', topWhatValues);
+    }
+  }
+
+  // Build thematic guidance (custom subject or default axes)
+  let thematicGuidance: string | undefined = undefined;
+  if (dilemmasSubjectEnabled && dilemmasSubject && dilemmasSubject.trim()) {
+    thematicGuidance = `Focus on: ${dilemmasSubject.trim()}`;
+  } else {
+    thematicGuidance = "Explore issues on axes: autonomy vs heteronomy, liberalism vs totalism";
+  }
+  if (debugMode) {
+    console.log('[buildLightSnapshot] Thematic guidance:', thematicGuidance);
+  }
+
   const request: LightDilemmaRequest = {
     role,
     system,
     daysLeft,
     subjectStreak: subjectStreak || null,
     previous,
+    topWhatValues, // Only defined on Day 1
+    thematicGuidance, // Always included (custom subject or default axes)
     debug: debugMode,
     useAnthropic: useLightDilemmaAnthropic
   };
