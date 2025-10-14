@@ -49,7 +49,7 @@ export default function App() {
   if (route === "/event") return <EventScreen3 push={push} />;
   if (route === "/highscores") return <HighscoreScreen push={push} />;
   if (route === "/aftermath") return <AftermathScreen push={push} />;
-  if (route === "/final-score") return <FinalScoreScreen />;
+  if (route === "/final-score") return <FinalScoreScreen push={push} />;
 
   
 

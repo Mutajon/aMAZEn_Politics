@@ -5,12 +5,14 @@ import { ChevronDown } from "lucide-react";
 import { bgStyle } from "../lib/ui";
 import { useSettingsStore } from "../store/settingsStore";
 import { useNarrator } from "../hooks/useNarrator";
+import { useCompassStore } from "../store/compassStore";
+import { useDilemmaStore } from "../store/dilemmaStore";
+import { useRoleStore } from "../store/roleStore";
+import { useMirrorQuizStore } from "../store/mirrorQuizStore";
+import { clearAllSnapshots } from "../lib/eventScreenSnapshot";
 
 const SUBTITLES = [
-  "Take on a challenge",
-  "Choose your path",
-  "Discover yourself",
-  "Will you make it into the Hall of Fame?"
+  "Discover Your Best Self"
 ];
 
 export default function SplashScreen({
@@ -309,11 +311,11 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
           transition={{ type: "spring", stiffness: 200, damping: 18 }}
           className="text-4xl sm:text-5xl font-extrabold leading-tight tracking-tight bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]"
         >
-          Speed Politics
+          aMAZE'n Politics
         </motion.h1>
 
-        {/* Animated subtitles - simple fade in */}
-        <div className="relative min-h-[200px] flex flex-col items-center justify-start pt-4">
+        {/* Animated subtitle - simple fade in */}
+        <div className="relative min-h-[80px] flex flex-col items-center justify-start pt-4">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: visibleSubtitles >= SUBTITLES.length ? 1 : 0 }}
@@ -321,7 +323,7 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
             className="relative"
           >
             <motion.div
-              className="flex flex-col items-center space-y-2"
+              className="flex flex-col items-center"
               animate={{
                 backgroundPosition: ["0% 100%", "0% 0%"],
               }}
@@ -339,16 +341,9 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
                 WebkitTextFillColor: "transparent",
               }}
             >
-              {SUBTITLES.map((subtitle, index) => (
-                <div key={index} className="flex flex-col items-center gap-1">
-                  <p className="text-base sm:text-lg font-medium">
-                    {subtitle}
-                  </p>
-                  {index < SUBTITLES.length - 1 && (
-                    <ChevronDown className="w-5 h-5 text-white/40" />
-                  )}
-                </div>
-              ))}
+              <p className="text-base sm:text-lg font-medium">
+                {SUBTITLES[0]}
+              </p>
             </motion.div>
           </motion.div>
         </div>
@@ -374,6 +369,13 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     transition={{ type: "spring", stiffness: 250, damping: 22 }}
     style={{ visibility: showButton ? "visible" : "hidden" }}
     onClick={() => {
+      // Reset all game stores for fresh start
+      useCompassStore.getState().reset();
+      useDilemmaStore.getState().reset();
+      useRoleStore.getState().reset();
+      useMirrorQuizStore.getState().resetAll();
+      clearAllSnapshots();
+
       narrator.prime();
       onStart();
       setShowSettings(false);

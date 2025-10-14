@@ -340,8 +340,11 @@ app.post("/api/validate-role", async (req, res) => {
   const system =
     "You validate a single short line describing a player's ROLE together with a SETTING.\n" +
     "ACCEPT if it clearly has (1) a role (the 'who') and (2) a setting (place and/or time). " +
-    "Examples that SHOULD pass: 'a king in medieval England', 'a partisan leader during World War II', " +
-    "'a Mars colony governor in 2300', 'a unicorn king in a fantasy land'. " +
+    "A PLACE alone is a valid setting (e.g., country names, regions, fictional locations). " +
+    "A TIME alone is a valid setting (e.g., historical periods, dates, eras). " +
+    "Examples that SHOULD pass: 'Prime Minister of Israel', 'President of United States', " +
+    "'a king in medieval England', 'a partisan leader during World War II', " +
+    "'a Mars colony governor in 2300', 'Chancellor of Germany', 'Senator of California'. " +
     "Examples that SHOULD fail: 'a king' (no setting), 'in medieval England' (no role), 'freedom' (neither).\n" +
     "Return STRICT JSON only as {\"valid\": true|false, \"reason\": \"short reason if invalid\"}. No extra keys, no prose.";
 
@@ -1510,6 +1513,7 @@ OUTPUT (STRICT JSON)
   {"id":"c","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}
  ],
  "topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture",
+ "scope":"Local|National|International",
  "supportShift": null | {
    "people":{"delta":0,"why":""},
    "mom":{"delta":0,"why":""},
@@ -1521,9 +1525,36 @@ Return ONLY that JSON. If there is no previous choice, set "supportShift": null.
 
 
 /**
+ * Calculate scope guidance - simple cycling to avoid repetition
+ */
+function calculateScopeGuidance(scopeStreak, recentScopes, debug) {
+  const currentScope = scopeStreak?.scope;
+  const streakCount = scopeStreak?.count || 0;
+  const all = ["Local", "National", "International"];
+
+  if (debug) {
+    console.log(`[calculateScopeGuidance] Current: ${currentScope || 'none'}, Streak: ${streakCount}`);
+  }
+
+  // Switch after 2 consecutive same-scope dilemmas
+  if (streakCount >= 2) {
+    const others = all.filter(s => s !== currentScope);
+    const guidance = `SCOPE: Avoid "${currentScope}" (used ${streakCount} times). Switch to "${others[0]}" or "${others[1]}".`;
+    if (debug) console.log(`[calculateScopeGuidance] ROTATE -> ${guidance}`);
+    return guidance;
+  }
+
+  // Natural variation otherwise
+  const guidance = "SCOPE: Choose naturally based on narrative continuity.";
+  if (debug) console.log(`[calculateScopeGuidance] FREE -> ${guidance}`);
+  return guidance;
+}
+
+
+/**
  * Build user prompt for light dilemma API - minimal dynamic context
  */
-function buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance }) {
+function buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance }) {
   const parts = [
     `ROLE & SETTING: ${role}`,
     `SYSTEM: ${system}`,
@@ -1553,6 +1584,11 @@ function buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatVa
     parts.push(`PREVIOUS: ${previous.title} — ${previous.choiceTitle}: ${previous.choiceSummary}`);
   } else {
     parts.push('PREVIOUS: none (first day)');
+  }
+
+  // Scope guidance (always included)
+  if (scopeGuidance) {
+    parts.push(scopeGuidance);
   }
 
   parts.push('');
@@ -1635,6 +1671,8 @@ app.post("/api/dilemma-light", async (req, res) => {
     const system = String(req.body?.system || "").trim() || "Divine Right Monarchy";
     const daysLeft = Number(req.body?.daysLeft ?? 1);
     const subjectStreak = req.body?.subjectStreak || null;
+    const scopeStreak = req.body?.scopeStreak || null; // NEW: Scope streak tracking
+    const recentScopes = req.body?.recentScopes || []; // NEW: Last 5 scopes
     const previous = req.body?.previous || null;
     const topWhatValues = req.body?.topWhatValues || null; // Day 1 only: top 2 compass values
     const thematicGuidance = req.body?.thematicGuidance || null; // Custom subject or default axes
@@ -1647,7 +1685,16 @@ app.post("/api/dilemma-light", async (req, res) => {
       if (thematicGuidance) {
         console.log(`[/api/dilemma-light] thematicGuidance: ${thematicGuidance}`);
       }
+      if (scopeStreak) {
+        console.log(`[/api/dilemma-light] scopeStreak: ${JSON.stringify(scopeStreak)}`);
+      }
+      if (recentScopes && recentScopes.length > 0) {
+        console.log(`[/api/dilemma-light] recentScopes: ${JSON.stringify(recentScopes)}`);
+      }
     }
+
+    // Calculate scope guidance
+    const scopeGuidance = calculateScopeGuidance(scopeStreak, recentScopes, debug);
 
     // Build prompts dynamically based on daysLeft
     let systemPrompt;
@@ -1665,7 +1712,7 @@ app.post("/api/dilemma-light", async (req, res) => {
       systemPrompt = buildLightSystemPrompt();
     }
 
-    const userPrompt = buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance });
+    const userPrompt = buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance });
 
     if (debug) {
       console.log("[/api/dilemma-light] System prompt length:", systemPrompt.length);
@@ -1709,6 +1756,7 @@ app.post("/api/dilemma-light", async (req, res) => {
           { id: "c", title: "Open Negotiations", summary: "Invite opposition figures for mediated talks.", cost: 50, iconHint: "diplomacy" }
         ],
         topic: "Security",
+        scope: "National", // Default fallback
         supportShift: null
       };
       usedFallback = true;
@@ -1758,11 +1806,21 @@ app.post("/api/dilemma-light", async (req, res) => {
       }
     }
 
-    // Extract title, description, topic
+    // Extract title, description, topic, scope
     const title = String(raw?.title || "").slice(0, 120) || "A Difficult Choice";
     const description = String(raw?.description || "").slice(0, 500);
     const validTopics = ["Economy", "Security", "Diplomacy", "Rights", "Infrastructure", "Environment", "Health", "Education", "Justice", "Culture"];
     const topic = validTopics.includes(String(raw?.topic || "")) ? String(raw.topic) : "Security";
+
+    // Validate and extract scope
+    const validScopes = ["Local", "National", "International"];
+    const scope = validScopes.includes(String(raw?.scope || "")) ? String(raw.scope) : "National";
+
+    // Warn if AI failed to return scope
+    if (!raw?.scope) {
+      console.warn(`[/api/dilemma-light] ⚠️ WARNING: AI did not return scope field! Using fallback: "National"`);
+      console.warn(`[/api/dilemma-light] This means the model is not following the OUTPUT schema. Check system prompt.`);
+    }
 
     // Extract support shift (already in correct format from AI)
     let supportShift = null;
@@ -1797,6 +1855,7 @@ app.post("/api/dilemma-light", async (req, res) => {
       description,
       actions,
       topic,
+      scope,
       supportShift,
       isFallback: usedFallback,
       isGameEnd: daysLeft === 0 // Mark game conclusion

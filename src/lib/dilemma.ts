@@ -63,11 +63,20 @@ export type SubjectStreak = {
   count: number;
 };
 
+export type DilemmaScope = "Local" | "National" | "International";
+
+export type ScopeStreak = {
+  scope: DilemmaScope;
+  count: number;
+};
+
 export type LightDilemmaRequest = {
   role: string;
   system: string;
   daysLeft: number; // totalDays - day + 1 (used for epic finale and game conclusion)
   subjectStreak: SubjectStreak | null;
+  scopeStreak: ScopeStreak | null; // NEW: Scope rotation tracking
+  recentScopes?: DilemmaScope[]; // NEW: Last 5 scopes for diversity checking
   previous?: {
     title: string;
     choiceTitle: string;
@@ -75,6 +84,7 @@ export type LightDilemmaRequest = {
   };
   topWhatValues?: string[]; // Day 1 only: Top 2 "what" compass values for personalized dilemma
   thematicGuidance?: string; // Optional subject/theme guidance (custom subject or default axes)
+  scopeGuidance?: string; // NEW: Server-calculated scope rotation guidance
   debug?: boolean;
   useAnthropic?: boolean;
 };
@@ -90,6 +100,7 @@ export type LightDilemmaResponse = {
   description: string;
   actions: [DilemmaAction, DilemmaAction, DilemmaAction] | []; // Empty array when isGameEnd
   topic: string;
+  scope: DilemmaScope; // NEW: AI-classified scope level
   supportShift: SupportShift | null;
   isFallback?: boolean;
   isGameEnd?: boolean; // True when daysLeft was 0 (game conclusion)

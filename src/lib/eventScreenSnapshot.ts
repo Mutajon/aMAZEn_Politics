@@ -222,3 +222,15 @@ export function clearAftermathScreenSnapshot(): void {
 export function hasAftermathScreenSnapshot(): boolean {
   return loadAftermathScreenSnapshot() !== null;
 }
+
+/**
+ * Clear all snapshots and return routes from sessionStorage.
+ * Used when starting a new game to ensure clean state.
+ */
+export function clearAllSnapshots(): void {
+  clearEventScreenSnapshot();
+  clearMirrorReturnRoute();
+  clearAftermathReturnRoute();
+  clearAftermathScreenSnapshot();
+  console.log('[Snapshots] 🧹 Cleared all snapshots and return routes');
+}

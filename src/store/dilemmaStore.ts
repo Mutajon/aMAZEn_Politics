@@ -1,7 +1,8 @@
 // src/store/dilemmaStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Dilemma, DilemmaRequest, DilemmaAction, DilemmaHistoryEntry, SubjectStreak, LightDilemmaRequest, LightDilemmaResponse } from "../lib/dilemma";
+import type { Dilemma, DilemmaRequest, DilemmaAction, DilemmaHistoryEntry, SubjectStreak, DilemmaScope, ScopeStreak, LightDilemmaRequest, LightDilemmaResponse } from "../lib/dilemma";
+import type { ScoreBreakdown } from "../lib/scoring";
 import { useSettingsStore } from "./settingsStore";
 import { useRoleStore } from "./roleStore";
 import { useCompassStore } from "./compassStore"; // <-- A) use compass values (0..10)
@@ -56,6 +57,14 @@ type DilemmaState = {
   // Subject streak tracking (Light API)
   subjectStreak: SubjectStreak | null;
 
+  // Scope streak tracking (Light API)
+  scopeStreak: ScopeStreak | null;
+  recentScopes: DilemmaScope[];
+
+  // Final score persistence (prevent recalculation on revisit)
+  finalScoreCalculated: boolean;
+  finalScoreBreakdown: ScoreBreakdown | null;
+
   // Game resources and support (0-100 for support)
   budget: number;
   supportPeople: number;
@@ -91,6 +100,13 @@ type DilemmaState = {
 
   // Subject streak tracking methods (Light API)
   updateSubjectStreak: (topic: string) => void;
+
+  // Scope streak tracking methods (Light API)
+  updateScopeStreak: (scope: DilemmaScope) => void;
+
+  // Final score persistence methods
+  saveFinalScore: (breakdown: ScoreBreakdown) => void;
+  clearFinalScore: () => void;
 
   // Dilemma history methods
   addHistoryEntry: (entry: DilemmaHistoryEntry) => void;
@@ -130,6 +146,14 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
 
   // Subject streak tracking (Light API)
   subjectStreak: null,
+
+  // Scope streak tracking (Light API)
+  scopeStreak: null,
+  recentScopes: [],
+
+  // Final score persistence
+  finalScoreCalculated: false,
+  finalScoreBreakdown: null,
 
   // Game resources and support
   budget: 1500,
@@ -276,6 +300,10 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
       recentTopics: [],
       topicCounts: {},
       subjectStreak: null,
+      scopeStreak: null,
+      recentScopes: [],
+      finalScoreCalculated: false,
+      finalScoreBreakdown: null,
       budget: 1500,
       supportPeople: 50,
       supportMiddle: 50,
@@ -320,7 +348,7 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
     dlog("setDifficulty ->", level);
     set({ difficulty: level });
 
-    // Apply difficulty modifiers
+    // Apply difficulty modifiers (support and budget only - score applied in FinalScoreScreen)
     const modifiers = {
       "baby-boss": { supportMod: 10, budgetMod: 250, scoreMod: -200 },
       "freshman": { supportMod: 0, budgetMod: 0, scoreMod: 0 },
@@ -424,6 +452,44 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
       dlog("updateSubjectStreak -> increment:", topic, "count:", newCount);
       set({ subjectStreak: { subject: topic, count: newCount } });
     }
+  },
+
+  // Scope streak tracking (Light API)
+  updateScopeStreak(scope) {
+    const { scopeStreak, recentScopes } = get();
+
+    // Update streak
+    if (!scopeStreak || scopeStreak.scope !== scope) {
+      // New scope - reset streak
+      dlog("updateScopeStreak -> new scope:", scope);
+      set({ scopeStreak: { scope, count: 1 } });
+    } else {
+      // Same scope - increment count
+      const newCount = scopeStreak.count + 1;
+      dlog("updateScopeStreak -> increment:", scope, "count:", newCount);
+      set({ scopeStreak: { scope, count: newCount } });
+    }
+
+    // Update recent list (keep last 5)
+    const newRecent = [scope, ...recentScopes.slice(0, 4)];
+    set({ recentScopes: newRecent });
+  },
+
+  // Final score persistence methods
+  saveFinalScore(breakdown) {
+    dlog("saveFinalScore -> saving breakdown with final score:", breakdown.final);
+    set({
+      finalScoreCalculated: true,
+      finalScoreBreakdown: breakdown,
+    });
+  },
+
+  clearFinalScore() {
+    dlog("clearFinalScore -> clearing saved score");
+    set({
+      finalScoreCalculated: false,
+      finalScoreBreakdown: null,
+    });
   },
 
   // Dilemma history methods
@@ -701,7 +767,7 @@ function getTop2WhatValues(): string[] {
  */
 export function buildLightSnapshot(): LightDilemmaRequest {
   const { debugMode, useLightDilemmaAnthropic, dilemmasSubjectEnabled, dilemmasSubject } = useSettingsStore.getState();
-  const { day, totalDays, lastChoice, current, subjectStreak } = useDilemmaStore.getState();
+  const { day, totalDays, lastChoice, current, subjectStreak, scopeStreak, recentScopes } = useDilemmaStore.getState();
   const roleState = useRoleStore.getState();
 
   // Calculate days left (for epic finale and game conclusion)
@@ -752,6 +818,8 @@ export function buildLightSnapshot(): LightDilemmaRequest {
     system,
     daysLeft,
     subjectStreak: subjectStreak || null,
+    scopeStreak: scopeStreak || null, // NEW: Scope streak tracking
+    recentScopes: recentScopes || [], // NEW: Last 5 scopes for diversity checking
     previous,
     topWhatValues, // Only defined on Day 1
     thematicGuidance, // Always included (custom subject or default axes)
@@ -772,7 +840,7 @@ export function buildLightSnapshot(): LightDilemmaRequest {
  */
 async function loadNextLight(): Promise<Dilemma | null> {
   const { debugMode } = useSettingsStore.getState();
-  const { day, supportPeople, supportMiddle, supportMom, setSupportPeople, setSupportMiddle, setSupportMom, updateSubjectStreak } = useDilemmaStore.getState();
+  const { day, supportPeople, supportMiddle, supportMom, setSupportPeople, setSupportMiddle, setSupportMom, updateSubjectStreak, updateScopeStreak } = useDilemmaStore.getState();
 
   try {
     const snapshot = buildLightSnapshot();
@@ -790,6 +858,9 @@ async function loadNextLight(): Promise<Dilemma | null> {
     }
 
     const raw: LightDilemmaResponse = await r.json();
+
+    // DIAGNOSTIC: Log what API actually returned (always visible for debugging)
+    console.log('[loadNextLight] Raw API response - scope:', raw.scope, '| topic:', raw.topic);
 
     if (debugMode) {
       console.log("[loadNextLight] Response received:", raw);
@@ -825,6 +896,11 @@ async function loadNextLight(): Promise<Dilemma | null> {
     // Update subject streak tracking
     if (raw.topic) {
       updateSubjectStreak(raw.topic);
+    }
+
+    // Update scope streak tracking
+    if (raw.scope) {
+      updateScopeStreak(raw.scope);
     }
 
     // Build Dilemma object (same format as standard API)

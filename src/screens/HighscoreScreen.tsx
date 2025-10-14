@@ -1,5 +1,5 @@
 // src/screens/HighscoreScreen.tsx
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import type { PushFn } from "../lib/router";
 import { bgStyle } from "../lib/ui";
 import { useHighscoreStore } from "../store/highscoreStore";
@@ -44,11 +44,37 @@ function rankColor(i: number): string | undefined {
 export default function HighscoreScreen({ push }: { push: PushFn }) {
   const entries = useHighscoreStore((s) => s.entries);
   const [selected, setSelected] = useState<HighscoreEntry | null>(null);
+  const highlightedRef = useRef<HTMLButtonElement | null>(null);
+
+  // Extract highlight parameter from URL
+  const highlightName = useMemo(() => {
+    const hash = window.location.hash; // e.g. "#/highscores?highlight=John%20Doe"
+    const queryStart = hash.indexOf("?");
+    if (queryStart === -1) return null;
+
+    const params = new URLSearchParams(hash.slice(queryStart + 1));
+    return params.get("highlight");
+  }, []);
 
   const list = useMemo(
     () => [...entries].sort((a, b) => b.score - a.score).slice(0, 50),
     [entries]
   );
+
+  // Auto-scroll to highlighted entry after animation completes
+  useEffect(() => {
+    if (highlightName && highlightedRef.current) {
+      // Delay to allow animation to complete (stagger: 0.05s per row × 50 rows = ~2.5s max)
+      const timer = setTimeout(() => {
+        highlightedRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }, 2800); // Wait 2.8s for animation to mostly complete
+
+      return () => clearTimeout(timer);
+    }
+  }, [highlightName]);
 
   return (
     <div className="min-h-[100dvh] px-5 py-8" style={bgStyle}>
@@ -89,12 +115,19 @@ export default function HighscoreScreen({ push }: { push: PushFn }) {
 
             {list.map((e, i) => {
               const color = rankColor(i);
+              const isHighlighted = highlightName && e.name === highlightName;
               return (
                 <motion.button
   type="button"
   key={`${e.name}-${i}`}
+  ref={isHighlighted ? highlightedRef : null}
   onClick={() => setSelected(e)}
-  className="w-full text-left grid items-center gap-3 pl-1 pr-4 py-3 hover:bg-white/8 focus:outline-none will-change-[transform,opacity]"
+  className={[
+    "w-full text-left grid items-center gap-3 pl-1 pr-4 py-3 focus:outline-none will-change-[transform,opacity]",
+    isHighlighted
+      ? "bg-amber-500/20 border-2 border-amber-400 ring-2 ring-amber-400/50 rounded-lg my-1"
+      : "hover:bg-white/8"
+  ].join(" ")}
   style={{ gridTemplateColumns: "44px 1.2fr 1.1fr 1fr 1fr 0.7fr" }}
   variants={rowVariants}
 >

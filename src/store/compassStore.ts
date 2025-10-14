@@ -9,7 +9,7 @@ export type CompassValues = Record<PropKey, number[]>;
 function emptyValues(): CompassValues {
   const v: CompassValues = { what: [], whence: [], how: [], whither: [] } as any;
   (PROPERTIES.map(p => p.key) as PropKey[]).forEach(k => {
-    v[k] = Array(10).fill(0);
+    v[k] = Array(10).fill(0); // Start at zero (0-10 scale)
   });
   return v;
 }

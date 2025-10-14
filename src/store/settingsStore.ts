@@ -46,6 +46,18 @@ type SettingsState = {
   useLightDilemmaAnthropic: boolean;
   setUseLightDilemmaAnthropic: (v: boolean) => void;
   toggleUseLightDilemmaAnthropic: () => void;
+
+  // --- NEW: In-game narration mute (separate from global toggle) ---
+  narrationMutedInGame: boolean;
+  setNarrationMutedInGame: (v: boolean) => void;
+  toggleNarrationMutedInGame: () => void;
+
+  // --- NEW: Background music ---
+  musicEnabled: boolean;
+  setMusicEnabled: (v: boolean) => void;
+  toggleMusicEnabled: () => void;
+  musicVolume: number;
+  setMusicVolume: (v: number) => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -95,10 +107,22 @@ export const useSettingsStore = create<SettingsState>()(
       useLightDilemmaAnthropic: false,
       setUseLightDilemmaAnthropic: (v) => set({ useLightDilemmaAnthropic: v }),
       toggleUseLightDilemmaAnthropic: () => set({ useLightDilemmaAnthropic: !get().useLightDilemmaAnthropic }),
+
+      // NEW: In-game narration mute (default OFF - respects global setting)
+      narrationMutedInGame: false,
+      setNarrationMutedInGame: (v) => set({ narrationMutedInGame: v }),
+      toggleNarrationMutedInGame: () => set({ narrationMutedInGame: !get().narrationMutedInGame }),
+
+      // NEW: Background music (default ON at 30% volume)
+      musicEnabled: true,
+      setMusicEnabled: (v) => set({ musicEnabled: v }),
+      toggleMusicEnabled: () => set({ musicEnabled: !get().musicEnabled }),
+      musicVolume: 0.3,
+      setMusicVolume: (v) => set({ musicVolume: Math.max(0, Math.min(1, v)) }),
     }),
     {
       // Bump key so no stale objects hide the new fields
-      name: "settings-v7",
+      name: "settings-v9",
       partialize: (s) => ({
         generateImages: s.generateImages,
         narrationEnabled: s.narrationEnabled,
@@ -110,6 +134,9 @@ export const useSettingsStore = create<SettingsState>()(
         enableModifiers: s.enableModifiers,
         useLightDilemma: s.useLightDilemma,
         useLightDilemmaAnthropic: s.useLightDilemmaAnthropic,
+        narrationMutedInGame: s.narrationMutedInGame,
+        musicEnabled: s.musicEnabled,
+        musicVolume: s.musicVolume,
       }),
     }
   )
