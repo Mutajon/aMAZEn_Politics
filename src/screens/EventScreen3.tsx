@@ -263,9 +263,39 @@ export default function EventScreen3({ push }: Props) {
   /**
    * Handle custom action suggestion
    */
-  const handleSuggest = (text?: string) => {
-    // ActionDeck handles suggestion validation internally
-    // This handler is just for EventScreen3 to be notified
+  const handleSuggest = async (text?: string) => {
+    if (!text || !text.trim()) {
+      console.warn('[EventScreen3] ❌ handleSuggest called with empty text');
+      return;
+    }
+
+    console.log('[EventScreen3] 💡 Processing custom suggestion:', text);
+
+    // Convert suggestion to ActionCard format (same as regular actions)
+    // This allows cleanAndAdvanceDay to process it uniformly
+    const suggestCost = -300; // Default suggestion cost from ActionDeck
+    const suggestionCard: ActionCard = {
+      id: 'suggest',
+      title: text.trim(),
+      summary: '', // No summary for custom suggestions
+      cost: suggestCost,
+      icon: null as any, // Not used by cleaner
+      iconBgClass: '',
+      iconTextClass: '',
+      cardGradientClass: ''
+    };
+
+    // Advance to cleaning phase
+    setPhase('cleaning');
+
+    // Run cleaner (handles: save choice, update budget, wait for animation, advance day)
+    await cleanAndAdvanceDay(suggestionCard, clearFlights);
+
+    // After cleaning complete, reset to collecting phase for next day
+    setPhase('collecting');
+    setPresentationStep(-1);
+    setInitialSupportValues(null); // Clear for next day
+    // Collection will be triggered by effect watching phase/day
   };
 
   /**

@@ -62,13 +62,14 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   const { quiz, idx, done, summary, epilogueShown, init, advance, setDone, setSummary, markEpilogueShown } =
     useMirrorQuizStore();
 
-  // on first mount, start quiz and clear compass
+  // ALWAYS reset compass and start fresh quiz on mount
+  // This ensures clean state even if user navigates back to this screen
+  // or if quiz store has stale data from previous session
   useEffect(() => {
-    if (quiz.length === 0) {
-      resetCompass();
-      init(pickQuiz(3));
-    }
-  }, [quiz.length, init, resetCompass]);
+    resetCompass();
+    init(pickQuiz(3));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only on mount, not on quiz/init/resetCompass changes
 
   // once done, fetch a one-shot summary (Mirror Quiz Light API - Mushu/Genie personality)
   useEffect(() => {
@@ -85,18 +86,29 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   // NOTE: we intentionally DO NOT use an effect tied to `summary`.
   // The epilogue is enabled *only* by the verdict bubble's onDone (after 2s).
 
-  function answer(opt: { a: string; mappings: string[] }) {
-    if (done) return;
-    const pairs = opt.mappings
-      .map(resolveLabel)
-      .filter((x): x is NonNullable<ReturnType<typeof resolveLabel>> => x !== null);
-    const effects = pairs.map(({ prop, idx }) => ({ prop, idx, delta: VALUE_RULES.strongPositive }));
-    applyWithPings(effects);
+  // Track selected option for shimmer animation
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
 
+  function answer(opt: { a: string; mappings: string[] }, optionIndex: number) {
+    if (done || selectedOption !== null) return; // Prevent multiple clicks during animation
+
+    // Trigger shimmer animation
+    setSelectedOption(optionIndex);
+
+    // Wait for shimmer animation, then process answer
     window.setTimeout(() => {
-      if (idx + 1 >= quiz.length) setDone();
-      else advance();
-    }, 580);
+      const pairs = opt.mappings
+        .map(resolveLabel)
+        .filter((x): x is NonNullable<ReturnType<typeof resolveLabel>> => x !== null);
+      const effects = pairs.map(({ prop, idx }) => ({ prop, idx, delta: VALUE_RULES.strongPositive }));
+      applyWithPings(effects);
+
+      window.setTimeout(() => {
+        setSelectedOption(null); // Reset selection
+        if (idx + 1 >= quiz.length) setDone();
+        else advance();
+      }, 580);
+    }, 600); // Shimmer duration
   }
 
   /** Layout */
@@ -106,9 +118,9 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   // Mirror-bubble-like options
   const optionStyle: React.CSSProperties = {
     background: T.bg,
-    color: T.textColor,
+    color: "rgba(255, 255, 255, 0.65)", // Much brighter light gray
     fontFamily: T.fontFamily,
-    fontSize: `${T.fontSizePx}px`,
+    fontSize: "16px", // Increased by 2px
     padding: `${T.paddingY - 2}px ${T.paddingX}px`,
     border: "1px solid rgba(255,255,255,0.18)",
     borderRadius: 16,
@@ -214,7 +226,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
                   >
                     {/* QUESTION — styled like mirror bubble text */}
                     <div
-                      className="text-[16px] font-semibold italic drop-shadow"
+                      className="text-[19px] font-semibold italic drop-shadow"
                       style={{ color: T.textColor, fontFamily: T.fontFamily }}
                     >
                       {quiz[idx].q}
@@ -222,19 +234,55 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
 
                     {/* OPTIONS — mirror bubble style buttons */}
                     <div className="mt-3 grid gap-2">
-                      {quiz[idx].options.map((opt, i) => (
-                        <motion.button
-                          key={i}
-                          onClick={() => answer(opt)}
-                          whileTap={{ scale: 0.985 }}
-                          className="w-full text-left transition focus:outline-none focus:ring-2 focus:ring-amber-300/60"
-                          style={optionStyle}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0,0,0,0.55)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = T.bg)}
-                        >
-                          {opt.a}
-                        </motion.button>
-                      ))}
+                      {quiz[idx].options.map((opt, i) => {
+                        const isSelected = selectedOption === i;
+                        return (
+                          <motion.button
+                            key={i}
+                            onClick={() => answer(opt, i)}
+                            whileTap={{ scale: 0.985 }}
+                            className="w-full text-left transition focus:outline-none focus:ring-2 focus:ring-amber-300/60"
+                            style={{
+                              ...optionStyle,
+                              ...(isSelected && {
+                                background: "linear-gradient(90deg, rgba(251, 191, 36, 0.3), rgba(245, 158, 11, 0.3), rgba(251, 191, 36, 0.3))",
+                                backgroundSize: "200% 100%",
+                                color: "#FCD34D",
+                                borderColor: "rgba(251, 191, 36, 0.6)",
+                              }),
+                            }}
+                            animate={
+                              isSelected
+                                ? {
+                                    backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
+                                  }
+                                : {}
+                            }
+                            transition={
+                              isSelected
+                                ? {
+                                    duration: 0.6,
+                                    ease: "linear",
+                                  }
+                                : {}
+                            }
+                            onMouseEnter={(e) => {
+                              if (!isSelected) {
+                                e.currentTarget.style.background = "rgba(0,0,0,0.55)";
+                                e.currentTarget.style.color = "#FCD34D"; // Golden yellow
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSelected) {
+                                e.currentTarget.style.background = T.bg;
+                                e.currentTarget.style.color = "rgba(255, 255, 255, 0.65)";
+                              }
+                            }}
+                          >
+                            {opt.a}
+                          </motion.button>
+                        );
+                      })}
                     </div>
                   </motion.div>
                 )}

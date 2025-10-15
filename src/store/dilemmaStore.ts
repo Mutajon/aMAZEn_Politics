@@ -789,7 +789,8 @@ export function buildLightSnapshot(): LightDilemmaRequest {
     previous = {
       title: current.title,
       choiceTitle: lastChoice.title,
-      choiceSummary: lastChoice.summary
+      // Fallback to title if summary is empty (bug workaround for AI not generating summaries)
+      choiceSummary: lastChoice.summary || lastChoice.title
     };
   }
 

@@ -1453,12 +1453,12 @@ SYSTEM FEEL (GLOBAL CONTEXT — ALWAYS APPLY)
   * Institution Strength (media, judiciary, unions) → Strong = constrain/expose; Weak = comply/stay silent.
 - Never make “system feel” the explicit subject. Let it color tension, friction, and perceived autonomy.
 
-CONTINUITY
+CONTINUITY (CRITICAL - ALWAYS FOLLOW THIS)
 - Always apply **SYSTEM FEEL** when evolving reactions and resistance across turns.
-- If subject streak ≥ 3, shift to a new topic, but tie it back to outcomes or tensions from the last decision.
-- If subject streak < 3, follow up logically on the previous choice within the same political and narrative context.
+- If subject streak ≥ 3: Conclude the previous topic in one short sentence, THEN shift to a new topic.
+- If subject streak < 3: The new situation MUST be a direct consequence of or reaction to the previous choice. Explicitly reference what happened (e.g., "After you issued the decree...", "The settlers you turned away...", "Following your speech...").
 - Evolve plausibly given the system: e.g., pushback mounts in democracies, fades or goes underground in autocracies.
-- Ensure each new event feels like a natural evolution of the player's world, not a random reset.
+- NEVER generate a random unrelated event when there is a PREVIOUS choice. Every turn must feel causally connected to the last.
 
 DAY 1 VALUE FOCUS (only if TOP VALUES provided)
 - Use the top 2 "what" values to inspire the situation.
@@ -1508,9 +1508,9 @@ SUPPORT SHIFT (only if previous choice exists)
 OUTPUT (STRICT JSON)
 {"title":"","description":"",
  "actions":[
-  {"id":"a","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"},
-  {"id":"b","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"},
-  {"id":"c","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale","topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture"}
+  {"id":"a","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale"},
+  {"id":"b","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale"},
+  {"id":"c","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale"}
  ],
  "topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture",
  "scope":"Local|National|International",
@@ -1714,9 +1714,22 @@ app.post("/api/dilemma-light", async (req, res) => {
 
     const userPrompt = buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance });
 
+    // ALWAYS log previous context (critical for debugging continuity)
+    if (previous) {
+      console.log("[/api/dilemma-light] 🔗 PREVIOUS CONTEXT:");
+      console.log(`  Dilemma: "${previous.title}"`);
+      console.log(`  Choice: "${previous.choiceTitle}"`);
+      console.log(`  Summary: "${previous.choiceSummary}"`);
+    } else {
+      console.log("[/api/dilemma-light] 🔗 PREVIOUS CONTEXT: none (Day 1)");
+    }
+
     if (debug) {
       console.log("[/api/dilemma-light] System prompt length:", systemPrompt.length);
       console.log("[/api/dilemma-light] User prompt length:", userPrompt.length);
+      console.log("[/api/dilemma-light] 📝 FULL USER PROMPT:");
+      console.log(userPrompt);
+      console.log("[/api/dilemma-light] ================");
     }
 
     // Call AI with JSON mode (route to correct provider)
@@ -1739,6 +1752,16 @@ app.post("/api/dilemma-light", async (req, res) => {
       raw = safeParseJSON(responseText);
 
       if (debug) console.log("[/api/dilemma-light] AI response parsed:", raw);
+
+      // ALWAYS log action summaries (critical for debugging empty summary bug)
+      if (raw && Array.isArray(raw.actions)) {
+        console.log("[/api/dilemma-light] 📋 AI RETURNED ACTIONS:");
+        raw.actions.forEach((a, i) => {
+          console.log(`  [${a?.id || i}] "${a?.title || 'NO TITLE'}"`);
+          console.log(`      Summary: "${a?.summary || 'EMPTY SUMMARY ⚠️'}"`);
+          console.log(`      Cost: ${a?.cost ?? 'MISSING'}`);
+        });
+      }
     } catch (e) {
       console.error("[/api/dilemma-light] AI call failed:", e?.message || e);
     }
