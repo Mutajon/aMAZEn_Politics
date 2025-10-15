@@ -17,7 +17,7 @@ const IMAGE_URL = "https://api.openai.com/v1/images/generations";
 const anthropic = ANTHROPIC_KEY ? new Anthropic({ apiKey: ANTHROPIC_KEY }) : null;
 
 // One default text model + per-task overrides from .env
-const CHAT_MODEL_DEFAULT = process.env.CHAT_MODEL || "gpt-5-mini";
+const CHAT_MODEL_DEFAULT = process.env.CHAT_MODEL || "gpt-4o-mini";
 const MODEL_VALIDATE = process.env.MODEL_VALIDATE || CHAT_MODEL_DEFAULT;
 const MODEL_NAMES    = process.env.MODEL_NAMES    || CHAT_MODEL_DEFAULT;
 const MODEL_ANALYZE  = process.env.MODEL_ANALYZE  || CHAT_MODEL_DEFAULT;
@@ -167,7 +167,7 @@ async function aiJSON({ system, user, model = CHAT_MODEL_DEFAULT, temperature = 
 }
 
 
-async function aiText({ system, user, model = CHAT_MODEL_DEFAULT, temperature }) {
+async function aiText({ system, user, model = CHAT_MODEL_DEFAULT, temperature, maxTokens }) {
   const FALLBACK_MODEL = "gpt-4o";
 
   // Helper function to make the actual API call
@@ -183,6 +183,14 @@ async function aiText({ system, user, model = CHAT_MODEL_DEFAULT, temperature })
     if (typeof temperature === "number") {
       body.temperature = temperature;
     }
+    // Include max_completion_tokens if provided (critical for preventing truncated JSON responses)
+    // NOTE: Newer models (GPT-4o) prefer max_completion_tokens over max_tokens
+    if (typeof maxTokens === "number") {
+      body.max_completion_tokens = maxTokens;
+    }
+
+    // DIAGNOSTIC: Log request parameters to verify max_completion_tokens is sent
+    console.log(`[aiText] Requesting model=${body.model}, temp=${body.temperature ?? 'default'}, max_completion_tokens=${body.max_completion_tokens ?? 'not set'}`);
 
     const resp = await fetch(CHAT_URL, {
       method: "POST",
@@ -1459,6 +1467,11 @@ CONTINUITY (CRITICAL - ALWAYS FOLLOW THIS)
 - If subject streak < 3: The new situation MUST be a direct consequence of or reaction to the previous choice. Explicitly reference what happened (e.g., "After you issued the decree...", "The settlers you turned away...", "Following your speech...").
 - Evolve plausibly given the system: e.g., pushback mounts in democracies, fades or goes underground in autocracies.
 - NEVER generate a random unrelated event when there is a PREVIOUS choice. Every turn must feel causally connected to the last.
+- **VOTE OUTCOME CONTINUITY**: If the player's previous action involved putting a decision to a public vote, referendum, or popular consultation, the next situation MUST present the results of that vote.
+  * Describe the outcome clearly (e.g., "The referendum passed with 62% support..." or "The citizens voted down your proposal by a slim margin...").
+  * Show immediate implications and reactions (e.g., "Supporters celebrate in the streets," "The losing side demands a recount," "International observers raise concerns").
+  * Frame the new dilemma around what the player should do next in response to these results (e.g., implement the mandate immediately, delay for reconciliation, propose modifications, or handle the backlash).
+  * Apply SYSTEM FEEL: vote outcomes play out differently based on the political system (e.g., direct democracies see swift implementation, autocracies may face underground resistance if results are ignored).
 
 DAY 1 VALUE FOCUS (only if TOP VALUES provided)
 - Use the top 2 "what" values to inspire the situation.
@@ -1526,10 +1539,30 @@ MAGNITUDE GUIDE:
 - Large shift (±11 to ±15): Strong reaction, major decision
 - Extreme shift (±16 to ±20): Rare, use only for shocking reversals or exactly what they demanded
 
-EXPLANATION STYLE:
-  * people.why → Civic/social reasoning (e.g., "Feared violence, got it")
-  * mom.why → Personal voice, first person ("I hoped you'd find another way")
-  * holders.why → Institutional logic (e.g., "Wanted decisive show of authority")
+EXPLANATION STYLE (NATURAL VOICES, NOT SUMMARIES):
+Write each "why" as a DIRECT QUOTE expressing the faction's authentic reaction. Make it conversational, personal, and emotionally honest. Avoid dry summaries or bureaucratese.
+
+IMPORTANT: Wrap each "why" text in quotation marks to show it's a quote (e.g., "We're so relieved!" not We're so relieved!)
+
+VOICE PERSONALITIES:
+  * people.why → COLLECTIVE VOICE: Enthusiastic when happy, worried when upset. Informal, emotional, immediate.
+    - Positive examples: "Finally! This is exactly what we've been asking for!" / "Thank goodness—we were terrified this would escalate!"
+    - Negative examples: "We're furious—this betrays everything we stood for!" / "This is going to blow up in everyone's faces, mark our words."
+
+  * mom.why → MATERNAL FIRST-PERSON: Warm, protective, personally invested. Mix pride with worry.
+    - Positive examples: "Oh, I'm so relieved you took the diplomatic path, dear." / "I'm proud you stood up for what's right, even if it was risky."
+    - Negative examples: "I'm worried sick about what this means for your reputation." / "You know I support you, but this decision keeps me up at night."
+
+  * holders.why → INSTITUTIONAL POMPOUS: Formal but slightly stuffy. Pride in governance, obsessed with order/precedent.
+    - Positive examples: "An exemplary display of leadership and institutional authority." / "This demonstrates the sound fiscal judgment we've always championed."
+    - Negative examples: "This reckless decision undermines decades of careful governance." / "We are deeply concerned about the constitutional implications of this action."
+
+LENGTH & TONE:
+- 10-20 words per quote
+- Lighthearted where appropriate (not dark/cynical)
+- Feel like something a REAL person/group would actually say
+- Avoid: "Feared violence, got it" / "Wanted decisive action" → TOO DRY
+- Prefer: "We're so relieved you didn't escalate this!" / "Finally, someone who takes security seriously!"
 
 OUTPUT (STRICT JSON)
 {"title":"","description":"",
@@ -1760,57 +1793,100 @@ app.post("/api/dilemma-light", async (req, res) => {
       console.log("[/api/dilemma-light] ================");
     }
 
-    // Call AI with JSON mode (route to correct provider)
+    // Call AI with JSON mode with retry logic (route to correct provider)
     let raw = null;
-    try {
-      const responseText = useAnthropic
-        ? await aiTextAnthropic({
-            system: systemPrompt,
-            user: userPrompt,
-            model: MODEL_DILEMMA_ANTHROPIC,
-            temperature: 1
-          })
-        : await aiText({
-            system: systemPrompt,
-            user: userPrompt,
-            model: MODEL_DILEMMA,
-            temperature: 1
+    const maxAttempts = 8;  // Increased retries for better reliability
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.log(`[/api/dilemma-light] Attempt ${attempt}/${maxAttempts}...`);
+
+        const responseText = useAnthropic
+          ? await aiTextAnthropic({
+              system: systemPrompt,
+              user: userPrompt,
+              model: MODEL_DILEMMA_ANTHROPIC,
+              temperature: 1
+            })
+          : await aiText({
+              system: systemPrompt,
+              user: userPrompt,
+              model: MODEL_DILEMMA,
+              temperature: 1,
+              maxTokens: 2048  // Generous limit to prevent truncation
+            });
+
+        // DIAGNOSTIC: Always log raw response length
+        console.log(`[/api/dilemma-light] 📤 AI returned ${responseText?.length || 0} characters`);
+
+        // DIAGNOSTIC: Log first 200 chars of response (helps see if it's JSON)
+        if (responseText) {
+          const preview = responseText.substring(0, 200).replace(/\n/g, ' ');
+          console.log(`[/api/dilemma-light] 📄 Response preview: ${preview}...`);
+        }
+
+        raw = safeParseJSON(responseText);
+
+        if (!raw) {
+          console.error(`[/api/dilemma-light] ❌ JSON parse failed! Raw response:`);
+          console.error(responseText?.substring(0, 500)); // Log first 500 chars
+        }
+
+        if (debug && raw) console.log("[/api/dilemma-light] AI response parsed:", raw);
+
+        // ALWAYS log action summaries (critical for debugging empty summary bug)
+        if (raw && Array.isArray(raw.actions)) {
+          console.log("[/api/dilemma-light] 📋 AI RETURNED ACTIONS:");
+          raw.actions.forEach((a, i) => {
+            console.log(`  [${a?.id || i}] "${a?.title || 'NO TITLE'}"`);
+            console.log(`      Summary: "${a?.summary || 'EMPTY SUMMARY ⚠️'}"`);
+            console.log(`      Cost: ${a?.cost ?? 'MISSING'}`);
           });
+        }
 
-      raw = safeParseJSON(responseText);
+        // Check if response is valid - with detailed validation logging
+        if (!raw) {
+          console.warn(`[/api/dilemma-light] ⚠️  Attempt ${attempt} failed: Could not parse JSON`);
+        } else if (!raw.title) {
+          console.warn(`[/api/dilemma-light] ⚠️  Attempt ${attempt} failed: Missing 'title' field`);
+          console.warn(`[/api/dilemma-light] Available fields:`, Object.keys(raw));
+        } else if (!Array.isArray(raw.actions)) {
+          console.warn(`[/api/dilemma-light] ⚠️  Attempt ${attempt} failed: 'actions' is not an array`);
+          console.warn(`[/api/dilemma-light] actions type:`, typeof raw.actions);
+        } else if (raw.actions.length === 0 && daysLeft !== 0) {
+          // Empty actions only allowed in conclusion mode (daysLeft === 0)
+          console.warn(`[/api/dilemma-light] ⚠️  Attempt ${attempt} failed: 'actions' array is empty (not conclusion mode)`);
+        } else {
+          console.log(`[/api/dilemma-light] ✅ Attempt ${attempt} succeeded`);
+          break; // Success! Exit retry loop
+        }
 
-      if (debug) console.log("[/api/dilemma-light] AI response parsed:", raw);
-
-      // ALWAYS log action summaries (critical for debugging empty summary bug)
-      if (raw && Array.isArray(raw.actions)) {
-        console.log("[/api/dilemma-light] 📋 AI RETURNED ACTIONS:");
-        raw.actions.forEach((a, i) => {
-          console.log(`  [${a?.id || i}] "${a?.title || 'NO TITLE'}"`);
-          console.log(`      Summary: "${a?.summary || 'EMPTY SUMMARY ⚠️'}"`);
-          console.log(`      Cost: ${a?.cost ?? 'MISSING'}`);
-        });
+        raw = null; // Reset for retry
+      } catch (e) {
+        console.error(`[/api/dilemma-light] ❌ Attempt ${attempt} exception:`, e?.message || e);
+        if (e?.stack) {
+          console.error(`[/api/dilemma-light] Stack trace:`, e.stack.split('\n').slice(0, 5).join('\n'));
+        }
+        raw = null; // Reset for retry
       }
-    } catch (e) {
-      console.error("[/api/dilemma-light] AI call failed:", e?.message || e);
+
+      // Wait before retry (except on last attempt)
+      if (attempt < maxAttempts && !raw) {
+        const delay = Math.min(2000, 500 * attempt);  // Exponential: 500ms, 1000ms, 1500ms, 2000ms...
+        console.log(`[/api/dilemma-light] Waiting ${delay}ms before retry...`);
+        await new Promise(r => setTimeout(r, delay));
+      }
     }
 
-    // Fallback if AI fails
-    let usedFallback = false;
+    // If all retries failed, return error response
     if (!raw || !raw.title || !Array.isArray(raw.actions)) {
-      console.log("[/api/dilemma-light] Using fallback dilemma");
-      raw = {
-        title: "First Night in the Palace",
-        description: "As the seals change hands, a restless city watches. Advisors split: display resolve now, or earn trust with patience.",
-        actions: [
-          { id: "a", title: "Impose Curfew", summary: "Restrict movement after dusk with visible patrols.", cost: -150, iconHint: "security" },
-          { id: "b", title: "Address the Nation", summary: "Speak live tonight to calm fears and set the tone.", cost: -50, iconHint: "speech" },
-          { id: "c", title: "Open Negotiations", summary: "Invite opposition figures for mediated talks.", cost: 50, iconHint: "diplomacy" }
-        ],
-        topic: "Security",
-        scope: "National", // Default fallback
-        supportShift: null
-      };
-      usedFallback = true;
+      console.error("[/api/dilemma-light] ❌ ALL RETRIES FAILED - Cannot generate dilemma");
+      return res.status(500).json({
+        error: true,
+        message: "AI generation failed after 3 attempts. Please start a new game.",
+        attempts: maxAttempts,
+        provider: useAnthropic ? "Anthropic" : "OpenAI"
+      });
     }
 
     // Normalize action costs using existing logic
@@ -1908,7 +1984,6 @@ app.post("/api/dilemma-light", async (req, res) => {
       topic,
       scope,
       supportShift,
-      isFallback: usedFallback,
       isGameEnd: daysLeft === 0 // Mark game conclusion
     };
 
@@ -2059,7 +2134,8 @@ app.post("/api/dilemma", async (req, res) => {
           system,
           user,
           model: MODEL_DILEMMA,
-          temperature: 1  // gpt-5 only supports temperature = 1
+          temperature: 1,  // gpt-5 only supports temperature = 1
+          maxTokens: 2048  // Generous limit to prevent truncation
         });
 
         const parsed = safeParseJSON(responseText);
@@ -2075,7 +2151,8 @@ app.post("/api/dilemma", async (req, res) => {
               system,
               user: user + "\n\n" + repairPrompt,
               model: MODEL_DILEMMA,
-              temperature: 1  // gpt-5 only supports temperature = 1
+              temperature: 1,  // gpt-5 only supports temperature = 1
+              maxTokens: 2048  // Generous limit to prevent truncation
             });
 
             const reparsed = safeParseJSON(repaired);
@@ -2096,7 +2173,8 @@ app.post("/api/dilemma", async (req, res) => {
               system,
               user: user + "\n\n" + repairPrompt,
               model: MODEL_DILEMMA,
-              temperature: 1  // gpt-5 only supports temperature = 1
+              temperature: 1,  // gpt-5 only supports temperature = 1
+              maxTokens: 2048  // Generous limit to prevent truncation
             });
 
             const reparsed = safeParseJSON(repaired);
@@ -2119,26 +2197,14 @@ app.post("/api/dilemma", async (req, res) => {
       }
     }
 
-    let usedFallback = false;
-    function buildFallback(d) {
-      return {
-        title: d === 1 ? "First Night in the Palace" : "Crowds Swell Outside the Palace",
-        description:
-          d === 1
-            ? "As the seals change hands, a restless city watches. Advisors split: display resolve now, or earn trust with patience."
-            : "Rumors spiral as barricades appear along the market roads. Decide whether to project strength or show empathy before things harden.",
-        actions: [
-          { id: "a", title: "Impose Curfew",      summary: "Restrict movement after dusk with visible patrols.", cost: -150, iconHint: "security"  },
-          { id: "b", title: "Address the Nation", summary: "Speak live tonight to calm fears and set the tone.", cost:  -50, iconHint: "speech"    },
-          { id: "c", title: "Open Negotiations",  summary: "Invite opposition figures for mediated talks.",      cost:   50, iconHint: "diplomacy" },
-        ],
-        topic: "Security"  // Fallback dilemmas get Security topic
-      };
-    }
-
+    // If all retries failed, return error response
     if (!raw || !raw.title || !Array.isArray(raw.actions)) {
-      raw = buildFallback(day);
-      usedFallback = true;
+      console.error("[/api/dilemma] ❌ ALL RETRIES FAILED - Cannot generate dilemma");
+      return res.status(500).json({
+        error: true,
+        message: "AI generation failed after 3 attempts. Please start a new game.",
+        attempts: maxAttempts
+      });
     }
 
     // ----- Normalization / cost logic (unchanged logic, but fed from `raw`)
@@ -2383,7 +2449,6 @@ app.post("/api/dilemma", async (req, res) => {
       description,
       actions,
       topic,
-      isFallback: usedFallback,
       isGameEnd: daysLeft === 0, // Mark game conclusion
       ...(supportEffects !== null && { supportEffects }) // Only include if Day 2+
     };

@@ -2,24 +2,38 @@
 // Error display component when dilemma fails to load
 //
 // Shows:
-// - Error message
-// - "Try Again" button to retry collection
+// - Error message explaining AI generation failure
+// - "Start New Game" button to clear state and restart
 // - Debug details in debug mode
 //
 // Used by: EventScreen3
-// Props: error (string), onRetry (function)
+// Props: error (string), onStartNew (function)
 
 import { AlertTriangle } from "lucide-react";
 import { useSettingsStore } from "../../store/settingsStore";
+import { useDilemmaStore } from "../../store/dilemmaStore";
+import { useCompassStore } from "../../store/compassStore";
+import { useRoleStore } from "../../store/roleStore";
 import { bgStyle } from "../../lib/ui";
 
 type Props = {
   error: string;
-  onRetry: () => void;
+  onStartNew: () => void; // Navigate to role selection
+  onRetry?: () => void;   // Retry loading current dilemma
 };
 
-export default function DilemmaLoadError({ error, onRetry }: Props) {
+export default function DilemmaLoadError({ error, onStartNew, onRetry }: Props) {
   const debugMode = useSettingsStore(s => s.debugMode);
+
+  const handleStartNewGame = () => {
+    // Clear all game state
+    useDilemmaStore.getState().reset();
+    useCompassStore.getState().reset();
+    useRoleStore.getState().reset();
+
+    // Navigate to role selection
+    onStartNew();
+  };
 
   return (
     <div className="min-h-screen" style={bgStyle}>
@@ -34,7 +48,7 @@ export default function DilemmaLoadError({ error, onRetry }: Props) {
 
           {/* Error Heading */}
           <h2 className="text-2xl font-bold text-white mb-3">
-            Failed to Load Dilemma
+            Unable to Generate Challenge
           </h2>
 
           {/* Error Message */}
@@ -54,25 +68,49 @@ export default function DilemmaLoadError({ error, onRetry }: Props) {
             </details>
           )}
 
-          {/* Try Again Button */}
-          <button
-            onClick={onRetry}
-            className="
-              px-6 py-3
-              bg-gradient-to-r from-indigo-500 to-purple-600
-              hover:from-indigo-600 hover:to-purple-700
-              text-white font-medium rounded-lg
-              transition-all duration-200
-              shadow-lg hover:shadow-xl
-              transform hover:scale-105
-            "
-          >
-            Try Again
-          </button>
+          {/* Action Buttons */}
+          <div className="flex flex-col gap-3">
+            {/* Try Again Button (if retry handler provided) */}
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                className="
+                  px-6 py-3
+                  bg-gradient-to-r from-emerald-500 to-teal-600
+                  hover:from-emerald-600 hover:to-teal-700
+                  text-white font-medium rounded-lg
+                  transition-all duration-200
+                  shadow-lg hover:shadow-xl
+                  transform hover:scale-105
+                "
+              >
+                Try Again
+              </button>
+            )}
+
+            {/* Start New Game Button */}
+            <button
+              onClick={handleStartNewGame}
+              className="
+                px-6 py-3
+                bg-gradient-to-r from-indigo-500 to-purple-600
+                hover:from-indigo-600 hover:to-purple-700
+                text-white font-medium rounded-lg
+                transition-all duration-200
+                shadow-lg hover:shadow-xl
+                transform hover:scale-105
+              "
+            >
+              Start New Game
+            </button>
+          </div>
 
           {/* Helper Text */}
           <p className="text-sm text-white/50 mt-4">
-            Check your internet connection and try again.
+            {onRetry
+              ? "The AI service failed after 8 attempts. Wait a moment and try again, or start a new game."
+              : "The AI service failed after 8 attempts. Please start a new game to continue."
+            }
           </p>
         </div>
       </div>

@@ -373,14 +373,15 @@ export default function EventScreen3({ push }: Props) {
   }
 
   // ========================================================================
-  // RENDER: Error State (dilemma failed - no fallback)
+  // RENDER: Error State (AI generation failed after retries)
   // ========================================================================
   if (collectionError) {
     return (
       <DilemmaLoadError
         error={collectionError}
+        onStartNew={() => push('/role-selection')}
         onRetry={() => {
-          setPhase('collecting');
+          // Retry data collection without clearing state
           collectData();
         }}
       />
