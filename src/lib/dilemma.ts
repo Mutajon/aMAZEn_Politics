@@ -79,6 +79,7 @@ export type LightDilemmaRequest = {
   recentScopes?: DilemmaScope[]; // NEW: Last 5 scopes for diversity checking
   previous?: {
     title: string;
+    description: string; // CRITICAL: Full dilemma description (shows what each faction wanted)
     choiceTitle: string;
     choiceSummary: string;
   };

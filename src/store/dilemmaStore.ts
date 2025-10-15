@@ -788,6 +788,7 @@ export function buildLightSnapshot(): LightDilemmaRequest {
   if (day > 1 && lastChoice && current) {
     previous = {
       title: current.title,
+      description: current.description, // CRITICAL: Include full description so AI knows what each faction wanted
       choiceTitle: lastChoice.title,
       // Fallback to title if summary is empty (bug workaround for AI not generating summaries)
       choiceSummary: lastChoice.summary || lastChoice.title

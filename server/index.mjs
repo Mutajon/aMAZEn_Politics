@@ -1497,13 +1497,39 @@ RELATIVE COST ASSIGNMENT (APPLY AFTER WRITING THE THREE ACTIONS)
 - Do **not** edit summaries to justify costs; just assign values.
 
 SUPPORT SHIFT (only if previous choice exists)
-- Output percentage deltas for three entities based on the last choice: people, mom, power holders (not the player).
-- Each delta is an integer in [-20..20]. Typical magnitudes: ±5 small, ±10 medium, ±20 rare extremes.
-- Keep shifts varied and logical (a pro-people act usually helps people, etc.).
-- Add a very short explanation for each:
-  * people.why → civic/social reasoning.
-  * mom.why → personal voice, first person ("I…"), like a mother to her child.
-  * holders.why → institutional/political logic.
+CRITICAL: You receive "PREVIOUS SITUATION" describing what was happening and what each faction wanted.
+Read it carefully to understand each faction's stance, then calculate support shifts logically.
+
+LOGIC (apply for each faction: people, mom, holders):
+1. READ the "PREVIOUS SITUATION" description carefully
+2. INFER what this faction wanted or feared in that specific situation
+3. CHECK the "PLAYER'S CHOICE" - did it align with or oppose this faction's stance?
+4. ASSIGN delta based on alignment:
+   * If choice matched what faction wanted → POSITIVE delta (+5 to +15)
+   * If choice opposed what faction wanted → NEGATIVE delta (-5 to -15)
+   * If choice was neutral/mixed → SMALL delta (-3 to +3)
+   * Extreme actions get stronger magnitudes (±10 to ±20)
+
+EXAMPLES OF CORRECT LOGIC:
+- Previous: "Council urges strong action against intruders"
+  Choice: "Enforce immediate eviction" → Council: +10 to +15 (they got what they wanted)
+
+- Previous: "People fear violence will escalate"
+  Choice: "Enforce immediate eviction" → People: -8 to -12 (escalation they feared)
+
+- Previous: "Mom worries about your reputation abroad"
+  Choice: "Open diplomatic channels" → Mom: +8 to +12 (diplomatic, preserves reputation)
+
+MAGNITUDE GUIDE:
+- Small shift (±3 to ±5): Mild approval/disappointment, expected action
+- Medium shift (±6 to ±10): Clear approval/disapproval, significant action
+- Large shift (±11 to ±15): Strong reaction, major decision
+- Extreme shift (±16 to ±20): Rare, use only for shocking reversals or exactly what they demanded
+
+EXPLANATION STYLE:
+  * people.why → Civic/social reasoning (e.g., "Feared violence, got it")
+  * mom.why → Personal voice, first person ("I hoped you'd find another way")
+  * holders.why → Institutional logic (e.g., "Wanted decisive show of authority")
 
 OUTPUT (STRICT JSON)
 {"title":"","description":"",
@@ -1581,7 +1607,8 @@ function buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatVa
 
   // Previous choice (only if exists)
   if (previous && previous.title) {
-    parts.push(`PREVIOUS: ${previous.title} — ${previous.choiceTitle}: ${previous.choiceSummary}`);
+    parts.push(`PREVIOUS SITUATION: "${previous.description}"`);
+    parts.push(`PLAYER'S CHOICE: ${previous.choiceTitle} — ${previous.choiceSummary}`);
   } else {
     parts.push('PREVIOUS: none (first day)');
   }
@@ -1714,12 +1741,13 @@ app.post("/api/dilemma-light", async (req, res) => {
 
     const userPrompt = buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance });
 
-    // ALWAYS log previous context (critical for debugging continuity)
+    // ALWAYS log previous context (critical for debugging continuity and support shifts)
     if (previous) {
       console.log("[/api/dilemma-light] 🔗 PREVIOUS CONTEXT:");
-      console.log(`  Dilemma: "${previous.title}"`);
-      console.log(`  Choice: "${previous.choiceTitle}"`);
+      console.log(`  Situation: "${previous.description}"`);
+      console.log(`  Player Choice: "${previous.choiceTitle}"`);
       console.log(`  Summary: "${previous.choiceSummary}"`);
+      console.log("  → AI will use this context to calculate support shifts");
     } else {
       console.log("[/api/dilemma-light] 🔗 PREVIOUS CONTEXT: none (Day 1)");
     }
