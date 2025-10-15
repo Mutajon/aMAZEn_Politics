@@ -1542,12 +1542,15 @@ MAGNITUDE GUIDE:
 EXPLANATION STYLE (NATURAL VOICES, NOT SUMMARIES):
 Write each "why" as a DIRECT QUOTE expressing the faction's authentic reaction. Make it conversational, personal, and emotionally honest. Avoid dry summaries or bureaucratese.
 
-IMPORTANT: Wrap each "why" text in quotation marks to show it's a quote (e.g., "We're so relieved!" not We're so relieved!)
+CRITICAL FORMATTING: Each "why" string must START with a quotation mark (") and END with a quotation mark (").
+This makes it clear to the player that they're hearing direct speech.
+Example of CORRECT format: "We're so relieved you took this path!"
+Example of WRONG format: We're so relieved you took this path!
 
 VOICE PERSONALITIES:
   * people.why → COLLECTIVE VOICE: Enthusiastic when happy, worried when upset. Informal, emotional, immediate.
-    - Positive examples: "Finally! This is exactly what we've been asking for!" / "Thank goodness—we were terrified this would escalate!"
-    - Negative examples: "We're furious—this betrays everything we stood for!" / "This is going to blow up in everyone's faces, mark our words."
+    - Positive examples: "This is exactly what we've been asking for!" / "Thank goodness—we were terrified this would escalate!" / "About time someone took this seriously!"
+    - Negative examples: "We're furious—this betrays everything we stood for!" / "This is going to blow up in everyone's faces." / "You've got to be kidding us with this."
 
   * mom.why → MATERNAL FIRST-PERSON: Warm, protective, personally invested. Mix pride with worry.
     - Positive examples: "Oh, I'm so relieved you took the diplomatic path, dear." / "I'm proud you stood up for what's right, even if it was risky."
@@ -1574,10 +1577,15 @@ OUTPUT (STRICT JSON)
  "topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture",
  "scope":"Local|National|International",
  "supportShift": null | {
-   "people":{"delta":0,"why":""},
-   "mom":{"delta":0,"why":""},
-   "holders":{"delta":0,"why":""}
+   "people":{"delta":0,"why":"\"Your explanation here\""},
+   "mom":{"delta":0,"why":"\"Your explanation here\""},
+   "holders":{"delta":0,"why":"\"Your explanation here\""}
  }}
+
+CRITICAL: The "why" strings must include opening and closing quotation marks inside the JSON string value.
+Example: "why":"\"We're thrilled about this decision!\""  ← CORRECT (quotes inside the string)
+NOT: "why":"We're thrilled about this decision!"  ← WRONG (no quotes inside the string)
+
 Return ONLY that JSON. If there is no previous choice, set "supportShift": null.`;
 }
 
