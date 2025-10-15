@@ -21,7 +21,7 @@ type DifficultyLevel = {
 const difficulties: DifficultyLevel[] = [
   {
     id: "baby-boss",
-    title: "Baby Boss",
+    title: "Baby Boss (Easy)",
     image: "/assets/images/diffLevels/babyboss.jpg",
     supportMod: "Support +10%",
     budgetMod: "Budget +250",
@@ -29,7 +29,7 @@ const difficulties: DifficultyLevel[] = [
   },
   {
     id: "freshman",
-    title: "Freshman",
+    title: "Freshman (Normal)",
     image: "/assets/images/diffLevels/freshman.jpg",
     supportMod: "Support +0%",
     budgetMod: "Budget +0",
@@ -37,7 +37,7 @@ const difficulties: DifficultyLevel[] = [
   },
   {
     id: "tactician",
-    title: "Tactician",
+    title: "Tactician (Hard)",
     image: "/assets/images/diffLevels/tactician.jpg",
     supportMod: "Support -10%",
     budgetMod: "Budget -250",
@@ -45,7 +45,7 @@ const difficulties: DifficultyLevel[] = [
   },
   {
     id: "old-fox",
-    title: "Old Fox",
+    title: "Old Fox (Very Hard)",
     image: "/assets/images/diffLevels/oldfox.jpg",
     supportMod: "Support -20%",
     budgetMod: "Budget -500",
