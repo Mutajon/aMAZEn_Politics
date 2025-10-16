@@ -990,7 +990,7 @@ export function buildLightSnapshot(): LightDilemmaRequest {
     subjectStreak: subjectStreak || null,
     scopeStreak: scopeStreak || null, // NEW: Scope streak tracking
     recentScopes: recentScopes || [], // NEW: Last 5 scopes for diversity checking
-    recentDilemmaTitles: recentDilemmaTitles.slice(0, 3), // NEW: Last 3 titles for semantic variety
+    recentDilemmaTitles: recentDilemmaTitles.slice(0, 2), // NEW: Last 2 titles for semantic variety (2-2-2-1 pattern)
     previous,
     topWhatValues, // Only defined on Day 1
     thematicGuidance, // Always included (custom subject or default axes)
@@ -1039,7 +1039,9 @@ async function loadNextLight(): Promise<Dilemma | null> {
 
     // Store the new dilemma title for semantic variety tracking
     if (raw.title) {
+      console.log('[loadNextLight] 📝 Storing dilemma title:', raw.title);
       addDilemmaTitle(raw.title);
+      console.log('[loadNextLight] ✅ Title stored. Current titles:', useDilemmaStore.getState().recentDilemmaTitles);
     }
 
     // Apply support shifts if they exist (Day 2+)

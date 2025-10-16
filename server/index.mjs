@@ -1475,10 +1475,10 @@ SYSTEM FEEL (GLOBAL CONTEXT — ALWAYS APPLY)
 
 CONTINUITY (CRITICAL - ALWAYS FOLLOW THIS)
 - Always apply **SYSTEM FEEL** when evolving reactions and resistance across turns.
-- If subject streak ≥ 3: Conclude the previous topic in one short sentence, THEN shift to a new topic.
-- If subject streak < 3: The new situation MUST be a direct consequence of or reaction to the previous choice. Explicitly reference what happened (e.g., "After you issued the decree...", "The settlers you turned away...", "Following your speech...").
+- If subject streak ≥ 2: Conclude the previous topic in one short sentence, THEN shift to a COMPLETELY DIFFERENT topic (different subject matter, different stakeholders, different type of issue).
+- If subject streak < 2: The new situation MUST be a direct consequence of or reaction to the previous choice. Explicitly reference what happened (e.g., "After you issued the decree...", "The settlers you turned away...", "Following your speech...").
 - Evolve plausibly given the system: e.g., pushback mounts in democracies, fades or goes underground in autocracies.
-- NEVER generate a random unrelated event when there is a PREVIOUS choice. Every turn must feel causally connected to the last.
+- NEVER generate a random unrelated event when there is a PREVIOUS choice (UNLESS subject streak ≥ 2 requires a topic change). Every turn must feel causally connected to the last.
 - **VOTE OUTCOME CONTINUITY**: If the player's previous action involved putting a decision to a public vote, referendum, or popular consultation, the next situation MUST present the results of that vote.
   * Describe the outcome clearly (e.g., "The referendum passed with 62% support..." or "The citizens voted down your proposal by a slim margin...").
   * Show immediate implications and reactions (e.g., "Supporters celebrate in the streets," "The losing side demands a recount," "International observers raise concerns").
@@ -1633,7 +1633,7 @@ function calculateScopeGuidance(scopeStreak, recentScopes, debug) {
 /**
  * Build user prompt for light dilemma API - minimal dynamic context
  */
-function buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance, recentDilemmaTitles }) {
+function buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance, recentDilemmaTitles, daysLeft }) {
   const parts = [
     `ROLE & SETTING: ${role}`,
     `SYSTEM: ${system}`,
@@ -1652,19 +1652,21 @@ function buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatVa
   parts.push('');
 
   // Recent dilemma titles for semantic variety checking (NEW)
-  if (recentDilemmaTitles && Array.isArray(recentDilemmaTitles) && recentDilemmaTitles.length >= 3) {
-    parts.push('RECENT DILEMMA TITLES (last 3):');
-    recentDilemmaTitles.slice(0, 3).forEach(title => {
+  // Skip on Day 7 (epic finale handles variety independently)
+  if (daysLeft !== 1 && recentDilemmaTitles && Array.isArray(recentDilemmaTitles) && recentDilemmaTitles.length >= 2) {
+    parts.push('RECENT DILEMMA TITLES (last 2):');
+    recentDilemmaTitles.slice(0, 2).forEach(title => {
       parts.push(`- "${title}"`);
     });
     parts.push('');
-    parts.push('If these are thematically similar, create your next dilemma to contrast maximally in:');
-    parts.push('• Subject matter');
-    parts.push('• Stakeholder groups');
-    parts.push('• Type of decision required');
-    parts.push('• Resources at stake');
+    parts.push('⚠️ VARIETY CHECK: If these two titles revolve around the same specific subject matter,');
+    parts.push('you MUST create a dilemma that contrasts maximally in ALL of these dimensions:');
+    parts.push('• Subject matter (completely different topic, not just a different angle)');
+    parts.push('• Stakeholder groups (different people/factions involved)');
+    parts.push('• Type of decision required (not just variations of the same choice)');
+    parts.push('• Resources at stake (different currencies: territory vs money vs authority vs lives)');
     parts.push('');
-    parts.push('The player should feel "this is a completely different kind of problem."');
+    parts.push('The player should feel: "This is a completely different kind of problem than before."');
     parts.push('');
   }
 
@@ -1700,12 +1702,26 @@ function buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatVa
  */
 function buildEpicFinaleSection() {
   return `
-🎯 EPIC FINALE MODE:
-This is the player's FINAL dilemma (last day before game ends).
-- Make it HIGH STAKES with lasting consequences
-- Make it CLIMACTIC and game-changing
-- This should feel like the CULMINATION of their tenure
-- Still follow all other rules (specificity, brevity, realistic)
+🎯 EPIC FINALE MODE (Day 7 - FINAL DILEMMA):
+This is the player's LAST decision before the game ends.
+
+CRITICAL REQUIREMENTS:
+- **IGNORE CONTINUITY**: Do NOT continue the previous topic. Generate a NEW, unrelated high-stakes situation.
+- **NATIONAL SCOPE**: Make it affect the entire nation or multiple factions simultaneously (not a local issue).
+- **CLEAR CONSEQUENCES**: Frame it as a defining moment with visible, immediate impact on the nation's future.
+- **HARD CHOICES**: All three options should feel significant, difficult, and consequential.
+- **NO SMALL ISSUES**: This is NOT about festivals, local disputes, or administrative matters.
+
+Examples of epic finale scenarios:
+• Constitutional crisis requiring immediate decision (e.g., "Parliament votes no confidence," "Supreme Court declares emergency powers unconstitutional")
+• Major external threat demanding decisive action (e.g., "Neighboring state mobilizes army at border," "Economic embargo threatens collapse")
+• Nationwide scandal forcing you to take sides (e.g., "Evidence of massive corruption in key ministry," "Military generals demand your resignation")
+• Historic opportunity with major trade-offs (e.g., "Alliance offer that requires compromising sovereignty," "Revolutionary technology with ethical concerns")
+• Coalition collapse requiring dramatic intervention (e.g., "Key allies threaten to withdraw support unless you act," "Popular uprising reaches capital")
+
+Make the player feel: "This decision will define my entire tenure and shape the nation's future."
+
+REMINDER: Still follow all other rules (specificity, natural language, no jargon, realistic costs, support shift logic).
 `.trim();
 }
 
@@ -1813,7 +1829,7 @@ app.post("/api/dilemma-light", async (req, res) => {
       systemPrompt = buildLightSystemPrompt();
     }
 
-    const userPrompt = buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance, recentDilemmaTitles });
+    const userPrompt = buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance, recentDilemmaTitles, daysLeft });
 
     // ALWAYS log previous context (critical for debugging continuity and support shifts)
     if (previous) {
