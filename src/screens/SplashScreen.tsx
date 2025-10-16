@@ -12,7 +12,7 @@ import { useMirrorQuizStore } from "../store/mirrorQuizStore";
 import { clearAllSnapshots } from "../lib/eventScreenSnapshot";
 
 const SUBTITLES = [
-  "Discover Your Best Self"
+  "Choose your path. Discover yourself."
 ];
 
 export default function SplashScreen({

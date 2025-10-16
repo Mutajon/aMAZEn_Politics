@@ -3,6 +3,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Dilemma, DilemmaRequest, DilemmaAction, DilemmaHistoryEntry, SubjectStreak, DilemmaScope, ScopeStreak, LightDilemmaRequest, LightDilemmaResponse } from "../lib/dilemma";
 import type { ScoreBreakdown } from "../lib/scoring";
+import type { Goal, SelectedGoal } from "../data/goals";
+import { evaluateAllGoals } from "../lib/goalEvaluation";
 import { useSettingsStore } from "./settingsStore";
 import { useRoleStore } from "./roleStore";
 import { useCompassStore } from "./compassStore"; // <-- A) use compass values (0..10)
@@ -76,6 +78,14 @@ type DilemmaState = {
   difficulty: "baby-boss" | "freshman" | "tactician" | "old-fox" | null;
   setDifficulty: (level: "baby-boss" | "freshman" | "tactician" | "old-fox") => void;
 
+  // Goals system
+  selectedGoals: SelectedGoal[];
+  customActionCount: number;
+  minBudget: number;
+  minSupportPeople: number;
+  minSupportMiddle: number;
+  minSupportMom: number;
+
   loadNext: () => Promise<void>;
   nextDay: () => void;
   setTotalDays: (n: number) => void;
@@ -111,9 +121,17 @@ type DilemmaState = {
   // Dilemma history methods
   addHistoryEntry: (entry: DilemmaHistoryEntry) => void;
   clearHistory: () => void;
+
+  // Goals system methods
+  setGoals: (goals: Goal[]) => void;
+  evaluateGoals: () => void;
+  incrementCustomActions: () => void;
+  updateMinimumValues: () => void;
 };
 
-export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
+export const useDilemmaStore = create<DilemmaState>()(
+  persist(
+    (set, get) => ({
   day: 1,
   totalDays: 7,
 
@@ -165,6 +183,14 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
   // Difficulty level
   difficulty: null,
 
+  // Goals system
+  selectedGoals: [],
+  customActionCount: 0,
+  minBudget: 1500,
+  minSupportPeople: 50,
+  minSupportMiddle: 50,
+  minSupportMom: 50,
+
   async loadNext() {
     // If something is already loading, bail early
     if (get().loading || loadNextInFlight) {
@@ -203,7 +229,6 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
           if (r.ok) {
               const raw = await r.json();
               d = { title: raw.title, description: raw.description, actions: raw.actions } as Dilemma;
-              (d as any)._isFallback = !!raw.isFallback;
               dlog("server /api/dilemma ->", raw);
             } else {
             const t = await r.text();
@@ -214,10 +239,12 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
         }
       }
 
-      // Fallback to local mock if both APIs failed
+      // If API failed, propagate error to UI
       if (!d) {
-        d = localMock(get().day);
-        dlog("fallback mock ->", d);
+        const errorMsg = "Unable to generate your next challenge. The AI service failed after multiple attempts. Please start a new game.";
+        dlog("API failed, setting error:", errorMsg);
+        set({ loading: false, error: errorMsg, current: null });
+        return;
       }
 
       const prev = get().current;
@@ -310,6 +337,12 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
       supportMom: 50,
       score: 0,
       difficulty: null,
+      selectedGoals: [],
+      customActionCount: 0,
+      minBudget: 1500,
+      minSupportPeople: 50,
+      minSupportMiddle: 50,
+      minSupportMom: 50,
     });
   },
 
@@ -504,7 +537,68 @@ export const useDilemmaStore = create<DilemmaState>()((set, get) => ({
     dlog("clearHistory -> clearing all dilemma history");
     set({ dilemmaHistory: [] });
   },
-}));
+
+  // Goals system methods
+  setGoals(goals) {
+    const selectedGoals: SelectedGoal[] = goals.map(g => ({
+      ...g,
+      status: 'unmet' as const,
+      lastEvaluatedDay: 0,
+    }));
+    set({ selectedGoals });
+    dlog("setGoals ->", goals.map(g => g.id));
+  },
+
+  evaluateGoals() {
+    const { selectedGoals } = get();
+    if (selectedGoals.length === 0) {
+      dlog("evaluateGoals -> no goals selected, skipping");
+      return;
+    }
+
+    const updatedGoals = evaluateAllGoals(selectedGoals);
+    set({ selectedGoals: updatedGoals });
+    dlog("evaluateGoals ->", updatedGoals.map(g => `${g.id}: ${g.status}`));
+  },
+
+  incrementCustomActions() {
+    const { customActionCount } = get();
+    const newCount = customActionCount + 1;
+    set({ customActionCount: newCount });
+    dlog("incrementCustomActions ->", newCount);
+  },
+
+  updateMinimumValues() {
+    const state = get();
+    const newMinBudget = Math.min(state.minBudget, state.budget);
+    const newMinPeople = Math.min(state.minSupportPeople, state.supportPeople);
+    const newMinMiddle = Math.min(state.minSupportMiddle, state.supportMiddle);
+    const newMinMom = Math.min(state.minSupportMom, state.supportMom);
+
+    set({
+      minBudget: newMinBudget,
+      minSupportPeople: newMinPeople,
+      minSupportMiddle: newMinMiddle,
+      minSupportMom: newMinMom,
+    });
+
+    dlog("updateMinimumValues ->", {
+      budget: newMinBudget,
+      people: newMinPeople,
+      middle: newMinMiddle,
+      mom: newMinMom,
+    });
+  },
+    }),
+    {
+      name: "amaze-politics-difficulty-v1",
+      partialize: (state) => ({
+        difficulty: state.difficulty,
+        selectedGoals: state.selectedGoals
+      })
+    }
+  )
+);
 
 // ---- helpers ----
 
@@ -766,7 +860,7 @@ function getTop2WhatValues(): string[] {
  * Much simpler than buildSnapshot() - only role, system, streak, and previous choice
  */
 export function buildLightSnapshot(): LightDilemmaRequest {
-  const { debugMode, useLightDilemmaAnthropic, dilemmasSubjectEnabled, dilemmasSubject } = useSettingsStore.getState();
+  const { debugMode, useLightDilemmaAnthropic, dilemmasSubjectEnabled, dilemmasSubject, skipPreviousContext } = useSettingsStore.getState();
   const { day, totalDays, lastChoice, current, subjectStreak, scopeStreak, recentScopes } = useDilemmaStore.getState();
   const roleState = useRoleStore.getState();
 
@@ -784,15 +878,42 @@ export function buildLightSnapshot(): LightDilemmaRequest {
     : "Divine Right Monarchy";
 
   // Build previous choice data (only for day 2+)
+  // SAFETY: Validate all fields before sending to AI
+  // DEBUG: Can be disabled via skipPreviousContext setting
   let previous: LightDilemmaRequest['previous'] | undefined = undefined;
-  if (day > 1 && lastChoice && current) {
-    previous = {
-      title: current.title,
-      description: current.description, // CRITICAL: Include full description so AI knows what each faction wanted
-      choiceTitle: lastChoice.title,
-      // Fallback to title if summary is empty (bug workaround for AI not generating summaries)
-      choiceSummary: lastChoice.summary || lastChoice.title
-    };
+  if (day > 1 && lastChoice && current && !skipPreviousContext) {
+    // Validate that we have all required data
+    const hasValidTitle = current.title && typeof current.title === 'string' && current.title.trim().length > 0;
+    const hasValidDescription = current.description && typeof current.description === 'string' && current.description.trim().length > 0;
+    const hasValidChoiceTitle = lastChoice.title && typeof lastChoice.title === 'string' && lastChoice.title.trim().length > 0;
+
+    if (!hasValidTitle) {
+      console.error('[buildLightSnapshot] ⚠️ Day 2+ but current.title is invalid:', current.title);
+      console.error('[buildLightSnapshot] Skipping previous context to avoid AI failure');
+    } else if (!hasValidDescription) {
+      console.error('[buildLightSnapshot] ⚠️ Day 2+ but current.description is invalid:', current.description);
+      console.error('[buildLightSnapshot] Skipping previous context to avoid AI failure');
+    } else if (!hasValidChoiceTitle) {
+      console.error('[buildLightSnapshot] ⚠️ Day 2+ but lastChoice.title is invalid:', lastChoice.title);
+      console.error('[buildLightSnapshot] Skipping previous context to avoid AI failure');
+    } else {
+      // All data is valid, build the previous object
+      previous = {
+        title: current.title,
+        description: current.description,
+        choiceTitle: lastChoice.title,
+        // Fallback to title if summary is empty (bug workaround for AI not generating summaries)
+        choiceSummary: lastChoice.summary || lastChoice.title
+      };
+
+      if (debugMode) {
+        console.log('[buildLightSnapshot] ✅ Previous context validated and included');
+        console.log('[buildLightSnapshot] Previous dilemma:', previous.title);
+        console.log('[buildLightSnapshot] Player choice:', previous.choiceTitle);
+      }
+    }
+  } else if (day > 1 && skipPreviousContext) {
+    console.log('[buildLightSnapshot] ⚠️ Day 2+ but skipPreviousContext is enabled - treating as Day 1');
   }
 
   // Get top 2 "what" values on Day 1 for personalized dilemma
@@ -912,9 +1033,6 @@ async function loadNextLight(): Promise<Dilemma | null> {
       actions: raw.actions
     };
 
-    // Carry private marker for UI gating
-    (dilemma as any)._isFallback = !!raw.isFallback;
-
     if (debugMode) {
       console.log("[loadNextLight] Dilemma created:", dilemma);
     }
@@ -925,43 +1043,4 @@ async function loadNextLight(): Promise<Dilemma | null> {
     console.error("[loadNextLight] Error:", e?.message || e);
     return null;
   }
-}
-
-
-
-function localMock(day: number): Dilemma {
-  const dilemma: any = {
-    title:
-      day === 1 ? "First Night in the Palace" : "Crowds Swell Outside the Palace",
-    description:
-      day === 1
-        ? "As the seals change hands, a restless city watches. Advisors split: display resolve now, or earn trust with patience."
-        : "Rumors spiral as barricades appear along the market roads. Decide whether to project strength or show empathy before things harden.",
-    actions: [
-      {
-        id: "a",
-        title: "Impose Curfew",
-        summary: "Restrict movement after dusk with visible patrols.",
-        cost: -150,
-        iconHint: "security",
-      },
-      {
-        id: "b",
-        title: "Address the Nation",
-        summary: "Speak live tonight to calm fears and set the tone.",
-        cost: -50,
-        iconHint: "speech",
-      },
-      {
-        id: "c",
-        title: "Open Negotiations",
-        summary: "Invite opposition figures for mediated talks.",
-        cost: +50,
-        iconHint: "diplomacy",
-      },
-    ],
-  };
-  // Add topic for tracking (Rule #9)
-  (dilemma as any).topic = "Security";
-  return dilemma;
 }

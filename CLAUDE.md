@@ -60,8 +60,8 @@ toggleDebug()        # Toggle debug mode
 
 - **roleStore** - Selected role, political analysis, character data
 - **compassStore** - 4D political compass values (what/whence/how/whither)
-- **dilemmaStore** - Current game state, resources, support levels, subject streak tracking
-- **settingsStore** - User preferences (narration, music, debug mode, useLightDilemma toggle)
+- **dilemmaStore** - Current game state, resources, support levels, subject streak tracking, selected goals, goal tracking state
+- **settingsStore** - User preferences (narration, music, sound effects, debug mode, useLightDilemma toggle, enableModifiers)
 - **mirrorQuizStore** - Compass assessment progress
 - **aftermathStore** - Aftermath data prefetching
 - **dilemmaPrefetchStore** - First dilemma prefetching
@@ -94,12 +94,15 @@ toggleDebug()        # Toggle debug mode
 
 1. **Role Selection** → Political system analysis (predefined roles skip AI call)
 2. **Character Creation** → Name suggestions + AI avatar (predefined roles use static data)
-3. **Difficulty Selection** → Optional (if `enableModifiers` setting is ON)
-4. **Compass Assessment** → Mirror dialogue + quiz to map 4D values
-5. **Daily Dilemmas (7 days)** → AI-generated political situations affecting budget, support, compass values
-6. **Aftermath Screen** → AI epilogue with narrative summary, decision breakdown, ratings
-7. **Final Score Screen** → Animated score breakdown with Hall of Fame integration
-8. **Hall of Fame** → Top 50 highscores with player highlighting
+3. **Power Distribution** → Define support levels for three factions
+4. **Difficulty Selection** (if `enableModifiers` setting is ON) → Choose difficulty level affecting starting resources
+5. **Goals Selection** (if `enableModifiers` setting is ON) → Choose 2 out of 3 randomly-presented goals to pursue
+6. **Compass Assessment** → Mirror dialogue + quiz to map 4D values
+7. **Background Intro** → Sleep transition with personalized wake-up narrative
+8. **Daily Dilemmas (7 days)** → AI-generated political situations affecting budget, support, compass values
+9. **Aftermath Screen** → AI epilogue with narrative summary, decision breakdown, ratings
+10. **Final Score Screen** → Animated score breakdown with goal bonuses and Hall of Fame integration
+11. **Hall of Fame** → Top 50 highscores with player highlighting
 
 ### Key Game Mechanics
 
@@ -115,6 +118,13 @@ toggleDebug()        # Toggle debug mode
 **Subject Streak Tracking:**
 - Automatically varies topics after 3+ consecutive same-subject dilemmas
 - Prevents repetitive content
+
+**Vote Outcome Continuity:**
+- If player's previous action involved calling a vote, referendum, or public consultation, the next dilemma MUST present the results
+- Results include: outcome percentage/margin, immediate reactions, and implications
+- New dilemma framed around how player responds to the vote results
+- Applies SYSTEM FEEL: outcomes play differently across political systems (e.g., direct democracies implement immediately, autocracies may face resistance if ignored)
+- Implementation: `server/index.mjs:1469-1473` in CONTINUITY section of `buildLightSystemPrompt()`
 
 **Action Confirmation Pipeline:**
 1. Immediate UI: Card animation, coin flight, budget update (synchronous)
@@ -136,6 +146,59 @@ toggleDebug()        # Toggle debug mode
 - Appears on Day 2+ at presentation Step 4A
 - Auto-collapse after 2s, user-expandable with "+" button
 
+**Goals System:**
+- Only enabled when `enableModifiers` setting is ON
+- Player selects 2 out of 3 randomly-presented goals after difficulty selection
+- Goals displayed in ResourceBar (compact pill format, left of avatar picture) during gameplay
+- Three goal categories:
+  - **End-State Goals**: Evaluated only on final day (e.g., "End with 85%+ public support")
+  - **Continuous Goals**: Can permanently fail if threshold violated (e.g., "Never drop below 50% support")
+  - **Behavioral Goals**: Track player actions (e.g., "Never use custom actions")
+- Minimum value tracking: Budget, support levels tracked throughout game for continuous goals
+- Custom action tracking: Incremented when player uses "Suggest Your Own" option
+- Goal evaluation: Runs after each day advancement (in eventDataCleaner.ts)
+- Real-time status updates via GoalsCompact component with status icons (✅/⏳/❌) and hover tooltips
+- Final scoring: Bonus points awarded only for completed goals (0-300 total)
+- Data centralized in `src/data/goals.ts` for easy editing
+
+## Audio System
+
+**Architecture:**
+- Centralized audio management via `audioManager` singleton (`src/lib/audioManager.ts`)
+- React hook wrapper: `useAudioManager()` for component integration
+- Separate volume controls for music and sound effects
+- All audio files preloaded on initialization
+
+**Audio Files:**
+- `tempBKGmusic.mp3` - Background music (loops, 30% volume default)
+- `achievementsChimesShort.mp3` - Compass pills achievement sound
+- `coins.mp3` - Coin animation sound
+- `click soft.mp3` - Button click feedback
+
+**UI Controls:**
+- `AudioControls` component - Vertical stack at top-left
+- Music button (top): Music note icon (amber when enabled, gray when muted)
+- SFX button (bottom): Speaker icon (cyan when enabled, gray when muted)
+- Semi-transparent backdrop, visible on all screens
+
+**Settings Integration:**
+- `musicEnabled` / `sfxEnabled` - Toggle mute state
+- `musicVolume` / `sfxVolume` - Volume levels (0.0 - 1.0)
+- Persisted in localStorage via Zustand (settings-v11)
+
+**Sound Triggers:**
+- **Background Music**: Auto-starts in App.tsx on mount
+- **Achievement Chime**: CompassPillsOverlay when pills appear
+- **Coins**: CoinFlightSystem when animation starts
+- **Click**: ActionDeckContent on button interactions (select, confirm, cancel)
+
+**Narration Integration:**
+- Narration (TTS voiceover) is controlled by SFX toggle
+- When SFX is muted, narration is also disabled (prevents TTS API requests)
+- TTS API requests are automatically prevented when disabled (no token waste)
+- Prevention check occurs in useNarrator.ts:85-92 before fetch to /api/tts
+- Used in EventScreen (dilemma narration) and AftermathScreen (remembrance narration)
+
 ## Political Compass System
 
 Four dimensions with 10 components each (40 total):
@@ -153,13 +216,20 @@ Score calculated in FinalScoreScreen only (stays at 0 during gameplay).
 | **Support** | 1500 | 500 per track: `(value/100) × 500` |
 | **Budget** | 400 | `min(400, (budget/1200) × 400)` |
 | **Ideology** | 500 | 250 per axis (5-tier from Aftermath API) |
-| **Goals** | ±300 | ±150 per goal (not implemented) |
-| **Bonus** | ±200 | Variable (not implemented) |
+| **Goals** | 0-300 | Sum of completed goal bonuses (max 2 goals × 150 pts each) |
 | **Difficulty** | ±500 | -200/0/+200/+500 flat modifier |
-| **TOTAL** | ~3000 | Clamped [0, 3000] |
+| **TOTAL** | ~3500 | Clamped [0, 3500] |
 
 **Ideology Rating → Points:**
 - very-low: 50, low: 112, medium: 175, high: 212, very-high: 250
+
+**Goals System:**
+- Only available when `enableModifiers` setting is ON
+- Players select 2 out of 3 randomly-presented goals after difficulty selection
+- Goal types: End-State (final values), Continuous (never drop below), Behavioral (action tracking)
+- Real-time status tracking (✅ met / ⏳ in progress / ❌ failed) displayed in ResourceBar
+- Bonus points awarded only for completed goals
+- Goal pool contains 12 different goals with bonuses ranging from 100-150 points each
 
 **Hall of Fame Integration:**
 - All players auto-submitted to highscore table after animation

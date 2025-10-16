@@ -52,7 +52,9 @@ export type ScoreBreakdown = {
     total: number;        // Sum (max 500)
   };
   goals: {
-    total: number;        // ±300 points (not implemented)
+    completed: number;    // Number of goals completed (0-2)
+    bonusPoints: number;  // Total bonus from completed goals
+    total: number;        // Total goal points (max 300)
   };
   bonus: {
     points: number;       // ±200 points (not implemented)
@@ -61,7 +63,7 @@ export type ScoreBreakdown = {
     level: string;        // Difficulty name
     points: number;       // ±500 points
   };
-  final: number;          // Total clamped [0, 3000]
+  final: number;          // Total clamped [0, 3500]
 };
 
 // ========================================================================
@@ -138,12 +140,21 @@ export function calculateIdeologyScore(
 }
 
 /**
- * Calculate goals score (not implemented yet)
- * Placeholder: returns 0
+ * Calculate goals score from selected goals
+ * Sums bonus points from all completed goals (max 2 goals)
+ * @param selectedGoals Array of selected goals with status
+ * @returns Goals score breakdown
  */
-export function calculateGoalsScore(): ScoreBreakdown["goals"] {
+export function calculateGoalsScore(
+  selectedGoals: Array<{ status: string; scoreBonusOnCompletion: number }> = []
+): ScoreBreakdown["goals"] {
+  const completedGoals = selectedGoals.filter(g => g.status === 'met');
+  const bonusPoints = completedGoals.reduce((sum, g) => sum + g.scoreBonusOnCompletion, 0);
+
   return {
-    total: 0, // TODO: Implement goals tracking
+    completed: completedGoals.length,
+    bonusPoints,
+    total: bonusPoints, // Total is sum of bonuses (capped at 300 in final calculation)
   };
 }
 
@@ -181,7 +192,7 @@ export function calculateDifficultyScore(
 }
 
 /**
- * Calculate final score (sum all categories, clamp [0, 3000])
+ * Calculate final score (sum all categories, clamp [0, 3500])
  */
 export function calculateFinalScore(breakdown: ScoreBreakdown): number {
   const sum =
@@ -192,7 +203,7 @@ export function calculateFinalScore(breakdown: ScoreBreakdown): number {
     breakdown.bonus.points +
     breakdown.difficulty.points;
 
-  return Math.max(0, Math.min(3000, sum));
+  return Math.max(0, Math.min(3500, sum));
 }
 
 // ========================================================================

@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { CompassEffectPing } from "../MiniCompass";
 import { COMPONENTS, PALETTE } from "../../data/compass-data";
+import { useAudioManager } from "../../hooks/useAudioManager";
 
 type Props = {
   effectPills: CompassEffectPing[];
@@ -16,6 +17,8 @@ type Props = {
  *  - Container is pointer-events-none; only controls are clickable.
  *  - Pills animate from/to button position for smooth spatial transitions. */
 export default function CompassPillsOverlay({ effectPills, loading, color }: Props) {
+  const { playSfx } = useAudioManager();
+
   // Track expand/collapse
   const [expanded, setExpanded] = useState<boolean>(true);
 
@@ -36,6 +39,10 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
     }
     // New pills: show expanded then collapse after 2s
     setExpanded(true);
+
+    // Play achievement sound when new pills appear
+    playSfx('achievement');
+
     if (timerRef.current) window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => {
       setExpanded(false);

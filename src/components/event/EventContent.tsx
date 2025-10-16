@@ -191,8 +191,8 @@ export default function EventContent({
         />
       )}
 
-      {/* Dilemma + Actions (gated until narration is ready AND real dilemma exists) */}
-      {progressiveLoading?.shouldShowDilemma && canShowDilemma && current && !((current as any)._isFallback) && (
+      {/* Dilemma + Actions (gated until narration is ready AND dilemma exists) */}
+      {progressiveLoading?.shouldShowDilemma && canShowDilemma && current && (
         <div className="mt-4">
           <DilemmaCard title={current.title} description={current.description} />
         </div>
@@ -209,7 +209,7 @@ export default function EventContent({
         </div>
       )}
 
-      {canShowDilemma && current && !((current as any)._isFallback) && progressiveLoading?.shouldShowActionDeck && (
+      {canShowDilemma && current && progressiveLoading?.shouldShowActionDeck && (
         <ActionDeck
           actions={actionsForDeck}
           showBudget={showBudget}

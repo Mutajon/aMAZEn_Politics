@@ -8,10 +8,11 @@
  * Uses: framer-motion for animations, lucide-react for coin icons
  */
 
-import React from "react";
+import React, { useEffect } from "react";
 import { motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { Coins } from "lucide-react";
+import { useAudioManager } from "../../hooks/useAudioManager";
 
 export type Point = { x: number; y: number };
 export type CoinFlight = {
@@ -28,13 +29,22 @@ interface CoinFlightOverlayProps {
 }
 
 export function CoinFlightOverlay({ flights, onAllDone }: CoinFlightOverlayProps) {
+  const { playSfx } = useAudioManager();
+
   // Compute total max duration for auto-dispose
   const maxDuration = Math.max(
     0,
     ...flights.map((f) => (f.duration ?? 0.9) + 0.2) // +max stagger
   );
 
-  React.useEffect(() => {
+  // Play coin sound effect when flights start
+  useEffect(() => {
+    if (flights.length > 0) {
+      playSfx('coins');
+    }
+  }, []); // Only on mount - eslint-disable-next-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     const t = setTimeout(onAllDone, (maxDuration + 0.1) * 1000);
     return () => clearTimeout(t);
   }, [flights, onAllDone, maxDuration]);

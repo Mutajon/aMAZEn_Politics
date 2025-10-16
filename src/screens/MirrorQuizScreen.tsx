@@ -62,12 +62,14 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   const { quiz, idx, done, summary, epilogueShown, init, advance, setDone, setSummary, markEpilogueShown } =
     useMirrorQuizStore();
 
-  // ALWAYS reset compass and start fresh quiz on mount
-  // This ensures clean state even if user navigates back to this screen
-  // or if quiz store has stale data from previous session
+  // Only initialize quiz if it hasn't been started yet
+  // This allows returning from MirrorScreen without resetting the completed state
+  // New games are handled by resetAll() in SplashScreen
   useEffect(() => {
-    resetCompass();
-    init(pickQuiz(3));
+    if (quiz.length === 0) {
+      resetCompass();
+      init(pickQuiz(3));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only on mount, not on quiz/init/resetCompass changes
 

@@ -60,7 +60,7 @@ export default function DifficultyScreen({ push }: { push: PushFn }) {
   const handleConfirm = () => {
     if (!selected) return;
     setDifficulty(selected);
-    push("/compass-intro");
+    push("/goals");
   };
 
   return (

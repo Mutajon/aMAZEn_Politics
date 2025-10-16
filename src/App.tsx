@@ -1,4 +1,5 @@
 // src/App.tsx
+import { useEffect } from "react";
 import MiniCompassDebugScreen from "./screens/MiniCompassDebugScreen";
 
 import { useHashRoute } from "./lib/router";
@@ -15,49 +16,70 @@ import MirrorDialogueScreen from "./screens/MirrorDialogueScreen";
 import MirrorQuizScreen from "./screens/MirrorQuizScreen";
 import BackgroundIntroScreen from "./screens/BackgroundIntroScreen";
 import DifficultyScreen from "./screens/DifficultyScreen";
+import GoalsSelectionScreen from "./screens/GoalsSelectionScreen";
 import { useEnsureMirroredAvatarOnce } from "./hooks/useEnsureMirroredAvatarOnce";
 import EventScreen3 from "./screens/EventScreen3";
 import HighscoreScreen from "./screens/HighscoreScreen";
 import MirrorScreen from "./screens/MirrorScreen";
 import AftermathScreen from "./screens/AftermathScreen";
 import FinalScoreScreen from "./screens/FinalScoreScreen";
+import AudioControls from "./components/AudioControls";
+import { useAudioManager } from "./hooks/useAudioManager";
+import { useSettingsStore } from "./store/settingsStore";
+
 if (import.meta.env.DEV) {
   import("./dev/storesDebug").then(m => m.attachStoresDebug());
 }
 
 export default function App() {
   const { route, push } = useHashRoute();
+  const { playMusic } = useAudioManager();
+  const enableModifiers = useSettingsStore((s) => s.enableModifiers);
+
   console.debug("[App] route =", route);
   useEnsureMirroredAvatarOnce();
 
-  if (route === "/intro") return <IntroScreen push={push} />;
-  if (route === "/role") return <RoleSelectionScreen push={push} />;
-  if (route === "/campaign") return <CampaignScreen />;
-  if (route === "/power") return <PowerDistributionScreen push={push} />;
-  if (route === "/difficulty") return <DifficultyScreen push={push} />;
+  // Auto-start background music on mount (respects user settings)
+  useEffect(() => {
+    playMusic('background', true); // Loop enabled
+  }, [playMusic]);
 
-  // NEW split screens
-  if (route === "/compass-intro") return <CompassIntroStart push={push} />;
-  if (route === "/compass-mirror") return <MirrorDialogueScreen push={push} />;
-  if (route === "/compass-quiz") return <MirrorQuizScreen push={push} />;
-
-  if (route === "/name") return <NameScreen push={push} />;
-  if (route === "/compass-vis") return <CompassVisScreen push={push} />;
-  if (route === "/mirror") return <MirrorScreen push={push} />;
-  if (route === "/debug-mini") return <MiniCompassDebugScreen push={push} />;
-  if (route === "/background-intro") return <BackgroundIntroScreen push={push} />;
-  if (route === "/event") return <EventScreen3 push={push} />;
-  if (route === "/highscores") return <HighscoreScreen push={push} />;
-  if (route === "/aftermath") return <AftermathScreen push={push} />;
-  if (route === "/final-score") return <FinalScoreScreen push={push} />;
-
-  
-
+  // Render current screen with global audio controls
   return (
-    <SplashScreen
-      onStart={() => push("/role")}
-      onHighscores={() => push("/highscores")} // ← new
-    />
+    <>
+      {/* Global audio controls - visible on all screens */}
+      <AudioControls />
+
+      {route === "/intro" && <IntroScreen push={push} />}
+      {route === "/role" && <RoleSelectionScreen push={push} />}
+      {route === "/campaign" && <CampaignScreen />}
+      {route === "/power" && <PowerDistributionScreen push={push} />}
+      {enableModifiers && route === "/difficulty" && <DifficultyScreen push={push} />}
+
+      {/* NEW split screens */}
+      {route === "/compass-intro" && <CompassIntroStart push={push} />}
+      {route === "/compass-mirror" && <MirrorDialogueScreen push={push} />}
+      {route === "/compass-quiz" && <MirrorQuizScreen push={push} />}
+
+      {route === "/name" && <NameScreen push={push} />}
+      {route === "/compass-vis" && <CompassVisScreen push={push} />}
+      {route === "/mirror" && <MirrorScreen push={push} />}
+      {route === "/debug-mini" && <MiniCompassDebugScreen push={push} />}
+      {route === "/background-intro" && <BackgroundIntroScreen push={push} />}
+      {enableModifiers && route === "/goals" && <GoalsSelectionScreen push={push} />}
+      {route === "/event" && <EventScreen3 push={push} />}
+      {route.startsWith("/highscores") && <HighscoreScreen />}
+      {route === "/aftermath" && <AftermathScreen push={push} />}
+      {route === "/final-score" && <FinalScoreScreen push={push} />}
+
+
+      {/* Default route - SplashScreen */}
+      {route === "/" && (
+        <SplashScreen
+          onStart={() => push("/role")}
+          onHighscores={() => push("/highscores")}
+        />
+      )}
+    </>
   );
-  
 }

@@ -1,8 +1,10 @@
 // src/components/event/ResourceBar.tsx
-// Restored visuals + animated budget counter + anchor for coin flights + player avatar
+// Restored visuals + animated budget counter + anchor for coin flights + player avatar + goals display
 
 import React, { useMemo, useState } from "react";
 import { Hourglass, Coins, User } from "lucide-react";
+import GoalsCompact from "./GoalsCompact";
+import { useSettingsStore } from "../../store/settingsStore";
 
 type Props = {
   daysLeft: number;
@@ -12,6 +14,9 @@ type Props = {
 };
 
 export default function ResourceBar({ daysLeft, budget, showBudget = true, avatarSrc }: Props) {
+  // Check if modifiers (difficulty + goals) are enabled
+  const enableModifiers = useSettingsStore((s) => s.enableModifiers);
+
   // --- Animated counter: prev -> budget over 2s (ease-out) ---
   const [displayBudget, setDisplayBudget] = React.useState(budget);
   const prevRef = React.useRef(budget);
@@ -78,6 +83,8 @@ export default function ResourceBar({ daysLeft, budget, showBudget = true, avata
           iconTextClass="text-amber-200" // ← original: light gold icon
         />
       )}
+      {/* Goals display (only if modifiers enabled) */}
+      {enableModifiers && <GoalsCompact />}
       {/* Avatar Pill */}
       <div
         className="shrink-0 rounded-xl overflow-hidden ring-1 ring-white/15 bg-white/5"

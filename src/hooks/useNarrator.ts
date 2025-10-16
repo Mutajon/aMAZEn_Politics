@@ -26,24 +26,27 @@ export type PreparedTTS = {
 
 const log = (...a: unknown[]) => console.log("[Narrator/OAI]", ...a);
 
+// Global refs shared across all useNarrator instances
+// This allows any component to stop the currently playing narration
+let globalAudioRef: HTMLAudioElement | null = null;
+let globalObjectUrlRef: string | null = null;
+let globalAbortRef: AbortController | null = null;
+
 export function useNarrator() {
   const { narrationEnabled } = useSettingsStore();
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const objectUrlRef = useRef<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
   const [speaking, setSpeaking] = useState(false);
 
   const _cleanup = useCallback(() => {
-    try { audioRef.current?.pause?.(); } catch {}
-    audioRef.current = null;
+    try { globalAudioRef?.pause?.(); } catch {}
+    globalAudioRef = null;
 
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
-      objectUrlRef.current = null;
+    if (globalObjectUrlRef) {
+      URL.revokeObjectURL(globalObjectUrlRef);
+      globalObjectUrlRef = null;
     }
-    if (abortRef.current) {
-      abortRef.current.abort();
-      abortRef.current = null;
+    if (globalAbortRef) {
+      globalAbortRef.abort();
+      globalAbortRef = null;
     }
     setSpeaking(false);
   }, []);
@@ -93,7 +96,7 @@ export function useNarrator() {
 
       // Any previous in-flight fetch/audio is canceled
       _cleanup();
-      abortRef.current = new AbortController();
+      globalAbortRef = new AbortController();
 
       const voice = (opts.voiceName || "alloy").toLowerCase();
       const format = opts.format || "mp3";
@@ -104,7 +107,7 @@ export function useNarrator() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, voice, format }),
-        signal: abortRef.current.signal,
+        signal: globalAbortRef.signal,
       });
       if (!r.ok) {
         const t = await r.text().catch(() => "");
@@ -120,7 +123,7 @@ export function useNarrator() {
       const blob = new Blob([buf], { type });
       const url = URL.createObjectURL(blob);
 
-      objectUrlRef.current = url;
+      globalObjectUrlRef = url;
       const audio = new Audio(url);
       audio.preload = "auto";
       audio.volume = volume;
@@ -147,8 +150,8 @@ export function useNarrator() {
 
       const start = async () => {
         if (disposed) return;
-        // register as the active audio
-        audioRef.current = audio;
+        // register as the active audio in global ref
+        globalAudioRef = audio;
         audio.onplay = () => { setSpeaking(true); log("play start"); };
         audio.onended = () => { setSpeaking(false); log("play end"); };
         audio.onerror = (e) => { setSpeaking(false); console.warn("[Narrator/OAI] audio error", e); };
@@ -160,9 +163,9 @@ export function useNarrator() {
         disposed = true;
         try { audio.pause(); } catch {}
         audio.src = "";
-        if (objectUrlRef.current) {
-          URL.revokeObjectURL(objectUrlRef.current);
-          objectUrlRef.current = null;
+        if (globalObjectUrlRef) {
+          URL.revokeObjectURL(globalObjectUrlRef);
+          globalObjectUrlRef = null;
         }
       };
 

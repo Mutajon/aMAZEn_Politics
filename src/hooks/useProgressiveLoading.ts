@@ -327,9 +327,9 @@ export function useProgressiveLoading(props?: ProgressiveLoadingProps) {
       // Wait for the dilemma that started generating earlier
       await dilemmaPromise;
 
-      // Verify we have a real dilemma
+      // Verify we have a dilemma
       const currentDilemma = useDilemmaStore.getState().current;
-      if (!currentDilemma || (currentDilemma as any)._isFallback) {
+      if (!currentDilemma) {
         console.warn("[useProgressiveLoading] Dilemma generation may have failed, but continuing");
       }
 

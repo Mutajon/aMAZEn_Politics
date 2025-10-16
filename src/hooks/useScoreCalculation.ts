@@ -45,6 +45,7 @@ export function useScoreCalculation({
   const supportMom = useDilemmaStore((s) => s.supportMom);
   const budget = useDilemmaStore((s) => s.budget);
   const difficulty = useDilemmaStore((s) => s.difficulty);
+  const selectedGoals = useDilemmaStore((s) => s.selectedGoals);
 
   // Calculate all score categories (memoized for performance)
   const breakdown = useMemo<ScoreBreakdown>(() => {
@@ -52,7 +53,7 @@ export function useScoreCalculation({
     const support = calculateSupportScore(supportPeople, supportMiddle, supportMom);
     const budgetScore = calculateBudgetScore(budget);
     const ideology = calculateIdeologyScore(liberalismRating, autonomyRating);
-    const goals = calculateGoalsScore();
+    const goals = calculateGoalsScore(selectedGoals);
     const bonus = calculateBonusScore();
     const difficultyScore = calculateDifficultyScore(difficulty);
 
@@ -71,7 +72,7 @@ export function useScoreCalculation({
     partial.final = calculateFinalScore(partial);
 
     return partial;
-  }, [supportPeople, supportMiddle, supportMom, budget, liberalismRating, autonomyRating, difficulty]);
+  }, [supportPeople, supportMiddle, supportMom, budget, liberalismRating, autonomyRating, difficulty, selectedGoals]);
 
   return breakdown;
 }

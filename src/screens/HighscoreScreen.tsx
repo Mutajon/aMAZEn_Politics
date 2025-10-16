@@ -1,6 +1,5 @@
 // src/screens/HighscoreScreen.tsx
 import { useMemo, useState, useEffect, useRef } from "react";
-import type { PushFn } from "../lib/router";
 import { bgStyle } from "../lib/ui";
 import { useHighscoreStore } from "../store/highscoreStore";
 import LeaderPopup from "../components/LeaderPopup";
@@ -41,7 +40,7 @@ function rankColor(i: number): string | undefined {
   return undefined;              // 4+ → default table color
 }
 
-export default function HighscoreScreen({ push }: { push: PushFn }) {
+export default function HighscoreScreen() {
   const entries = useHighscoreStore((s) => s.entries);
   const [selected, setSelected] = useState<HighscoreEntry | null>(null);
   const highlightedRef = useRef<HTMLButtonElement | null>(null);
@@ -84,7 +83,7 @@ export default function HighscoreScreen({ push }: { push: PushFn }) {
             Top hall of famers
           </h1>
           <button
-            onClick={() => push("/")}
+            onClick={() => window.history.back()}
             className="rounded-xl px-3 py-2 bg-white/10 hover:bg-white/15 text-white"
           >
             ← Back

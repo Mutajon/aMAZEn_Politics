@@ -80,6 +80,13 @@ export async function cleanAndAdvanceDay(
   console.log(`[Cleaner] Budget updated: ${budget} → ${newBudget} (${costDisplay})`);
 
   // ========================================================================
+  // STEP 2A: Update minimum values tracking (for continuous goals)
+  // ========================================================================
+  const { updateMinimumValues } = useDilemmaStore.getState();
+  updateMinimumValues();
+  console.log('[Cleaner] Minimum values updated for goal tracking');
+
+  // ========================================================================
   // STEP 3: Wait for coin animation (triggered by ActionDeck internally)
   // ========================================================================
   // Note: ActionDeck's confirmation flow already triggers coin flight
@@ -126,6 +133,13 @@ export async function cleanAndAdvanceDay(
 
   const { day: newDay } = useDilemmaStore.getState();
   console.log(`[Cleaner] Day advanced: ${currentDay} → ${newDay}`);
+
+  // ========================================================================
+  // STEP 7: Evaluate goals after day advancement
+  // ========================================================================
+  const { evaluateGoals } = useDilemmaStore.getState();
+  evaluateGoals();
+  console.log('[Cleaner] Goals evaluated for day', newDay);
 
   // ========================================================================
   // DONE - EventScreen3 will detect day change and restart collection

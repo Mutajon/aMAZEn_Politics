@@ -285,6 +285,7 @@ useEffect(() => {
                   useDilemmaStore.getState().clearHistory();
                   console.log("[BackgroundIntro] Dilemma history cleared for new game");
 
+                  // Navigate to event screen
                   push("/event");
                 }}
               >

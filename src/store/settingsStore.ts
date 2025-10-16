@@ -58,6 +58,18 @@ type SettingsState = {
   toggleMusicEnabled: () => void;
   musicVolume: number;
   setMusicVolume: (v: number) => void;
+
+  // --- NEW: Sound effects ---
+  sfxEnabled: boolean;
+  setSfxEnabled: (v: boolean) => void;
+  toggleSfxEnabled: () => void;
+  sfxVolume: number;
+  setSfxVolume: (v: number) => void;
+
+  // --- DEBUG: Skip previous context on Day 2+ (for debugging AI failures) ---
+  skipPreviousContext: boolean;
+  setSkipPreviousContext: (v: boolean) => void;
+  toggleSkipPreviousContext: () => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -119,10 +131,22 @@ export const useSettingsStore = create<SettingsState>()(
       toggleMusicEnabled: () => set({ musicEnabled: !get().musicEnabled }),
       musicVolume: 0.3,
       setMusicVolume: (v) => set({ musicVolume: Math.max(0, Math.min(1, v)) }),
+
+      // NEW: Sound effects (default ON at 100% volume)
+      sfxEnabled: true,
+      setSfxEnabled: (v) => set({ sfxEnabled: v }),
+      toggleSfxEnabled: () => set({ sfxEnabled: !get().sfxEnabled }),
+      sfxVolume: 1.0,
+      setSfxVolume: (v) => set({ sfxVolume: Math.max(0, Math.min(1, v)) }),
+
+      // DEBUG: Skip previous context (default OFF)
+      skipPreviousContext: false,
+      setSkipPreviousContext: (v) => set({ skipPreviousContext: v }),
+      toggleSkipPreviousContext: () => set({ skipPreviousContext: !get().skipPreviousContext }),
     }),
     {
       // Bump key so no stale objects hide the new fields
-      name: "settings-v9",
+      name: "settings-v11",
       partialize: (s) => ({
         generateImages: s.generateImages,
         narrationEnabled: s.narrationEnabled,
@@ -137,6 +161,9 @@ export const useSettingsStore = create<SettingsState>()(
         narrationMutedInGame: s.narrationMutedInGame,
         musicEnabled: s.musicEnabled,
         musicVolume: s.musicVolume,
+        sfxEnabled: s.sfxEnabled,
+        sfxVolume: s.sfxVolume,
+        skipPreviousContext: s.skipPreviousContext,
       }),
     }
   )

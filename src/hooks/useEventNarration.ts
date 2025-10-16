@@ -83,9 +83,8 @@ export function useEventNarration() {
     }
   }, [canShowDilemma, narrationEnabled]);
 
-  // Check if we should show overlay for fallback dilemmas
-  const overlayPreparing =
-    (!!current && !canShowDilemma) || (!!(current as any)?._isFallback === true);
+  // Check if we should show overlay while preparing TTS
+  const overlayPreparing = !!current && !canShowDilemma;
 
   return {
     canShowDilemma,

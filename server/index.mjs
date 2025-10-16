@@ -1505,7 +1505,7 @@ RELATIVE COST ASSIGNMENT (APPLY AFTER WRITING THE THREE ACTIONS)
   * Cheapest → -50 or 0 (symbolic/administrative)
   * Middle → -100 or -150
   * Most expensive → -200 or -250
-- If an action **generates** clear revenue, use a positive tier (+50, +100, +150) while preserving relative order.
+- If an action **generates** clear revenue (e.g., taxes, bribes, trade), use a positive tier (+50, +100, +150) while preserving relative order.
 - Tie-breakers: the more coercive/logistically heavy option costs more.
 - Do **not** edit summaries to justify costs; just assign values.
 

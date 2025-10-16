@@ -5,7 +5,6 @@ import { bgStyle } from "../lib/ui";
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
 import { useSettingsStore } from "../store/settingsStore";
-import MiniCompass from "../components/MiniCompass";
 import MirrorBubble from "../components/MirrorBubble";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -63,7 +62,6 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
   const generateImages = useSettingsStore((s) => s.generateImages);
   const character = useRoleStore((s) => s.character);
   const resetCompass = useCompassStore((s) => s.reset);
-  const values = useCompassStore((s) => s.values);
 
   // script
   const playerName = character?.name || "Player";
@@ -105,15 +103,16 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ type: "spring", stiffness: 220, damping: 18 }}
-            className="relative shrink-0"
-            style={{ width: MIRROR + 120, height: MIRROR + 120 }}
+            className="relative self-start"
+            style={{ width: MIRROR, height: MIRROR }}
           >
-            <div className="absolute inset-0 grid place-items-center pointer-events-none">
-              <MiniCompass size={MIRROR + 120} innerRadius={MIRROR / 2 + 10} values={values} lengthScale={0.45} />
-            </div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-              <img src="/assets/images/mirror.png" alt="Mystic mirror" width={MIRROR} height={MIRROR} className="rounded-full object-cover" />
-            </div>
+            <img
+              src="/assets/images/mirror.png"
+              alt="Mystic mirror"
+              width={MIRROR}
+              height={MIRROR}
+              className="rounded-full object-cover"
+            />
           </motion.div>
 
           <motion.div

@@ -271,6 +271,11 @@ export default function EventScreen3({ push }: Props) {
 
     console.log('[EventScreen3] 💡 Processing custom suggestion:', text);
 
+    // Track custom action for goals system
+    const { incrementCustomActions } = useDilemmaStore.getState();
+    incrementCustomActions();
+    console.log('[EventScreen3] 📊 Custom action tracked for goals');
+
     // Convert suggestion to ActionCard format (same as regular actions)
     // This allows cleanAndAdvanceDay to process it uniformly
     const suggestCost = -300; // Default suggestion cost from ActionDeck

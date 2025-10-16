@@ -12,6 +12,7 @@ import React from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { Coins, CheckCircle2 } from "lucide-react";
 import type { ActionCard } from "../../hooks/useActionDeckState";
+import { useAudioManager } from "../../hooks/useAudioManager";
 
 // Visual constants
 const ENTER_STAGGER = 0.12;
@@ -102,9 +103,41 @@ export default function ActionDeckContent({
   onSuggestTextChange,
   onConfirmSuggestion,
 }: ActionDeckContentProps) {
+  const { playSfx } = useAudioManager();
 
   const canAffordSuggestion = !showBudget || budget >= Math.abs(suggestCost);
   const suggestTextValid = suggestText.trim().length >= 4;
+
+  // Wrapper handlers with click sound
+  const handleSelectCard = (id: string) => {
+    playSfx('click-soft');
+    onSelectCard(id);
+  };
+
+  const handleConfirmCard = (id: string) => {
+    playSfx('click-soft');
+    onConfirmCard(id);
+  };
+
+  const handleCancelSelection = () => {
+    playSfx('click-soft');
+    onCancelSelection();
+  };
+
+  const handleOpenSuggest = () => {
+    playSfx('click-soft');
+    onOpenSuggest();
+  };
+
+  const handleCloseSuggest = () => {
+    playSfx('click-soft');
+    onCloseSuggest();
+  };
+
+  const handleConfirmSuggestion = () => {
+    playSfx('click-soft');
+    onConfirmSuggestion();
+  };
 
   return (
     <LayoutGroup id="action-deck">
@@ -153,11 +186,11 @@ export default function ActionDeckContent({
                     }
                   },
                 }}
-                onClick={() => !disabled && onSelectCard(c.id)}
+                onClick={() => !disabled && handleSelectCard(c.id)}
                 onKeyDown={(e) => {
                   if (!disabled && (e.key === "Enter" || e.key === " ")) {
                     e.preventDefault();
-                    onSelectCard(c.id);
+                    handleSelectCard(c.id);
                   }
                 }}
                 role="button"
@@ -221,7 +254,7 @@ export default function ActionDeckContent({
             ref={suggestRef}
             animate={othersDown ? suggestCtrl : undefined}
             className={SUGGEST_BTN_CLASS}
-            onClick={onOpenSuggest}
+            onClick={handleOpenSuggest}
             disabled={Boolean(confirmingId) || validatingSuggest || !canAffordSuggestion}
           >
             <span className="text-[12.5px] font-semibold">Suggest your own</span>
@@ -247,7 +280,7 @@ export default function ActionDeckContent({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              <div className={OVERLAY_BACKDROP} onClick={onCancelSelection} />
+              <div className={OVERLAY_BACKDROP} onClick={handleCancelSelection} />
 
               <motion.div
                 key={`expanded-${selectedCard.id}`}
@@ -290,14 +323,14 @@ export default function ActionDeckContent({
                     type="button"
                     className={CONFIRM_BTN_CLASS}
                     disabled={showBudget && !selectedCard.affordable}
-                    onClick={() => onConfirmCard(selectedCard.id)}
+                    onClick={() => handleConfirmCard(selectedCard.id)}
                   >
                     Confirm
                   </button>
                   <button
                     type="button"
                     className="px-3 py-1.5 rounded-full bg-white/10 ring-1 ring-white/15 text-white text-[12px]"
-                    onClick={onCancelSelection}
+                    onClick={handleCancelSelection}
                   >
                     Cancel
                   </button>
@@ -317,7 +350,7 @@ export default function ActionDeckContent({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              <div className={OVERLAY_BACKDROP} onClick={onCloseSuggest} />
+              <div className={OVERLAY_BACKDROP} onClick={handleCloseSuggest} />
               <motion.div
                 className={`${CARD_BASE} bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 w-[96%] max-w-md px-4 py-4 relative`}
                 initial={{ y: 30, scale: 0.98 }}
@@ -361,7 +394,7 @@ export default function ActionDeckContent({
                   <button
                     type="button"
                     className="px-3 py-1.5 rounded-full bg-white/10 ring-1 ring-white/15 text-white text-[12px]"
-                    onClick={onCloseSuggest}
+                    onClick={handleCloseSuggest}
                     disabled={validatingSuggest}
                   >
                     Cancel
@@ -370,7 +403,7 @@ export default function ActionDeckContent({
                     type="button"
                     className={CONFIRM_BTN_CLASS}
                     disabled={validatingSuggest || !canAffordSuggestion || !suggestTextValid}
-                    onClick={onConfirmSuggestion}
+                    onClick={handleConfirmSuggestion}
                   >
                     {validatingSuggest ? "Validating..." : "Confirm"}
                   </button>

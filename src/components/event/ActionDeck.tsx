@@ -13,7 +13,7 @@ import { AnimatePresence } from "framer-motion";
 import { useSettingsStore } from "../../store/settingsStore";
 
 import ActionDeckContent from "./ActionDeckContent";
-import { CoinFlightOverlay, useCoinFlights, getCenterRect, getBudgetAnchorRect, syncCoinAndBudget } from "./CoinFlightSystem";
+import { CoinFlightOverlay, useCoinFlights, getCenterRect, getBudgetAnchorRect, syncCoinAndBudget, type Point } from "./CoinFlightSystem";
 import { useActionDeckState, type ActionCard } from "../../hooks/useActionDeckState";
 import { useActionSuggestion } from "../../hooks/useActionSuggestion";
 
