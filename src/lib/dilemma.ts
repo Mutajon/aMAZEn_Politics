@@ -77,6 +77,7 @@ export type LightDilemmaRequest = {
   subjectStreak: SubjectStreak | null;
   scopeStreak: ScopeStreak | null; // NEW: Scope rotation tracking
   recentScopes?: DilemmaScope[]; // NEW: Last 5 scopes for diversity checking
+  recentDilemmaTitles?: string[]; // NEW: Last 3-5 dilemma titles for semantic variety checking
   previous?: {
     title: string;
     description: string; // CRITICAL: Full dilemma description (shows what each faction wanted)

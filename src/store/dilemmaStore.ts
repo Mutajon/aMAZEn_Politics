@@ -59,6 +59,9 @@ type DilemmaState = {
   // Subject streak tracking (Light API)
   subjectStreak: SubjectStreak | null;
 
+  // Recent dilemma titles for semantic variety checking (Light API)
+  recentDilemmaTitles: string[];
+
   // Scope streak tracking (Light API)
   scopeStreak: ScopeStreak | null;
   recentScopes: DilemmaScope[];
@@ -111,6 +114,9 @@ type DilemmaState = {
   // Subject streak tracking methods (Light API)
   updateSubjectStreak: (topic: string) => void;
 
+  // Recent dilemma titles tracking methods (Light API)
+  addDilemmaTitle: (title: string) => void;
+
   // Scope streak tracking methods (Light API)
   updateScopeStreak: (scope: DilemmaScope) => void;
 
@@ -124,9 +130,17 @@ type DilemmaState = {
 
   // Goals system methods
   setGoals: (goals: Goal[]) => void;
-  evaluateGoals: () => void;
+  evaluateGoals: () => GoalStatusChange[];
   incrementCustomActions: () => void;
   updateMinimumValues: () => void;
+};
+
+// Type for goal status changes (used for audio/visual feedback)
+export type GoalStatusChange = {
+  goalId: string;
+  goalTitle: string;
+  oldStatus: import("../data/goals").GoalStatus;
+  newStatus: import("../data/goals").GoalStatus;
 };
 
 export const useDilemmaStore = create<DilemmaState>()(
@@ -164,6 +178,9 @@ export const useDilemmaStore = create<DilemmaState>()(
 
   // Subject streak tracking (Light API)
   subjectStreak: null,
+
+  // Recent dilemma titles tracking (Light API)
+  recentDilemmaTitles: [],
 
   // Scope streak tracking (Light API)
   scopeStreak: null,
@@ -327,6 +344,7 @@ export const useDilemmaStore = create<DilemmaState>()(
       recentTopics: [],
       topicCounts: {},
       subjectStreak: null,
+      recentDilemmaTitles: [],
       scopeStreak: null,
       recentScopes: [],
       finalScoreCalculated: false,
@@ -487,6 +505,14 @@ export const useDilemmaStore = create<DilemmaState>()(
     }
   },
 
+  // Recent dilemma titles tracking (Light API)
+  addDilemmaTitle(title) {
+    const { recentDilemmaTitles } = get();
+    const newTitles = [title, ...recentDilemmaTitles.slice(0, 4)]; // Keep last 5
+    dlog("addDilemmaTitle ->", title, "| recent:", newTitles.length);
+    set({ recentDilemmaTitles: newTitles });
+  },
+
   // Scope streak tracking (Light API)
   updateScopeStreak(scope) {
     const { scopeStreak, recentScopes } = get();
@@ -553,12 +579,33 @@ export const useDilemmaStore = create<DilemmaState>()(
     const { selectedGoals } = get();
     if (selectedGoals.length === 0) {
       dlog("evaluateGoals -> no goals selected, skipping");
-      return;
+      return [];
     }
 
     const updatedGoals = evaluateAllGoals(selectedGoals);
+
+    // Detect status changes for audio/visual feedback
+    const changes: GoalStatusChange[] = [];
+    selectedGoals.forEach((oldGoal, idx) => {
+      const newGoal = updatedGoals[idx];
+      if (oldGoal.status !== newGoal.status) {
+        changes.push({
+          goalId: newGoal.id,
+          goalTitle: newGoal.title,
+          oldStatus: oldGoal.status,
+          newStatus: newGoal.status
+        });
+      }
+    });
+
     set({ selectedGoals: updatedGoals });
     dlog("evaluateGoals ->", updatedGoals.map(g => `${g.id}: ${g.status}`));
+
+    if (changes.length > 0) {
+      dlog("evaluateGoals -> status changes detected:", changes.map(c => `${c.goalId}: ${c.oldStatus} → ${c.newStatus}`));
+    }
+
+    return changes;
   },
 
   incrementCustomActions() {
@@ -861,7 +908,7 @@ function getTop2WhatValues(): string[] {
  */
 export function buildLightSnapshot(): LightDilemmaRequest {
   const { debugMode, useLightDilemmaAnthropic, dilemmasSubjectEnabled, dilemmasSubject, skipPreviousContext } = useSettingsStore.getState();
-  const { day, totalDays, lastChoice, current, subjectStreak, scopeStreak, recentScopes } = useDilemmaStore.getState();
+  const { day, totalDays, lastChoice, current, subjectStreak, scopeStreak, recentScopes, recentDilemmaTitles } = useDilemmaStore.getState();
   const roleState = useRoleStore.getState();
 
   // Calculate days left (for epic finale and game conclusion)
@@ -943,6 +990,7 @@ export function buildLightSnapshot(): LightDilemmaRequest {
     subjectStreak: subjectStreak || null,
     scopeStreak: scopeStreak || null, // NEW: Scope streak tracking
     recentScopes: recentScopes || [], // NEW: Last 5 scopes for diversity checking
+    recentDilemmaTitles: recentDilemmaTitles.slice(0, 3), // NEW: Last 3 titles for semantic variety
     previous,
     topWhatValues, // Only defined on Day 1
     thematicGuidance, // Always included (custom subject or default axes)
@@ -963,7 +1011,7 @@ export function buildLightSnapshot(): LightDilemmaRequest {
  */
 async function loadNextLight(): Promise<Dilemma | null> {
   const { debugMode } = useSettingsStore.getState();
-  const { day, supportPeople, supportMiddle, supportMom, setSupportPeople, setSupportMiddle, setSupportMom, updateSubjectStreak, updateScopeStreak } = useDilemmaStore.getState();
+  const { day, supportPeople, supportMiddle, supportMom, setSupportPeople, setSupportMiddle, setSupportMom, updateSubjectStreak, updateScopeStreak, addDilemmaTitle } = useDilemmaStore.getState();
 
   try {
     const snapshot = buildLightSnapshot();
@@ -987,6 +1035,11 @@ async function loadNextLight(): Promise<Dilemma | null> {
 
     if (debugMode) {
       console.log("[loadNextLight] Response received:", raw);
+    }
+
+    // Store the new dilemma title for semantic variety tracking
+    if (raw.title) {
+      addDilemmaTitle(raw.title);
     }
 
     // Apply support shifts if they exist (Day 2+)

@@ -205,7 +205,19 @@ async function aiText({ system, user, model = CHAT_MODEL_DEFAULT, temperature, m
       throw new Error(`OpenAI chat error ${resp.status}: ${t}`);
     }
     const data = await resp.json();
-    return (data?.choices?.[0]?.message?.content ?? "").trim();
+    const choice = data?.choices?.[0];
+    const content = choice?.message?.content ?? "";
+    const finishReason = choice?.finish_reason;
+
+    // Log finish reason for debugging truncation issues
+    if (finishReason && finishReason !== 'stop') {
+      console.warn(`[aiText] ⚠️  Generation finished with reason: ${finishReason} (expected 'stop')`);
+      if (finishReason === 'length') {
+        console.warn(`[aiText] 🚨 Response was TRUNCATED due to token limit!`);
+      }
+    }
+
+    return content.trim();
   }
 
   try {
@@ -1621,7 +1633,7 @@ function calculateScopeGuidance(scopeStreak, recentScopes, debug) {
 /**
  * Build user prompt for light dilemma API - minimal dynamic context
  */
-function buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance }) {
+function buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance, recentDilemmaTitles }) {
   const parts = [
     `ROLE & SETTING: ${role}`,
     `SYSTEM: ${system}`,
@@ -1638,6 +1650,23 @@ function buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatVa
   }
 
   parts.push('');
+
+  // Recent dilemma titles for semantic variety checking (NEW)
+  if (recentDilemmaTitles && Array.isArray(recentDilemmaTitles) && recentDilemmaTitles.length >= 3) {
+    parts.push('RECENT DILEMMA TITLES (last 3):');
+    recentDilemmaTitles.slice(0, 3).forEach(title => {
+      parts.push(`- "${title}"`);
+    });
+    parts.push('');
+    parts.push('If these are thematically similar, create your next dilemma to contrast maximally in:');
+    parts.push('• Subject matter');
+    parts.push('• Stakeholder groups');
+    parts.push('• Type of decision required');
+    parts.push('• Resources at stake');
+    parts.push('');
+    parts.push('The player should feel "this is a completely different kind of problem."');
+    parts.push('');
+  }
 
   // Subject streak
   if (subjectStreak && subjectStreak.subject) {
@@ -1741,6 +1770,7 @@ app.post("/api/dilemma-light", async (req, res) => {
     const subjectStreak = req.body?.subjectStreak || null;
     const scopeStreak = req.body?.scopeStreak || null; // NEW: Scope streak tracking
     const recentScopes = req.body?.recentScopes || []; // NEW: Last 5 scopes
+    const recentDilemmaTitles = req.body?.recentDilemmaTitles || []; // NEW: Last 3-5 dilemma titles for semantic variety
     const previous = req.body?.previous || null;
     const topWhatValues = req.body?.topWhatValues || null; // Day 1 only: top 2 compass values
     const thematicGuidance = req.body?.thematicGuidance || null; // Custom subject or default axes
@@ -1758,6 +1788,9 @@ app.post("/api/dilemma-light", async (req, res) => {
       }
       if (recentScopes && recentScopes.length > 0) {
         console.log(`[/api/dilemma-light] recentScopes: ${JSON.stringify(recentScopes)}`);
+      }
+      if (recentDilemmaTitles && recentDilemmaTitles.length > 0) {
+        console.log(`[/api/dilemma-light] recentDilemmaTitles: ${JSON.stringify(recentDilemmaTitles)}`);
       }
     }
 
@@ -1780,7 +1813,7 @@ app.post("/api/dilemma-light", async (req, res) => {
       systemPrompt = buildLightSystemPrompt();
     }
 
-    const userPrompt = buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance });
+    const userPrompt = buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance, recentDilemmaTitles });
 
     // ALWAYS log previous context (critical for debugging continuity and support shifts)
     if (previous) {
@@ -1820,8 +1853,8 @@ app.post("/api/dilemma-light", async (req, res) => {
               system: systemPrompt,
               user: userPrompt,
               model: MODEL_DILEMMA,
-              temperature: 1,
-              maxTokens: 2048  // Generous limit to prevent truncation
+              temperature: 1
+              // maxTokens removed - let prompt instructions control length naturally
             });
 
         // DIAGNOSTIC: Always log raw response length
@@ -1838,6 +1871,12 @@ app.post("/api/dilemma-light", async (req, res) => {
         if (!raw) {
           console.error(`[/api/dilemma-light] ❌ JSON parse failed! Raw response:`);
           console.error(responseText?.substring(0, 500)); // Log first 500 chars
+
+          // Check if response looks truncated (incomplete JSON)
+          if (responseText && !responseText.trim().endsWith('}')) {
+            console.error(`[/api/dilemma-light] 🚨 Response appears TRUNCATED (no closing brace)`);
+            console.error(`[/api/dilemma-light] Last 100 chars: ...${responseText.slice(-100)}`);
+          }
         }
 
         if (debug && raw) console.log("[/api/dilemma-light] AI response parsed:", raw);
@@ -2142,8 +2181,8 @@ app.post("/api/dilemma", async (req, res) => {
           system,
           user,
           model: MODEL_DILEMMA,
-          temperature: 1,  // gpt-5 only supports temperature = 1
-          maxTokens: 2048  // Generous limit to prevent truncation
+          temperature: 1  // gpt-5 only supports temperature = 1
+          // maxTokens removed - let prompt instructions control length naturally
         });
 
         const parsed = safeParseJSON(responseText);
@@ -2159,8 +2198,8 @@ app.post("/api/dilemma", async (req, res) => {
               system,
               user: user + "\n\n" + repairPrompt,
               model: MODEL_DILEMMA,
-              temperature: 1,  // gpt-5 only supports temperature = 1
-              maxTokens: 2048  // Generous limit to prevent truncation
+              temperature: 1  // gpt-5 only supports temperature = 1
+              // maxTokens removed - let prompt instructions control length naturally
             });
 
             const reparsed = safeParseJSON(repaired);
@@ -2181,8 +2220,8 @@ app.post("/api/dilemma", async (req, res) => {
               system,
               user: user + "\n\n" + repairPrompt,
               model: MODEL_DILEMMA,
-              temperature: 1,  // gpt-5 only supports temperature = 1
-              maxTokens: 2048  // Generous limit to prevent truncation
+              temperature: 1  // gpt-5 only supports temperature = 1
+              // maxTokens removed - let prompt instructions control length naturally
             });
 
             const reparsed = safeParseJSON(repaired);
@@ -2828,7 +2867,14 @@ Remembrance: 3-4 sentences on legacy—personal vs people's benefit, autonomy vs
 
 Rank: short, amusing fictional title based on Remembrance part above.
 
-Decisions: for each decision, ≤12-word title + one line judging autonomy/heteronomy & liberalism/totalism.
+Decisions: for each decision, provide:
+- title: ≤12-word summary of the action taken
+- reflection: one SHORT sentence (~15-25 words) that EXPLAINS WHY this specific decision demonstrates support for or opposition to autonomy/heteronomy AND liberalism/totalism. Be concrete and educational—describe what aspect of the decision shows the ideological position rather than just stating the rating.
+
+Examples of good reflections:
+- "Tightly controlled ceremony reflects heteronomy (state choreography) and liberalism (order without suppressing dissent)"
+- "Consulting citizens shows autonomy (empowering individual choice) and moderate liberalism (deliberative, slower process)"
+- "Forceful crackdown demonstrates heteronomy (external control) and totalism (prioritizing order over individual freedoms)"
 
 Ratings:
 
