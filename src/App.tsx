@@ -33,16 +33,14 @@ if (import.meta.env.DEV) {
 
 export default function App() {
   const { route, push } = useHashRoute();
-  const { playMusic } = useAudioManager();
   const enableModifiers = useSettingsStore((s) => s.enableModifiers);
 
-  console.debug("[App] route =", route);
+  console.debug("[App] 📍 Current route:", route);
+  console.debug("[App] enableModifiers:", enableModifiers);
   useEnsureMirroredAvatarOnce();
 
-  // Auto-start background music on mount (respects user settings)
-  useEffect(() => {
-    playMusic('background', true); // Loop enabled
-  }, [playMusic]);
+  // Initialize audio manager hook to sync settings with audio playback
+  useAudioManager();
 
   // Render current screen with global audio controls
   return (
@@ -57,7 +55,10 @@ export default function App() {
       {enableModifiers && route === "/difficulty" && <DifficultyScreen push={push} />}
 
       {/* NEW split screens */}
-      {route === "/compass-intro" && <CompassIntroStart push={push} />}
+      {route === "/compass-intro" && (() => {
+        console.log("[App] 🎯 Rendering CompassIntroStart");
+        return <CompassIntroStart push={push} />;
+      })()}
       {route === "/compass-mirror" && <MirrorDialogueScreen push={push} />}
       {route === "/compass-quiz" && <MirrorQuizScreen push={push} />}
 
@@ -66,7 +67,10 @@ export default function App() {
       {route === "/mirror" && <MirrorScreen push={push} />}
       {route === "/debug-mini" && <MiniCompassDebugScreen push={push} />}
       {route === "/background-intro" && <BackgroundIntroScreen push={push} />}
-      {enableModifiers && route === "/goals" && <GoalsSelectionScreen push={push} />}
+      {enableModifiers && route === "/goals" && (() => {
+        console.log("[App] 🎯 Rendering GoalsSelectionScreen");
+        return <GoalsSelectionScreen push={push} />;
+      })()}
       {route === "/event" && <EventScreen3 push={push} />}
       {route.startsWith("/highscores") && <HighscoreScreen />}
       {route === "/aftermath" && <AftermathScreen push={push} />}
@@ -76,7 +80,7 @@ export default function App() {
       {/* Default route - SplashScreen */}
       {route === "/" && (
         <SplashScreen
-          onStart={() => push("/role")}
+          onStart={() => push("/intro")}
           onHighscores={() => push("/highscores")}
         />
       )}

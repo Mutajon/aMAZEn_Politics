@@ -61,10 +61,13 @@ export default function IntroScreen({ push }: { push: PushFn }) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.1, duration: 0.5 }}
-                onClick={() => push("/campaign")}
-                className="w-[14rem] rounded-2xl px-5 py-3 font-semibold text-lg bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] shadow-lg hover:scale-[1.02] active:scale-[0.98] mx-auto sm:mx-0"
+                onClick={() => {/* Coming soon - do nothing */}}
+                className="w-[14rem] rounded-2xl px-5 py-3 font-semibold text-lg bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] shadow-lg hover:scale-[1.02] active:scale-[0.98] mx-auto sm:mx-0 opacity-60 cursor-default"
               >
-                Campaign Mode
+                <div className="flex flex-col items-center gap-0.5">
+                  <span>Campaign Mode</span>
+                  <span className="text-xs font-normal">(Coming soon)</span>
+                </div>
               </motion.button>
             </>
           )}
