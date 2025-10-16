@@ -1498,12 +1498,36 @@ THEMATIC GUIDANCE (if provided)
   * Liberalism vs Totalism: individual rights vs uniformity.
 - These tensions should feel natural to the political system and role; balance across days.
 
-ACTIONS
-- Present exactly three actions that conflict clearly in tone and intent:
+ACTIONS (CYNICAL ADVISOR TONE)
+- Write summaries as a knowing advisor giving recommendations, not neutral descriptions
+- Use patterns like:
+  * "Do X - [who benefits], though [cynical consequence]"
+  * "Go with X - [upside], but [realistic downside]"
+  * "Consider X - [immediate effect], even if [longer-term cost]"
+- Vary the phrasing across the three options (don't repeat the same pattern 3 times)
+- Inject subtle cynicism, irony, or wry observations about trade-offs
+- Keep it punchy: ~15-25 words per summary
+
+Present exactly three actions that conflict clearly in tone and intent:
   * Assertive control (authoritarian or decisive leadership)
   * Negotiated / consultative (pragmatic compromise)
   * Principled restraint / rights (ethical or liberty-focused)
-- Each action: one sentence (~15–20 words). No numbers or meta language.
+
+Examples of the cynical advisor voice:
+✅ "Crack down hard - sends a clear message, though you'll make enemies of the reform crowd."
+✅ "Open negotiations - looks collaborative, even if it drags on forever and satisfies nobody."
+✅ "Invoke your emergency powers - fast and final, but the constitutional lawyers will have a field day."
+
+✅ "Support the traditionalists with a formal ceremony - they'll be grateful, the progressives less so."
+✅ "Go with the inclusive approach - popular with the youth, though the old guard won't be pleased."
+✅ "Defer to parliament - safe for you, but don't expect anyone to thank you for dodging."
+
+❌ "Implement strict enforcement measures targeting unauthorized settlements." (too dry)
+❌ "Facilitate a consultative process engaging all stakeholders." (bureaucratic)
+❌ "Respect individual autonomy by declining to intervene." (formal/boring)
+
+IMPORTANT: No numbers, no meta language, no bureaucratese. Sound like a sharp political advisor, not a policy memo.
+
 - Cost from {0, ±50, ±100, ±150, ±200, ±250} — typically negative unless it clearly earns income.
 
 RELATIVE COST ASSIGNMENT (APPLY AFTER WRITING THE THREE ACTIONS)
