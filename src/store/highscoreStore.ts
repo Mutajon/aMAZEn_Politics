@@ -30,11 +30,11 @@ export const useHighscoreStore = create<HighscoreState>()(
         // Keep top 50 entries
         const trimmed = next.slice(0, 50);
 
-        // Storage optimization: Keep avatars only for top 20 (Hall of Fame)
-        // Ranks 21-50 will use default placeholder image
+        // Session optimization: Keep avatars only for top 20 during current session
+        // Note: ALL avatars are stripped when persisting to localStorage (see partialize)
+        // Ranks 21-50 use placeholder images even during session
         const withManagedAvatars = trimmed.map((entry, idx) => {
           if (idx >= 20 && entry.avatarUrl) {
-            // Strip avatars from entries outside Hall of Fame to save storage
             return { ...entry, avatarUrl: undefined };
           }
           return entry;
@@ -53,10 +53,14 @@ export const useHighscoreStore = create<HighscoreState>()(
       reset: () => set({ entries: [...DEFAULT_HIGHSCORES] }),
     }),
     {
-      name: "amaze-politics-highscores-v1", // localStorage key
-      // Only persist top 50 entries to avoid storage issues
+      name: "amaze-politics-highscores-v2", // localStorage key (v2: strips avatars to prevent quota errors)
+      // Strip avatars to prevent localStorage quota errors (base64 images are too large)
+      // Avatars work during current session, but aren't persisted across sessions
       partialize: (state) => ({
-        entries: state.entries.slice(0, 50),
+        entries: state.entries.slice(0, 50).map(entry => ({
+          ...entry,
+          avatarUrl: undefined, // Strip all avatars to avoid storage quota
+        })),
       }),
     }
   )
