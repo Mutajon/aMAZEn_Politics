@@ -3,6 +3,8 @@ import "dotenv/config";
 import express from "express";
 import bodyParser from "body-parser";
 import Anthropic from "@anthropic-ai/sdk";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const app = express();
 app.use(bodyParser.json());
@@ -3082,6 +3084,24 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
     });
   }
 });
+
+// -------------------- Serve static files in production -------
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+if (process.env.NODE_ENV === "production") {
+  // Serve static files from the 'dist' directory
+  const distPath = path.join(__dirname, "..", "dist");
+  app.use(express.static(distPath));
+
+  // Handle SPA routing - send index.html for all non-API routes
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
+  });
+
+  console.log(`[server] serving static files from ${distPath}`);
+}
 
 // -------------------- Start server ---------------------------
 const PORT = Number(process.env.PORT) || 3001;

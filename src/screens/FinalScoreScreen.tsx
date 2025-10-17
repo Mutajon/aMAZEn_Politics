@@ -603,20 +603,24 @@ export default function FinalScoreScreen({ push }: Props) {
 
                 {piece.key === "goals" && (
                   <div className="space-y-2">
-                    {breakdown.goals.completed > 0 ? (
+                    {selectedGoals.length > 0 ? (
                       <>
-                        <TocRow
-                          left={
-                            <span>
-                              Goals completed:{" "}
-                              <span className="font-semibold">
-                                {breakdown.goals.completed} / 2
+                        {/* Summary line: Only show if at least one goal completed */}
+                        {breakdown.goals.completed > 0 && (
+                          <TocRow
+                            left={
+                              <span>
+                                Goals completed:{" "}
+                                <span className="font-semibold">
+                                  {breakdown.goals.completed} / 2
+                                </span>
                               </span>
-                            </span>
-                          }
-                          right={<span>{breakdown.goals.bonusPoints}</span>}
-                        />
-                        {/* Show individual goal results */}
+                            }
+                            right={<span>{breakdown.goals.bonusPoints}</span>}
+                          />
+                        )}
+
+                        {/* Goal list: ALWAYS show with status icons */}
                         {selectedGoals.map(goal => (
                           <div key={goal.id} className="text-xs text-white/60 flex items-center gap-2 ml-4">
                             <span>{goal.status === 'met' ? '✅' : goal.status === 'failed' ? '❌' : '⏳'}</span>
@@ -627,7 +631,7 @@ export default function FinalScoreScreen({ push }: Props) {
                       </>
                     ) : (
                       <div className="text-sm text-white/60 italic">
-                        {selectedGoals.length === 0 ? 'No goals selected' : 'No goals completed'}
+                        No goals selected
                       </div>
                     )}
                   </div>
@@ -706,9 +710,20 @@ export default function FinalScoreScreen({ push }: Props) {
                 className="mt-4 text-center"
               >
                 {isHallOfFame ? (
-                  <div className="text-lg font-semibold text-amber-300">
+                  <motion.div
+                    className="text-lg font-semibold text-amber-300"
+                    animate={{
+                      opacity: [1, 0.6, 1],
+                      scale: [1, 1.02, 1],
+                    }}
+                    transition={{
+                      duration: 1.5,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                  >
                     🎉 You made it to the Hall of Fame! Your current rank: <span className="text-amber-400">#{playerRank}</span>
-                  </div>
+                  </motion.div>
                 ) : (
                   <div className="text-lg text-white/70">
                     You did not make it to the Hall of Fame... maybe next time 😊

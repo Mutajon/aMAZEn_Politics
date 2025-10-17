@@ -19,9 +19,11 @@ const SUBTITLES = [
 export default function SplashScreen({
   onStart,
   onHighscores,
+  onAchievements,
 }: {
   onStart: () => void;
   onHighscores?: () => void; // optional, so we don't break existing callers
+  onAchievements?: () => void; // optional, navigates to achievements screen
 }) {
 
   const [visibleSubtitles, setVisibleSubtitles] = useState(0);
@@ -410,6 +412,26 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
                shadow-sm active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-white/20"
   >
     Hall of Fame
+  </motion.button>
+
+  {/* Tertiary: Book of Achievements (subtle/glass) */}
+  <motion.button
+    initial={{ opacity: 0 }}
+    animate={{ opacity: showButton ? 1 : 0 }}
+    transition={{ delay: 0.1, type: "spring", stiffness: 250, damping: 22 }}
+    style={{ visibility: showButton ? "visible" : "hidden" }}
+    onClick={() => {
+      // Start music on any user interaction
+      playMusic('background', true);
+
+      onAchievements?.(); // no-op if not wired yet
+      setShowSettings(false);
+    }}
+    className="w-[14rem] rounded-2xl px-4 py-2.5 text-sm font-semibold
+               bg-white/10 hover:bg-white/15 text-white/90 border border-white/15
+               shadow-sm active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-white/20"
+  >
+    Book of Achievements
   </motion.button>
 </div>
 

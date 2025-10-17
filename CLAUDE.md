@@ -32,6 +32,67 @@ disableDebug()       # Disable debug mode
 toggleDebug()        # Toggle debug mode
 ```
 
+## Deployment
+
+### Production Build & Deploy
+
+The game is configured for deployment to Render.com (or similar Node.js hosting platforms).
+
+**Prerequisites:**
+- Node.js 20+
+- GitHub repository connected to hosting platform
+- Environment variables configured on hosting platform
+
+**Build Process:**
+```bash
+npm install          # Install dependencies
+npm run build        # Build production frontend (creates dist/)
+npm start            # Start production server (serves static files + API)
+```
+
+**Git Workflow:**
+- `main` branch → Connected to Render (production deployment)
+- `development` branch → Active development work
+- **Deployment:** Merge `development` → `main` → push → auto-deploy
+
+**Key Files:**
+- `.node-version` - Specifies Node.js v20 for Render
+- `server/index.mjs` - Serves static files from `dist/` when `NODE_ENV=production`
+- `package.json` - Contains `start` script for production
+
+**Environment Variables (Required on Render):**
+```bash
+NODE_ENV=production
+OPENAI_API_KEY=your-key
+ANTHROPIC_API_KEY=your-key  # Optional, for Claude support
+CHAT_MODEL=gpt-5-mini
+MODEL_DILEMMA=gpt-5
+MODEL_MIRROR=gpt-5
+IMAGE_MODEL=gpt-image-1
+TTS_MODEL=tts-1
+TTS_VOICE=alloy
+PORT=3001  # Auto-set by Render, override if needed
+```
+
+**Render.com Configuration:**
+- **Build Command:** `npm install && npm run build`
+- **Start Command:** `npm start`
+- **Plan:** Starter ($7/month) - No cold starts, instant access
+- **Auto-Deploy:** Enabled on `main` branch pushes
+
+**Deployment Workflow:**
+1. Work on `development` branch
+2. Test locally: `npm run dev`
+3. When ready: merge `development` → `main`
+4. Push `main` to GitHub
+5. Render auto-deploys (2-5 minutes)
+6. Test live URL
+7. Notify testers
+
+**Rollback:**
+- Git: `git revert HEAD && git push`
+- Render Dashboard: Click "Redeploy" on previous deployment
+
 ## Project Architecture
 
 ### Tech Stack
@@ -235,6 +296,46 @@ Score calculated in FinalScoreScreen only (stays at 0 during gameplay).
 - All players auto-submitted to highscore table after animation
 - Top 20 = celebration banner, others = acknowledgment
 - Highlighting + auto-scroll via URL param: `/highscores?highlight=PlayerName`
+
+## Meta Screens (Accessible from Splash Screen)
+
+### Hall of Fame
+**Route**: `/highscores`
+**Access**: "Hall of Fame" button on SplashScreen
+**Features**:
+- Displays top 50 highscores in sorted order
+- Shows leader avatar, name, political system, compass axes, and score
+- Top 3 ranks have special colors (gold, silver, copper)
+- Auto-scroll and highlight support via URL parameter
+- Back button returns to previous screen
+
+### Book of Achievements
+**Route**: `/achievements`
+**Access**: "Book of Achievements" button on SplashScreen
+**Status**: 🚧 **Under Construction** - Display only, no tracking yet
+
+**Current Implementation** (2025-10-17):
+- Achievement database: `src/data/achievements.ts` (7 achievements defined)
+- Display screen: `src/screens/AchievementsScreen.tsx`
+- Grid layout with animated cards showing icon, title, and description
+- Lock icons on all achievements (placeholder for future functionality)
+- Info banner indicating feature is under construction
+
+**Defined Achievements**:
+- **Dictator's Dilemma**: Complete a full game as a dictator
+- **Role Completionist**: Complete the game with all pre-existing roles
+- **Unicorn Ruler**: Complete a game as the unicorn king
+- **Warmonger**: Trigger a world war during your rule
+- **Revolutionary**: Trigger a political system change in your game
+- **Fallen Leader**: Get assassinated during your rule
+- **Peacemaker**: Sign a peace treaty during your rule
+
+**Future Functionality** (Not Yet Implemented):
+- Achievement tracking store
+- Unlock logic based on game events
+- Locked/unlocked visual states
+- Achievement notifications during gameplay
+- Persistence across sessions
 
 ## Code Patterns & Architecture
 

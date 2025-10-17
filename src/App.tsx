@@ -20,6 +20,7 @@ import GoalsSelectionScreen from "./screens/GoalsSelectionScreen";
 import { useEnsureMirroredAvatarOnce } from "./hooks/useEnsureMirroredAvatarOnce";
 import EventScreen3 from "./screens/EventScreen3";
 import HighscoreScreen from "./screens/HighscoreScreen";
+import AchievementsScreen from "./screens/AchievementsScreen";
 import MirrorScreen from "./screens/MirrorScreen";
 import AftermathScreen from "./screens/AftermathScreen";
 import FinalScoreScreen from "./screens/FinalScoreScreen";
@@ -73,6 +74,7 @@ export default function App() {
       })()}
       {route === "/event" && <EventScreen3 push={push} />}
       {route.startsWith("/highscores") && <HighscoreScreen />}
+      {route === "/achievements" && <AchievementsScreen />}
       {route === "/aftermath" && <AftermathScreen push={push} />}
       {route === "/final-score" && <FinalScoreScreen push={push} />}
 
@@ -82,6 +84,7 @@ export default function App() {
         <SplashScreen
           onStart={() => push("/intro")}
           onHighscores={() => push("/highscores")}
+          onAchievements={() => push("/achievements")}
         />
       )}
     </>

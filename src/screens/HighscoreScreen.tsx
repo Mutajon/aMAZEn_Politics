@@ -96,9 +96,14 @@ export default function HighscoreScreen() {
     <div className="min-h-[100dvh] px-5 py-8" style={bgStyle}>
       <div className="w-full max-w-5xl mx-auto">
         <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-2xl font-extrabold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
-            Top hall of famers
-          </h1>
+          <div>
+            <h1 className="text-4xl font-extrabold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
+              Hall of Famers
+            </h1>
+            <p className="text-white/60 text-sm mt-1">
+              click leaders to explore
+            </p>
+          </div>
           <button
             onClick={() => window.history.back()}
             className="rounded-xl px-3 py-2 bg-white/10 hover:bg-white/15 text-white"
