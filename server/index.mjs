@@ -1552,8 +1552,14 @@ RELATIVE COST ASSIGNMENT (APPLY AFTER WRITING THE THREE ACTIONS)
 - Tie-breakers: the more coercive/logistically heavy option costs more.
 - Do **not** edit summaries to justify costs; just assign values.
 
-SUPPORT SHIFT (only if previous choice exists)
-CRITICAL: You receive "PREVIOUS SITUATION" describing what was happening and what each faction wanted.
+SUPPORT SHIFT (MANDATORY when previous context exists)
+🚨 CRITICAL REQUIREMENT 🚨
+- If you receive "PREVIOUS SITUATION" and "PLAYER'S CHOICE", you MUST return a supportShift object
+- Setting "supportShift": null is ONLY valid when there is NO previous context (Day 1 only)
+- Even if the previous choice was unusual, custom, or unclear - INFER what factions would think
+- Every action has consequences - factions ALWAYS have opinions
+
+You receive "PREVIOUS SITUATION" describing what was happening and what each faction wanted.
 Read it carefully to understand each faction's stance, then calculate support shifts logically.
 
 LOGIC (apply for each faction: people, mom, holders):
@@ -1728,12 +1734,18 @@ function buildLightUserPrompt({ role, system, day, daysLeft, subjectStreak, prev
     parts.push('SUBJECT STREAK: none');
   }
 
-  // Previous choice (Days 2-8, except Day 7 epic finale)
-  if (day >= 2 && day !== 7 && previous && previous.title) {
+  // Previous choice (Days 2-8, with special handling for Day 7)
+  if (day === 7 && previous && previous.title) {
+    // Day 7: Send previous data but with split instructions
     parts.push(`PREVIOUS SITUATION: "${previous.description}"`);
     parts.push(`PLAYER'S CHOICE: ${previous.choiceTitle} — ${previous.choiceSummary}`);
-  } else if (day === 7) {
-    parts.push('PREVIOUS: IGNORE (Epic Finale - create unrelated national crisis)');
+    parts.push('');
+    parts.push('⚠️ DAY 7 EPIC FINALE INSTRUCTIONS:');
+    parts.push('- IGNORE previous for STORY CONTINUITY (create unrelated national crisis)');
+    parts.push('- USE previous for SUPPORT SHIFT CALCULATION (factions remember what you did)');
+  } else if (day >= 2 && previous && previous.title) {
+    parts.push(`PREVIOUS SITUATION: "${previous.description}"`);
+    parts.push(`PLAYER'S CHOICE: ${previous.choiceTitle} — ${previous.choiceSummary}`);
   } else {
     parts.push('PREVIOUS: none (first day)');
   }
@@ -1852,10 +1864,11 @@ app.post("/api/dilemma-light", async (req, res) => {
     let topWhatValues = req.body?.topWhatValues || null; // Days 1, 3, 5: top 2 compass values
     const thematicGuidance = req.body?.thematicGuidance || null; // Custom subject or default axes
 
-    // Day 7: Epic Finale - strip all continuity for pure national crisis
+    // Day 7: Epic Finale - strip continuity EXCEPT previous (needed for support shifts)
     if (day === 7) {
-      console.log('[/api/dilemma-light] 🎯 DAY 7 EPIC FINALE - Stripping all continuity data');
-      previous = null;
+      console.log('[/api/dilemma-light] 🎯 DAY 7 EPIC FINALE - Stripping continuity (preserving previous for support shifts)');
+      // DON'T set previous = null - we need it for support shift calculation
+      // The AI will be instructed to IGNORE it for story continuity but USE it for support shifts
       subjectStreak = null;
       recentTopics = [];
       topWhatValues = null;
@@ -1989,6 +2002,11 @@ app.post("/api/dilemma-light", async (req, res) => {
         } else if (raw.actions.length === 0 && daysLeft !== 0) {
           // Empty actions only allowed in conclusion mode (daysLeft === 0)
           console.warn(`[/api/dilemma-light] ⚠️  Attempt ${attempt} failed: 'actions' array is empty (not conclusion mode)`);
+        } else if (previous && previous.title && (!raw.supportShift || typeof raw.supportShift !== 'object')) {
+          // Support shift is REQUIRED when previous context exists
+          console.warn(`[/api/dilemma-light] ⚠️  Attempt ${attempt} failed: Missing or invalid 'supportShift' with previous context`);
+          console.warn(`[/api/dilemma-light] Previous choice: "${previous.choiceTitle}"`);
+          console.warn(`[/api/dilemma-light] supportShift value:`, raw.supportShift);
         } else {
           console.log(`[/api/dilemma-light] ✅ Attempt ${attempt} succeeded`);
           break; // Success! Exit retry loop
