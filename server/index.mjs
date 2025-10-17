@@ -3096,7 +3096,8 @@ if (process.env.NODE_ENV === "production") {
   app.use(express.static(distPath));
 
   // Handle SPA routing - send index.html for all non-API routes
-  app.get("*", (req, res) => {
+  // Express 5 compatible: use regex instead of "*"
+  app.get(/^\/(?!api).*/, (req, res) => {
     res.sendFile(path.join(distPath, "index.html"));
   });
 
