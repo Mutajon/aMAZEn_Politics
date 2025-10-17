@@ -13,7 +13,7 @@
 // - src/hooks/useAftermathNarration.ts: narration control
 // - All section components
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { AftermathResponse } from "../../lib/aftermath";
 import type { PropKey } from "../../data/compass-data";
 import { useAftermathNarration } from "../../hooks/useAftermathNarration";
@@ -70,19 +70,25 @@ export default function AftermathContent({
   onExploreClick,
   onRevealScoreClick,
 }: Props) {
-  // Narration hook
-  const { startNarration, stopNarration } = useAftermathNarration(data.remembrance);
+  // Narration hook - only prepare TTS if not skipped (prevents unnecessary API calls on return from mirror)
+  const { startNarration, stopNarration, canStartNarration } = useAftermathNarration(
+    isSkipped ? undefined : data.remembrance
+  );
 
-  // Handle narration step specially
+  // Ref to ensure narration is only triggered once
+  const narrationStartedRef = useRef(false);
+
+  // Handle narration step specially - wait for TTS to be ready before starting
   useEffect(() => {
-    if (isAtStep(steps.narration) && !isSkipped) {
+    if (isAtStep(steps.narration) && !isSkipped && canStartNarration && !narrationStartedRef.current) {
+      narrationStartedRef.current = true;
       console.log('[AftermathContent] Starting narration...');
       startNarration(() => {
         console.log('[AftermathContent] Narration completed, advancing');
         advanceToNext();
       });
     }
-  }, [isAtStep, steps.narration, isSkipped, startNarration, advanceToNext]);
+  }, [isAtStep, steps.narration, isSkipped, canStartNarration, startNarration, advanceToNext]);
 
   // Stop narration if skipped
   useEffect(() => {

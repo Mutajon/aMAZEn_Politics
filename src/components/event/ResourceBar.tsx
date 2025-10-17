@@ -61,31 +61,42 @@ export default function ResourceBar({ daysLeft, budget, showBudget = true, avata
   }, [avatarSrc]);
 
   return (
-    <div className="w-full flex items-center justify-between gap-3">
-      <ResourcePill
-        icon={<Hourglass className="w-4 h-4" />}
-        label="Days Left"
-        value={String(daysLeft)}
-        iconBgClass="bg-sky-500/20"   // ← original: dark blue chip
-        iconTextClass="text-sky-200"  // ← original: light blue icon
-      />
-      {showBudget && (
-        <ResourcePill
-          // Wrap icon with an anchor span so coins can locate it
-          icon={
-            <span data-budget-anchor="true" id="budget-anchor" className="inline-flex">
-              <Coins className="w-4 h-4" />
-            </span>
-          }
-          label="Budget"
-          value={formatMoney(displayBudget)}
-          iconBgClass="bg-amber-500/25"  // ← original: dark gold chip
-          iconTextClass="text-amber-200" // ← original: light gold icon
-        />
-      )}
-      {/* Goals display (only if modifiers enabled) */}
+    <div className="w-full flex items-end justify-between gap-3">
+      {/* Resources Section */}
+      <div className="flex flex-col gap-1">
+        <div className="text-[10px] text-white/50 uppercase tracking-wide px-1">
+          Resources
+        </div>
+        <div className="flex items-stretch gap-2">
+          <ResourcePill
+            icon={<Hourglass className="w-4 h-4" />}
+            label="Days Left"
+            value={String(daysLeft)}
+            iconBgClass="bg-sky-500/20"
+            iconTextClass="text-sky-200"
+            width={120}
+          />
+          {showBudget && (
+            <ResourcePill
+              icon={
+                <span data-budget-anchor="true" id="budget-anchor" className="inline-flex">
+                  <Coins className="w-4 h-4" />
+                </span>
+              }
+              label="Budget"
+              value={formatMoney(displayBudget)}
+              iconBgClass="bg-amber-500/25"
+              iconTextClass="text-amber-200"
+              width={140}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Goals Section (only if modifiers enabled) */}
       {enableModifiers && <GoalsCompact />}
-      {/* Avatar Pill */}
+
+      {/* Avatar */}
       <div
         className="shrink-0 rounded-xl overflow-hidden ring-1 ring-white/15 bg-white/5"
         style={{ width: 100, height: 100, minWidth: 100 }}
@@ -118,24 +129,28 @@ function ResourcePill({
   value,
   iconBgClass = "bg-white/10",
   iconTextClass = "text-white/90",
+  width,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   iconBgClass?: string;
   iconTextClass?: string;
+  width: number;
 }) {
   return (
     <div
       className={[
-        "flex-1 min-w-0",
-        "px-3 py-3 rounded-2xl",  // Increased from py-2 to py-3 for better vertical alignment with avatar
+        "shrink-0",
+        "px-3 rounded-2xl",
         "bg-white/10 border border-white/15 shadow-sm",
         "backdrop-blur-sm",
         "text-white",
+        "flex items-center", // Center content vertically
       ].join(" ")}
+      style={{ width: `${width}px`, height: "60px" }}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 w-full">
         <span
           className={[
             "inline-flex items-center justify-center shrink-0 rounded-lg p-1",
@@ -145,8 +160,8 @@ function ResourcePill({
         >
           {icon}
         </span>
-        <div className="truncate">
-          <div className="text-[11px] leading-none text-white/80">{label}</div>
+        <div className="truncate flex-1 min-w-0">
+          <div className="text-[11px] leading-none text-white/80 mb-1">{label}</div>
           <div className="text-base font-semibold leading-tight">{value}</div>
         </div>
       </div>

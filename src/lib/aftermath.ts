@@ -34,7 +34,7 @@ export type AftermathRequest = {
 /** Individual decision analysis from AI */
 export type DecisionAnalysis = {
   title: string; // ≤12 words
-  reflection: string; // one line judging autonomy/liberalism
+  reflection: string; // short explanatory sentence (~15-25 words) explaining WHY the decision demonstrates autonomy/heteronomy and liberalism/totalism
 };
 
 /** Response from /api/aftermath */

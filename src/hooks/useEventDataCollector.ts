@@ -12,12 +12,14 @@
 
 import { useState, useCallback, useRef } from "react";
 import { useDilemmaStore, buildSnapshot, buildLightSnapshot } from "../store/dilemmaStore";
+import type { GoalStatusChange } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { COMPONENTS, type PropKey } from "../data/compass-data";
 import type { Dilemma, DilemmaAction, LightDilemmaResponse } from "../lib/dilemma";
 import type { TickerItem } from "../components/event/NewsTicker";
+import { audioManager } from "../lib/audioManager";
 
 // ============================================================================
 // TYPES
@@ -223,6 +225,30 @@ async function fetchDilemma(): Promise<Dilemma> {
       setSupportPeople(newPeople);
       setSupportMom(newMom);
       setSupportMiddle(newMiddle);
+
+      // CRITICAL: Update minimum values for continuous goal tracking
+      // This must happen after support shifts to capture new lows
+      const { updateMinimumValues, evaluateGoals } = useDilemmaStore.getState();
+      updateMinimumValues();
+      console.log('[fetchDilemma] ✅ Minimum values updated after support shifts');
+
+      // Re-evaluate goals to check if any just failed/completed
+      const goalChanges = evaluateGoals();
+      console.log('[fetchDilemma] ✅ Goals re-evaluated after support shifts');
+
+      // Play achievement sound if any goal status changed
+      if (goalChanges.length > 0) {
+        console.log('[fetchDilemma] 🎵 Goal status changed, playing achievement sound:', goalChanges);
+        audioManager.playSfx('achievement');
+
+        // TODO: Trigger visual feedback (flash goal pills) - handled in GoalsCompact
+        // We'll emit the changes through a custom event
+        goalChanges.forEach(change => {
+          window.dispatchEvent(new CustomEvent('goal-status-changed', {
+            detail: change
+          }));
+        });
+      }
 
       // Store support effects in the dilemma object for the collector
       (data as any).supportEffects = [

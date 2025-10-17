@@ -59,7 +59,7 @@ export default function SupportList({
   animateDurationMs = 1000,
 }: Props) {
   return (
-    <div className="mt-4 space-y-1.5">
+    <div className="space-y-1.5">
       {items.map((it, index) => (
         <SupportCard
           key={it.id}

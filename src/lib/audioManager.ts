@@ -162,7 +162,11 @@ class AudioManager {
         console.log('🎵 Music muted');
       }
     } else {
-      if (this.currentMusic && this.currentMusic.paused) {
+      // If no music is playing, start background music (fallback for deep links)
+      if (!this.currentMusic) {
+        console.log('🎵 No music playing, starting background music...');
+        this.playMusic('background', true);
+      } else if (this.currentMusic.paused) {
         this.currentMusic.play().catch((err) => {
           console.warn('🎵 Music resume failed:', err);
         });

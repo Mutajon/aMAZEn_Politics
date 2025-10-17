@@ -23,6 +23,7 @@ import {
   DollarSign,
   Gauge,
   Target,
+  Gift,
   Rocket,
   Trophy,
 } from "lucide-react";
@@ -43,9 +44,7 @@ import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
 import { useHighscoreStore } from "../store/highscoreStore";
-import { useSettingsStore } from "../store/settingsStore";
 import { useMirrorTop3 } from "../hooks/useMirrorTop3";
-import { useAudioManager } from "../hooks/useAudioManager";
 import type { PushFn } from "../lib/router";
 
 type Props = {
@@ -89,16 +88,6 @@ type CategoryPiece = {
   tint: string; // Tailwind background color
 };
 
-/**
- * Map difficulty IDs to display names (matches DifficultyScreen titles)
- */
-const difficultyDisplayMap: Record<string, string> = {
-  "baby-boss": "Baby Boss (Easy)",
-  "freshman": "Freshman (Normal)",
-  "tactician": "Tactician (Hard)",
-  "old-fox": "Old Fox (Very Hard)",
-};
-
 export default function FinalScoreScreen({ push }: Props) {
   // Load aftermath ratings from snapshot (saved by AftermathScreen)
   const [ratings, setRatings] = useState<{
@@ -106,9 +95,8 @@ export default function FinalScoreScreen({ push }: Props) {
     autonomy: AftermathRating;
   } | null>(null);
 
-  // Submission state (persistent to prevent duplicates on revisit)
-  const finalScoreSubmitted = useDilemmaStore((s) => s.finalScoreSubmitted);
-  const markScoreSubmitted = useDilemmaStore((s) => s.markScoreSubmitted);
+  // Submission state
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const [playerRank, setPlayerRank] = useState<number | null>(null);
   const [isHallOfFame, setIsHallOfFame] = useState(false);
 
@@ -116,10 +104,8 @@ export default function FinalScoreScreen({ push }: Props) {
   const character = useRoleStore((s) => s.character);
   const analysis = useRoleStore((s) => s.analysis);
   const addHighscoreEntry = useHighscoreStore((s) => s.addEntry);
+  const highscoreEntries = useHighscoreStore((s) => s.entries);
   const top3ByDimension = useMirrorTop3();
-  const selectedGoals = useDilemmaStore((s) => s.selectedGoals);
-  const enableModifiers = useSettingsStore((s) => s.enableModifiers);
-  const { playSfx } = useAudioManager();
 
   // Score persistence (prevents recalculation on revisit)
   const saveFinalScore = useDilemmaStore((s) => s.saveFinalScore);
@@ -157,87 +143,87 @@ export default function FinalScoreScreen({ push }: Props) {
   // Use saved breakdown if score already calculated, otherwise use fresh
   const breakdown = savedBreakdown && finalScoreCalculated ? savedBreakdown : freshBreakdown;
 
-  // Build category sequence for animation (4-5 categories depending on enableModifiers, final score bar added separately)
+  // Build category sequence for animation
   const sequence: CategoryPiece[] = useMemo(
-    () => {
-      const allCategories: CategoryPiece[] = [
-        {
-          key: "support",
-          label: "Final Support",
-          value: breakdown.support.total,
-          icon: <Users className="h-5 w-5" />,
-          tint: "bg-blue-500/10",
-        },
-        {
-          key: "budget",
-          label: "Budget",
-          value: breakdown.budget.points,
-          icon: <DollarSign className="h-5 w-5" />,
-          tint: "bg-emerald-500/10",
-        },
-        {
-          key: "ideology",
-          label: "Ideology",
-          value: breakdown.ideology.total,
-          icon: <Gauge className="h-5 w-5" />,
-          tint: "bg-purple-500/10",
-        },
-        {
-          key: "goals",
-          label: "Goals",
-          value: breakdown.goals.total,
-          icon: <Target className="h-5 w-5" />,
-          tint: "bg-orange-500/10",
-        },
-        {
-          key: "difficulty",
-          label: "Difficulty",
-          value: breakdown.difficulty.points,
-          icon: <Rocket className="h-5 w-5" />,
-          tint: "bg-yellow-500/10",
-        },
-      ];
-
-      // Filter out goals category if modifiers are disabled
-      return enableModifiers ? allCategories : allCategories.filter(c => c.key !== 'goals' && c.key !== 'difficulty');
-    },
-    [breakdown, enableModifiers]
+    () => [
+      {
+        key: "support",
+        label: "Final Support",
+        value: breakdown.support.total,
+        icon: <Users className="h-5 w-5" />,
+        tint: "bg-blue-500/10",
+      },
+      {
+        key: "budget",
+        label: "Budget",
+        value: breakdown.budget.points,
+        icon: <DollarSign className="h-5 w-5" />,
+        tint: "bg-emerald-500/10",
+      },
+      {
+        key: "ideology",
+        label: "Ideology",
+        value: breakdown.ideology.total,
+        icon: <Gauge className="h-5 w-5" />,
+        tint: "bg-purple-500/10",
+      },
+      {
+        key: "goals",
+        label: "Goals",
+        value: breakdown.goals.total,
+        icon: <Target className="h-5 w-5" />,
+        tint: "bg-orange-500/10",
+      },
+      {
+        key: "bonus",
+        label: "Bonus",
+        value: breakdown.bonus.points,
+        icon: <Gift className="h-5 w-5" />,
+        tint: "bg-pink-500/10",
+      },
+      {
+        key: "difficulty",
+        label: "Difficulty",
+        value: breakdown.difficulty.points,
+        icon: <Rocket className="h-5 w-5" />,
+        tint: "bg-yellow-500/10",
+      },
+      {
+        key: "final",
+        label: "Final Score",
+        value: breakdown.final,
+        icon: <Trophy className="h-5 w-5" />,
+        tint: "bg-amber-500/10",
+      },
+    ],
+    [breakdown]
   );
 
-  // Animation state (3-5 categories + 1 final score = 4-6 total steps, depending on enableModifiers)
+  // Animation state
   const [step, setStep] = useState(0);
   const [running, setRunning] = useState(true);
   const [displayValues, setDisplayValues] = useState<number[]>(() =>
-    [...sequence.map(() => 0), 0] // N categories + final score
+    sequence.map(() => 0)
   );
-  const [finalScoreDisplay, setFinalScoreDisplay] = useState(0);
   const rafRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
-
-  // Refs for auto-scrolling category cards
-  const categoryRefs = useRef<(HTMLLIElement | null)[]>([]);
-  const finalScoreRef = useRef<HTMLDivElement | null>(null);
 
   // Restore animation state if score already calculated (runs once on mount)
   useEffect(() => {
     if (finalScoreCalculated && savedBreakdown && ratings) {
       console.log("[FinalScoreScreen] Score already calculated - skipping animation");
-      // Jump to completed state immediately with saved values (sequence.length categories + final score)
-      // Build array matching current sequence (filtered by enableModifiers)
-      const categoryValues = sequence.map(piece => {
-        switch (piece.key) {
-          case 'support': return savedBreakdown.support.total;
-          case 'budget': return savedBreakdown.budget.points;
-          case 'ideology': return savedBreakdown.ideology.total;
-          case 'goals': return savedBreakdown.goals.total;
-          case 'difficulty': return savedBreakdown.difficulty.points;
-          default: return 0;
-        }
-      });
-      const finalSequence = [...categoryValues, savedBreakdown.final];
+      // Jump to completed state immediately with saved values
+      const finalSequence = [
+        savedBreakdown.support.total,
+        savedBreakdown.budget.points,
+        savedBreakdown.ideology.total,
+        savedBreakdown.goals.total,
+        savedBreakdown.bonus.points,
+        savedBreakdown.difficulty.points,
+        savedBreakdown.final,
+      ];
       setDisplayValues(finalSequence);
-      setFinalScoreDisplay(savedBreakdown.final);
-      setStep(sequence.length + 1); // sequence.length categories + 1 final score
+      setStep(finalSequence.length);
       setRunning(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -248,78 +234,15 @@ export default function FinalScoreScreen({ push }: Props) {
     if (!finalScoreCalculated) {
       setStep(0);
       setRunning(true);
-      setDisplayValues([...sequence.map(() => 0), 0]); // 5 categories + final score
-      setFinalScoreDisplay(0);
+      setDisplayValues(sequence.map(() => 0));
     }
   }, [sequence, finalScoreCalculated]);
 
-  // Calculate rank on mount if already submitted (for revisits after navigation)
-  useEffect(() => {
-    if (finalScoreSubmitted && savedBreakdown && character && ratings && playerRank === null) {
-      console.log("[FinalScoreScreen] Already submitted - calculating rank on revisit");
-      const freshEntries = useHighscoreStore.getState().entries;
-      const rank = findPlayerRank(character.name, savedBreakdown.final, freshEntries);
-      console.log("[FinalScoreScreen] Recalculated rank on revisit:", rank);
-      setPlayerRank(rank);
-      setIsHallOfFame(rank > 0 && rank <= 20);
-    }
-  }, [finalScoreSubmitted, savedBreakdown, character, ratings, playerRank]);
-
-  // Auto-scroll to active category card
-  useEffect(() => {
-    if (step >= 0 && step < sequence.length) {
-      // Steps 0-(N-1): category cards
-      const element = categoryRefs.current[step];
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    } else if (step === sequence.length) {
-      // Step N: final score bar
-      if (finalScoreRef.current) {
-        finalScoreRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    }
-  }, [step, sequence.length]);
-
   // Animate current step
   useEffect(() => {
-    if (!running || step > sequence.length) return; // N+1 steps total (0-N)
+    if (!running || step >= sequence.length) return;
 
-    // Step N is the final score bar animation
-    if (step === sequence.length) {
-      // Play drumroll sound effect
-      playSfx('drumroll');
-
-      const duration = 1200;
-      const from = 0;
-      const to = breakdown.final;
-
-      const tick = (t: number) => {
-        if (startTimeRef.current === 0) startTimeRef.current = t;
-        const elapsed = t - startTimeRef.current;
-        const progress = Math.min(1, elapsed / duration);
-        const val = Math.round(easeNumber(from, to, progress));
-
-        setFinalScoreDisplay(val);
-        setDisplayValues((prev) => prev.map((v, i) => (i === sequence.length ? val : v)));
-
-        if (progress < 1) {
-          rafRef.current = requestAnimationFrame(tick);
-        } else {
-          startTimeRef.current = 0;
-          setRunning(false); // Animation complete
-          setTimeout(() => setStep((s) => s + 1), 200);
-        }
-      };
-
-      rafRef.current = requestAnimationFrame(tick);
-      return () => {
-        if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      };
-    }
-
-    // Steps 0-4: category animations
-    const duration = 800;
+    const duration = step === sequence.length - 1 ? 1200 : 800;
     const from = 0;
     const to = sequence[step].value;
 
@@ -343,11 +266,11 @@ export default function FinalScoreScreen({ push }: Props) {
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [running, step, sequence, breakdown.final, playSfx]);
+  }, [running, step, sequence]);
 
-  // On animation complete: submit to highscores (only once, tracked in persisted store)
+  // On animation complete: submit to highscores
   useEffect(() => {
-    if (step === sequence.length + 1 && !finalScoreSubmitted && ratings) {
+    if (step === sequence.length && !isSubmitted && ratings) {
       console.log("[FinalScoreScreen] Animation complete - submitting to highscores");
 
       // Submit to highscores (AUTOMATIC FOR ALL PLAYERS)
@@ -361,13 +284,10 @@ export default function FinalScoreScreen({ push }: Props) {
 
       console.log("[FinalScoreScreen] Submitting highscore entry:", entry);
       addHighscoreEntry(entry);
+      setIsSubmitted(true);
 
-      // Mark as submitted in persistent store (prevents duplicates on revisit)
-      markScoreSubmitted();
-
-      // Get FRESH entries from store after adding (hook value is stale)
-      const freshEntries = useHighscoreStore.getState().entries;
-      const rank = findPlayerRank(entry.name, breakdown.final, freshEntries);
+      // Check player's rank in sorted list
+      const rank = findPlayerRank(entry.name, breakdown.final);
       console.log("[FinalScoreScreen] Player rank:", rank);
       setPlayerRank(rank);
       setIsHallOfFame(rank > 0 && rank <= 20);
@@ -375,32 +295,27 @@ export default function FinalScoreScreen({ push }: Props) {
   }, [
     step,
     sequence.length,
-    finalScoreSubmitted,
+    isSubmitted,
     ratings,
     breakdown,
     character,
     analysis,
     top3ByDimension,
     addHighscoreEntry,
-    markScoreSubmitted,
   ]);
 
   // Save score to store after animation completes (prevents recalculation on revisit)
   useEffect(() => {
-    if (step === sequence.length + 1 && !finalScoreCalculated && breakdown && ratings) {
+    if (step === sequence.length && !finalScoreCalculated && breakdown && ratings) {
       console.log("[FinalScoreScreen] Saving score to store (final score:", breakdown.final, ")");
       saveFinalScore(breakdown);
     }
   }, [step, sequence.length, finalScoreCalculated, breakdown, ratings, saveFinalScore]);
 
-  // Helper: Find player rank in sorted highscores (takes entries as param to avoid stale closure)
-  function findPlayerRank(
-    playerName: string,
-    playerScore: number,
-    entries: ReturnType<typeof useHighscoreStore.getState>["entries"]
-  ): number {
+  // Helper: Find player rank in sorted highscores
+  function findPlayerRank(playerName: string, playerScore: number): number {
     // Highscores are already sorted by score (descending) by the store
-    const playerIndex = entries.findIndex(
+    const playerIndex = highscoreEntries.findIndex(
       (e) => e.name === playerName && e.score === playerScore
     );
     return playerIndex >= 0 ? playerIndex + 1 : -1; // 1-indexed
@@ -411,8 +326,7 @@ export default function FinalScoreScreen({ push }: Props) {
     console.log("[FinalScoreScreen] Restarting animation");
     setStep(0);
     setRunning(true);
-    setDisplayValues([...sequence.map(() => 0), 0]); // 5 categories + final score
-    setFinalScoreDisplay(0);
+    setDisplayValues(sequence.map(() => 0));
     startTimeRef.current = 0;
     // Clear saved score so animation can replay fully
     if (finalScoreCalculated) {
@@ -452,6 +366,18 @@ export default function FinalScoreScreen({ push }: Props) {
     push(`/highscores?highlight=${encodeURIComponent(playerName)}`);
   };
 
+  // Progress for cumulative bar
+  const isFinalStep = step >= sequence.length - 1;
+
+  const currentScore = isFinalStep
+    ? displayValues[sequence.length - 1]
+    : displayValues.slice(0, sequence.length - 1).reduce((a, b) => a + b, 0);
+
+  const maxScore = 3000;
+  const currentPct = Math.round(
+    (Math.max(0, Math.min(maxScore, currentScore)) / maxScore) * 100
+  );
+
   return (
     <div className="min-h-screen px-5 py-8" style={bgStyle}>
       <div className="w-full max-w-3xl mx-auto space-y-6">
@@ -472,15 +398,37 @@ export default function FinalScoreScreen({ push }: Props) {
           Final Score
         </h1>
 
+        {/* Cumulative Progress Bar */}
+        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6">
+          <div className="mb-3 flex items-baseline justify-between">
+            <div className="text-sm text-white/70">Current Score</div>
+            <div className="text-sm text-white/70">Max {maxScore}</div>
+          </div>
+          <div className="relative h-10 w-full overflow-hidden rounded-xl bg-white/5 border border-white/10">
+            <motion.div
+              className="absolute left-0 top-0 h-full bg-gradient-to-r from-amber-400 to-amber-600"
+              initial={{ width: 0 }}
+              animate={{ width: `${currentPct}%` }}
+              transition={{ type: "tween", duration: 0.3 }}
+            />
+            <div className="relative z-10 flex h-full items-center justify-center text-xl font-bold tabular-nums text-white">
+              {currentScore}
+            </div>
+          </div>
+          {isFinalStep && (
+            <div className="mt-2 text-center text-sm text-white/80">
+              Final score:{" "}
+              <span className="font-semibold text-white">
+                {displayValues[sequence.length - 1]}
+              </span>
+            </div>
+          )}
+        </div>
+
         {/* Category Cards */}
         <ul className="space-y-4">
           {sequence.map((piece, idx) => (
-            <li
-              key={piece.key}
-              ref={(el) => {
-                categoryRefs.current[idx] = el;
-              }}
-            >
+            <li key={piece.key}>
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: idx <= step ? 1 : 0.4, y: 0 }}
@@ -519,7 +467,7 @@ export default function FinalScoreScreen({ push }: Props) {
                           Public support{" "}
                           <span className="font-semibold">
                             {breakdown.support.people > 0
-                              ? Math.round((breakdown.support.people / 600) * 100)
+                              ? Math.round((breakdown.support.people / 500) * 100)
                               : 0}
                             %
                           </span>
@@ -533,7 +481,7 @@ export default function FinalScoreScreen({ push }: Props) {
                           Power holders support{" "}
                           <span className="font-semibold">
                             {breakdown.support.middle > 0
-                              ? Math.round((breakdown.support.middle / 600) * 100)
+                              ? Math.round((breakdown.support.middle / 500) * 100)
                               : 0}
                             %
                           </span>
@@ -547,7 +495,7 @@ export default function FinalScoreScreen({ push }: Props) {
                           Mom support{" "}
                           <span className="font-semibold">
                             {breakdown.support.mom > 0
-                              ? Math.round((breakdown.support.mom / 600) * 100)
+                              ? Math.round((breakdown.support.mom / 500) * 100)
                               : 0}
                             %
                           </span>
@@ -603,33 +551,13 @@ export default function FinalScoreScreen({ push }: Props) {
 
                 {piece.key === "goals" && (
                   <div className="space-y-2">
-                    {breakdown.goals.completed > 0 ? (
-                      <>
-                        <TocRow
-                          left={
-                            <span>
-                              Goals completed:{" "}
-                              <span className="font-semibold">
-                                {breakdown.goals.completed} / 2
-                              </span>
-                            </span>
-                          }
-                          right={<span>{breakdown.goals.bonusPoints}</span>}
-                        />
-                        {/* Show individual goal results */}
-                        {selectedGoals.map(goal => (
-                          <div key={goal.id} className="text-xs text-white/60 flex items-center gap-2 ml-4">
-                            <span>{goal.status === 'met' ? '✅' : goal.status === 'failed' ? '❌' : '⏳'}</span>
-                            <span className={goal.status === 'met' ? 'text-green-400' : goal.status === 'failed' ? 'text-red-400' : ''}>{goal.title}</span>
-                            {goal.status === 'met' && <span className="text-green-400">+{goal.scoreBonusOnCompletion}</span>}
-                          </div>
-                        ))}
-                      </>
-                    ) : (
-                      <div className="text-sm text-white/60 italic">
-                        {selectedGoals.length === 0 ? 'No goals selected' : 'No goals completed'}
-                      </div>
-                    )}
+                    <div className="text-sm text-white/60 italic">Coming Soon</div>
+                  </div>
+                )}
+
+                {piece.key === "bonus" && (
+                  <div className="space-y-2">
+                    <div className="text-sm text-white/60 italic">Coming Soon</div>
                   </div>
                 )}
 
@@ -639,8 +567,8 @@ export default function FinalScoreScreen({ push }: Props) {
                       left={
                         <span>
                           Level:{" "}
-                          <span className="font-semibold">
-                            {difficultyDisplayMap[breakdown.difficulty.level] || breakdown.difficulty.level}
+                          <span className="font-semibold capitalize">
+                            {breakdown.difficulty.level.replace("-", " ")}
                           </span>
                         </span>
                       }
@@ -665,56 +593,31 @@ export default function FinalScoreScreen({ push }: Props) {
           ))}
         </ul>
 
-        {/* Final Score Bar (appears after all categories complete) */}
-        {step >= sequence.length && (
+        {/* Hall of Fame Banner / Rank Acknowledgment */}
+        {isSubmitted && playerRank && playerRank > 0 && (
           <motion.div
-            ref={finalScoreRef}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="bg-amber-500/10 backdrop-blur-sm border border-amber-400/30 rounded-xl p-6"
+            transition={{ delay: 0.3 }}
+            className={
+              isHallOfFame
+                ? "bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border-2 border-amber-400 rounded-xl p-6"
+                : "bg-white/5 border border-white/10 rounded-xl p-4"
+            }
           >
-            {/* Header with Trophy Icon */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className="rounded-full bg-amber-500/20 p-2.5 text-amber-400">
-                <Trophy className="h-6 w-6" />
+            {isHallOfFame ? (
+              <>
+                <div className="text-center text-3xl font-bold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent mb-2">
+                  🎉 YOU MADE THE HALL OF FAME! 🎉
+                </div>
+                <div className="text-center text-xl text-white font-semibold">
+                  Rank #{playerRank}
+                </div>
+              </>
+            ) : (
+              <div className="text-center text-white/80">
+                Your rank: <span className="font-semibold">#{playerRank}</span>
               </div>
-              <div className="font-bold text-2xl text-amber-400">
-                Final Score
-              </div>
-            </div>
-
-            {/* Animated Progress Bar */}
-            <div className="relative h-12 w-full overflow-hidden rounded-xl bg-white/5 border border-white/10">
-              <motion.div
-                className="absolute left-0 top-0 h-full bg-gradient-to-r from-amber-400 to-amber-600"
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.round((Math.max(0, Math.min(3600, finalScoreDisplay)) / 3600) * 100)}%` }}
-                transition={{ type: "tween", duration: 0.3 }}
-              />
-              <div className="relative z-10 flex h-full items-center justify-center text-2xl font-bold tabular-nums text-white">
-                {finalScoreDisplay}
-              </div>
-            </div>
-
-            {/* Hall of Fame Status Message (appears below bar after animation) */}
-            {playerRank !== null && step === sequence.length + 1 && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5, duration: 0.4 }}
-                className="mt-4 text-center"
-              >
-                {isHallOfFame ? (
-                  <div className="text-lg font-semibold text-amber-300">
-                    🎉 You made it to the Hall of Fame! Your current rank: <span className="text-amber-400">#{playerRank}</span>
-                  </div>
-                ) : (
-                  <div className="text-lg text-white/70">
-                    You did not make it to the Hall of Fame... maybe next time 😊
-                  </div>
-                )}
-              </motion.div>
             )}
           </motion.div>
         )}

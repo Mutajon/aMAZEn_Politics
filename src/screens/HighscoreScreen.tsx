@@ -28,8 +28,25 @@ const rowVariants: Variants = {
 
 
 
-function imgForLeader(name: string) {
-  const first = name.split(" ")[0];
+/**
+ * Get avatar image source with intelligent fallback logic
+ * @param entry - Highscore entry
+ * @param rank - 0-indexed rank (0 = 1st place, 19 = 20th place)
+ * @returns Image URL or data URL
+ */
+function imgForLeader(entry: HighscoreEntry, rank: number): string {
+  // Top 20 (Hall of Fame): Use custom avatar if available
+  if (rank < 20 && entry.avatarUrl) {
+    return entry.avatarUrl;
+  }
+
+  // Ranks 21+ (21-50): Use default placeholder avatar
+  if (rank >= 20) {
+    return "/assets/images/leaders/placeholder.jpg";
+  }
+
+  // Top 20 without custom avatar: Try to find static historical image
+  const first = entry.name.split(" ")[0];
   return `/assets/images/leaders/${first}.jpg`;
 }
 
@@ -149,7 +166,7 @@ export default function HighscoreScreen() {
                   {/* Leader cell: 50x50 image + name */}
                   <div className="flex items-center gap-3 min-w-0">
                     <img
-                      src={imgForLeader(e.name)}
+                      src={imgForLeader(e, i)}
                       alt={e.name}
                       width={50}
                       height={50}

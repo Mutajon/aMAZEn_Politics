@@ -11,7 +11,7 @@
 // - src/screens/AftermathScreen.tsx: main orchestrator
 // - src/components/aftermath/*: individual section components
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import type { AftermathResponse } from "../lib/aftermath";
 
 export function useAftermathSequence(data: AftermathResponse | null, isFirstVisit: boolean) {
@@ -33,6 +33,16 @@ export function useAftermathSequence(data: AftermathResponse | null, isFirstVisi
   // If not first visit, start at final step (show everything)
   const [counter, setCounter] = useState(isFirstVisit ? 0 : getFinalStep());
   const [isSkipped, setIsSkipped] = useState(!isFirstVisit);
+
+  // When returning from snapshot, data may not be available during initial useState,
+  // so counter initializes to 0. This effect jumps to final step once data loads.
+  useEffect(() => {
+    if (!isFirstVisit && data && counter < 3) {
+      const finalStep = getFinalStep();
+      console.log('[AftermathSequence] Data loaded on return visit, jumping to final step:', finalStep);
+      setCounter(finalStep);
+    }
+  }, [data, isFirstVisit, counter, getFinalStep]);
 
   // Refs for auto-scrolling
   const sectionRefs = useRef<{ [key: string]: HTMLElement | null }>({});

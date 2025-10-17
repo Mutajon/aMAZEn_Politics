@@ -76,7 +76,7 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set, get) => ({
       // Image generation
-      generateImages: false,
+      generateImages: true,
       setGenerateImages: (v) => set({ generateImages: v }),
       toggleGenerateImages: () => set({ generateImages: !get().generateImages }),
 
@@ -106,7 +106,7 @@ export const useSettingsStore = create<SettingsState>()(
       setDilemmasSubject: (s) => set({ dilemmasSubject: s }),
 
       // NEW: Enable modifiers
-      enableModifiers: false,
+      enableModifiers: true,
       setEnableModifiers: (v) => set({ enableModifiers: v }),
       toggleEnableModifiers: () => set({ enableModifiers: !get().enableModifiers }),
 
@@ -125,11 +125,11 @@ export const useSettingsStore = create<SettingsState>()(
       setNarrationMutedInGame: (v) => set({ narrationMutedInGame: v }),
       toggleNarrationMutedInGame: () => set({ narrationMutedInGame: !get().narrationMutedInGame }),
 
-      // NEW: Background music (default ON at 30% volume)
+      // NEW: Background music (default ON at 21% volume)
       musicEnabled: true,
       setMusicEnabled: (v) => set({ musicEnabled: v }),
       toggleMusicEnabled: () => set({ musicEnabled: !get().musicEnabled }),
-      musicVolume: 0.3,
+      musicVolume: 0.21,
       setMusicVolume: (v) => set({ musicVolume: Math.max(0, Math.min(1, v)) }),
 
       // NEW: Sound effects (default ON at 100% volume)

@@ -118,7 +118,8 @@ export async function cleanAndAdvanceDay(
       choiceSummary: selectedAction.summary,
       supportPeople,
       supportMiddle,
-      supportMom
+      supportMom,
+      topic: current.topic || 'Unknown' // NEW: Store topic for variety tracking
     });
     console.log(`[Cleaner] History entry added for Day ${currentDay}`);
   } else {

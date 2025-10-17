@@ -213,15 +213,15 @@ Score calculated in FinalScoreScreen only (stays at 0 during gameplay).
 
 | Category | Max Points | Formula |
 |----------|-----------|---------|
-| **Support** | 1500 | 500 per track: `(value/100) × 500` |
-| **Budget** | 400 | `min(400, (budget/1200) × 400)` |
-| **Ideology** | 500 | 250 per axis (5-tier from Aftermath API) |
+| **Support** | 1800 | 600 per track: `(value/100) × 600` |
+| **Budget** | 400 | `min(400, (budget/1000) × 400)` |
+| **Ideology** | 600 | 300 per axis (5-tier from Aftermath API) |
 | **Goals** | 0-300 | Sum of completed goal bonuses (max 2 goals × 150 pts each) |
 | **Difficulty** | ±500 | -200/0/+200/+500 flat modifier |
-| **TOTAL** | ~3500 | Clamped [0, 3500] |
+| **TOTAL** | ~3600 | No cap (theoretical max ~3600) |
 
 **Ideology Rating → Points:**
-- very-low: 50, low: 112, medium: 175, high: 212, very-high: 250
+- very-low: 60, low: 134, medium: 210, high: 254, very-high: 300
 
 **Goals System:**
 - Only available when `enableModifiers` setting is ON

@@ -378,6 +378,10 @@ app.post("/api/validate-role", async (req, res) => {
 });
 
 // -------------------- Name suggestions ----------------------
+// DISABLED: NameScreen now uses generic placeholders instead of AI-generated names
+// to save tokens. Predefined roles use static data, custom roles use GENERIC_CHARACTERS.
+// Endpoint kept for reference but no longer called.
+/*
 app.post("/api/name-suggestions", async (req, res) => {
   try {
     const { role } = req.body || {};
@@ -404,6 +408,7 @@ app.post("/api/name-suggestions", async (req, res) => {
     return res.status(500).json({ error: "Failed to generate name suggestions" });
   }
 });
+*/
 
 // -------------------- Background object suggestion ----------
 function backgroundHeuristic(role = "") {
@@ -1473,17 +1478,19 @@ SYSTEM FEEL (GLOBAL CONTEXT — ALWAYS APPLY)
   * Institution Strength (media, judiciary, unions) → Strong = constrain/expose; Weak = comply/stay silent.
 - Never make “system feel” the explicit subject. Let it color tension, friction, and perceived autonomy.
 
-CONTINUITY (CRITICAL - ALWAYS FOLLOW THIS)
-- Always apply **SYSTEM FEEL** when evolving reactions and resistance across turns.
-- If subject streak ≥ 2: Conclude the previous topic in one short sentence, THEN shift to a COMPLETELY DIFFERENT topic (different subject matter, different stakeholders, different type of issue).
-- If subject streak < 2: The new situation MUST be a direct consequence of or reaction to the previous choice. Explicitly reference what happened (e.g., "After you issued the decree...", "The settlers you turned away...", "Following your speech...").
-- Evolve plausibly given the system: e.g., pushback mounts in democracies, fades or goes underground in autocracies.
-- NEVER generate a random unrelated event when there is a PREVIOUS choice (UNLESS subject streak ≥ 2 requires a topic change). Every turn must feel causally connected to the last.
-- **VOTE OUTCOME CONTINUITY**: If the player's previous action involved putting a decision to a public vote, referendum, or popular consultation, the next situation MUST present the results of that vote.
-  * Describe the outcome clearly (e.g., "The referendum passed with 62% support..." or "The citizens voted down your proposal by a slim margin...").
-  * Show immediate implications and reactions (e.g., "Supporters celebrate in the streets," "The losing side demands a recount," "International observers raise concerns").
-  * Frame the new dilemma around what the player should do next in response to these results (e.g., implement the mandate immediately, delay for reconciliation, propose modifications, or handle the backlash).
-  * Apply SYSTEM FEEL: vote outcomes play out differently based on the political system (e.g., direct democracies see swift implementation, autocracies may face underground resistance if results are ignored).
+CONTINUITY (conditional - read carefully)
+- **DAY 7 (Epic Finale)**: IGNORE all previous events. Create a completely unrelated national crisis.
+- **FORBIDDEN TOPICS present (Days 3 & 5)**: Conclude the previous topic in one sentence, then shift to an entirely different subject area.
+- **Otherwise**: The new situation MUST be a direct consequence of or reaction to the previous choice.
+  * Always apply **SYSTEM FEEL** when evolving reactions and resistance across turns.
+  * Explicitly reference what happened (e.g., "After you issued the decree...", "The settlers you turned away...", "Following your speech...").
+  * Evolve plausibly given the system: e.g., pushback mounts in democracies, fades or goes underground in autocracies.
+  * If subject streak ≥ 2: Conclude the previous topic in one short sentence, THEN shift to a COMPLETELY DIFFERENT topic.
+  * If subject streak < 2: Direct continuation showing consequences.
+- **VOTE OUTCOME CONTINUITY**: If previous action involved a vote/referendum, the next dilemma MUST present results.
+  * Show outcome percentage, immediate reactions, implications.
+  * Frame new dilemma around responding to vote results.
+  * Apply SYSTEM FEEL to how outcomes play out.
 
 DAY 1 VALUE FOCUS (only if TOP VALUES provided)
 - Use the top 2 "what" values to inspire the situation.
@@ -1653,63 +1660,85 @@ function calculateScopeGuidance(scopeStreak, recentScopes, debug) {
   return guidance;
 }
 
+/**
+ * Build forbidden topics section for forced topic changes on Days 3 & 5
+ * Forces topic variety by explicitly banning previous subjects
+ */
+function buildForbiddenTopicsSection(recentTopics) {
+  if (!recentTopics || recentTopics.length === 0) return '';
+
+  const uniqueTopics = [...new Set(recentTopics)];
+
+  return `
+🚫 FORBIDDEN TOPICS - FORCED VARIETY:
+Previous days used these broad topics - YOU MUST AVOID THEM ENTIRELY:
+${uniqueTopics.map(t => `• ${t}`).join('\n')}
+
+YOU MUST choose a COMPLETELY DIFFERENT subject area.
+Not just a different angle on the same topic - a truly different domain.
+
+Available alternative topics: Economy, Culture, Justice, Education, Infrastructure,
+Foreign Relations, Healthcare, Environment, Technology, Social Policy, etc.
+
+⚠️ IMPORTANT: Changing topics does NOT mean ignoring consequences.
+- You MUST still calculate support shifts based on the PREVIOUS choice (shown above).
+- The new dilemma is just about a DIFFERENT subject area - not in a vacuum.
+- Think: "Different topic, but consequences from last choice still apply."
+`.trim();
+}
 
 /**
  * Build user prompt for light dilemma API - minimal dynamic context
  */
-function buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance, recentDilemmaTitles, daysLeft }) {
+function buildLightUserPrompt({ role, system, day, daysLeft, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance, recentTopics, recentDilemmaTitles }) {
   const parts = [
     `ROLE & SETTING: ${role}`,
     `SYSTEM: ${system}`,
+    '',
+    '⚠️ CRITICAL: Ground this dilemma in the SPECIFIC political context above.',
+    'Use setting-appropriate issues, stakeholders, terminology, and geography.',
+    'Example: "Prime Minister of Israel" → Israeli-specific politics (Knesset, settlements, coalition dynamics), not generic leadership.',
   ];
 
-  // Top values (Day 1 only)
+  // Top values (Days 1, 3, 5)
   if (topWhatValues && Array.isArray(topWhatValues) && topWhatValues.length > 0) {
-    parts.push(`TOP VALUES: ${topWhatValues.join(', ')}`);
+    parts.push('');
+    parts.push(`TOP PLAYER VALUES: ${topWhatValues.join(', ')}`);
+    parts.push('Create a situation that naturally tests or challenges these values (without naming them explicitly).');
   }
 
-  // Thematic guidance (custom subject or default axes)
+  // Forbidden topics (Days 3 & 5 only)
+  if ((day === 3 || day === 5) && recentTopics && recentTopics.length > 0) {
+    parts.push('');
+    parts.push(buildForbiddenTopicsSection(recentTopics));
+  }
+
+  // Thematic guidance
   if (thematicGuidance) {
+    parts.push('');
     parts.push(`THEME: ${thematicGuidance}`);
   }
 
   parts.push('');
 
-  // Recent dilemma titles for semantic variety checking (NEW)
-  // Skip on Day 7 (epic finale handles variety independently)
-  if (daysLeft !== 1 && recentDilemmaTitles && Array.isArray(recentDilemmaTitles) && recentDilemmaTitles.length >= 2) {
-    parts.push('RECENT DILEMMA TITLES (last 2):');
-    recentDilemmaTitles.slice(0, 2).forEach(title => {
-      parts.push(`- "${title}"`);
-    });
-    parts.push('');
-    parts.push('⚠️ VARIETY CHECK: If these two titles revolve around the same specific subject matter,');
-    parts.push('you MUST create a dilemma that contrasts maximally in ALL of these dimensions:');
-    parts.push('• Subject matter (completely different topic, not just a different angle)');
-    parts.push('• Stakeholder groups (different people/factions involved)');
-    parts.push('• Type of decision required (not just variations of the same choice)');
-    parts.push('• Resources at stake (different currencies: territory vs money vs authority vs lives)');
-    parts.push('');
-    parts.push('The player should feel: "This is a completely different kind of problem than before."');
-    parts.push('');
-  }
-
-  // Subject streak
-  if (subjectStreak && subjectStreak.subject) {
+  // Subject streak (all days except Day 7)
+  if (day !== 7 && subjectStreak && subjectStreak.subject) {
     parts.push(`SUBJECT STREAK: ${subjectStreak.subject} = ${subjectStreak.count}`);
   } else {
     parts.push('SUBJECT STREAK: none');
   }
 
-  // Previous choice (only if exists)
-  if (previous && previous.title) {
+  // Previous choice (Days 2-8, except Day 7 epic finale)
+  if (day >= 2 && day !== 7 && previous && previous.title) {
     parts.push(`PREVIOUS SITUATION: "${previous.description}"`);
     parts.push(`PLAYER'S CHOICE: ${previous.choiceTitle} — ${previous.choiceSummary}`);
+  } else if (day === 7) {
+    parts.push('PREVIOUS: IGNORE (Epic Finale - create unrelated national crisis)');
   } else {
     parts.push('PREVIOUS: none (first day)');
   }
 
-  // Scope guidance (always included)
+  // Scope guidance
   if (scopeGuidance) {
     parts.push(scopeGuidance);
   }
@@ -1726,26 +1755,32 @@ function buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatVa
  */
 function buildEpicFinaleSection() {
   return `
-🎯 EPIC FINALE MODE (Day 7 - FINAL DILEMMA):
-This is the player's LAST decision before the game ends.
+🎯 EPIC FINALE MODE (Day 7 - FINAL DILEMMA)
 
-CRITICAL REQUIREMENTS:
-- **IGNORE CONTINUITY**: Do NOT continue the previous topic. Generate a NEW, unrelated high-stakes situation.
-- **NATIONAL SCOPE**: Make it affect the entire nation or multiple factions simultaneously (not a local issue).
-- **CLEAR CONSEQUENCES**: Frame it as a defining moment with visible, immediate impact on the nation's future.
-- **HARD CHOICES**: All three options should feel significant, difficult, and consequential.
-- **NO SMALL ISSUES**: This is NOT about festivals, local disputes, or administrative matters.
+**⚠️ CRITICAL: DO NOT CONTINUE PREVIOUS STORY**
+Treat this as a FRESH, UNRELATED national crisis.
+Pretend Days 1-6 never happened. Start from scratch.
+
+REQUIREMENTS:
+- **MENTION FINALITY**: Reference that this is the leader's final day or defining moment in office
+  * Examples: "On your final day in office...", "As your tenure draws to a close...", "In what may be your last act as [role]..."
+- **NATIONAL SCOPE**: Affects entire nation or multiple major factions simultaneously (not a local issue)
+- **DEFINING MOMENT**: This decision will shape the nation's future and define the player's legacy
+- **HARD CHOICES**: All three options have major trade-offs and lasting consequences
+- **HIGH STAKES**: Constitutional crisis, external threat, nationwide scandal, or historic opportunity
 
 Examples of epic finale scenarios:
-• Constitutional crisis requiring immediate decision (e.g., "Parliament votes no confidence," "Supreme Court declares emergency powers unconstitutional")
-• Major external threat demanding decisive action (e.g., "Neighboring state mobilizes army at border," "Economic embargo threatens collapse")
-• Nationwide scandal forcing you to take sides (e.g., "Evidence of massive corruption in key ministry," "Military generals demand your resignation")
-• Historic opportunity with major trade-offs (e.g., "Alliance offer that requires compromising sovereignty," "Revolutionary technology with ethical concerns")
-• Coalition collapse requiring dramatic intervention (e.g., "Key allies threaten to withdraw support unless you act," "Popular uprising reaches capital")
+• Parliament passes vote of no confidence in your leadership
+• Military generals demand your resignation over policy dispute
+• Neighboring state mobilizes army at border requiring immediate response
+• Major corruption scandal implicates your closest advisors
+• Revolutionary alliance offer that requires compromising national sovereignty
+• Supreme Court declares your key policy unconstitutional
+• Popular uprising reaches the capital demanding systemic change
 
-Make the player feel: "This decision will define my entire tenure and shape the nation's future."
+Make the player feel: "This single decision will define my entire tenure."
 
-REMINDER: Still follow all other rules (specificity, natural language, no jargon, realistic costs, support shift logic).
+REMINDER: Still follow all other rules (specificity, natural language, realistic costs, support shift logic).
 `.trim();
 }
 
@@ -1806,14 +1841,25 @@ app.post("/api/dilemma-light", async (req, res) => {
     // Extract minimal payload
     const role = String(req.body?.role || "").trim() || "Unicorn King";
     const system = String(req.body?.system || "").trim() || "Divine Right Monarchy";
+    const day = Number(req.body?.day ?? 1); // NEW: Current day (1-7) for day-based variety logic
     const daysLeft = Number(req.body?.daysLeft ?? 1);
-    const subjectStreak = req.body?.subjectStreak || null;
+    let subjectStreak = req.body?.subjectStreak || null;
     const scopeStreak = req.body?.scopeStreak || null; // NEW: Scope streak tracking
     const recentScopes = req.body?.recentScopes || []; // NEW: Last 5 scopes
     const recentDilemmaTitles = req.body?.recentDilemmaTitles || []; // NEW: Last 3-5 dilemma titles for semantic variety
-    const previous = req.body?.previous || null;
-    const topWhatValues = req.body?.topWhatValues || null; // Day 1 only: top 2 compass values
+    let recentTopics = req.body?.recentTopics || []; // NEW: Last 4 broad topics for forbidden list (Days 3 & 5)
+    let previous = req.body?.previous || null;
+    let topWhatValues = req.body?.topWhatValues || null; // Days 1, 3, 5: top 2 compass values
     const thematicGuidance = req.body?.thematicGuidance || null; // Custom subject or default axes
+
+    // Day 7: Epic Finale - strip all continuity for pure national crisis
+    if (day === 7) {
+      console.log('[/api/dilemma-light] 🎯 DAY 7 EPIC FINALE - Stripping all continuity data');
+      previous = null;
+      subjectStreak = null;
+      recentTopics = [];
+      topWhatValues = null;
+    }
 
     if (debug) {
       console.log(`[/api/dilemma-light] daysLeft: ${daysLeft}`);
@@ -1853,7 +1899,7 @@ app.post("/api/dilemma-light", async (req, res) => {
       systemPrompt = buildLightSystemPrompt();
     }
 
-    const userPrompt = buildLightUserPrompt({ role, system, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance, recentDilemmaTitles, daysLeft });
+    const userPrompt = buildLightUserPrompt({ role, system, day, daysLeft, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance, recentTopics, recentDilemmaTitles });
 
     // ALWAYS log previous context (critical for debugging continuity and support shifts)
     if (previous) {

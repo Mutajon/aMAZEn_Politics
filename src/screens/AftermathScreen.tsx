@@ -16,7 +16,7 @@
 // - src/components/aftermath/AftermathContent.tsx: main content renderer
 // - server/index.mjs: POST /api/aftermath
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useAftermathData } from "../hooks/useAftermathData";
 import { useRoleStore } from "../store/roleStore";
 import { useLoadingProgress } from "../hooks/useLoadingProgress";
@@ -42,52 +42,55 @@ export default function AftermathScreen({ push }: Props) {
   const { character } = useRoleStore();
   const { progress, start: startProgress, notifyReady } = useLoadingProgress();
   const top3ByDimension = useMirrorTop3();
-  const [restoredFromSnapshot, setRestoredFromSnapshot] = useState(false);
+
+  // ========================================================================
+  // SNAPSHOT RESTORATION (synchronous, before first render)
+  // ========================================================================
+  // Check for snapshot and restore immediately to prevent race condition
+  // with fetch effect. Must happen synchronously before any effects run.
+  const [initializedFromSnapshot] = useState(() => {
+    const snapshot = loadAftermathScreenSnapshot();
+    if (snapshot) {
+      console.log('[AftermathScreen] 🔄 Restoring from snapshot');
+      restoreData(snapshot.data);
+      clearAftermathScreenSnapshot();
+      return true;
+    }
+    return false;
+  });
 
   // Detect if this is first visit (no snapshot = first visit, snapshot exists = return visit)
-  const isFirstVisit = useMemo(() => {
-    const snapshot = loadAftermathScreenSnapshot();
-    return !snapshot;
-  }, []);
+  const isFirstVisit = !initializedFromSnapshot;
 
-  console.log('[AftermathScreen] isFirstVisit:', isFirstVisit);
+  console.log('[AftermathScreen] isFirstVisit:', isFirstVisit, 'initializedFromSnapshot:', initializedFromSnapshot);
 
   // Initialize sequence orchestration
   const sequence = useAftermathSequence(data, isFirstVisit);
 
   // ========================================================================
-  // EFFECT 0A: RESTORATION FROM SNAPSHOT (on mount)
+  // EFFECT: FETCH DATA (only if not restored from snapshot)
   // ========================================================================
   useEffect(() => {
-    const snapshot = loadAftermathScreenSnapshot();
-    if (snapshot) {
-      console.log('[AftermathScreen] 🔄 Restoring from snapshot');
-      restoreData(snapshot.data);
-      setRestoredFromSnapshot(true);
-      // Clear snapshot after successful restoration
-      clearAftermathScreenSnapshot();
-    }
-  }, [restoreData]);
-
-  // Fetch data on mount (only if not restored)
-  useEffect(() => {
-    if (!restoredFromSnapshot && !data) {
+    if (!initializedFromSnapshot && !data && !loading) {
+      console.log('[AftermathScreen] Fetching aftermath data...');
       startProgress(); // Start progress animation
       fetchAftermathData();
     }
-  }, [fetchAftermathData, startProgress, restoredFromSnapshot, data]);
+  }, [initializedFromSnapshot, data, loading, fetchAftermathData, startProgress]);
 
-  // Notify progress when data ready (only if not restored)
+  // ========================================================================
+  // EFFECT: NOTIFY PROGRESS (only if not restored from snapshot)
+  // ========================================================================
   useEffect(() => {
-    if (data && !restoredFromSnapshot) {
+    if (data && !initializedFromSnapshot) {
       notifyReady();
     }
-  }, [data, notifyReady, restoredFromSnapshot]);
+  }, [data, notifyReady, initializedFromSnapshot]);
 
   // ========================================================================
   // RENDER: Loading State
   // ========================================================================
-  if (loading && !data && !restoredFromSnapshot) {
+  if (loading && !data && !initializedFromSnapshot) {
     return (
       <CollectorLoadingOverlay
         progress={progress}
@@ -153,7 +156,17 @@ export default function AftermathScreen({ push }: Props) {
           saveAftermathReturnRoute('/aftermath');
           push('/mirror');
         }}
-        onRevealScoreClick={() => push("/final-score")}
+        onRevealScoreClick={() => {
+          // Save snapshot with ratings before navigating to FinalScoreScreen
+          // This ensures ideology ratings persist when navigating back
+          if (data) {
+            saveAftermathScreenSnapshot({
+              data,
+              timestamp: Date.now()
+            });
+          }
+          push("/final-score");
+        }}
       />
     </div>
   );

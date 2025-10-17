@@ -105,7 +105,7 @@ export const GOAL_POOL: Goal[] = [
         state.supportMom > 60
       ) ? 'met' : 'unmet';
     },
-    scoreBonusOnCompletion: 150,
+    scoreBonusOnCompletion: 300,
     icon: 'Scale',
     color: 'blue',
   },
@@ -120,7 +120,7 @@ export const GOAL_POOL: Goal[] = [
       if (!state.isGameComplete) return 'unmet';
       return state.budget > 500 ? 'met' : 'unmet';
     },
-    scoreBonusOnCompletion: 100,
+    scoreBonusOnCompletion: 300,
     icon: 'DollarSign',
     color: 'green',
   },
@@ -135,7 +135,7 @@ export const GOAL_POOL: Goal[] = [
       if (!state.isGameComplete) return 'unmet';
       return state.supportPeople > 85 ? 'met' : 'unmet';
     },
-    scoreBonusOnCompletion: 150,
+    scoreBonusOnCompletion: 300,
     icon: 'Users',
     color: 'purple',
   },
@@ -150,7 +150,7 @@ export const GOAL_POOL: Goal[] = [
       if (!state.isGameComplete) return 'unmet';
       return state.supportMom > 90 ? 'met' : 'unmet';
     },
-    scoreBonusOnCompletion: 150,
+    scoreBonusOnCompletion: 300,
     icon: 'Heart',
     color: 'pink',
   },
@@ -167,7 +167,7 @@ export const GOAL_POOL: Goal[] = [
       const min = Math.min(state.supportPeople, state.supportMiddle, state.supportMom);
       return (max - min) <= 15 ? 'met' : 'unmet';
     },
-    scoreBonusOnCompletion: 150,
+    scoreBonusOnCompletion: 300,
     icon: 'Activity',
     color: 'teal',
   },
@@ -187,7 +187,7 @@ export const GOAL_POOL: Goal[] = [
       if (state.isGameComplete && state.minBudget >= 650) return 'met';
       return 'unmet';
     },
-    scoreBonusOnCompletion: 150,
+    scoreBonusOnCompletion: 300,
     icon: 'TrendingUp',
     color: 'gold',
   },
@@ -196,14 +196,14 @@ export const GOAL_POOL: Goal[] = [
     id: 'peoples-champion',
     category: 'continuous-support',
     title: "People's Champion",
-    description: 'Never let public support drop below 50% at any point',
-    shortDescription: 'Public never <50%',
+    description: 'Never let people support drop below 50% at any point',
+    shortDescription: 'People never <50%',
     evaluate: (state) => {
       if (state.minSupportPeople < 50) return 'failed';
       if (state.isGameComplete && state.minSupportPeople >= 50) return 'met';
       return 'unmet';
     },
-    scoreBonusOnCompletion: 150,
+    scoreBonusOnCompletion: 300,
     icon: 'Shield',
     color: 'blue',
   },
@@ -219,7 +219,7 @@ export const GOAL_POOL: Goal[] = [
       if (state.isGameComplete && state.minSupportMiddle >= 40) return 'met';
       return 'unmet';
     },
-    scoreBonusOnCompletion: 150,
+    scoreBonusOnCompletion: 300,
     icon: 'Building2',
     color: 'indigo',
   },
@@ -235,7 +235,7 @@ export const GOAL_POOL: Goal[] = [
       if (state.isGameComplete && state.minSupportMom >= 40) return 'met';
       return 'unmet';
     },
-    scoreBonusOnCompletion: 150,
+    scoreBonusOnCompletion: 300,
     icon: 'Users',
     color: 'rose',
   },
@@ -255,7 +255,7 @@ export const GOAL_POOL: Goal[] = [
       if (state.isGameComplete && state.customActionCount === 0) return 'met';
       return 'unmet';
     },
-    scoreBonusOnCompletion: 150,
+    scoreBonusOnCompletion: 300,
     icon: 'Target',
     color: 'red',
   },
@@ -272,7 +272,7 @@ export const GOAL_POOL: Goal[] = [
       if (state.isGameComplete && state.customActionCount === state.totalDays) return 'met';
       return 'unmet';
     },
-    scoreBonusOnCompletion: 150,
+    scoreBonusOnCompletion: 300,
     icon: 'Zap',
     color: 'yellow',
   },

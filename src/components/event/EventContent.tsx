@@ -174,7 +174,12 @@ export default function EventContent({
 
       {/* Support values (3 entities), animated */}
       {progressiveLoading?.shouldShowSupportList && (
-        <SupportList items={items} animatePercent={true} animateDurationMs={1000} />
+        <div className="mt-4">
+          <div className="text-[11px] text-emerald-300 font-bold uppercase tracking-wide px-2 py-1 mb-2 bg-emerald-500/15 rounded-lg inline-block border border-emerald-400/40">
+            Support Values:
+          </div>
+          <SupportList items={items} animatePercent={true} animateDurationMs={1000} />
+        </div>
       )}
 
       {/* News ticker */}

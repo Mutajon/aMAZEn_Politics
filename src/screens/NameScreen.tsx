@@ -47,6 +47,22 @@ type Trio = {
   any: { name: string; prompt: string };
 };
 
+// Generic placeholders for custom roles (no API call needed)
+const GENERIC_CHARACTERS: Trio = {
+  male: {
+    name: "James Anderson",
+    prompt: "with a professional demeanor, confident expression, and well-groomed appearance"
+  },
+  female: {
+    name: "Sarah Chen",
+    prompt: "with a poised bearing, thoughtful gaze, and dignified presence"
+  },
+  any: {
+    name: "Morgan Taylor",
+    prompt: "with an approachable demeanor, intelligent eyes, and professional appearance"
+  }
+};
+
 function extractPhysical(input: string): string {
   if (!input) return "";
   const i = input.indexOf(",");
@@ -160,19 +176,9 @@ export default function NameScreen({ push }: { push: PushFn }) {
         setPhysical(extractPhysical(pick?.prompt || ""));
         setBgObject((prev) => prev || suggestBackgroundObject(selectedRole));
       } else {
-        console.log("[NameScreen] Using AI generation for custom role:", selectedRole);
-        // Fall back to AI generation for custom roles
-        const res = await fetch("/api/name-suggestions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ role: selectedRole }),
-        });
-        if (!res.ok) {
-          let j: any = null;
-          try { j = await res.json(); } catch {}
-          throw new Error(j?.error || `HTTP ${res.status}`);
-        }
-        const data: Trio = await res.json();
+        console.log("[NameScreen] Using generic placeholders for custom role:", selectedRole);
+        // Use generic placeholders for custom roles (no API call)
+        const data: Trio = GENERIC_CHARACTERS;
         setTrio(data);
         const pick = data[gender] || data.any;
         setName(pick?.name || "");
@@ -180,7 +186,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
         setBgObject((prev) => prev || suggestBackgroundObject(selectedRole));
       }
     } catch (e: any) {
-      setErrorMsg(e?.message || "Name suggestion failed");
+      setErrorMsg(e?.message || "Failed to load character data");
     } finally {
       setLoading(false);
     }
@@ -348,10 +354,10 @@ export default function NameScreen({ push }: { push: PushFn }) {
 
               <div className="mt-6 flex justify-center">
                 <button
-                  disabled={loading}
+                  disabled={loading || !name.trim() || !physical.trim()}
                   onClick={onContinue}
                   className={`rounded-2xl px-5 py-3 font-semibold text-lg shadow-lg ${
-                    !loading
+                    !loading && name.trim() && physical.trim()
                       ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] hover:scale-[1.02] active:scale-[0.98]"
                       : "bg-white/10 text-white/60 cursor-not-allowed"
                   }`}

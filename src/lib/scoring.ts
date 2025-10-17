@@ -2,13 +2,13 @@
 // Score calculation formulas, types, and highscore helpers for the final score screen
 //
 // Implements the scoring system defined in CLAUDE.md:
-// - Support: 1500 max (500 per track)
-// - Budget: 400 max
-// - Ideology: 500 max (250 per axis based on aftermath ratings)
-// - Goals: ±300 (not implemented yet)
-// - Bonus: ±200 (not implemented yet)
+// - Support: 1800 max (600 per track)
+// - Budget: 500 max
+// - Ideology: 600 max (300 per axis based on aftermath ratings)
+// - Goals: 0-600 (sum of completed goal bonuses, max 2 goals × 300 pts each)
+// - Bonus: 0 (not implemented yet)
 // - Difficulty: ±500 (flat modifiers)
-// - Total: Clamped [0, 3000]
+// - Total: No cap (theoretical max ~3900)
 //
 // Connects to:
 // - src/hooks/useScoreCalculation.ts: Uses these formulas to calculate scores
@@ -31,30 +31,30 @@ export type AftermathRating = "very-low" | "low" | "medium" | "high" | "very-hig
  */
 export type ScoreBreakdown = {
   support: {
-    people: number;      // 0-500 points
-    middle: number;      // 0-500 points
-    mom: number;         // 0-500 points
-    total: number;       // Sum (max 1500)
+    people: number;      // 0-600 points
+    middle: number;      // 0-600 points
+    mom: number;         // 0-600 points
+    total: number;       // Sum (max 1800)
   };
   budget: {
     budgetAmount: number; // Raw budget value
-    points: number;       // 0-400 points
+    points: number;       // 0-500 points
   };
   ideology: {
     liberalism: {
       rating: AftermathRating;
-      points: number;     // 0-250 points
+      points: number;     // 0-300 points
     };
     autonomy: {
       rating: AftermathRating;
-      points: number;     // 0-250 points
+      points: number;     // 0-300 points
     };
-    total: number;        // Sum (max 500)
+    total: number;        // Sum (max 600)
   };
   goals: {
     completed: number;    // Number of goals completed (0-2)
     bonusPoints: number;  // Total bonus from completed goals
-    total: number;        // Total goal points (max 300)
+    total: number;        // Total goal points (max 600)
   };
   bonus: {
     points: number;       // ±200 points (not implemented)
@@ -71,17 +71,17 @@ export type ScoreBreakdown = {
 // ========================================================================
 
 /**
- * Calculate support score (max 1500)
- * Formula: (value/100) × 500 per track
+ * Calculate support score (max 1800)
+ * Formula: (value/100) × 600 per track
  */
 export function calculateSupportScore(
   people: number,
   middle: number,
   mom: number
 ): ScoreBreakdown["support"] {
-  const peoplePoints = Math.round((people / 100) * 500);
-  const middlePoints = Math.round((middle / 100) * 500);
-  const momPoints = Math.round((mom / 100) * 500);
+  const peoplePoints = Math.round((people / 100) * 600);
+  const middlePoints = Math.round((middle / 100) * 600);
+  const momPoints = Math.round((mom / 100) * 600);
 
   return {
     people: peoplePoints,
@@ -92,11 +92,11 @@ export function calculateSupportScore(
 }
 
 /**
- * Calculate budget score (max 400)
- * Formula: min(400, (budget/1200) × 400)
+ * Calculate budget score (max 500)
+ * Formula: min(500, (budget/1000) × 500)
  */
 export function calculateBudgetScore(budget: number): ScoreBreakdown["budget"] {
-  const points = Math.min(400, Math.round((budget / 1200) * 400));
+  const points = Math.min(500, Math.round((budget / 1000) * 500));
   return {
     budgetAmount: budget,
     points: Math.max(0, points), // Clamp to 0 minimum
@@ -104,9 +104,9 @@ export function calculateBudgetScore(budget: number): ScoreBreakdown["budget"] {
 }
 
 /**
- * Calculate ideology score (max 500)
- * Formula: 250 per axis based on rating
- * Rating → Points: very-low: 50, low: 112, medium: 175, high: 212, very-high: 250
+ * Calculate ideology score (max 600)
+ * Formula: 300 per axis based on rating
+ * Rating → Points: very-low: 60, low: 134, medium: 210, high: 254, very-high: 300
  */
 export function calculateIdeologyScore(
   liberalismRating: AftermathRating,
@@ -114,12 +114,12 @@ export function calculateIdeologyScore(
 ): ScoreBreakdown["ideology"] {
   const ratingToPoints = (rating: AftermathRating): number => {
     switch (rating) {
-      case "very-high": return 250;
-      case "high": return 212;
-      case "medium": return 175;
-      case "low": return 112;
-      case "very-low": return 50;
-      default: return 175; // Default to medium
+      case "very-high": return 300;
+      case "high": return 254;
+      case "medium": return 210;
+      case "low": return 134;
+      case "very-low": return 60;
+      default: return 210; // Default to medium
     }
   };
 
@@ -141,7 +141,7 @@ export function calculateIdeologyScore(
 
 /**
  * Calculate goals score from selected goals
- * Sums bonus points from all completed goals (max 2 goals)
+ * Sums bonus points from all completed goals (max 2 goals × 300 pts = 600 max)
  * @param selectedGoals Array of selected goals with status
  * @returns Goals score breakdown
  */
@@ -154,7 +154,7 @@ export function calculateGoalsScore(
   return {
     completed: completedGoals.length,
     bonusPoints,
-    total: bonusPoints, // Total is sum of bonuses (capped at 300 in final calculation)
+    total: bonusPoints, // Total is sum of bonuses (max 600 for 2 goals)
   };
 }
 
@@ -192,7 +192,7 @@ export function calculateDifficultyScore(
 }
 
 /**
- * Calculate final score (sum all categories, clamp [0, 3500])
+ * Calculate final score (sum all categories, floor at 0, no cap)
  */
 export function calculateFinalScore(breakdown: ScoreBreakdown): number {
   const sum =
@@ -203,7 +203,7 @@ export function calculateFinalScore(breakdown: ScoreBreakdown): number {
     breakdown.bonus.points +
     breakdown.difficulty.points;
 
-  return Math.max(0, Math.min(3500, sum));
+  return Math.max(0, sum);
 }
 
 // ========================================================================
@@ -270,5 +270,6 @@ export function buildHighscoreEntry(
     values: formatCompassValuesForHighscore(top3ByDimension),
     score: breakdown.final,
     politicalSystem: analysis?.systemName || "Unknown System",
+    avatarUrl: character?.avatarUrl, // Include player's custom avatar (if available)
   };
 }

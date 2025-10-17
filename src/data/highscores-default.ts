@@ -13,6 +13,9 @@ export type HighscoreEntry = {
 
   /** Canonical political system name from POLITICAL_SYSTEMS (displayed in table & popup). */
   politicalSystem: string;
+
+  /** Optional player avatar (base64 data URL). Only saved for top 20 Hall of Fame entries. */
+  avatarUrl?: string;
 };
 
 /** First 20 seeded entries (with concise period tags). */

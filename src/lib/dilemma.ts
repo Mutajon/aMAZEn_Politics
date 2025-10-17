@@ -26,6 +26,7 @@ export type DilemmaHistoryEntry = {
   supportPeople: number;       // Support values AFTER this choice (0-100)
   supportMiddle: number;
   supportMom: number;
+  topic?: string;              // NEW: Broad subject category (Security, Economy, etc.)
 };
 
 export type DilemmaRequest = {
@@ -73,18 +74,20 @@ export type ScopeStreak = {
 export type LightDilemmaRequest = {
   role: string;
   system: string;
+  day?: number; // NEW: Current day (1-7) for day-based variety logic
   daysLeft: number; // totalDays - day + 1 (used for epic finale and game conclusion)
   subjectStreak: SubjectStreak | null;
   scopeStreak: ScopeStreak | null; // NEW: Scope rotation tracking
   recentScopes?: DilemmaScope[]; // NEW: Last 5 scopes for diversity checking
   recentDilemmaTitles?: string[]; // NEW: Last 3-5 dilemma titles for semantic variety checking
+  recentTopics?: string[]; // NEW: Last 4 broad topics for forbidden list (Days 3 & 5)
   previous?: {
     title: string;
     description: string; // CRITICAL: Full dilemma description (shows what each faction wanted)
     choiceTitle: string;
     choiceSummary: string;
   };
-  topWhatValues?: string[]; // Day 1 only: Top 2 "what" compass values for personalized dilemma
+  topWhatValues?: string[]; // Days 1, 3, 5: Top 2 "what" compass values for personalized dilemma
   thematicGuidance?: string; // Optional subject/theme guidance (custom subject or default axes)
   scopeGuidance?: string; // NEW: Server-calculated scope rotation guidance
   debug?: boolean;

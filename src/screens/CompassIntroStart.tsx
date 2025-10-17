@@ -65,14 +65,25 @@ function genderizeRole(role: string, gender: "male" | "female" | "any"): string 
 }
 
 export default function CompassIntroStart({ push }: { push: PushFn }) {
+  console.log("[CompassIntroStart] 🟢 Component rendered");
+
   const generateImages = useSettingsStore((s) => s.generateImages);
   const character = useRoleStore((s) => s.character);
   const selectedRole = useRoleStore((s) => s.selectedRole);
+
+  console.log("[CompassIntroStart] Character data:", {
+    name: character?.name,
+    gender: character?.gender,
+    hasAvatar: !!character?.avatarUrl
+  });
+  console.log("[CompassIntroStart] Selected role:", selectedRole);
 
   const [loading, setLoading] = useState(true);
   const [showImage, setShowImage] = useState(false);
   const [showText, setShowText] = useState(false);
   const [narrationReady, setNarrationReady] = useState(false);
+
+  console.log("[CompassIntroStart] Current state:", { loading, showImage, showText, narrationReady });
 
   // Narration setup
   const { prepare } = useNarrator();
@@ -92,31 +103,43 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
 
   // Start narration preparation immediately on mount
   useEffect(() => {
-    if (!character?.name || !roleText) return;
+    console.log("[CompassIntroStart] 🔵 useEffect triggered");
+    console.log("[CompassIntroStart] character?.name:", character?.name);
+    console.log("[CompassIntroStart] roleText:", roleText);
+
+    if (!character?.name || !roleText) {
+      console.warn("[CompassIntroStart] ⚠️ Missing required data - early return");
+      console.warn("[CompassIntroStart] character?.name exists:", !!character?.name);
+      console.warn("[CompassIntroStart] roleText exists:", !!roleText);
+      return;
+    }
+
+    console.log("[CompassIntroStart] ✅ Required data present, proceeding with narration");
 
     const narrationText = `Welcome ${character.name}. It is the night before your first day as ${roleText}. A package arrives with no return address, only the words: Know Thyself. Inside, a mirror—black, breathless, waiting.`;
 
     const prepareAndStartNarration = async () => {
       try {
-        console.log("[CompassIntroStart] Preparing narration");
+        console.log("[CompassIntroStart] 🎤 Preparing narration");
         const prepared = await prepare(narrationText);
         preparedTTSRef.current = prepared;
 
         // Start narration immediately when ready
         if (!prepared.disposed()) {
-          console.log("[CompassIntroStart] Starting narration");
+          console.log("[CompassIntroStart] 🔊 Starting narration");
           await prepared.start();
         }
 
-        console.log("[CompassIntroStart] Narration complete, revealing content");
+        console.log("[CompassIntroStart] ✅ Narration complete, revealing content");
         // Only after narration is ready, start the reveal sequence
         setLoading(false);
         setShowImage(true);
         setTimeout(() => setShowText(true), 600);
         setTimeout(() => setNarrationReady(true), 1200);
       } catch (error) {
-        console.error("[CompassIntroStart] Narration preparation failed:", error);
+        console.error("[CompassIntroStart] ❌ Narration preparation failed:", error);
         // If narration fails, still allow progression
+        console.log("[CompassIntroStart] 🔧 Falling back to no-narration mode");
         setLoading(false);
         setShowImage(true);
         setTimeout(() => setShowText(true), 600);
@@ -128,6 +151,7 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
 
     // Cleanup on unmount
     return () => {
+      console.log("[CompassIntroStart] 🔴 useEffect cleanup - component unmounting");
       if (preparedTTSRef.current) {
         preparedTTSRef.current.dispose();
         preparedTTSRef.current = null;

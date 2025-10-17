@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { bgStyle } from "../lib/ui";
 import { useSettingsStore } from "../store/settingsStore";
 import { useNarrator } from "../hooks/useNarrator";
+import { useAudioManager } from "../hooks/useAudioManager";
 import { useCompassStore } from "../store/compassStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
@@ -30,6 +31,9 @@ export default function SplashScreen({
   // Instantiate the OpenAI-backed narrator.
   // We call narrator.prime() on the Start button to unlock audio policies.
   const narrator = useNarrator();
+
+  // Audio manager for background music
+  const { playMusic } = useAudioManager();
 
   // --- Global settings (persisted via zustand) -----------------------------
   // Image generation
@@ -376,7 +380,10 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
       useMirrorQuizStore.getState().resetAll();
       clearAllSnapshots();
 
+      // Prime narrator and start music (user interaction unlocks browser autoplay)
       narrator.prime();
+      playMusic('background', true);
+
       onStart();
       setShowSettings(false);
     }}
@@ -392,6 +399,9 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
     style={{ visibility: showButton ? "visible" : "hidden" }}
     onClick={() => {
+      // Start music on any user interaction
+      playMusic('background', true);
+
       onHighscores?.(); // no-op if not wired yet
       setShowSettings(false);
     }}

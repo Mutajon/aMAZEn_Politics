@@ -69,6 +69,7 @@ type DilemmaState = {
   // Final score persistence (prevent recalculation on revisit)
   finalScoreCalculated: boolean;
   finalScoreBreakdown: ScoreBreakdown | null;
+  finalScoreSubmitted: boolean; // Prevent duplicate highscore submissions
 
   // Game resources and support (0-100 for support)
   budget: number;
@@ -123,6 +124,7 @@ type DilemmaState = {
   // Final score persistence methods
   saveFinalScore: (breakdown: ScoreBreakdown) => void;
   clearFinalScore: () => void;
+  markScoreSubmitted: () => void;
 
   // Dilemma history methods
   addHistoryEntry: (entry: DilemmaHistoryEntry) => void;
@@ -189,6 +191,7 @@ export const useDilemmaStore = create<DilemmaState>()(
   // Final score persistence
   finalScoreCalculated: false,
   finalScoreBreakdown: null,
+  finalScoreSubmitted: false,
 
   // Game resources and support
   budget: 1500,
@@ -349,6 +352,7 @@ export const useDilemmaStore = create<DilemmaState>()(
       recentScopes: [],
       finalScoreCalculated: false,
       finalScoreBreakdown: null,
+      finalScoreSubmitted: false,
       budget: 1500,
       supportPeople: 50,
       supportMiddle: 50,
@@ -548,6 +552,14 @@ export const useDilemmaStore = create<DilemmaState>()(
     set({
       finalScoreCalculated: false,
       finalScoreBreakdown: null,
+      finalScoreSubmitted: false,
+    });
+  },
+
+  markScoreSubmitted() {
+    dlog("markScoreSubmitted -> marking score as submitted to highscores");
+    set({
+      finalScoreSubmitted: true,
     });
   },
 
@@ -641,7 +653,8 @@ export const useDilemmaStore = create<DilemmaState>()(
       name: "amaze-politics-difficulty-v1",
       partialize: (state) => ({
         difficulty: state.difficulty,
-        selectedGoals: state.selectedGoals
+        selectedGoals: state.selectedGoals,
+        finalScoreSubmitted: state.finalScoreSubmitted
       })
     }
   )
@@ -908,11 +921,17 @@ function getTop2WhatValues(): string[] {
  */
 export function buildLightSnapshot(): LightDilemmaRequest {
   const { debugMode, useLightDilemmaAnthropic, dilemmasSubjectEnabled, dilemmasSubject, skipPreviousContext } = useSettingsStore.getState();
-  const { day, totalDays, lastChoice, current, subjectStreak, scopeStreak, recentScopes, recentDilemmaTitles } = useDilemmaStore.getState();
+  const { day, totalDays, lastChoice, current, subjectStreak, scopeStreak, recentScopes, recentDilemmaTitles, dilemmaHistory } = useDilemmaStore.getState();
   const roleState = useRoleStore.getState();
 
   // Calculate days left (for epic finale and game conclusion)
   const daysLeft = totalDays - day + 1;
+
+  // Extract recent topics from dilemma history for forbidden list (last 4 days)
+  const recentTopics = dilemmaHistory
+    .slice(-4)
+    .map(entry => entry.topic)
+    .filter(Boolean) as string[];
 
   // Extract role (combine role name with any setting context)
   const role = typeof roleState.selectedRole === "string" && roleState.selectedRole.trim()
@@ -963,12 +982,12 @@ export function buildLightSnapshot(): LightDilemmaRequest {
     console.log('[buildLightSnapshot] ⚠️ Day 2+ but skipPreviousContext is enabled - treating as Day 1');
   }
 
-  // Get top 2 "what" values on Day 1 for personalized dilemma
+  // Get top 2 "what" values on Days 1, 3, 5 for personalized dilemmas
   let topWhatValues: string[] | undefined = undefined;
-  if (day === 1) {
+  if (day === 1 || day === 3 || day === 5) {
     topWhatValues = getTop2WhatValues();
     if (debugMode) {
-      console.log('[buildLightSnapshot] Day 1 - Top what values:', topWhatValues);
+      console.log(`[buildLightSnapshot] Day ${day} - Top what values:`, topWhatValues);
     }
   }
 
@@ -986,13 +1005,15 @@ export function buildLightSnapshot(): LightDilemmaRequest {
   const request: LightDilemmaRequest = {
     role,
     system,
+    day, // NEW: Current day (1-7) for day-based variety logic
     daysLeft,
     subjectStreak: subjectStreak || null,
     scopeStreak: scopeStreak || null, // NEW: Scope streak tracking
     recentScopes: recentScopes || [], // NEW: Last 5 scopes for diversity checking
     recentDilemmaTitles: recentDilemmaTitles.slice(0, 2), // NEW: Last 2 titles for semantic variety (2-2-2-1 pattern)
+    recentTopics, // NEW: Last 4 broad topics for forbidden list (Days 3 & 5)
     previous,
-    topWhatValues, // Only defined on Day 1
+    topWhatValues, // Only defined on Days 1, 3, 5
     thematicGuidance, // Always included (custom subject or default axes)
     debug: debugMode,
     useAnthropic: useLightDilemmaAnthropic

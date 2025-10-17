@@ -138,21 +138,31 @@ export default function GoalsSelectionScreen({ push }: Props) {
 
   // Initialize goals on mount
   useEffect(() => {
+    console.log("[GoalsSelectionScreen] 🟢 Component mounted");
     const goals = getRandomGoals(3);
     setAvailableGoals(goals);
     console.log("[GoalsSelectionScreen] Generated 3 random goals:", goals.map(g => g.id));
+
+    return () => {
+      console.log("[GoalsSelectionScreen] 🔴 Component unmounted");
+    };
   }, []);
 
   // Toggle goal selection
   const toggleGoal = (goalId: string) => {
+    console.log("[GoalsSelectionScreen] 🔄 toggleGoal called for:", goalId);
     setSelectedGoals(prev => {
       const next = new Set(prev);
       if (next.has(goalId)) {
         next.delete(goalId);
+        console.log("[GoalsSelectionScreen] Deselected goal:", goalId, "| New count:", next.size);
       } else {
         // Only allow 2 selections
         if (next.size < 2) {
           next.add(goalId);
+          console.log("[GoalsSelectionScreen] Selected goal:", goalId, "| New count:", next.size);
+        } else {
+          console.log("[GoalsSelectionScreen] Cannot select goal:", goalId, "| Already at max (2)");
         }
       }
       return next;
@@ -161,17 +171,37 @@ export default function GoalsSelectionScreen({ push }: Props) {
 
   // Confirm selection
   const handleConfirm = () => {
+    console.log("[GoalsSelectionScreen] 🔵 handleConfirm called");
+    console.log("[GoalsSelectionScreen] selectedGoals.size:", selectedGoals.size);
+    console.log("[GoalsSelectionScreen] canConfirm:", canConfirm);
+    console.log("[GoalsSelectionScreen] selectedGoals:", Array.from(selectedGoals));
+
     if (selectedGoals.size !== 2) {
-      console.warn("[GoalsSelectionScreen] Must select exactly 2 goals");
+      console.warn("[GoalsSelectionScreen] ❌ Validation failed - Must select exactly 2 goals");
       return;
     }
 
-    const goalsToSave = availableGoals.filter(g => selectedGoals.has(g.id));
-    console.log("[GoalsSelectionScreen] Saving goals:", goalsToSave.map(g => g.id));
-    setGoalsInStore(goalsToSave);
+    console.log("[GoalsSelectionScreen] ✅ Validation passed - exactly 2 goals selected");
 
-    // Navigate to compass intro (continue normal game flow)
-    push("/compass-intro");
+    const goalsToSave = availableGoals.filter(g => selectedGoals.has(g.id));
+    console.log("[GoalsSelectionScreen] goalsToSave:", goalsToSave.map(g => ({ id: g.id, title: g.title })));
+
+    console.log("[GoalsSelectionScreen] 📦 Calling setGoalsInStore...");
+    try {
+      setGoalsInStore(goalsToSave);
+      console.log("[GoalsSelectionScreen] ✅ setGoalsInStore completed successfully");
+    } catch (error) {
+      console.error("[GoalsSelectionScreen] ❌ setGoalsInStore threw an error:", error);
+      return;
+    }
+
+    console.log("[GoalsSelectionScreen] 🚀 Calling push('/compass-intro')...");
+    try {
+      push("/compass-intro");
+      console.log("[GoalsSelectionScreen] ✅ push('/compass-intro') called successfully");
+    } catch (error) {
+      console.error("[GoalsSelectionScreen] ❌ push threw an error:", error);
+    }
   };
 
   // Calculate starting values based on difficulty
