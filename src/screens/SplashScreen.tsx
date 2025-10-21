@@ -380,8 +380,8 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     transition={{ type: "spring", stiffness: 250, damping: 22 }}
     style={{ visibility: showButton ? "visible" : "hidden" }}
     onClick={async () => {
-      // Log button click
-      logger.log('button_click_start_game', { screen: 'splash' }, 'User clicked Start Game button');
+      // Log button click (screen auto-captured by useLogger)
+      logger.log('button_click_start_game', {}, 'User clicked Start Game button');
 
       // Start new logging session
       await loggingService.startSession();
@@ -412,8 +412,8 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
     style={{ visibility: showButton ? "visible" : "hidden" }}
     onClick={() => {
-      // Log button click
-      logger.log('button_click_hall_of_fame', { screen: 'splash' }, 'User clicked Hall of Fame button');
+      // Log button click (screen auto-captured by useLogger)
+      logger.log('button_click_hall_of_fame', {}, 'User clicked Hall of Fame button');
 
       // Start music on any user interaction
       playMusic('background', true);
@@ -435,8 +435,8 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     transition={{ delay: 0.1, type: "spring", stiffness: 250, damping: 22 }}
     style={{ visibility: showButton ? "visible" : "hidden" }}
     onClick={() => {
-      // Log button click
-      logger.log('button_click_achievements', { screen: 'splash' }, 'User clicked Book of Achievements button');
+      // Log button click (screen auto-captured by useLogger)
+      logger.log('button_click_achievements', {}, 'User clicked Book of Achievements button');
 
       // Start music on any user interaction
       playMusic('background', true);

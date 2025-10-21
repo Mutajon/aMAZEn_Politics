@@ -176,9 +176,10 @@ class LoggingService {
       treatment,
       source: 'player',  // Phase 1: only player events
       action,
+      currentScreen: metadata?.screen,  // Extract screen as top-level field for easier querying
       value: {
         ...value,
-        ...metadata  // Merge metadata into value
+        ...metadata  // Keep metadata in value too for backward compatibility
       },
       comments
     };

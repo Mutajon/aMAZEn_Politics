@@ -37,7 +37,7 @@ export function useHashRoute() {
   useEffect(() => {
     const onHashChange = () => {
       const newRoute = readHash();
-      const previousRoute = previousRouteRef.current;
+      const previousRoute = previousRouteRef.current || '/';  // Guard against empty/undefined
 
       // Log navigation if logging is enabled
       const { enabled } = useLoggingStore.getState();

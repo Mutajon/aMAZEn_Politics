@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { bgStyle } from "../lib/ui";
 import type { PushFn } from "../lib/router";
 import { useDilemmaStore } from "../store/dilemmaStore";
+import { useLogger } from "../hooks/useLogger";
 
 type DifficultyLevel = {
   id: "baby-boss" | "freshman" | "tactician" | "old-fox";
@@ -54,11 +55,19 @@ const difficulties: DifficultyLevel[] = [
 ];
 
 export default function DifficultyScreen({ push }: { push: PushFn }) {
+  const logger = useLogger();
   const [selected, setSelected] = useState<DifficultyLevel["id"] | null>(null);
   const setDifficulty = useDilemmaStore((s) => s.setDifficulty);
 
   const handleConfirm = () => {
     if (!selected) return;
+
+    const selectedDiff = difficulties.find(d => d.id === selected);
+    logger.log('button_click_difficulty_confirm', {
+      difficulty: selected,
+      difficultyTitle: selectedDiff?.title
+    }, `User confirmed difficulty: ${selectedDiff?.title}`);
+
     setDifficulty(selected);
     push("/goals");
   };
@@ -92,7 +101,16 @@ export default function DifficultyScreen({ push }: { push: PushFn }) {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 + index * 0.1 }}
-              onClick={() => setSelected(diff.id)}
+              onClick={() => {
+                logger.log('difficulty_selection', {
+                  difficulty: diff.id,
+                  difficultyTitle: diff.title,
+                  supportMod: diff.supportMod,
+                  budgetMod: diff.budgetMod,
+                  scoreMod: diff.scoreMod
+                }, `User selected difficulty: ${diff.title}`);
+                setSelected(diff.id);
+              }}
               className={[
                 "w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all",
                 "hover:scale-[1.02] active:scale-[0.99]",

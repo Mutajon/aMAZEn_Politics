@@ -3,8 +3,10 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { bgStyle } from "../lib/ui";
 import type { PushFn } from "../lib/router";
+import { useLogger } from "../hooks/useLogger";
 
 export default function IntroScreen({ push }: { push: PushFn }) {
+  const logger = useLogger();
   const paragraphs = [
     "Ready to be aMAZEd?",
     "Life is a branching journey where every choice reflects yourself and leads to a different outcome.",
@@ -52,7 +54,10 @@ export default function IntroScreen({ push }: { push: PushFn }) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5 }}
-                onClick={() => push("/role")}
+                onClick={() => {
+                  logger.log('button_click_free_play', { mode: 'free-play' }, 'User clicked Free Play button');
+                  push("/role");
+                }}
                 className="w-[14rem] rounded-2xl px-5 py-3 font-semibold text-lg bg-gradient-to-r from-indigo-400 to-purple-500 text-white shadow-lg hover:scale-[1.02] active:scale-[0.98] mx-auto sm:mx-0"
               >
                 Free Play

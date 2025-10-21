@@ -8,6 +8,7 @@ import type { Character } from "../store/roleStore";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { motion } from "framer-motion";
 import { getPredefinedCharacters } from "../data/predefinedCharacters";
+import { useLogger } from "../hooks/useLogger";
 
 /** Small built-in placeholder (no asset file needed). */
 const DEFAULT_AVATAR_DATA_URL =
@@ -128,6 +129,7 @@ function buildFullPrompt(
 
 
 export default function NameScreen({ push }: { push: PushFn }) {
+  const logger = useLogger();
   const selectedRole = useRoleStore((s) => s.selectedRole);
   const character = useRoleStore((s) => s.character);
   const setCharacter = useRoleStore((s) => s.setCharacter);
@@ -257,6 +259,13 @@ export default function NameScreen({ push }: { push: PushFn }) {
   const onContinue = () => {
     if (phase === "input") {
       // Phase 1: Clear any existing avatar and save character data, then move to avatar generation
+      logger.log('button_click_create_character', {
+        gender,
+        name: name.trim(),
+        descriptionLength: physical.trim().length,
+        description: physical.trim()
+      }, `User clicked Create Character - Name: ${name.trim()}, Gender: ${gender}`);
+
       const fullChar: Character = {
         gender,
         name: name.trim(),
@@ -270,6 +279,12 @@ export default function NameScreen({ push }: { push: PushFn }) {
       setPhase("avatar");
     } else {
       // Phase 2: Continue to power distribution
+      logger.log('button_click_continue_to_power', {
+        characterName: name,
+        gender,
+        hasAvatar: !!avatarUrl
+      }, `User clicked Continue to power distribution`);
+
       push("/power");
     }
   };
@@ -305,7 +320,10 @@ export default function NameScreen({ push }: { push: PushFn }) {
                     name="g"
                     className="accent-amber-300 focus:ring-2 focus:ring-amber-300/60"
                     checked={gender === "male"}
-                    onChange={() => setGender("male")}
+                    onChange={() => {
+                      logger.log('character_gender_selection', { gender: 'male' }, 'User selected Male gender');
+                      setGender("male");
+                    }}
                   />
                   <span>Male</span>
                 </label>
@@ -315,7 +333,10 @@ export default function NameScreen({ push }: { push: PushFn }) {
                     name="g"
                     className="accent-amber-300 focus:ring-2 focus:ring-amber-300/60"
                     checked={gender === "female"}
-                    onChange={() => setGender("female")}
+                    onChange={() => {
+                      logger.log('character_gender_selection', { gender: 'female' }, 'User selected Female gender');
+                      setGender("female");
+                    }}
                   />
                   <span>Female</span>
                 </label>
@@ -325,7 +346,10 @@ export default function NameScreen({ push }: { push: PushFn }) {
                     name="g"
                     className="accent-amber-300 focus:ring-2 focus:ring-amber-300/60"
                     checked={gender === "any"}
-                    onChange={() => setGender("any")}
+                    onChange={() => {
+                      logger.log('character_gender_selection', { gender: 'any' }, 'User selected Any gender');
+                      setGender("any");
+                    }}
                   />
                   <span>Any</span>
                 </label>
@@ -335,7 +359,10 @@ export default function NameScreen({ push }: { push: PushFn }) {
                 <div className="text-white/90 mb-2">Name:</div>
                 <input
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    logger.log('character_name_input', { name: e.target.value }, `User entered character name: "${e.target.value}"`);
+                  }}
                   placeholder="Character name"
                   className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
                 />
@@ -346,7 +373,13 @@ export default function NameScreen({ push }: { push: PushFn }) {
                 <textarea
                   rows={6}
                   value={physical}
-                  onChange={(e) => setPhysical(e.target.value)}
+                  onChange={(e) => {
+                    setPhysical(e.target.value);
+                    logger.log('character_description_input', {
+                      descriptionLength: e.target.value.length,
+                      description: e.target.value
+                    }, `User entered character description`);
+                  }}
                   placeholder="with a dignified expression, long black hair tied in a topknot, a finely groomed beard…"
                   className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
                 />

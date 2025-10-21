@@ -13,6 +13,7 @@
 import { Music, Volume2, VolumeX } from 'lucide-react';
 import { useSettingsStore } from '../store/settingsStore';
 import { useNarrator } from '../hooks/useNarrator';
+import { useLogger } from '../hooks/useLogger';
 
 export default function AudioControls() {
   const musicEnabled = useSettingsStore((s) => s.musicEnabled);
@@ -22,10 +23,30 @@ export default function AudioControls() {
   const setNarrationEnabled = useSettingsStore((s) => s.setNarrationEnabled);
 
   const narrator = useNarrator();
+  const logger = useLogger();
+
+  // Handle music toggle
+  const handleMusicToggle = () => {
+    const newMusicState = !musicEnabled;
+    logger.log('button_click_music_toggle', {
+      previousState: musicEnabled,
+      newState: newMusicState,
+      action: newMusicState ? 'unmute' : 'mute'
+    }, `User ${newMusicState ? 'unmuted' : 'muted'} music`);
+
+    toggleMusicEnabled();
+  };
 
   // Handle SFX toggle - also controls narration
   const handleSfxToggle = () => {
     const newSfxState = !sfxEnabled;
+
+    logger.log('button_click_sfx_toggle', {
+      previousState: sfxEnabled,
+      newState: newSfxState,
+      action: newSfxState ? 'unmute' : 'mute'
+    }, `User ${newSfxState ? 'unmuted' : 'muted'} sound effects`);
+
     toggleSfxEnabled();
 
     // Mirror SFX state to narration (prevents TTS API requests when muted)
@@ -42,7 +63,7 @@ export default function AudioControls() {
       {/* Music Toggle Button */}
       <button
         type="button"
-        onClick={toggleMusicEnabled}
+        onClick={handleMusicToggle}
         className="
           group
           flex items-center justify-center

@@ -14,6 +14,7 @@ import { HelpCircle, Cog } from "lucide-react";
 import { IconFromKey, getRankColor } from "./PowerDistributionIcons";
 import type { EnhancedPowerHolder, FetchState } from "../hooks/usePowerDistributionState";
 import { useRoleStore } from "../store/roleStore";
+import { useLogger } from "../hooks/useLogger";
 
 interface PowerDistributionContentProps {
   // State
@@ -53,6 +54,7 @@ export default function PowerDistributionContent({
   onShowSystemModal,
   onHideSystemModal,
 }: PowerDistributionContentProps) {
+  const logger = useLogger();
   const character = useRoleStore((s) => s.character);
 
   return (
@@ -101,7 +103,12 @@ export default function PowerDistributionContent({
               <div className="mt-3 flex items-center justify-center gap-2 text-white/85">
                 <span className="font-semibold">Political system:</span>
                 <button
-                  onClick={onShowSystemModal}
+                  onClick={() => {
+                    logger.log('button_click_show_political_system', {
+                      systemName
+                    }, `User clicked to view political system: ${systemName}`);
+                    onShowSystemModal();
+                  }}
                   className="inline-flex items-center gap-1 rounded-lg px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10"
                   aria-label="Show political system details"
                 >
@@ -153,7 +160,15 @@ export default function PowerDistributionContent({
                           <div className="flex items-center gap-2 min-w-0">
                             <input
                               value={h.name}
-                              onChange={(e) => onChangeName(h._id, e.target.value)}
+                              onChange={(e) => {
+                                logger.log('power_holder_name_change', {
+                                  holderRank: rank,
+                                  isPlayer,
+                                  oldName: h.name,
+                                  newName: e.target.value
+                                }, `User changed power holder #${rank} name from "${h.name}" to "${e.target.value}"`);
+                                onChangeName(h._id, e.target.value);
+                              }}
                               className="bg-transparent font-semibold text-white/95 outline-none flex-auto min-w-0"
                               placeholder="Enter a name…"
                               aria-label="Power holder name"
@@ -183,7 +198,17 @@ export default function PowerDistributionContent({
                           max={100}
                           step={1}
                           value={h.percent}
-                          onChange={(e) => onChangePercent(i, Number(e.target.value))}
+                          onChange={(e) => {
+                            const newValue = Number(e.target.value);
+                            logger.log('power_holder_percent_change', {
+                              holderRank: rank,
+                              holderName: h.name,
+                              isPlayer,
+                              oldPercent: h.percent,
+                              newPercent: newValue
+                            }, `User adjusted power holder #${rank} (${h.name}) from ${h.percent}% to ${newValue}%`);
+                            onChangePercent(i, newValue);
+                          }}
                           className="w-full accent-violet-500"
                           aria-label={`Adjust ${h.name || "this holder"}'s influence`}
                         />
@@ -197,7 +222,12 @@ export default function PowerDistributionContent({
             {/* Action Buttons */}
             <div className="flex items-center justify-between mt-6">
               <button
-                onClick={onReset}
+                onClick={() => {
+                  logger.log('button_click_power_reset', {
+                    currentHolders: holders.map(h => ({ name: h.name, percent: h.percent }))
+                  }, 'User clicked Reset button on power distribution screen');
+                  onReset();
+                }}
                 className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/7 active:scale-[.99] text-white/70"
               >
                 <Cog className="w-4 h-4" />
@@ -205,7 +235,12 @@ export default function PowerDistributionContent({
               </button>
 
               <button
-                onClick={onLooksGood}
+                onClick={() => {
+                  logger.log('button_click_power_looks_good', {
+                    finalHolders: holders.map(h => ({ name: h.name, percent: h.percent }))
+                  }, 'User confirmed power distribution and clicked "Looks good"');
+                  onLooksGood();
+                }}
                 className="rounded-2xl px-5 py-3 font-semibold bg-yellow-300 hover:bg-yellow-200 text-[#0b1335] shadow-lg hover:scale-[1.02] active:scale-[0.98]"
               >
                 Looks good →
@@ -240,7 +275,12 @@ export default function PowerDistributionContent({
                   {systemName}
                 </h2>
                 <button
-                  onClick={onHideSystemModal}
+                  onClick={() => {
+                    logger.log('button_click_close_political_system_modal', {
+                      systemName
+                    }, 'User closed political system modal');
+                    onHideSystemModal();
+                  }}
                   className="rounded-xl px-2 py-1 bg-white/5 border border-white/10 text-white/80 hover:bg-white/10"
                 >
                   Close

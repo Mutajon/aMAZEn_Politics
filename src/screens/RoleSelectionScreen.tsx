@@ -8,6 +8,7 @@ import { validateRoleStrict, AIConnectionError } from "../lib/validation";
 import { useRoleStore } from "../store/roleStore";
 import { POLITICAL_SYSTEMS } from "../data/politicalSystems";
 import { getPredefinedPowerDistribution } from "../data/predefinedPowerDistributions";
+import { useLogger } from "../hooks/useLogger";
 
 // Map display names in the roles list to our canonical political systems.
 const SYSTEM_ALIAS: Record<string, string> = {
@@ -30,6 +31,7 @@ type RoleItem = {
 };
 
 export default function RoleSelectionScreen({ push }: { push: PushFn }) {
+  const logger = useLogger();
   const setRole = useRoleStore((s) => s.setRole);
   const setAnalysis = useRoleStore(s => s.setAnalysis);
 
@@ -131,6 +133,11 @@ useEffect(() => {
 
   async function handleConfirmSuggest() {
     if (checking) return;
+
+    logger.log('button_click_custom_role_validate', {
+      inputText: input
+    }, `User clicked Validate for custom role: "${input}"`);
+
     setChecking(true);
     setAiMsg("");
     setAiError("");
@@ -139,6 +146,11 @@ useEffect(() => {
       const { valid, reason } = await validateRoleStrict(input);
 
       if (!valid) {
+        logger.log('custom_role_validation_failed', {
+          inputText: input,
+          validationReason: reason
+        }, `Custom role validation failed: ${reason}`);
+
         const witty =
           reason && reason.length > 0
             ? reason
@@ -148,6 +160,10 @@ useEffect(() => {
         setTimeout(() => inputRef.current?.focus(), 50);
         return;
       }
+
+      logger.log('custom_role_validation_success', {
+        inputText: input.trim()
+      }, `Custom role validation successful: "${input.trim()}"`);
 
       setAiMsg("Nice! That's a clear role and setting.");
       setChecking(false);
@@ -163,11 +179,17 @@ useEffect(() => {
         playerIndex: null,
       });
 
+      // Navigation will be logged automatically by router
       push("/name");
       closeSuggest();
     } catch (err) {
+      logger.log('custom_role_validation_error', {
+        inputText: input,
+        error: err instanceof Error ? err.message : 'Unknown error'
+      }, `Error during custom role validation`);
+
       if (err instanceof AIConnectionError) {
-        setAiError("We can’t reach the AI service right now. Check your connection or API key and try again.");
+        setAiError("We can't reach the AI service right now. Check your connection or API key and try again.");
       } else {
         setAiError("Unexpected error with AI validation.");
       }
@@ -196,7 +218,15 @@ useEffect(() => {
             <motion.li key={idx} variants={itemVariants}>
               <button
                 onClick={() => {
-                  if (r.suggest) return openSuggest();
+                  if (r.suggest) {
+                    logger.log('button_click_suggest_own_role', {}, 'User clicked "Suggest your own" button');
+                    return openSuggest();
+                  }
+                  logger.log('role_card_click', {
+                    role: r.label,
+                    subtitle: r.subtitle,
+                    politicalSystem: r.system
+                  }, `User clicked role card: ${r.label}`);
                   setSelectedRole(r); // open flavor modal
                 }}
                 className="relative w-full px-5 py-4 rounded-2xl bg-white/5 text-white/90 border border-white/10 hover:bg-white/10 hover:border-white/20 transition active:scale-[0.98] flex items-center gap-3 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]"
@@ -254,7 +284,13 @@ useEffect(() => {
                   <input
                     ref={inputRef}
                     value={input}
-                    onChange={(e) => setInput(e.target.value)}
+                    onChange={(e) => {
+                      setInput(e.target.value);
+                      logger.log('custom_role_input_change', {
+                        inputLength: e.target.value.length,
+                        inputText: e.target.value
+                      }, `User typing custom role: "${e.target.value}"`);
+                    }}
                     placeholder="Type a role and a setting (partisan leader in World War II, Mars colony leader in distant future etc.)"
                     className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
                   />
@@ -284,7 +320,13 @@ useEffect(() => {
 
                 <div className="mt-5 flex gap-3 justify-end">
                   <button
-                    onClick={closeSuggest}
+                    onClick={() => {
+                      logger.log('button_click_custom_role_cancel', {
+                        inputText: input,
+                        wasValidated: !!aiMsg
+                      }, 'User clicked Cancel/Close in custom role modal');
+                      closeSuggest();
+                    }}
                     className="rounded-xl px-4 py-2 text-sm bg-white/10 text-white hover:bg-white/15"
                   >
                     Close
@@ -330,15 +372,28 @@ useEffect(() => {
 
                 <div className="mt-6 flex gap-4 justify-center">
                   <button
-                    onClick={() => setSelectedRole(null)}
+                    onClick={() => {
+                      logger.log('button_click_flavor_modal_back', {
+                        role: selectedRole.label
+                      }, `User clicked Back in flavor modal for: ${selectedRole.label}`);
+                      setSelectedRole(null);
+                    }}
                     className="rounded-xl px-4 py-2 text-sm bg-white/10 text-white hover:bg-white/15"
                   >
                     Back
                   </button>
                   <button
                     onClick={() => {
+                      logger.log('predefined_role_confirmed', {
+                        role: selectedRole.label,
+                        subtitle: selectedRole.subtitle,
+                        politicalSystem: selectedRole.system
+                      }, `User confirmed predefined role: ${selectedRole.label}`);
+
                       setRole(selectedRole.label);
                       primeAnalysisFromRole(selectedRole.label, selectedRole.system);
+
+                      // Navigation will be logged automatically by router
                       push("/name");
                     }}
                     className="rounded-xl px-4 py-2 text-sm font-semibold shadow bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335]"

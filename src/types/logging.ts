@@ -12,6 +12,7 @@ export interface LogEntry {
   treatment: string;             // Treatment condition (e.g., "control", "experimental_a")
   source: 'player' | 'system';   // Who triggered the event
   action: string;                // Action name (e.g., "button_click_start_game")
+  currentScreen?: string;        // Current screen/route (e.g., "/role", "/event")
   value: any;                    // Action-specific data (flexible schema)
   comments?: string;             // Optional human-readable description
 }
