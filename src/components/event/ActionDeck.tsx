@@ -94,6 +94,13 @@ export default function ActionDeck({
     onConfirmSuggestion: async () => {
       await startSuggestConfirmationFlow();
 
+      // Skip coin animation if budget is disabled
+      if (!showBudget) {
+        debugLog("handleConfirmSuggestion: budget disabled, skipping coin animation");
+        onSuggest?.(suggestText);
+        return;
+      }
+
       // Coins + budget counter should start at the same time for suggestions
       if (suggestCost < 0) {
         // from budget → to pill
@@ -121,6 +128,8 @@ export default function ActionDeck({
   const cards = useMemo(() => {
     return actions.map((a) => {
       const cost = a.cost ?? 0;
+      // If budget is disabled, all actions are affordable
+      // If budget is enabled, check if player can afford negative costs
       const affordable = !showBudget || cost >= 0 || budget >= Math.abs(cost);
       return { ...a, cost, affordable };
     });
@@ -153,9 +162,9 @@ export default function ActionDeck({
 
     const cost = card.cost ?? 0;
 
-    // Skip coin animation if cost is zero
-    if (cost === 0) {
-      debugLog("handleConfirm: zero cost, skipping coin animation");
+    // Skip coin animation if budget is disabled or cost is zero
+    if (!showBudget || cost === 0) {
+      debugLog("handleConfirm: budget disabled or zero cost, skipping coin animation");
       onConfirm(id);
       return;
     }

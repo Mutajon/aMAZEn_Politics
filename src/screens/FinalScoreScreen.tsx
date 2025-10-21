@@ -121,6 +121,7 @@ export default function FinalScoreScreen({ push }: Props) {
   const top3ByDimension = useMirrorTop3();
   const selectedGoals = useDilemmaStore((s) => s.selectedGoals);
   const enableModifiers = useSettingsStore((s) => s.enableModifiers);
+  const showBudget = useSettingsStore((s) => s.showBudget);
   const { playSfx } = useAudioManager();
   const logger = useLogger();
 
@@ -201,10 +202,19 @@ export default function FinalScoreScreen({ push }: Props) {
         },
       ];
 
-      // Filter out goals category if modifiers are disabled
-      return enableModifiers ? allCategories : allCategories.filter(c => c.key !== 'goals' && c.key !== 'difficulty');
+      // Filter out categories based on settings
+      let filtered = allCategories;
+      // Filter budget if disabled
+      if (!showBudget) {
+        filtered = filtered.filter(c => c.key !== 'budget');
+      }
+      // Filter goals & difficulty if modifiers disabled
+      if (!enableModifiers) {
+        filtered = filtered.filter(c => c.key !== 'goals' && c.key !== 'difficulty');
+      }
+      return filtered;
     },
-    [breakdown, enableModifiers]
+    [breakdown, enableModifiers, showBudget]
   );
 
   // Animation state (3-5 categories + 1 final score = 4-6 total steps, depending on enableModifiers)

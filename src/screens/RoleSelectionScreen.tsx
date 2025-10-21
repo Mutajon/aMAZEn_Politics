@@ -219,14 +219,10 @@ useEffect(() => {
               <button
                 onClick={() => {
                   if (r.suggest) {
-                    logger.log('button_click_suggest_own_role', {}, 'User clicked "Suggest your own" button');
+                    logger.log('button_click', 'Suggest Your Own', 'User clicked "Suggest your own" button');
                     return openSuggest();
                   }
-                  logger.log('role_card_click', {
-                    role: r.label,
-                    subtitle: r.subtitle,
-                    politicalSystem: r.system
-                  }, `User clicked role card: ${r.label}`);
+                  logger.log('role_click', r.label, `User clicked role: ${r.label}`);
                   setSelectedRole(r); // open flavor modal
                 }}
                 className="relative w-full px-5 py-4 rounded-2xl bg-white/5 text-white/90 border border-white/10 hover:bg-white/10 hover:border-white/20 transition active:scale-[0.98] flex items-center gap-3 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]"

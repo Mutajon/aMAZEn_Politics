@@ -150,14 +150,14 @@ class LoggingService {
    * Log an event
    * Adds log entry to queue and triggers flush if queue is full
    *
-   * @param action - Action name (e.g., "button_click_start_game")
-   * @param value - Action-specific data (flexible schema)
+   * @param action - Action name (e.g., "button_click", "role_confirm")
+   * @param value - Simple value (string, number, or boolean) - e.g., button name, role name
    * @param comments - Optional human-readable description
    * @param metadata - Optional metadata (screen, day, role)
    */
   log(
     action: string,
-    value: any = {},
+    value: string | number | boolean,
     comments?: string,
     metadata?: { screen?: string; day?: number; role?: string }
   ): void {
@@ -168,7 +168,7 @@ class LoggingService {
       return;
     }
 
-    // Create log entry
+    // Create log entry with flat structure (all fields at top level)
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       userId,
@@ -176,11 +176,10 @@ class LoggingService {
       treatment,
       source: 'player',  // Phase 1: only player events
       action,
-      currentScreen: metadata?.screen,  // Extract screen as top-level field for easier querying
-      value: {
-        ...value,
-        ...metadata  // Keep metadata in value too for backward compatibility
-      },
+      value,                          // Simple value (not an object)
+      currentScreen: metadata?.screen,
+      day: metadata?.day,
+      role: metadata?.role,
       comments
     };
 

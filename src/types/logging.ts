@@ -4,17 +4,23 @@
 /**
  * Log entry structure
  * Sent to backend and stored in MongoDB
+ *
+ * IMPORTANT: All fields are flat/simple for easy CSV export
+ * - value must be string, number, or boolean (NOT an object)
+ * - day and role are separate top-level fields
  */
 export interface LogEntry {
-  timestamp: Date | string;      // When the event occurred
-  userId: string;                // Anonymous user UUID
-  gameVersion: string;           // From package.json
-  treatment: string;             // Treatment condition (e.g., "control", "experimental_a")
-  source: 'player' | 'system';   // Who triggered the event
-  action: string;                // Action name (e.g., "button_click_start_game")
-  currentScreen?: string;        // Current screen/route (e.g., "/role", "/event")
-  value: any;                    // Action-specific data (flexible schema)
-  comments?: string;             // Optional human-readable description
+  timestamp: Date | string;                // When the event occurred
+  userId: string;                          // Anonymous user UUID
+  gameVersion: string;                     // From package.json
+  treatment: string;                       // Treatment condition (e.g., "control", "experimental_a")
+  source: 'player' | 'system';             // Who triggered the event
+  action: string;                          // Action name (e.g., "button_click", "role_confirm")
+  value: string | number | boolean;        // Simple value (e.g., button name, role name, slider value)
+  currentScreen?: string;                  // Where action occurred (e.g., "/role", "/event")
+  day?: number;                            // Game day (if in gameplay)
+  role?: string;                           // Player's selected role (if applicable)
+  comments?: string;                       // Human-readable description
 }
 
 /**

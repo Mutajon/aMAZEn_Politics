@@ -380,12 +380,16 @@ export const useDilemmaStore = create<DilemmaState>()(
 
     const mod = modifiers[level];
 
+    // Check if budget system is enabled
+    const { showBudget } = useSettingsStore.getState();
+
     // Apply support modifiers (add percentage points, clamped to 0-100)
+    // Only apply budget modifier if budget system is enabled
     set({
       supportPeople: Math.max(0, Math.min(100, 50 + mod.supportMod)),
       supportMiddle: Math.max(0, Math.min(100, 50 + mod.supportMod)),
       supportMom: Math.max(0, Math.min(100, 50 + mod.supportMod)),
-      budget: 1500 + mod.budgetMod,
+      budget: showBudget ? 1500 + mod.budgetMod : 1500, // Default budget if disabled
       score: mod.scoreMod,
     });
   },

@@ -13,6 +13,7 @@
 // Dependencies: dilemmaStore
 
 import { useDilemmaStore } from "../store/dilemmaStore";
+import { useSettingsStore } from "../store/settingsStore";
 import type { ActionCard } from "../components/event/ActionDeck";
 
 // ============================================================================
@@ -71,13 +72,20 @@ export async function cleanAndAdvanceDay(
 
   // ========================================================================
   // STEP 2: Update budget IMMEDIATELY (for responsive visual feedback)
+  // Only apply if budget system is enabled
   // ========================================================================
-  const { budget, setBudget } = useDilemmaStore.getState();
-  const newBudget = budget + selectedAction.cost;
-  setBudget(newBudget);
+  const { showBudget } = useSettingsStore.getState();
 
-  const costDisplay = selectedAction.cost >= 0 ? `+${selectedAction.cost}` : `${selectedAction.cost}`;
-  console.log(`[Cleaner] Budget updated: ${budget} → ${newBudget} (${costDisplay})`);
+  if (showBudget) {
+    const { budget, setBudget } = useDilemmaStore.getState();
+    const newBudget = budget + selectedAction.cost;
+    setBudget(newBudget);
+
+    const costDisplay = selectedAction.cost >= 0 ? `+${selectedAction.cost}` : `${selectedAction.cost}`;
+    console.log(`[Cleaner] Budget updated: ${budget} → ${newBudget} (${costDisplay})`);
+  } else {
+    console.log('[Cleaner] Budget system disabled - skipping budget update');
+  }
 
   // ========================================================================
   // STEP 2A: Update minimum values tracking (for continuous goals)

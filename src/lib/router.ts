@@ -32,7 +32,8 @@ function readHash(): string {
 /** Minimal hash-router hook (no whitelist needed). */
 export function useHashRoute() {
   const [route, setRoute] = useState<string>(readHash());
-  const previousRouteRef = useRef<string>(route);
+  // Initialize with readHash() to ensure it's never empty
+  const previousRouteRef = useRef<string>(readHash());
 
   useEffect(() => {
     const onHashChange = () => {
@@ -44,8 +45,9 @@ export function useHashRoute() {
       if (enabled && newRoute !== previousRoute) {
         loggingService.log(
           'navigation',
-          { from: previousRoute, to: newRoute },
-          `User navigated from ${previousRoute} to ${newRoute}`
+          newRoute,  // Simple value: where user is going
+          `User navigated from ${previousRoute} to ${newRoute}`,
+          { screen: newRoute }  // Metadata for currentScreen field
         );
       }
 

@@ -55,7 +55,7 @@ export default function IntroScreen({ push }: { push: PushFn }) {
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5 }}
                 onClick={() => {
-                  logger.log('button_click_free_play', { mode: 'free-play' }, 'User clicked Free Play button');
+                  logger.log('button_click', 'Free Play', 'User clicked Free Play button');
                   push("/role");
                 }}
                 className="w-[14rem] rounded-2xl px-5 py-3 font-semibold text-lg bg-gradient-to-r from-indigo-400 to-purple-500 text-white shadow-lg hover:scale-[1.02] active:scale-[0.98] mx-auto sm:mx-0"

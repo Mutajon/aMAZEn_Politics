@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { bgStyle } from "../lib/ui";
 import type { PushFn } from "../lib/router";
 import { useDilemmaStore } from "../store/dilemmaStore";
+import { useSettingsStore } from "../store/settingsStore";
 import { useLogger } from "../hooks/useLogger";
 
 type DifficultyLevel = {
@@ -58,6 +59,7 @@ export default function DifficultyScreen({ push }: { push: PushFn }) {
   const logger = useLogger();
   const [selected, setSelected] = useState<DifficultyLevel["id"] | null>(null);
   const setDifficulty = useDilemmaStore((s) => s.setDifficulty);
+  const showBudget = useSettingsStore((s) => s.showBudget);
 
   const handleConfirm = () => {
     if (!selected) return;
@@ -135,7 +137,7 @@ export default function DifficultyScreen({ push }: { push: PushFn }) {
                 </div>
                 <div className="text-sm text-white/70 space-y-0.5">
                   <div>{diff.supportMod}</div>
-                  <div>{diff.budgetMod}</div>
+                  {showBudget && <div>{diff.budgetMod}</div>}
                   <div>{diff.scoreMod}</div>
                 </div>
               </div>

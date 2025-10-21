@@ -11,6 +11,7 @@
 
 import { useMemo } from "react";
 import { useDilemmaStore } from "../store/dilemmaStore";
+import { useSettingsStore } from "../store/settingsStore";
 import {
   calculateSupportScore,
   calculateBudgetScore,
@@ -46,12 +47,16 @@ export function useScoreCalculation({
   const budget = useDilemmaStore((s) => s.budget);
   const difficulty = useDilemmaStore((s) => s.difficulty);
   const selectedGoals = useDilemmaStore((s) => s.selectedGoals);
+  const showBudget = useSettingsStore((s) => s.showBudget);
 
   // Calculate all score categories (memoized for performance)
   const breakdown = useMemo<ScoreBreakdown>(() => {
     // Calculate each category
     const support = calculateSupportScore(supportPeople, supportMiddle, supportMom);
-    const budgetScore = calculateBudgetScore(budget);
+    // Only calculate budget score if budget system is enabled
+    const budgetScore = showBudget
+      ? calculateBudgetScore(budget)
+      : { budgetAmount: budget, points: 0 };
     const ideology = calculateIdeologyScore(liberalismRating, autonomyRating);
     const goals = calculateGoalsScore(selectedGoals);
     const bonus = calculateBonusScore();
@@ -72,7 +77,7 @@ export function useScoreCalculation({
     partial.final = calculateFinalScore(partial);
 
     return partial;
-  }, [supportPeople, supportMiddle, supportMom, budget, liberalismRating, autonomyRating, difficulty, selectedGoals]);
+  }, [supportPeople, supportMiddle, supportMom, budget, liberalismRating, autonomyRating, difficulty, selectedGoals, showBudget]);
 
   return breakdown;
 }

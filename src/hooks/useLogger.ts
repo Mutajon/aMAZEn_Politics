@@ -3,7 +3,7 @@
 //
 // Usage:
 //   const logger = useLogger();
-//   logger.log('button_click', { buttonId: 'start-game' }, 'User clicked start button');
+//   logger.log('button_click', 'Start Game', 'User clicked start button');
 //
 // Automatically includes metadata (screen, day, role) from application state
 
@@ -11,38 +11,46 @@ import { useCallback } from 'react';
 import { useLoggingStore } from '../store/loggingStore';
 import { useDilemmaStore } from '../store/dilemmaStore';
 import { useRoleStore } from '../store/roleStore';
-import { useHashRoute } from '../lib/router';
 import { loggingService } from '../lib/loggingService';
+
+/**
+ * Get current route without creating event listeners
+ * (prevents duplicate navigation logging)
+ */
+function getCurrentRoute(): string {
+  if (typeof window === 'undefined') return '/';
+  const hash = window.location.hash.replace(/^#/, '');
+  return hash || '/';
+}
 
 export function useLogger() {
   const enabled = useLoggingStore((s) => s.enabled);
-  const currentRoute = useHashRoute().route;
   const day = useDilemmaStore((s) => s.day);
   const selectedRole = useRoleStore((s) => s.selectedRole);
 
   /**
    * Log an event with automatic metadata
    *
-   * @param action - Action name (e.g., "button_click_start_game")
-   * @param value - Action-specific data (object, string, number, etc.)
+   * @param action - Action name (e.g., "button_click", "role_confirm")
+   * @param value - Simple value (string, number, or boolean)
    * @param comments - Optional human-readable description
    */
   const log = useCallback(
-    (action: string, value: any = {}, comments?: string) => {
+    (action: string, value: string | number | boolean, comments?: string) => {
       if (!enabled) {
         return;
       }
 
       // Automatically attach metadata from application state
       const metadata = {
-        screen: currentRoute,
+        screen: getCurrentRoute(),  // Read directly without creating listener
         day: day || undefined,
         role: selectedRole || undefined,
       };
 
       loggingService.log(action, value, comments, metadata);
     },
-    [enabled, currentRoute, day, selectedRole]
+    [enabled, day, selectedRole]  // Removed currentRoute dependency
   );
 
   return { log };
