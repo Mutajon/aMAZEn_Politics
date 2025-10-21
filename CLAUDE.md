@@ -122,7 +122,7 @@ PORT=3001  # Auto-set by Render, override if needed
 - **roleStore** - Selected role, political analysis, character data
 - **compassStore** - 4D political compass values (what/whence/how/whither)
 - **dilemmaStore** - Current game state, resources, support levels, subject streak tracking, selected goals, goal tracking state
-- **settingsStore** - User preferences (narration, music, sound effects, debug mode, useLightDilemma toggle, enableModifiers)
+- **settingsStore** - User preferences (narration, music, sound effects, debug mode, enableModifiers)
 - **mirrorQuizStore** - Compass assessment progress
 - **aftermathStore** - Aftermath data prefetching
 - **dilemmaPrefetchStore** - First dilemma prefetching
@@ -130,19 +130,16 @@ PORT=3001  # Auto-set by Render, override if needed
 ### AI Endpoints
 
 **Dilemma Generation:**
-- `/api/dilemma-light` - **DEFAULT** - Minimal payload, integrated support analysis (~15-20s, 85% token reduction)
-- `/api/dilemma` - Heavy version with separate support analysis (legacy, ~60s)
+- `/api/dilemma-light` - Minimal payload with integrated support analysis (~15-20s, 85% token reduction vs legacy heavy API)
 
 **Mirror Dialogue:**
 - `/api/mirror-quiz-light` - Personality summary after quiz (1 sentence, Mushu/Genie personality)
 - `/api/mirror-light` - Event screen advice (1 sentence, dramatic sidekick personality)
-- `/api/mirror-summary` - **DEPRECATED** - Old cynical personality (no longer used)
 
 **Other Endpoints:**
 - `/api/validate-role`, `/api/analyze-role` - Role validation and political system analysis
 - `/api/generate-avatar`, `/api/tts` - Avatar and text-to-speech generation
 - `/api/compass-analyze` - Maps text to compass values (81% optimized)
-- `/api/support-analyze` - Support change analysis (heavy API only)
 - `/api/aftermath` - Game epilogue generation
 - `/api/news-ticker` - **DISABLED** - Satirical news (code kept for future)
 
@@ -397,15 +394,32 @@ Benefits: Better React optimizations (memoization, selective re-renders), improv
 
 ## Code Cleanup
 
-**Legacy Files (Safe to Delete):**
+**Recent Cleanup (2025-10-20):**
+
+Completed major cleanup after first prototype completion:
+
+**Deleted Files:**
+- `src/screens/AftermathScreen.backup.tsx` - Backup file
+- `src/screens/FinalScoreScreen.backup.tsx` - Backup file
 - `src/hooks/useEventEffects.ts` - Replaced by EventScreen3 architecture
 - `src/components/event/EventContent.tsx` - Not imported anywhere
+- `src/components/event/ProgressiveLoadingCard.tsx` - Only used by deleted EventContent
+- `src/hooks/useProgressiveLoading.ts` - Legacy loading system
+- `src/hooks/useDynamicParameters.ts` - Legacy parameters system
+- `src/hooks/useDayProgression.ts` - Legacy progression system
 
-**Verification:**
-```bash
-grep -r "useEventEffects" src/
-grep -r "EventContent" src/screens/
-```
+**Removed Server Endpoints:**
+- `/api/dilemma` - Heavy dilemma API (~465 lines)
+- `/api/support-analyze` - Support analysis for heavy API (~98 lines)
+- `/api/mirror-summary` - Old mirror summary with game history (~232 lines)
+- Commented `/api/name-suggestions` code (~28 lines)
+
+**Simplified Code:**
+- `dilemmaStore.ts` - Removed `buildSnapshot()`, `analyzeEnhancedContext()`, `flattenCompass()`, `flattenCompassOptimized()` (~228 lines)
+- `settingsStore.ts` - Removed `useLightDilemma` toggle (light API now only option)
+- `useEventDataCollector.ts` - Removed `fetchSupportAnalysis()`, `fetchNews()`, heavy API branch (~68 lines)
+
+**Total Cleanup:** ~1,100+ lines of dead code removed
 
 ## Development Guidelines
 

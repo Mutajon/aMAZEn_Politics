@@ -47,6 +47,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
 const defaultPlayedRef = useRef(false);
 const introPlayedRef = useRef(false);
 const bgReadyRef = useRef(false);
+  const [defaultNarrationComplete, setDefaultNarrationComplete] = useState(false);
 
 
   // 1) On mount, PREPARE default line audio; show nothing until ready
@@ -71,9 +72,9 @@ const bgReadyRef = useRef(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-// Prefetch the generated paragraph + prepare its TTS while the default line plays
+// Prefetch the generated paragraph + prepare its TTS AFTER the default narration completes
 useEffect(() => {
-  if (phase !== "idle" || bgReadyRef.current) return;
+  if (phase !== "idle" || bgReadyRef.current || !defaultNarrationComplete) return;
 
   let cancelled = false;
   const controller = new AbortController();
@@ -111,7 +112,7 @@ useEffect(() => {
     controller.abort();
   };
 // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [phase, roleText, gender]);
+}, [phase, roleText, gender, defaultNarrationComplete]);
 
   // 2) Wake up → fade out, then load paragraph
   const onWake = () => {
@@ -201,7 +202,18 @@ useEffect(() => {
                 const p = preparedDefaultRef.current;
                 if (p && narrationEnabled && !defaultPlayedRef.current) {
                   defaultPlayedRef.current = true;
-                  try { await p.start(); } catch (e) { console.warn("default play blocked:", e); }
+                  try {
+                    await p.start();
+                    // Audio finished playing - safe to prefetch now
+                    setDefaultNarrationComplete(true);
+                  } catch (e) {
+                    console.warn("default play blocked:", e);
+                    // If blocked, allow prefetch anyway
+                    setDefaultNarrationComplete(true);
+                  }
+                } else if (!narrationEnabled) {
+                  // If narration disabled, allow prefetch immediately
+                  setDefaultNarrationComplete(true);
                 }
               }}
               

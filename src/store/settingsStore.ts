@@ -37,11 +37,6 @@ type SettingsState = {
   setEnableModifiers: (v: boolean) => void;
   toggleEnableModifiers: () => void;
 
-  // --- NEW: Use light dilemma API (faster, minimal payload) ---
-  useLightDilemma: boolean;
-  setUseLightDilemma: (v: boolean) => void;
-  toggleUseLightDilemma: () => void;
-
   // --- NEW: Use Anthropic (Claude) for light dilemma API ---
   useLightDilemmaAnthropic: boolean;
   setUseLightDilemmaAnthropic: (v: boolean) => void;
@@ -110,11 +105,6 @@ export const useSettingsStore = create<SettingsState>()(
       setEnableModifiers: (v) => set({ enableModifiers: v }),
       toggleEnableModifiers: () => set({ enableModifiers: !get().enableModifiers }),
 
-      // NEW: Use light dilemma API (default ON for faster gameplay)
-      useLightDilemma: true,
-      setUseLightDilemma: (v) => set({ useLightDilemma: v }),
-      toggleUseLightDilemma: () => set({ useLightDilemma: !get().useLightDilemma }),
-
       // NEW: Use Anthropic (Claude) for light dilemma API (default OFF)
       useLightDilemmaAnthropic: false,
       setUseLightDilemmaAnthropic: (v) => set({ useLightDilemmaAnthropic: v }),
@@ -156,7 +146,6 @@ export const useSettingsStore = create<SettingsState>()(
         dilemmasSubjectEnabled: s.dilemmasSubjectEnabled,
         dilemmasSubject: s.dilemmasSubject,
         enableModifiers: s.enableModifiers,
-        useLightDilemma: s.useLightDilemma,
         useLightDilemmaAnthropic: s.useLightDilemmaAnthropic,
         narrationMutedInGame: s.narrationMutedInGame,
         musicEnabled: s.musicEnabled,

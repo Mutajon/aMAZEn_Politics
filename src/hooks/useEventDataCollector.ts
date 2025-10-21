@@ -11,7 +11,7 @@
 // Dependencies: dilemmaStore, roleStore, compassStore
 
 import { useState, useCallback, useRef } from "react";
-import { useDilemmaStore, buildSnapshot, buildLightSnapshot } from "../store/dilemmaStore";
+import { useDilemmaStore, buildLightSnapshot } from "../store/dilemmaStore";
 import type { GoalStatusChange } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
@@ -176,165 +176,91 @@ function topOverallWithNames(compassValues: any, k = 3): Array<{ name: string; s
 }
 
 /**
- * Fetch dilemma from API (uses light or heavy API based on settings)
+ * Fetch dilemma from API (uses light API)
  * REQUIRED - throws error if fails (no fallback)
  */
 async function fetchDilemma(): Promise<Dilemma> {
-  const { useLightDilemma } = useSettingsStore.getState();
   const { day, supportPeople, supportMiddle, supportMom, setSupportPeople, setSupportMiddle, setSupportMom, updateSubjectStreak } = useDilemmaStore.getState();
 
-  if (useLightDilemma) {
-    // ===== LIGHT API =====
-    const snapshot = buildLightSnapshot();
+  const snapshot = buildLightSnapshot();
 
-    const response = await fetch("/api/dilemma-light", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(snapshot)
-    });
+  const response = await fetch("/api/dilemma-light", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(snapshot)
+  });
 
-    if (!response.ok) {
-      throw new Error(`Light Dilemma API failed: ${response.status}`);
-    }
-
-    const data: LightDilemmaResponse = await response.json();
-
-    // Validate required fields
-    if (!data.title || !data.description || !Array.isArray(data.actions)) {
-      throw new Error("Invalid dilemma response: missing required fields");
-    }
-
-    // Allow empty actions array ONLY when isGameEnd is true
-    if (!data.isGameEnd && data.actions.length !== 3) {
-      throw new Error("Invalid dilemma response: expected 3 actions for normal dilemma");
-    }
-
-    // Game end must have empty actions
-    if (data.isGameEnd && data.actions.length !== 0) {
-      throw new Error("Invalid dilemma response: game end must have empty actions array");
-    }
-
-    // Apply support shifts if they exist (Day 2+)
-    if (data.supportShift && day > 1) {
-      const { people, mom, holders } = data.supportShift;
-
-      const newPeople = Math.max(0, Math.min(100, supportPeople + people.delta));
-      const newMom = Math.max(0, Math.min(100, supportMom + mom.delta));
-      const newMiddle = Math.max(0, Math.min(100, supportMiddle + holders.delta));
-
-      setSupportPeople(newPeople);
-      setSupportMom(newMom);
-      setSupportMiddle(newMiddle);
-
-      // CRITICAL: Update minimum values for continuous goal tracking
-      // This must happen after support shifts to capture new lows
-      const { updateMinimumValues, evaluateGoals } = useDilemmaStore.getState();
-      updateMinimumValues();
-      console.log('[fetchDilemma] ✅ Minimum values updated after support shifts');
-
-      // Re-evaluate goals to check if any just failed/completed
-      const goalChanges = evaluateGoals();
-      console.log('[fetchDilemma] ✅ Goals re-evaluated after support shifts');
-
-      // Play achievement sound if any goal status changed
-      if (goalChanges.length > 0) {
-        console.log('[fetchDilemma] 🎵 Goal status changed, playing achievement sound:', goalChanges);
-        audioManager.playSfx('achievement');
-
-        // TODO: Trigger visual feedback (flash goal pills) - handled in GoalsCompact
-        // We'll emit the changes through a custom event
-        goalChanges.forEach(change => {
-          window.dispatchEvent(new CustomEvent('goal-status-changed', {
-            detail: change
-          }));
-        });
-      }
-
-      // Store support effects in the dilemma object for the collector
-      (data as any).supportEffects = [
-        { id: "people", delta: people.delta, explain: people.why },
-        { id: "mom", delta: mom.delta, explain: mom.why },
-        { id: "middle", delta: holders.delta, explain: holders.why }
-      ];
-    }
-
-    // Update subject streak
-    if (data.topic) {
-      updateSubjectStreak(data.topic);
-    }
-
-    return data;
-
-  } else {
-    // ===== HEAVY API =====
-    const snapshot = buildSnapshot();
-
-    const response = await fetch("/api/dilemma", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(snapshot)
-    });
-
-    if (!response.ok) {
-      throw new Error(`Dilemma API failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Validate required fields
-    if (!data.title || !data.description || !Array.isArray(data.actions)) {
-      throw new Error("Invalid dilemma response: missing required fields");
-    }
-
-    // Allow empty actions array ONLY when isGameEnd is true
-    if (!data.isGameEnd && data.actions.length !== 3) {
-      throw new Error("Invalid dilemma response: expected 3 actions for normal dilemma");
-    }
-
-    // Game end must have empty actions
-    if (data.isGameEnd && data.actions.length !== 0) {
-      throw new Error("Invalid dilemma response: game end must have empty actions array");
-    }
-
-    // Return the full response to preserve supportEffects for Day 2+
-    return data;
+  if (!response.ok) {
+    throw new Error(`Light Dilemma API failed: ${response.status}`);
   }
-}
 
-/**
- * Analyze support changes from previous action (Day 2+ only)
- * Fallback: [] (empty array)
- */
-async function fetchSupportAnalysis(lastChoice: DilemmaAction): Promise<SupportEffect[]> {
-  const { day, totalDays } = useDilemmaStore.getState();
-  const { selectedRole, analysis } = useRoleStore.getState();
-  const { values: compassValues } = useCompassStore.getState();
+  const data: LightDilemmaResponse = await response.json();
 
-  const text = `${lastChoice.title}. ${lastChoice.summary}`;
-
-  const politicalContext = {
-    role: selectedRole,
-    systemName: analysis?.systemName,
-    day,
-    totalDays,
-    compassValues
-  };
-
-  try {
-    const response = await fetch("/api/support-analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, politicalContext })
-    });
-
-    if (!response.ok) return [];
-
-    const data = await response.json();
-    return Array.isArray(data.items) ? data.items : [];
-  } catch (error) {
-    console.error("[Collector] Support analysis failed:", error);
-    return [];
+  // Validate required fields
+  if (!data.title || !data.description || !Array.isArray(data.actions)) {
+    throw new Error("Invalid dilemma response: missing required fields");
   }
+
+  // Allow empty actions array ONLY when isGameEnd is true
+  if (!data.isGameEnd && data.actions.length !== 3) {
+    throw new Error("Invalid dilemma response: expected 3 actions for normal dilemma");
+  }
+
+  // Game end must have empty actions
+  if (data.isGameEnd && data.actions.length !== 0) {
+    throw new Error("Invalid dilemma response: game end must have empty actions array");
+  }
+
+  // Apply support shifts if they exist (Day 2+)
+  if (data.supportShift && day > 1) {
+    const { people, mom, holders } = data.supportShift;
+
+    const newPeople = Math.max(0, Math.min(100, supportPeople + people.delta));
+    const newMom = Math.max(0, Math.min(100, supportMom + mom.delta));
+    const newMiddle = Math.max(0, Math.min(100, supportMiddle + holders.delta));
+
+    setSupportPeople(newPeople);
+    setSupportMom(newMom);
+    setSupportMiddle(newMiddle);
+
+    // CRITICAL: Update minimum values for continuous goal tracking
+    // This must happen after support shifts to capture new lows
+    const { updateMinimumValues, evaluateGoals } = useDilemmaStore.getState();
+    updateMinimumValues();
+    console.log('[fetchDilemma] ✅ Minimum values updated after support shifts');
+
+    // Re-evaluate goals to check if any just failed/completed
+    const goalChanges = evaluateGoals();
+    console.log('[fetchDilemma] ✅ Goals re-evaluated after support shifts');
+
+    // Play achievement sound if any goal status changed
+    if (goalChanges.length > 0) {
+      console.log('[fetchDilemma] 🎵 Goal status changed, playing achievement sound:', goalChanges);
+      audioManager.playSfx('achievement');
+
+      // TODO: Trigger visual feedback (flash goal pills) - handled in GoalsCompact
+      // We'll emit the changes through a custom event
+      goalChanges.forEach(change => {
+        window.dispatchEvent(new CustomEvent('goal-status-changed', {
+          detail: change
+        }));
+      });
+    }
+
+    // Store support effects in the dilemma object for the collector
+    (data as any).supportEffects = [
+      { id: "people", delta: people.delta, explain: people.why },
+      { id: "mom", delta: mom.delta, explain: mom.why },
+      { id: "middle", delta: holders.delta, explain: holders.why }
+    ];
+  }
+
+  // Update subject streak
+  if (data.topic) {
+    updateSubjectStreak(data.topic);
+  }
+
+  return data;
 }
 
 /**
@@ -425,40 +351,6 @@ async function fetchDynamicParams(lastChoice: DilemmaAction): Promise<DynamicPar
 }
 
 /**
- * Fetch news ticker items
- * Day 1: last=null (onboarding mode)
- * Day 2+: last=lastChoice (reaction mode)
- * Fallback: [] (empty array)
- */
-async function fetchNews(): Promise<TickerItem[]> {
-  const { day, lastChoice } = useDilemmaStore.getState();
-  const { selectedRole, analysis } = useRoleStore.getState();
-
-  const payload = {
-    day,
-    role: selectedRole,
-    systemName: analysis?.systemName,
-    last: day === 1 ? null : lastChoice  // KEY: Day 1 vs Day 2+ logic
-  };
-
-  try {
-    const response = await fetch("/api/news-ticker", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) return [];
-
-    const data = await response.json();
-    return Array.isArray(data.items) ? data.items : [];
-  } catch (error) {
-    console.error("[Collector] News ticker failed:", error);
-    return [];
-  }
-}
-
-/**
  * Fetch mirror dialogue with dilemma context
  * USES MIRROR LIGHT API: Top 2 "what" values + dilemma only
  * CRITICAL: Always sorts current "what" values by strength descending before taking top 2
@@ -488,9 +380,9 @@ async function fetchMirrorText(dilemma: Dilemma): Promise<string> {
       strength: Math.round(item.strength * 10) / 10
     }));
 
-  // Validate we have at least 2 values
-  if (sortedWhat.length < 2) {
-    return "The mirror blinks—your values are still forming...";
+  // Validate we have at least 1 value
+  if (sortedWhat.length < 1) {
+    return "The mirror is silent—your values haven't crystallized yet...";
   }
 
   const payload = {
