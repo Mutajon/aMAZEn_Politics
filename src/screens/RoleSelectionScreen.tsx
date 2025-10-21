@@ -134,9 +134,7 @@ useEffect(() => {
   async function handleConfirmSuggest() {
     if (checking) return;
 
-    logger.log('button_click_custom_role_validate', {
-      inputText: input
-    }, `User clicked Validate for custom role: "${input}"`);
+    logger.log('button_click', 'Validate Custom Role', 'User clicked Validate for custom role');
 
     setChecking(true);
     setAiMsg("");
@@ -146,10 +144,7 @@ useEffect(() => {
       const { valid, reason } = await validateRoleStrict(input);
 
       if (!valid) {
-        logger.log('custom_role_validation_failed', {
-          inputText: input,
-          validationReason: reason
-        }, `Custom role validation failed: ${reason}`);
+        logger.log('role_validation_failed', input, `Custom role validation failed: ${reason}`);
 
         const witty =
           reason && reason.length > 0
@@ -161,9 +156,7 @@ useEffect(() => {
         return;
       }
 
-      logger.log('custom_role_validation_success', {
-        inputText: input.trim()
-      }, `Custom role validation successful: "${input.trim()}"`);
+      logger.log('role_confirm', input.trim(), 'User confirmed custom role');
 
       setAiMsg("Nice! That's a clear role and setting.");
       setChecking(false);
@@ -183,10 +176,7 @@ useEffect(() => {
       push("/name");
       closeSuggest();
     } catch (err) {
-      logger.log('custom_role_validation_error', {
-        inputText: input,
-        error: err instanceof Error ? err.message : 'Unknown error'
-      }, `Error during custom role validation`);
+      logger.log('role_validation_error', input, 'Error during custom role validation');
 
       if (err instanceof AIConnectionError) {
         setAiError("We can't reach the AI service right now. Check your connection or API key and try again.");
@@ -282,10 +272,7 @@ useEffect(() => {
                     value={input}
                     onChange={(e) => {
                       setInput(e.target.value);
-                      logger.log('custom_role_input_change', {
-                        inputLength: e.target.value.length,
-                        inputText: e.target.value
-                      }, `User typing custom role: "${e.target.value}"`);
+                      logger.log('custom_role_input', e.target.value, 'User typing custom role');
                     }}
                     placeholder="Type a role and a setting (partisan leader in World War II, Mars colony leader in distant future etc.)"
                     className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
@@ -317,10 +304,7 @@ useEffect(() => {
                 <div className="mt-5 flex gap-3 justify-end">
                   <button
                     onClick={() => {
-                      logger.log('button_click_custom_role_cancel', {
-                        inputText: input,
-                        wasValidated: !!aiMsg
-                      }, 'User clicked Cancel/Close in custom role modal');
+                      logger.log('button_click', 'Cancel Custom Role', 'User clicked Cancel/Close in custom role modal');
                       closeSuggest();
                     }}
                     className="rounded-xl px-4 py-2 text-sm bg-white/10 text-white hover:bg-white/15"
@@ -369,9 +353,7 @@ useEffect(() => {
                 <div className="mt-6 flex gap-4 justify-center">
                   <button
                     onClick={() => {
-                      logger.log('button_click_flavor_modal_back', {
-                        role: selectedRole.label
-                      }, `User clicked Back in flavor modal for: ${selectedRole.label}`);
+                      logger.log('button_click', 'Back', 'User clicked Back in flavor modal');
                       setSelectedRole(null);
                     }}
                     className="rounded-xl px-4 py-2 text-sm bg-white/10 text-white hover:bg-white/15"
@@ -380,11 +362,10 @@ useEffect(() => {
                   </button>
                   <button
                     onClick={() => {
-                      logger.log('predefined_role_confirmed', {
-                        role: selectedRole.label,
-                        subtitle: selectedRole.subtitle,
-                        politicalSystem: selectedRole.system
-                      }, `User confirmed predefined role: ${selectedRole.label}`);
+                      // Extract role name without time period (e.g., "Senator of the Roman Republic" instead of full label)
+                      const roleName = selectedRole.label.replace(/\s*\(.*?\)\s*/g, '').trim();
+
+                      logger.log('role_confirm', roleName, `User confirmed predefined role: ${roleName}`);
 
                       setRole(selectedRole.label);
                       primeAnalysisFromRole(selectedRole.label, selectedRole.system);

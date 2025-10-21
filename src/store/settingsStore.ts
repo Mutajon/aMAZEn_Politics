@@ -88,7 +88,7 @@ export const useSettingsStore = create<SettingsState>()(
       setNarrationVoice: (name) => set({ narrationVoice: name ?? null }),
 
       // Budget
-      showBudget: true, // default ON
+      showBudget: false, // default OFF
       setShowBudget: (v) => set({ showBudget: v }),
       toggleShowBudget: () => set({ showBudget: !get().showBudget }),
 

@@ -259,12 +259,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
   const onContinue = () => {
     if (phase === "input") {
       // Phase 1: Clear any existing avatar and save character data, then move to avatar generation
-      logger.log('button_click_create_character', {
-        gender,
-        name: name.trim(),
-        descriptionLength: physical.trim().length,
-        description: physical.trim()
-      }, `User clicked Create Character - Name: ${name.trim()}, Gender: ${gender}`);
+      logger.log('button_click', 'Create Character', 'User clicked Create Character button');
 
       const fullChar: Character = {
         gender,
@@ -279,11 +274,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
       setPhase("avatar");
     } else {
       // Phase 2: Continue to power distribution
-      logger.log('button_click_continue_to_power', {
-        characterName: name,
-        gender,
-        hasAvatar: !!avatarUrl
-      }, `User clicked Continue to power distribution`);
+      logger.log('button_click', 'Continue to Power', 'User clicked Continue to power distribution');
 
       push("/power");
     }
@@ -321,7 +312,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
                     className="accent-amber-300 focus:ring-2 focus:ring-amber-300/60"
                     checked={gender === "male"}
                     onChange={() => {
-                      logger.log('character_gender_selection', { gender: 'male' }, 'User selected Male gender');
+                      logger.log('character_gender', 'male', 'User selected Male gender');
                       setGender("male");
                     }}
                   />
@@ -334,7 +325,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
                     className="accent-amber-300 focus:ring-2 focus:ring-amber-300/60"
                     checked={gender === "female"}
                     onChange={() => {
-                      logger.log('character_gender_selection', { gender: 'female' }, 'User selected Female gender');
+                      logger.log('character_gender', 'female', 'User selected Female gender');
                       setGender("female");
                     }}
                   />
@@ -347,7 +338,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
                     className="accent-amber-300 focus:ring-2 focus:ring-amber-300/60"
                     checked={gender === "any"}
                     onChange={() => {
-                      logger.log('character_gender_selection', { gender: 'any' }, 'User selected Any gender');
+                      logger.log('character_gender', 'any', 'User selected Any gender');
                       setGender("any");
                     }}
                   />
@@ -361,7 +352,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value);
-                    logger.log('character_name_input', { name: e.target.value }, `User entered character name: "${e.target.value}"`);
+                    logger.log('character_name', e.target.value, 'User entered character name');
                   }}
                   placeholder="Character name"
                   className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
@@ -375,10 +366,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
                   value={physical}
                   onChange={(e) => {
                     setPhysical(e.target.value);
-                    logger.log('character_description_input', {
-                      descriptionLength: e.target.value.length,
-                      description: e.target.value
-                    }, `User entered character description`);
+                    logger.log('character_description', e.target.value, 'User entered character description');
                   }}
                   placeholder="with a dignified expression, long black hair tied in a topknot, a finely groomed beard…"
                   className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
