@@ -1,5 +1,7 @@
 // src/lib/router.ts
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { loggingService } from "./loggingService";
+import { useLoggingStore } from "../store/loggingStore";
 
 export type PushFn = (path: string) => void;
 
@@ -30,16 +32,34 @@ function readHash(): string {
 /** Minimal hash-router hook (no whitelist needed). */
 export function useHashRoute() {
   const [route, setRoute] = useState<string>(readHash());
+  const previousRouteRef = useRef<string>(route);
 
   useEffect(() => {
-    const onHashChange = () => setRoute(readHash());
+    const onHashChange = () => {
+      const newRoute = readHash();
+      const previousRoute = previousRouteRef.current;
+
+      // Log navigation if logging is enabled
+      const { enabled } = useLoggingStore.getState();
+      if (enabled && newRoute !== previousRoute) {
+        loggingService.log(
+          'navigation',
+          { from: previousRoute, to: newRoute },
+          `User navigated from ${previousRoute} to ${newRoute}`
+        );
+      }
+
+      previousRouteRef.current = newRoute;
+      setRoute(newRoute);
+    };
+
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
   const push = useCallback<PushFn>((path: string) => {
     const next = normalizePath(path);
-    // only update if it’s actually different to avoid duplicate events
+    // only update if it's actually different to avoid duplicate events
     const curr = readHash();
     if (next !== curr) {
       window.location.hash = next; // browser will prepend '#'
