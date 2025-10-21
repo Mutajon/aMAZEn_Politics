@@ -65,6 +65,11 @@ type SettingsState = {
   skipPreviousContext: boolean;
   setSkipPreviousContext: (v: boolean) => void;
   toggleSkipPreviousContext: () => void;
+
+  // --- NEW: Data collection (for research) ---
+  dataCollectionEnabled: boolean;
+  setDataCollectionEnabled: (v: boolean) => void;
+  toggleDataCollectionEnabled: () => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -133,10 +138,15 @@ export const useSettingsStore = create<SettingsState>()(
       skipPreviousContext: false,
       setSkipPreviousContext: (v) => set({ skipPreviousContext: v }),
       toggleSkipPreviousContext: () => set({ skipPreviousContext: !get().skipPreviousContext }),
+
+      // NEW: Data collection (default OFF - requires consent)
+      dataCollectionEnabled: false,
+      setDataCollectionEnabled: (v) => set({ dataCollectionEnabled: v }),
+      toggleDataCollectionEnabled: () => set({ dataCollectionEnabled: !get().dataCollectionEnabled }),
     }),
     {
       // Bump key so no stale objects hide the new fields
-      name: "settings-v11",
+      name: "settings-v12",
       partialize: (s) => ({
         generateImages: s.generateImages,
         narrationEnabled: s.narrationEnabled,
@@ -153,6 +163,7 @@ export const useSettingsStore = create<SettingsState>()(
         sfxEnabled: s.sfxEnabled,
         sfxVolume: s.sfxVolume,
         skipPreviousContext: s.skipPreviousContext,
+        dataCollectionEnabled: s.dataCollectionEnabled,
       }),
     }
   )

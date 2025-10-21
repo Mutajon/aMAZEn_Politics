@@ -27,6 +27,9 @@ import FinalScoreScreen from "./screens/FinalScoreScreen";
 import AudioControls from "./components/AudioControls";
 import { useAudioManager } from "./hooks/useAudioManager";
 import { useSettingsStore } from "./store/settingsStore";
+import { useLoggingStore } from "./store/loggingStore";
+import { loggingService } from "./lib/loggingService";
+import DataCollectionBanner from "./components/DataCollectionBanner";
 
 if (import.meta.env.DEV) {
   import("./dev/storesDebug").then(m => m.attachStoresDebug());
@@ -35,6 +38,8 @@ if (import.meta.env.DEV) {
 export default function App() {
   const { route, push } = useHashRoute();
   const enableModifiers = useSettingsStore((s) => s.enableModifiers);
+  const loggingEnabled = useLoggingStore((s) => s.enabled);
+  const consented = useLoggingStore((s) => s.consented);
 
   console.debug("[App] 📍 Current route:", route);
   console.debug("[App] enableModifiers:", enableModifiers);
@@ -43,9 +48,31 @@ export default function App() {
   // Initialize audio manager hook to sync settings with audio playback
   useAudioManager();
 
+  // Initialize logging service when consented
+  useEffect(() => {
+    if (consented && loggingEnabled) {
+      loggingService.init();
+    }
+  }, [consented, loggingEnabled]);
+
+  // Handle browser close - flush remaining logs
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (loggingEnabled) {
+        loggingService.flush(true);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [loggingEnabled]);
+
   // Render current screen with global audio controls
   return (
     <>
+      {/* Data collection consent banner - shows on first visit if backend enabled */}
+      <DataCollectionBanner />
+
       {/* Global audio controls - visible on all screens */}
       <AudioControls />
 

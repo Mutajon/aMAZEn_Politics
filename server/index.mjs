@@ -5,9 +5,15 @@ import bodyParser from "body-parser";
 import Anthropic from "@anthropic-ai/sdk";
 import path from "path";
 import { fileURLToPath } from "url";
+import loggingRouter from "./api/logging.mjs";
 
 const app = express();
 app.use(bodyParser.json());
+
+// -------------------- Data Logging Routes --------------------
+// Mount logging API endpoints (for research data collection)
+app.use("/api/log", loggingRouter);
+// --------------------------------------------------------------
 
 // -------------------- Model & API config --------------------
 const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
@@ -360,14 +366,19 @@ app.post("/api/validate-role", async (req, res) => {
   const raw = (req.body?.text || req.body?.role || req.body?.input || "").toString().trim();
 
   const system =
-    "You validate a single short line describing a player's ROLE together with a SETTING.\n" +
-    "ACCEPT if it clearly has (1) a role (the 'who') and (2) a setting (place and/or time). " +
-    "A PLACE alone is a valid setting (e.g., country names, regions, fictional locations). " +
-    "A TIME alone is a valid setting (e.g., historical periods, dates, eras). " +
-    "Examples that SHOULD pass: 'Prime Minister of Israel', 'President of United States', " +
-    "'a king in medieval England', 'a partisan leader during World War II', " +
-    "'a Mars colony governor in 2300', 'Chancellor of Germany', 'Senator of California'. " +
-    "Examples that SHOULD fail: 'a king' (no setting), 'in medieval England' (no role), 'freedom' (neither).\n" +
+    "You validate a single short line describing a player's ROLE in a political game.\n" +
+    "ACCEPT if the input describes a plausible political/leadership role with enough context to understand the setting. " +
+    "The setting can be EXPLICIT (place/time stated) or IMPLICIT (inferred from the role itself). " +
+    "Be PERMISSIVE: accept roles where context can be reasonably inferred.\n\n" +
+    "Examples that SHOULD PASS:\n" +
+    "- Explicit setting: 'Prime Minister of Israel', 'President of United States', 'Chancellor of Germany 1980s'\n" +
+    "- Implicit setting: 'Mars Colony Leader' (implies future/space), 'Viking Chief' (implies historical Norse), " +
+    "'Galactic Emperor' (implies sci-fi), 'Pharaoh' (implies ancient Egypt)\n" +
+    "- Partial setting: 'Medieval King', 'WWII General', 'Roman Senator'\n\n" +
+    "Examples that SHOULD FAIL:\n" +
+    "- Too vague: 'a leader', 'someone powerful', 'a person'\n" +
+    "- Not a role: 'in medieval England' (no role), 'freedom' (not a role)\n" +
+    "- Gibberish: 'asdfgh', 'xyz123'\n\n" +
     "Return STRICT JSON only as {\"valid\": true|false, \"reason\": \"short reason if invalid\"}. No extra keys, no prose.";
 
   const user = `Input: ${raw || ""}`;
@@ -1903,13 +1914,21 @@ app.post("/api/validate-suggestion", async (req, res) => {
       "gpt-5-mini";
 
     const system = [
-      "You are a strict validator for a strategy game.",
-      "Given a DILEMMA (title + description) and a SUGGESTION, decide if the suggestion is:",
-      "- meaningful (not gibberish),",
-      "- relevant/connected to the dilemma’s situation, and",
-      "- actionable in spirit (a plausible policy or action, not random text).",
+      "You are a PERMISSIVE validator for a strategy game.",
+      "Given a DILEMMA (title + description) and a SUGGESTION from the player, your job is to accept anything that shows reasonable engagement.",
+      "",
+      "ACCEPT the suggestion if it:",
+      "- Shows ANY attempt to engage with the dilemma (even if tangentially related)",
+      "- Contains actual words/sentences (not random keyboard mashing)",
+      "- Suggests any kind of action, policy, or response",
+      "",
+      "REJECT only if:",
+      "- Empty or whitespace-only input",
+      "- Pure gibberish (random characters like 'asdfgh', 'xyz123')",
+      "- Completely irrelevant to politics/governance (e.g., 'I like pizza', 'random thoughts')",
+      "",
+      "DEFAULT STANCE: If in doubt, ACCEPT the suggestion.",
       "Only return compact JSON: { \"valid\": boolean, \"reason\": string }.",
-      "Be conservative: if in doubt, mark valid=false with a short reason.",
     ].join("\n");
 
     const user = JSON.stringify(

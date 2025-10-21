@@ -3,6 +3,7 @@ import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { COMPONENTS, type PropKey } from "../data/compass-data";
+import { attachLoggingDebug } from "./loggingDebug";
 
 type StoresSnapshot = {
   role: {
@@ -89,4 +90,7 @@ export function attachStoresDebug() {
 
   console.info("%c[stores] debug helpers attached (debugStores, setRoleStore, resetRoleStore, setCompassValue, bumpCompass, resetCompass, setSettings, resetAllStores)",
     "color:#93c5fd");
+
+  // Attach logging debug tools
+  attachLoggingDebug();
 }
