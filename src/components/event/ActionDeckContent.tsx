@@ -13,6 +13,7 @@ import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { Coins, CheckCircle2 } from "lucide-react";
 import type { ActionCard } from "../../hooks/useActionDeckState";
 import { useAudioManager } from "../../hooks/useAudioManager";
+import { useLogger } from "../../hooks/useLogger";
 
 // Visual constants
 const ENTER_STAGGER = 0.12;
@@ -104,38 +105,70 @@ export default function ActionDeckContent({
   onConfirmSuggestion,
 }: ActionDeckContentProps) {
   const { playSfx } = useAudioManager();
+  const logger = useLogger();
 
   const canAffordSuggestion = !showBudget || budget >= Math.abs(suggestCost);
   const suggestTextValid = suggestText.trim().length >= 4;
 
-  // Wrapper handlers with click sound
+  // Wrapper handlers with click sound + logging
   const handleSelectCard = (id: string) => {
+    const card = cards.find(c => c.id === id);
     playSfx('click-soft');
+    logger.log('action_card_selected', {
+      actionId: id,
+      actionTitle: card?.title,
+      actionCost: card?.cost
+    }, `User selected action card: ${card?.title || id}`);
     onSelectCard(id);
   };
 
   const handleConfirmCard = (id: string) => {
+    const card = cards.find(c => c.id === id);
     playSfx('click-soft');
+    logger.log('action_card_confirmed', {
+      actionId: id,
+      actionTitle: card?.title,
+      actionSummary: card?.summary,
+      actionCost: card?.cost,
+      budgetBefore: budget
+    }, `User confirmed action: ${card?.title || id}`);
     onConfirmCard(id);
   };
 
   const handleCancelSelection = () => {
     playSfx('click-soft');
+    logger.log('action_selection_cancelled', {
+      selectedCardId: selectedCard?.id,
+      selectedCardTitle: selectedCard?.title
+    }, 'User cancelled action selection');
     onCancelSelection();
   };
 
   const handleOpenSuggest = () => {
     playSfx('click-soft');
+    logger.log('button_click_suggest_own_action', {
+      suggestCost,
+      canAfford: canAffordSuggestion
+    }, 'User clicked Suggest Your Own button');
     onOpenSuggest();
   };
 
   const handleCloseSuggest = () => {
     playSfx('click-soft');
+    logger.log('suggest_modal_cancelled', {
+      textLength: suggestText.length
+    }, 'User cancelled custom action suggestion');
     onCloseSuggest();
   };
 
   const handleConfirmSuggestion = () => {
     playSfx('click-soft');
+    logger.log('custom_action_submitted', {
+      customText: suggestText,
+      textLength: suggestText.length,
+      suggestCost,
+      budgetBefore: budget
+    }, `User submitted custom action: ${suggestText.substring(0, 50)}...`);
     onConfirmSuggestion();
   };
 

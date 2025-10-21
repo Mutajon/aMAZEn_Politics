@@ -11,6 +11,8 @@ import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useMirrorQuizStore } from "../store/mirrorQuizStore";
 import { clearAllSnapshots } from "../lib/eventScreenSnapshot";
+import { useLogger } from "../hooks/useLogger";
+import { loggingService } from "../lib/loggingService";
 
 const SUBTITLES = [
   "Choose your path. Discover yourself."
@@ -33,6 +35,9 @@ export default function SplashScreen({
   // Instantiate the OpenAI-backed narrator.
   // We call narrator.prime() on the Start button to unlock audio policies.
   const narrator = useNarrator();
+
+  // Logging hook for data collection
+  const logger = useLogger();
 
   // Audio manager for background music
   const { playMusic } = useAudioManager();
@@ -374,7 +379,13 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     }}
     transition={{ type: "spring", stiffness: 250, damping: 22 }}
     style={{ visibility: showButton ? "visible" : "hidden" }}
-    onClick={() => {
+    onClick={async () => {
+      // Log button click
+      logger.log('button_click_start_game', { screen: 'splash' }, 'User clicked Start Game button');
+
+      // Start new logging session
+      await loggingService.startSession();
+
       // Reset all game stores for fresh start
       useCompassStore.getState().reset();
       useDilemmaStore.getState().reset();
@@ -401,6 +412,9 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
     style={{ visibility: showButton ? "visible" : "hidden" }}
     onClick={() => {
+      // Log button click
+      logger.log('button_click_hall_of_fame', { screen: 'splash' }, 'User clicked Hall of Fame button');
+
       // Start music on any user interaction
       playMusic('background', true);
 
@@ -421,6 +435,9 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     transition={{ delay: 0.1, type: "spring", stiffness: 250, damping: 22 }}
     style={{ visibility: showButton ? "visible" : "hidden" }}
     onClick={() => {
+      // Log button click
+      logger.log('button_click_achievements', { screen: 'splash' }, 'User clicked Book of Achievements button');
+
       // Start music on any user interaction
       playMusic('background', true);
 

@@ -46,6 +46,8 @@ import { useHighscoreStore } from "../store/highscoreStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useMirrorTop3 } from "../hooks/useMirrorTop3";
 import { useAudioManager } from "../hooks/useAudioManager";
+import { useLogger } from "../hooks/useLogger";
+import { loggingService } from "../lib/loggingService";
 import type { PushFn } from "../lib/router";
 
 type Props = {
@@ -120,6 +122,7 @@ export default function FinalScoreScreen({ push }: Props) {
   const selectedGoals = useDilemmaStore((s) => s.selectedGoals);
   const enableModifiers = useSettingsStore((s) => s.enableModifiers);
   const { playSfx } = useAudioManager();
+  const logger = useLogger();
 
   // Score persistence (prevents recalculation on revisit)
   const saveFinalScore = useDilemmaStore((s) => s.saveFinalScore);
@@ -371,6 +374,21 @@ export default function FinalScoreScreen({ push }: Props) {
       console.log("[FinalScoreScreen] Player rank:", rank);
       setPlayerRank(rank);
       setIsHallOfFame(rank > 0 && rank <= 20);
+
+      // End logging session (game complete)
+      loggingService.endSession();
+      logger.log('game_completed', {
+        finalScore: breakdown.final,
+        rank: rank,
+        isHallOfFame: rank > 0 && rank <= 20,
+        scoreBreakdown: {
+          support: breakdown.support.total,
+          budget: breakdown.budget.points,
+          ideology: breakdown.ideology.total,
+          goals: breakdown.goals.total,
+          difficulty: breakdown.difficulty.points
+        }
+      }, `Game completed - Final score: ${breakdown.final}, Rank: ${rank}`);
     }
   }, [
     step,
@@ -383,6 +401,7 @@ export default function FinalScoreScreen({ push }: Props) {
     top3ByDimension,
     addHighscoreEntry,
     markScoreSubmitted,
+    logger,
   ]);
 
   // Save score to store after animation completes (prevents recalculation on revisit)
@@ -429,11 +448,17 @@ export default function FinalScoreScreen({ push }: Props) {
 
   // Navigation handlers
   const handleBackToAftermath = () => {
+    logger.log('button_click_back_to_aftermath', {}, 'User clicked back to Aftermath');
     // Navigate back to Aftermath (will restore from snapshot, no reload)
     push("/aftermath");
   };
 
   const handlePlayAgain = () => {
+    logger.log('button_click_play_again', {
+      previousScore: breakdown.final,
+      previousRank: playerRank
+    }, 'User clicked Play Again');
+
     // Reset all stores for new game
     useDilemmaStore.getState().reset();
     useRoleStore.getState().reset();
@@ -447,6 +472,11 @@ export default function FinalScoreScreen({ push }: Props) {
   };
 
   const handleVisitHallOfFame = () => {
+    logger.log('button_click_visit_hall_of_fame', {
+      playerScore: breakdown.final,
+      playerRank: playerRank
+    }, 'User clicked Visit Hall of Fame');
+
     // Navigate to highscores with player name for highlighting
     const playerName = character?.name || "Unknown Leader";
     push(`/highscores?highlight=${encodeURIComponent(playerName)}`);
