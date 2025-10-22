@@ -7,6 +7,7 @@ import { useSettingsStore } from "../store/settingsStore";
 import { useNarrator, type PreparedTTS } from "../hooks/useNarrator";
 import { motion, AnimatePresence } from "framer-motion";
 import LoadingOverlay from "../components/LoadingOverlay";
+import { useLogger } from "../hooks/useLogger";
 
 /** Small built-in placeholder (no asset file needed). */
 const DEFAULT_AVATAR_DATA_URL =
@@ -88,6 +89,9 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
   // Narration setup
   const { prepare } = useNarrator();
   const preparedTTSRef = useRef<PreparedTTS | null>(null);
+
+  // Logging hook for data collection
+  const logger = useLogger();
 
   /** The URL we actually display, factoring in settings + fallback. */
   const displayAvatar = useMemo(() => {
@@ -215,7 +219,10 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.92, y: 8 }}
                 transition={{ type: "spring", stiffness: 300, damping: 22 }}
-                onClick={() => push("/compass-mirror")}
+                onClick={() => {
+                  logger.log('button_click_look_in_mirror', 'Look in the mirror', 'User clicked Look in the mirror button');
+                  push("/compass-mirror");
+                }}
                 className="rounded-2xl px-5 py-3 font-semibold text-lg shadow-lg bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] hover:scale-[1.02] active:scale-[0.98]"
               >
                 Look in the mirror

@@ -7,6 +7,7 @@ import { useCompassStore } from "../store/compassStore";
 import { useSettingsStore } from "../store/settingsStore";
 import MirrorBubble from "../components/MirrorBubble";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLogger } from "../hooks/useLogger";
 
 /** Built-in placeholder (no file asset needed) */
 const DEFAULT_AVATAR_DATA_URL =
@@ -62,6 +63,9 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
   const generateImages = useSettingsStore((s) => s.generateImages);
   const character = useRoleStore((s) => s.character);
   const resetCompass = useCompassStore((s) => s.reset);
+
+  // Logging hook for data collection
+  const logger = useLogger();
 
   // script
   const playerName = character?.name || "Player";
@@ -157,10 +161,13 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
                       initial={{ opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ type: "spring", stiffness: 280, damping: 22 }}
-                      onClick={() => push("/compass-quiz")}
+                      onClick={() => {
+                        logger.log('button_click_mirror_dialogue_continue', "Sure, let's go", 'User clicked continue to compass quiz');
+                        push("/compass-quiz");
+                      }}
                       className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/15 text-white hover:bg-white/25 border border-white/30"
                     >
-                      Sure, let’s go
+                      Sure, let's go
                     </motion.button>
                   </div>
                 )}

@@ -33,6 +33,7 @@ import {
   substituteGoalText,
 } from "../lib/goalHelpers";
 import type { PushFn } from "../lib/router";
+import { useLogger } from "../hooks/useLogger";
 
 type Props = {
   push: PushFn;
@@ -136,6 +137,9 @@ export default function GoalsSelectionScreen({ push }: Props) {
   const playerIndex = analysis?.playerIndex ?? 0;
   const middleEntity = analysis?.holders?.[playerIndex + 1]?.name ?? "Power Holders";
 
+  // Logging hook for data collection
+  const logger = useLogger();
+
   // Initialize goals on mount
   useEffect(() => {
     console.log("[GoalsSelectionScreen] 🟢 Component mounted");
@@ -151,16 +155,27 @@ export default function GoalsSelectionScreen({ push }: Props) {
   // Toggle goal selection
   const toggleGoal = (goalId: string) => {
     console.log("[GoalsSelectionScreen] 🔄 toggleGoal called for:", goalId);
+
+    // Find the goal to get its title
+    const goal = availableGoals.find(g => g.id === goalId);
+    const goalName = goal?.title || goalId;
+
     setSelectedGoals(prev => {
       const next = new Set(prev);
       if (next.has(goalId)) {
         next.delete(goalId);
         console.log("[GoalsSelectionScreen] Deselected goal:", goalId, "| New count:", next.size);
+
+        // Log deselection
+        logger.log('goal_deselected', goalName, `User deselected goal: ${goalName}`);
       } else {
         // Only allow 2 selections
         if (next.size < 2) {
           next.add(goalId);
           console.log("[GoalsSelectionScreen] Selected goal:", goalId, "| New count:", next.size);
+
+          // Log selection
+          logger.log('goal_selected', goalName, `User selected goal: ${goalName}`);
         } else {
           console.log("[GoalsSelectionScreen] Cannot select goal:", goalId, "| Already at max (2)");
         }
@@ -185,6 +200,10 @@ export default function GoalsSelectionScreen({ push }: Props) {
 
     const goalsToSave = availableGoals.filter(g => selectedGoals.has(g.id));
     console.log("[GoalsSelectionScreen] goalsToSave:", goalsToSave.map(g => ({ id: g.id, title: g.title })));
+
+    // Log the confirmation with selected goals
+    const selectedGoalNames = goalsToSave.map(g => g.title).join(', ');
+    logger.log('button_click_confirm_goals', selectedGoalNames, `User confirmed goal selection: ${selectedGoalNames}`);
 
     console.log("[GoalsSelectionScreen] 📦 Calling setGoalsInStore...");
     try {

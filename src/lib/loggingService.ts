@@ -161,6 +161,40 @@ class LoggingService {
     comments?: string,
     metadata?: { screen?: string; day?: number; role?: string }
   ): void {
+    this._logInternal('player', action, value, comments, metadata);
+  }
+
+  /**
+   * Log a system event
+   * Similar to log() but marks the source as 'system' instead of 'player'
+   * Used for logging game events not directly triggered by player actions
+   * (e.g., questions presented, AI-generated content displayed)
+   *
+   * @param action - Action name (e.g., "mirror_question_1", "mirror_summary_presented")
+   * @param value - Simple value (string, number, or boolean)
+   * @param comments - Optional human-readable description
+   * @param metadata - Optional metadata (screen, day, role)
+   */
+  logSystem(
+    action: string,
+    value: string | number | boolean,
+    comments?: string,
+    metadata?: { screen?: string; day?: number; role?: string }
+  ): void {
+    this._logInternal('system', action, value, comments, metadata);
+  }
+
+  /**
+   * Internal logging implementation
+   * Shared by both log() and logSystem()
+   */
+  private _logInternal(
+    source: 'player' | 'system',
+    action: string,
+    value: string | number | boolean,
+    comments?: string,
+    metadata?: { screen?: string; day?: number; role?: string }
+  ): void {
     const { enabled, userId, gameVersion, treatment } = useLoggingStore.getState();
 
     if (!enabled || !userId) {
@@ -174,7 +208,7 @@ class LoggingService {
       userId,
       gameVersion,
       treatment,
-      source: 'player',  // Phase 1: only player events
+      source,
       action,
       value,                          // Simple value (not an object)
       currentScreen: metadata?.screen,
