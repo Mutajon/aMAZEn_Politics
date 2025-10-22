@@ -8,6 +8,7 @@ import type { PreparedTTS } from "../hooks/useNarrator";
 import { useSettingsStore } from "../store/settingsStore";
 import { useRoleStore } from "../store/roleStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
+import { useLogger } from "../hooks/useLogger";
 
 /**
  * Phases:
@@ -26,6 +27,9 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
   const narrator = useNarrator();
   const narrationEnabled = useSettingsStore((s) => s.narrationEnabled);
 
+  // Logging hook for data collection
+  const logger = useLogger();
+
   // Role data (forgiving shape)
   const selectedRoleRaw = useRoleStore((s: any) => s.selectedRole);
   const genderRaw = useRoleStore((s: any) => s?.character?.gender);
@@ -37,7 +41,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
     genderRaw === "male" || genderRaw === "female" ? genderRaw : "any";
 
   const DEFAULT_LINE =
-    "You drift into sleep as the mirror’s last words echo softly. Tomorrow, your new role begins…";
+    "You drift into sleep as the mirror's last words echo softly. Tomorrow, your new role begins…";
 
   const [phase, setPhase] = useState<Phase>("preparingDefault");
   const [para, setPara] = useState<string>("");
@@ -48,6 +52,10 @@ const defaultPlayedRef = useRef(false);
 const introPlayedRef = useRef(false);
 const bgReadyRef = useRef(false);
   const [defaultNarrationComplete, setDefaultNarrationComplete] = useState(false);
+  // Track if we've logged the paragraph to avoid duplicate logs
+  const paragraphLoggedRef = useRef(false);
+  // Track if we're currently fetching the intro paragraph to prevent race condition
+  const fetchingIntroRef = useRef(false);
 
 
   // 1) On mount, PREPARE default line audio; show nothing until ready
@@ -74,12 +82,13 @@ const bgReadyRef = useRef(false);
   }, []);
 // Prefetch the generated paragraph + prepare its TTS AFTER the default narration completes
 useEffect(() => {
-  if (phase !== "idle" || bgReadyRef.current || !defaultNarrationComplete) return;
+  if (phase !== "idle" || bgReadyRef.current || !defaultNarrationComplete || fetchingIntroRef.current) return;
 
   let cancelled = false;
   const controller = new AbortController();
 
   (async () => {
+    fetchingIntroRef.current = true;
     try {
       const payload = { role: roleText || "Unknown role", gender };
       const r = await fetch("/api/intro-paragraph", {
@@ -104,6 +113,8 @@ useEffect(() => {
     } catch (e: any) {
       if (e?.name === "AbortError") return;
       // silent fail; foreground flow will handle errors
+    } finally {
+      if (!cancelled) fetchingIntroRef.current = false;
     }
   })();
 
@@ -116,6 +127,9 @@ useEffect(() => {
 
   // 2) Wake up → fade out, then load paragraph
   const onWake = () => {
+    // Log player clicking "Wake up" button
+    logger.log('button_click_wake_up', 'Wake up', 'User clicked Wake up button');
+
     // If background prefetch finished, jump straight to ready; else do the normal loading flow
     if (bgReadyRef.current && preparedIntroRef.current && para.trim()) {
       setPhase("ready");
@@ -129,7 +143,8 @@ useEffect(() => {
   useEffect(() => {
     let abort = new AbortController();
     (async () => {
-      if (phase !== "loading") return;
+      if (phase !== "loading" || fetchingIntroRef.current) return;
+      fetchingIntroRef.current = true;
       try {
         const payload = { role: roleText || "Unknown role", gender };
         const r = await fetch("/api/intro-paragraph", {
@@ -143,6 +158,7 @@ useEffect(() => {
           console.warn("Intro API error:", r.status, detail);
           setPara("The morning arrives, but words fail to settle. Try again in a moment.");
           setPhase("error");
+          fetchingIntroRef.current = false;
           return;
         }
         const data = await r.json();
@@ -150,15 +166,18 @@ useEffect(() => {
         if (!paragraph) {
           setPara("The morning arrives, but words fail to settle. Try again in a moment.");
           setPhase("error");
+          fetchingIntroRef.current = false;
           return;
         }
         setPara(paragraph);
         setPhase("preparingIntro"); // buffer TTS before revealing
+        fetchingIntroRef.current = false;
       } catch (e) {
         if ((e as any)?.name === "AbortError") return;
         console.warn("Intro generation error:", e);
         setPara("The morning arrives, but words fail to settle. Try again in a moment.");
         setPhase("error");
+        fetchingIntroRef.current = false;
       }
     })();
     return () => abort.abort();
@@ -183,6 +202,18 @@ useEffect(() => {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, para]);
+
+  // 5) Log system-generated intro paragraph when it's ready
+  useEffect(() => {
+    if (phase === "ready" && para.trim() && !paragraphLoggedRef.current) {
+      paragraphLoggedRef.current = true;
+      logger.logSystem(
+        'background_intro_generated',
+        para,
+        'System presented AI-generated background intro paragraph'
+      );
+    }
+  }, [phase, para, logger]);
 
   return (
     <div className="min-h-[100dvh] px-5 py-6" style={bgStyle}>
@@ -292,6 +323,9 @@ useEffect(() => {
                 className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
                 onClick={() => {
                   console.log("[BackgroundIntro] Begin clicked");
+
+                  // Log player clicking "Begin" button
+                  logger.log('button_click_begin', 'Begin', 'User clicked Begin button to start first day');
 
                   // Clear dilemma history when starting a new game (Day 1)
                   useDilemmaStore.getState().clearHistory();

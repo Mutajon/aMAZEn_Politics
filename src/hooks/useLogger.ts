@@ -7,7 +7,7 @@
 //
 // Automatically includes metadata (screen, day, role) from application state
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useLoggingStore } from '../store/loggingStore';
 import { useDilemmaStore } from '../store/dilemmaStore';
 import { useRoleStore } from '../store/roleStore';
@@ -53,7 +53,34 @@ export function useLogger() {
     [enabled, day, selectedRole]  // Removed currentRoute dependency
   );
 
-  return { log };
+  /**
+   * Log a system event with automatic metadata
+   * Used for logging game events not directly triggered by player actions
+   *
+   * @param action - Action name (e.g., "mirror_question_1", "dilemma_presented")
+   * @param value - Simple value (string, number, or boolean)
+   * @param comments - Optional human-readable description
+   */
+  const logSystem = useCallback(
+    (action: string, value: string | number | boolean, comments?: string) => {
+      if (!enabled) {
+        return;
+      }
+
+      // Automatically attach metadata from application state
+      const metadata = {
+        screen: getCurrentRoute(),
+        day: day || undefined,
+        role: selectedRole || undefined,
+      };
+
+      loggingService.logSystem(action, value, comments, metadata);
+    },
+    [enabled, day, selectedRole]
+  );
+
+  // Stabilize object reference to prevent unnecessary effect re-triggers
+  return useMemo(() => ({ log, logSystem }), [log, logSystem]);
 }
 
 /**

@@ -1,5 +1,5 @@
 // src/screens/MirrorQuizScreen.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import type { PushFn } from "../lib/router";
 import { bgStyle } from "../lib/ui";
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,6 +16,7 @@ import { mirrorBubbleTheme as T } from "../theme/mirrorBubbleTheme";
 import { saveMirrorReturnRoute } from "../lib/eventScreenSnapshot";
 import MirrorBubbleTyping from "../components/MirrorBubbleTyping";
 import { COMPONENTS, PALETTE } from "../data/compass-data";
+import { useLogger } from "../hooks/useLogger";
 
 
 /** placeholder avatar for images OFF */
@@ -62,6 +63,18 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   const { quiz, idx, done, summary, epilogueShown, init, advance, setDone, setSummary, markEpilogueShown } =
     useMirrorQuizStore();
 
+  // Logging hook for data collection
+  const logger = useLogger();
+
+  // Track which questions have been logged to prevent duplicates
+  const loggedQuestionsRef = useRef<Set<number>>(new Set());
+
+  // Track which questions' pills have been logged to prevent duplicates
+  const loggedPillsRef = useRef<Set<number>>(new Set());
+
+  // Track if we're currently fetching the mirror summary to prevent race condition
+  const fetchingSummaryRef = useRef(false);
+
   // Only initialize quiz if it hasn't been started yet
   // This allows returning from MirrorScreen without resetting the completed state
   // New games are handled by resetAll() in SplashScreen
@@ -73,15 +86,72 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only on mount, not on quiz/init/resetCompass changes
 
+  // Log when a new question is presented (system event)
+  // Uses ref to prevent duplicate logging when effect dependencies trigger multiple times
+  useEffect(() => {
+    if (!done && quiz[idx] && !loggedQuestionsRef.current.has(idx)) {
+      loggedQuestionsRef.current.add(idx);
+
+      const questionNum = idx + 1;
+      const question = quiz[idx];
+
+      // Format: "Q: [question] | Options: [opt1] / [opt2] / [opt3]"
+      const optionsText = question.options.map(opt => opt.a).join(' / ');
+      const logValue = `Q: ${question.q} | Options: ${optionsText}`;
+
+      logger.logSystem(
+        `mirror_question_${questionNum}`,
+        logValue,
+        `System presented mirror question ${questionNum} to player`
+      );
+    }
+  }, [idx, done, quiz, logger]);
+
+  // Log compass pills (value changes) when they appear after player answers
+  // Uses ref to prevent duplicate logging
+  useEffect(() => {
+    if (pings.length > 0 && !done && !loggedPillsRef.current.has(idx)) {
+      loggedPillsRef.current.add(idx);
+
+      const questionNum = idx + 1;
+
+      // Format pills: "+2 Equality, -2 Freedom"
+      const pillsText = pings.map(p => {
+        const label = COMPONENTS[p.prop][p.idx]?.short ?? "";
+        return `${p.delta > 0 ? "+" : ""}${p.delta} ${label}`;
+      }).join(", ");
+
+      logger.logSystem(
+        `compass_pills_shown_question_${questionNum}`,
+        pillsText,
+        `System presented compass value changes for question ${questionNum}`
+      );
+    }
+  }, [pings, idx, done, logger]);
+
   // once done, fetch a one-shot summary (Mirror Quiz Light API - Mushu/Genie personality)
   useEffect(() => {
     (async () => {
-      if (done && !summary) {
-        const s = await generateMirrorQuizSummary(values, { useAI: true });
-        setSummary(s);
+      if (done && !summary && !fetchingSummaryRef.current) {
+        fetchingSummaryRef.current = true;
+        try {
+          const s = await generateMirrorQuizSummary(values, { useAI: true });
+          setSummary(s);
+
+          // Log the AI-generated summary (system event)
+          if (s) {
+            logger.logSystem(
+              'mirror_summary_presented',
+              s,
+              'System presented AI-generated mirror summary'
+            );
+          }
+        } finally {
+          fetchingSummaryRef.current = false;
+        }
       }
     })();
-  }, [done, summary, setSummary, values]);
+  }, [done, summary, setSummary, values, logger]);
 
   /** STRICT sequencing flags for verdict → 2s delay → epilogue. */
   const [showEpilogue, setShowEpilogue] = useState(false);
@@ -93,6 +163,14 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
 
   function answer(opt: { a: string; mappings: string[] }, optionIndex: number) {
     if (done || selectedOption !== null) return; // Prevent multiple clicks during animation
+
+    // Log player answer (player event)
+    const questionNum = idx + 1;
+    logger.log(
+      `player_answer_mirror_question_${questionNum}`,
+      opt.a,
+      `Player answered mirror question ${questionNum}: ${opt.a}`
+    );
 
     // Trigger shimmer animation
     setSelectedOption(optionIndex);
@@ -327,13 +405,17 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
     {epilogueShown && (
       <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
         <button
-          onClick={() => push("/background-intro")}
+          onClick={() => {
+            logger.log('button_click_go_to_sleep', 'Go to sleep', 'User clicked Go to sleep button');
+            push("/background-intro");
+          }}
           className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/90 text-[#0b1335] hover:bg-white"
         >
           Go to sleep
         </button>
         <button
           onClick={() => {
+            logger.log('button_click_examine_mirror', 'Examine mirror', 'User clicked Examine mirror button');
             // Save current route so MirrorScreen knows where to return
             saveMirrorReturnRoute("/compass-quiz");
             push("/mirror");
