@@ -8,6 +8,8 @@ import { useNarrator, type PreparedTTS } from "../hooks/useNarrator";
 import { motion, AnimatePresence } from "framer-motion";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { useLogger } from "../hooks/useLogger";
+import { useLang } from "../i18n/lang";
+import { useTranslatedConst, createTranslatedConst } from "../i18n/useTranslatedConst";
 
 /** Small built-in placeholder (no asset file needed). */
 const DEFAULT_AVATAR_DATA_URL =
@@ -27,14 +29,14 @@ const DEFAULT_AVATAR_DATA_URL =
   );
 
 // Loading quotes for the overlay
-const LOADING_QUOTES = [
-  "Preparing the mirror of self-discovery…",
-  "Polishing reflective surfaces for maximum introspection…",
-  "Calibrating the cosmic mirror for your political soul…",
-  "Loading ancient wisdom about knowing thyself…",
-  "Adjusting the looking glass for perfect clarity…",
-  "Preparing your journey into the depths of conscience…",
-];
+const LOADING_QUOTES = createTranslatedConst((lang) => [
+  lang("COMPASS_INTRO_QUOTE_1"),
+  lang("COMPASS_INTRO_QUOTE_2"),
+  lang("COMPASS_INTRO_QUOTE_3"),
+  lang("COMPASS_INTRO_QUOTE_4"),
+  lang("COMPASS_INTRO_QUOTE_5"),
+  lang("COMPASS_INTRO_QUOTE_6"),
+]);
 
 function trimEra(role: string): string {
   return (role || "").replace(/\s*[—–-].*$/u, "").trim();
@@ -67,6 +69,9 @@ function genderizeRole(role: string, gender: "male" | "female" | "any"): string 
 
 export default function CompassIntroStart({ push }: { push: PushFn }) {
   console.log("[CompassIntroStart] 🟢 Component rendered");
+
+  const lang = useLang();
+  const loadingQuotes = useTranslatedConst(LOADING_QUOTES);
 
   const generateImages = useSettingsStore((s) => s.generateImages);
   const character = useRoleStore((s) => s.character);
@@ -165,7 +170,7 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
 
   return (
     <div className="min-h-[100dvh] px-5 py-6" style={bgStyle}>
-      <LoadingOverlay visible={loading} title="Know Thyself…" quotes={LOADING_QUOTES} />
+      <LoadingOverlay visible={loading} title={lang("COMPASS_INTRO_TITLE")} quotes={loadingQuotes} />
 
       <div className="w-full max-w-xl mx-auto">
         <div className="relative mt-2 grid place-items-center">

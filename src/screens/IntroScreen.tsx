@@ -3,16 +3,17 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { bgStyle } from "../lib/ui";
 import type { PushFn } from "../lib/router";
+import { lang } from "../i18n/lang";
 import { useLogger } from "../hooks/useLogger";
 
 export default function IntroScreen({ push }: { push: PushFn }) {
   const logger = useLogger();
   const paragraphs = [
-    "Ready to be aMAZEd?",
-    "Life is a branching journey where every choice reflects yourself and leads to a different outcome.",
-    "In aMaze’n Politics you travel a constantly shifting maze, where private choices intersect with public life.",
-    "Know yourself—and become your best!",
-    "Ready to pick your path?",
+    lang("INTRO_READY_TO_BE_AMAZED"),
+    lang("INTRO_LIFE_BRANCHING"),
+    lang("INTRO_MAZE_POLITICS"),
+    lang("INTRO_KNOW_YOURSELF"),
+    lang("INTRO_READY_TO_PICK"),
   ];
 
   const [visibleCount, setVisibleCount] = useState(0);
@@ -60,7 +61,7 @@ export default function IntroScreen({ push }: { push: PushFn }) {
                 }}
                 className="w-[14rem] rounded-2xl px-5 py-3 font-semibold text-lg bg-gradient-to-r from-indigo-400 to-purple-500 text-white shadow-lg hover:scale-[1.02] active:scale-[0.98] mx-auto sm:mx-0"
               >
-                Free Play
+                {lang("FREE_PLAY")}
               </motion.button>
               <motion.button
                 initial={{ opacity: 0 }}
@@ -70,8 +71,8 @@ export default function IntroScreen({ push }: { push: PushFn }) {
                 className="w-[14rem] rounded-2xl px-5 py-3 font-semibold text-lg bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] shadow-lg hover:scale-[1.02] active:scale-[0.98] mx-auto sm:mx-0 opacity-60 cursor-default"
               >
                 <div className="flex flex-col items-center gap-0.5">
-                  <span>Campaign Mode</span>
-                  <span className="text-xs font-normal">(Coming soon)</span>
+                  <span>{lang("CAMPAIGN_MODE")}</span>
+                  <span className="text-xs font-normal">{lang("COMING_SOON")}</span>
                 </div>
               </motion.button>
             </>

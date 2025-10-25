@@ -22,12 +22,14 @@ import {
   getAftermathReturnRoute,
   clearAftermathReturnRoute
 } from "../lib/eventScreenSnapshot";
+import { useLang } from "../i18n/lang";
 
 const MIRROR_SRC = "/assets/images/mirror.png";
 
 type Props = { push: PushFn };
 
 export default function MirrorScreen({ push }: Props) {
+  const lang = useLang();
   const top3ByDimension = useMirrorTop3();
   const [selectedDef, setSelectedDef] = useState<{ prop: PropKey; short: string; full: string } | null>(null);
 
@@ -62,10 +64,10 @@ export default function MirrorScreen({ push }: Props) {
 
   // Section titles for each dimension
   const sectionTitles: Record<PropKey, string> = {
-    what: "Your main motivations:",
-    whence: "Your main justifications:",
-    how: "Your main means of action:",
-    whither: "Who mainly benefits from your actions:",
+    what: lang("MIRROR_MAIN_MOTIVATIONS"),
+    whence: lang("MIRROR_MAIN_JUSTIFICATIONS"),
+    how: lang("MIRROR_MAIN_MEANS"),
+    whither: lang("MIRROR_MAIN_BENEFICIARIES"),
   };
 
   return (
@@ -77,7 +79,7 @@ export default function MirrorScreen({ push }: Props) {
             className="rounded-xl px-4 py-2 bg-white/10 hover:bg-white/20 text-white/90 transition-colors"
             onClick={handleBack}
           >
-            ← Back{getBackButtonLabel()}
+            {lang("MIRROR_BACK")}{getBackButtonLabel()}
           </button>
         </div>
 
@@ -86,18 +88,18 @@ export default function MirrorScreen({ push }: Props) {
           <div className="w-32 h-32 mb-4 rounded-full overflow-hidden shadow-2xl">
             <img
               src={MIRROR_SRC}
-              alt="Magic Mirror"
+              alt={lang("MIRROR_ALT")}
               className="w-full h-full object-cover"
             />
           </div>
           <h1 className="text-2xl font-semibold text-white/95 text-center mb-2">
-            The magic mirror reflects your inner self.
+            {lang("MIRROR_TITLE")}
           </h1>
           <p className="text-base text-white/80 text-center max-w-md">
-            Your motivations and values, as they are manifested by your actions.
+            {lang("MIRROR_SUBTITLE")}
           </p>
           <p className="text-lg font-medium text-amber-400 italic mt-1">
-            The mirror never lies
+            {lang("MIRROR_QUOTE")}
           </p>
         </div>
 

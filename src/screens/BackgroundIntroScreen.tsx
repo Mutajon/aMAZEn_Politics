@@ -9,6 +9,7 @@ import { useSettingsStore } from "../store/settingsStore";
 import { useRoleStore } from "../store/roleStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useLogger } from "../hooks/useLogger";
+import { useLang } from "../i18n/lang";
 
 /**
  * Phases:
@@ -24,6 +25,7 @@ import { useLogger } from "../hooks/useLogger";
 type Phase = "preparingDefault" | "idle" | "loading" | "preparingIntro" | "ready" | "error";
 
 export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
+  const lang = useLang();
   const narrator = useNarrator();
   const narrationEnabled = useSettingsStore((s) => s.narrationEnabled);
 
@@ -40,8 +42,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
   const gender: "male" | "female" | "any" =
     genderRaw === "male" || genderRaw === "female" ? genderRaw : "any";
 
-  const DEFAULT_LINE =
-    "You drift into sleep as the mirror's last words echo softly. Tomorrow, your new role begins…";
+  const DEFAULT_LINE = lang("BACKGROUND_INTRO_DEFAULT_LINE");
 
   const [phase, setPhase] = useState<Phase>("preparingDefault");
   const [para, setPara] = useState<string>("");
@@ -313,7 +314,7 @@ useEffect(() => {
             
           >
             <h1 className="text-3xl sm:text-4xl font-extrabold leading-tight tracking-tight bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]">
-              First Light
+              {lang("BACKGROUND_INTRO_TITLE")}
             </h1>
 
             <p className="mt-3 text-white/80 whitespace-pre-wrap">{para}</p>
@@ -335,7 +336,7 @@ useEffect(() => {
                   push("/event");
                 }}
               >
-                Begin
+                {lang("BACKGROUND_INTRO_BEGIN")}
               </button>
             </div>
           </motion.div>

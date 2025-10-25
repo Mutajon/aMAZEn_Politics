@@ -1,6 +1,7 @@
 // src/App.tsx
 import { useEffect } from "react";
 import MiniCompassDebugScreen from "./screens/MiniCompassDebugScreen";
+import { LanguageProvider, useLanguage } from "./i18n/LanguageContext";
 
 import { useHashRoute } from "./lib/router";
 import SplashScreen from "./screens/SplashScreen";
@@ -33,6 +34,40 @@ import DataCollectionBanner from "./components/DataCollectionBanner";
 
 if (import.meta.env.DEV) {
   import("./dev/storesDebug").then(m => m.attachStoresDebug());
+}
+
+// Component to handle RTL direction based on language
+function RTLHandler() {
+  const { language } = useLanguage();
+
+  useEffect(() => {
+    const htmlElement = document.documentElement;
+    
+    // Update lang attribute
+    htmlElement.setAttribute('lang', language);
+    
+    // Update dir attribute for RTL support
+    if (language === 'he') {
+      htmlElement.setAttribute('dir', 'rtl');
+    } else {
+      // Remove dir attribute for LTR languages (default)
+      htmlElement.removeAttribute('dir');
+    }
+  }, [language]);
+
+  return null; // This component doesn't render anything
+}
+
+// Loading screen while translations are loading
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+        <p className="text-white/80">Loading...</p>
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
@@ -68,6 +103,25 @@ export default function App() {
   }, [loggingEnabled]);
 
   // Render current screen with global audio controls
+  return (
+    <LanguageProvider>
+      {/* RTL direction handler */}
+      <RTLHandler />
+      
+      {/* App content with loading check */}
+      <AppContent route={route} push={push} enableModifiers={enableModifiers} />
+    </LanguageProvider>
+  );
+}
+
+// Separate component to access language context
+function AppContent({ route, push, enableModifiers }: { route: string; push: any; enableModifiers: boolean }) {
+  const { isLoading } = useLanguage();
+  
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
   return (
     <>
       {/* Data collection consent banner - shows on first visit if backend enabled */}
