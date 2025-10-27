@@ -72,33 +72,33 @@ useEffect(() => {
 
   // Roles with political system + flavor text
   const roles: RoleItem[] = [
-    { 
-      icon: "🏛️", 
-      label: "Citizen of the Assembly in Classical Athens", 
-      subtitle: "5th century BCE", 
-      system: "Direct Democracy", 
-      flavor: "Feel equal among your peers as you shape the destiny of the city." 
+    {
+      icon: "🏛️",
+      label: "Citizen of the Assembly in Classical Athens",
+      subtitle: "5th century BCE",
+      system: "Democracy",
+      flavor: "Feel equal among your peers as you shape the destiny of the city."
     },
-    { 
-      icon: "🏺", 
-      label: "Senator of the Roman Republic", 
-      subtitle: "3rd century BCE", 
-      system: "Early Republicanism", 
-      flavor: "Balance ambition and duty in the crowded halls of the Republic." 
+    {
+      icon: "🏺",
+      label: "Senator of the Roman Republic",
+      subtitle: "3rd century BCE",
+      system: "Republican Oligarchy",
+      flavor: "Balance ambition and duty in the crowded halls of the Republic."
     },
-    { 
-      icon: "🐉", 
-      label: "Emperor of Tang China", 
-      subtitle: "8th century AD", 
-      system: "Absolute Monarchy", 
-      flavor: "Wield the absolute power of the Dragon Throne." 
+    {
+      icon: "🐉",
+      label: "Emperor of Tang China",
+      subtitle: "8th century AD",
+      system: "Theocratic Monarchy",
+      flavor: "Wield the absolute power of the Dragon Throne."
     },
-    { 
-      icon: "🇩🇪", 
-      label: "Chancellor of Modern Germany", 
-      subtitle: "21st century", 
-      system: "Representative Democracy", 
-      flavor: "Navigate compromise and power in a modern democracy." 
+    {
+      icon: "🇩🇪",
+      label: "Chancellor of Modern Germany",
+      subtitle: "21st century",
+      system: "Republican Oligarchy",
+      flavor: "Navigate compromise and power in a modern democracy."
     },
     { icon: "❓", label: "Suggest your own", suggest: true },
   ];

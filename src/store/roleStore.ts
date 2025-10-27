@@ -8,6 +8,11 @@ export type PowerHolder = {
   percent: number;
   icon?: string;
   note?: string; // witty description
+  role?: { A: boolean; E: boolean }; // NEW: Author/Eraser flags
+  stype?: { // NEW: Subject-Type classification
+    t: "Author" | "Eraser" | "Agent" | "Actor" | "Acolyte" | "Dictator";
+    i: "-" | "•" | "+"; // intensity
+  };
 };
 
 export type AnalysisResult = {
@@ -16,6 +21,18 @@ export type AnalysisResult = {
   flavor: string;
   holders: PowerHolder[];
   playerIndex: number | null;
+  e12?: { // NEW: Exception-12 analysis
+    tierI: string[];
+    tierII: string[];
+    tierIII: string[];
+    stopA: boolean;
+    stopB: boolean;
+    decisive: string[];
+  };
+  grounding?: { // NEW: Setting context
+    settingType: "real" | "fictional" | "unclear";
+    era: string;
+  };
 };
 
 export type Character = {

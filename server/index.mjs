@@ -71,33 +71,19 @@ LANGUAGE ACCESSIBILITY (CRITICAL)
 `.trim();
 // ----------------------------------------------------------------
 
-// Canonical political systems (must match the client table)
-const ALLOWED_SYSTEMS = [
-  "Absolute Monarchy",
-  "Constitutional Monarchy",
-  "Elective Monarchy",
-  "Direct Democracy",
-  "Representative Democracy",
-  "Parliamentary Democracy",
-  "Presidential Democracy",
-  "Federal Republic",
-  "Unitary Republic",
-  "People’s Republic",
-  "Banana Republic",
-  "Dictatorship",
-  "Military Junta",
-  "One-Party State",
-  "Clerical Theocracy",
-  "Divine Right Monarchy",
-  "Anarchy",
-  "Oligarchy",
-  "Plutocracy",
-  "Technocracy",
-  "Timocracy",
-  "Kleptocracy",
-  "Stratocracy",
-  "Gerontocracy",
-  "Kakistocracy",
+// Canonical polity types (E-12 framework classification)
+const ALLOWED_POLITIES = [
+  "Democracy",
+  "Republican Oligarchy",
+  "Hard-Power Oligarchy — Plutocracy",
+  "Hard-Power Oligarchy — Stratocracy",
+  "Mental-Might Oligarchy — Theocracy",
+  "Mental-Might Oligarchy — Technocracy",
+  "Mental-Might Oligarchy — Telecracy",
+  "Autocratizing (Executive)",
+  "Autocratizing (Military)",
+  "Personalist Monarchy / Autocracy",
+  "Theocratic Monarchy",
 ];
 // Helper: call Chat Completions and try to parse JSON from the reply
 // Automatically falls back to gpt-4o if quota error (429) is encountered
@@ -430,112 +416,154 @@ app.post("/api/bg-suggestion", async (req, res) => {
   }
 });
 
-// -------------------- Power analysis (uses AI) ---------------
+// -------------------- Power analysis with E-12 framework ---------------
 app.post("/api/analyze-role", async (req, res) => {
+  // Increase timeout to 120 seconds for GPT-5 processing
+  req.setTimeout(120000);
+
   try {
     const role = String(req.body?.role || "").trim();
 
-    const fallback = {
-      systemName: "Generic Mixed Republic",
-      systemDesc: "A plausible balance of powers for a mixed system.",
-      flavor: "A tenuous balance binds factions together.",
+    const FALLBACK = {
+      systemName: "Republican Oligarchy",
+      systemDesc: "Formal offices dominate without direct demos in core areas.",
+      flavor: "Institutions grind; factions bargain.",
       holders: [
-        { name: "Executive", percent: 30, icon: "👑", note: "Leads day-to-day rule" },
-        { name: "Legislature", percent: 35, icon: "🏛️", note: "Makes laws and budgets" },
-        { name: "Judiciary", percent: 15, icon: "⚖️", note: "Interprets and constrains" },
-        { name: "Elites & Factions", percent: 20, icon: "🦅", note: "Informal yet crucial power" },
+        { name: "Executive", percent: 28, role: {A:true, E:false}, stype: {t:"Author", i:"•"}, note: "Agenda & decrees" },
+        { name: "Legislative", percent: 32, role: {A:true, E:false}, stype: {t:"Author", i:"•"}, note: "Law & purse" },
+        { name: "Judicial", percent: 14, role: {A:false, E:true}, stype: {t:"Eraser", i:"•"}, note: "Review & injunctions" },
+        { name: "Bureaucracy", percent: 12, role: {A:false, E:false}, stype: {t:"Agent", i:"•"}, note: "Implements/filters" },
+        { name: "Wealth", percent: 14, role: {A:false, E:false}, stype: {t:"Actor", i:"-"}, note: "Lobby & capture" }
       ],
       playerIndex: null,
+      e12: {
+        tierI: ["Security", "CivilLib", "InfoOrder"],
+        tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
+        tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
+        stopA: false,
+        stopB: false,
+        decisive: []
+      },
+      grounding: { settingType: "unclear", era: "" }
     };
 
-    const system =
-  "You analyze a player's ROLE+SETTING into a political power breakdown **and** choose a canonical political system.\n" +
-  "Return STRICT JSON only as:\n" +
-  "{\n" +
-  '  "systemName": "<one of ALLOWED>",\n' +
-  '  "systemDesc": "<short, neutral explanation>",\n' +
-  '  "flavor": "<short flavor> ",\n' +
-  '  "holders": [{"name":"", "percent":0, "icon":"", "note":""}],\n' +
-  '  "playerIndex": null|number\n' +
-  "}\n" +
-  "- IMPORTANT: systemName MUST be exactly one of the supplied ALLOWED names. Do NOT invent new names.\n" +
-  "- holders: 4–5 concise entities whose percents sum to 100 (±1 rounding).\n" +
-  "- Keep labels short and game-friendly; avoid country-specific system names.";
+    const system = `${ANTI_JARGON_RULES}
 
-const user =
-  `ROLE: ${role}\n` +
-  `ALLOWED SYSTEMS: ${JSON.stringify(ALLOWED_SYSTEMS)}\n` +
-  "Pick the closest political system from ALLOWED (exact string). If borderline, choose the most broadly recognized match from ALLOWED.\n" +
-  "JSON ONLY.";
+You are a polity analyst for a political simulation. Given ROLE (which may include setting context), you will:
 
+1) Determine if ROLE describes a real context (historic or current). If yes, ground analysis in actual context; treat de facto practice as decisive and note de jure only for narration. If fictional/unclear, infer plausibly from ROLE description.
 
-    const out = await aiJSON({ system, user, model: MODEL_ANALYZE, temperature: 0.4, fallback });
-    // Coerce & normalize
-    let sum = 0;
-    const holders = (Array.isArray(out?.holders) ? out.holders : fallback.holders)
-      .slice(0, 8)
-      .map((h) => {
-        const p = Math.max(0, Math.min(100, Number(h?.percent) || 0));
-        sum += p;
-        return {
-          name: String(h?.name || "").slice(0, 40) || "Group",
-          percent: p,
-          icon: String(h?.icon || "").slice(0, 2) || undefined,
-          note: String(h?.note || "").slice(0, 80) || undefined,
-        };
-      });
+2) Run the Exception-12 (E-12) analysis with priority tiers and stop-rules to identify who decides exceptions in practice:
+   Tier I (existential): Security; Civil Liberties & Surveillance; Information Order.
+     Stop-rule A: If Coercive Force launches/escalates war at will and faces no effective check within two scenes → Stratocracy / Military Autocratizing (unless Demos has and uses a hard veto).
+   Tier II (constitutive): Diplomacy; Justice; Economy (Budget & Allocation); Appointments.
+     Stop-rule B: If the Executive routinely authors exceptions across ≥2 Tier II domains and neutralizes Tier I erasers (Judicial/Media/Demos) → Autocratizing (Executive).
+   Tier III (contextual): Infrastructure; Curricula; Healthcare; Immigration; Environment.
+(Use tiers to rank; Tier I signals dominate; Tier III refines subtype.)
 
-    if (sum > 0 && Math.abs(100 - sum) > 1) {
-      holders.forEach((h) => (h.percent = Math.round((h.percent / sum) * 100)));
-      const diff = 100 - holders.reduce((a, b) => a + b.percent, 0);
-      if (diff) holders[0].percent += diff;
+3) Identify Authors (write/change rules/facts) and Erasers (credible veto/oversight) for each major seat.
+
+4) Assign Subject-Type intensity for each Seat (−/•/+): Acolyte, Actor, Agent, Author, Eraser, or Dictator. Intensities guide play but do not replace E-12 ranking.
+
+5) Build the Top-5 Seats (4–5 entries) that actually shape outcomes "next scene," interleaving potent Erasers if they routinely upend Authors. Percents must sum to 100±1. DO NOT include icon field.
+
+6) Locate the polity from the ALLOWED_POLITIES list using spectrum rules:
+   - Democracy: Demos is Top-2 in ≥2/3 of prioritized domains and direct self-determination exists in core areas.
+   - Republican Oligarchy: Executive + Legislative + Judicial are all in Top-5; no single Seat holds pen+eraser across multiple prioritized domains.
+   - Hard-Power Oligarchy: Wealth Top-2 in ≥1/3 of prioritized domains (plutocracy) OR Coercive Force Top-2 (stratocracy).
+   - Mental-Might Oligarchy: Doctrinal/epistemic/media Seats author outcomes system-wide (theocracy/technocracy/telecracy).
+   - Autocratizing/Monarchy: One Seat accumulates pen+eraser across diverse prioritized domains; personalist/hereditary → Monarchy/Autocracy.
+
+7) Keep labels short and game-friendly. Use PLAIN MODERN ENGLISH.
+
+Return STRICT JSON only as:
+{
+  "systemName": "<one of ALLOWED_POLITIES>",
+  "systemDesc": "<120 chars max, neutral explanation>",
+  "flavor": "<80 chars max, game-friendly flavor>",
+  "holders": [{"name":"<seat name>", "percent":0, "role":{"A":true/false, "E":true/false}, "stype":{"t":"Author|Eraser|Agent|Actor|Acolyte|Dictator", "i":"-|•|+"}, "note":"<60 chars max>"}],
+  "playerIndex": null,
+  "e12": {
+    "tierI": ["Security", "CivilLib", "InfoOrder"],
+    "tierII": ["Diplomacy", "Justice", "Economy", "Appointments"],
+    "tierIII": ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
+    "stopA": false,
+    "stopB": false,
+    "decisive": ["<seat names that decided exceptions>"]
+  },
+  "grounding": {
+    "settingType": "real|fictional|unclear",
+    "era": "<40 chars max>"
+  }
+}
+
+IMPORTANT:
+- systemName MUST be exactly one of the supplied ALLOWED_POLITIES names.
+- holders: 4–5 seats whose percents sum to 100 (±1 rounding). DO NOT include icon field.
+- Use standard seat vocabulary: Executive, Legislative, Judicial, Bureaucracy, Coercive Force, Wealth, Demos, Media/Platforms, Ideology/Religious, Art/Culture, Science/Philosophy, etc.`;
+
+    const user = `ROLE: ${role}
+ALLOWED_POLITIES: ${JSON.stringify(ALLOWED_POLITIES)}
+Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setting, rely on actual historical context; if fictional/unclear, infer plausibly.`;
+
+    const out = await aiJSON({ system, user, model: MODEL_ANALYZE, temperature: 0.2, fallback: FALLBACK });
+
+    // Normalize holders
+    let holders = Array.isArray(out?.holders) ? out.holders.slice(0, 5) : FALLBACK.holders;
+    let sum = holders.reduce((a, h) => a + (Number(h?.percent) || 0), 0);
+
+    if (sum <= 0) {
+      holders = FALLBACK.holders;
+    } else {
+      holders = holders.map(h => ({
+        name: String(h?.name || "Seat").slice(0, 40),
+        percent: Math.max(0, Math.min(100, Number(h?.percent) || 0)),
+        role: { A: !!h?.role?.A, E: !!h?.role?.E },
+        stype: {
+          t: String(h?.stype?.t || "Actor"),
+          i: (h?.stype?.i === "+" || h?.stype?.i === "-" || h?.stype?.i === "•") ? h?.stype?.i : "•"
+        },
+        note: String(h?.note || "").slice(0, 60)
+      }));
+
+      // Renormalize to 100
+      const s = holders.reduce((a, b) => a + b.percent, 0);
+      if (Math.abs(100 - s) > 1) {
+        holders = holders.map(h => ({ ...h, percent: Math.round(h.percent / s * 100) }));
+        const diff = 100 - holders.reduce((a, b) => a + b.percent, 0);
+        if (diff) holders[0].percent += diff;
+      }
     }
+
+    // Enforce allowed polities
+    const systemName = ALLOWED_POLITIES.includes(out?.systemName) ? out.systemName : FALLBACK.systemName;
 
     const result = {
-      systemName: String(out?.systemName || fallback.systemName),
-      systemDesc: String(out?.systemDesc || fallback.systemDesc),
-      flavor: String(out?.flavor || fallback.flavor),
+      systemName,
+      systemDesc: String(out?.systemDesc || FALLBACK.systemDesc).slice(0, 120),
+      flavor: String(out?.flavor || FALLBACK.flavor).slice(0, 80),
       holders,
-      playerIndex:
-        out?.playerIndex === null || out?.playerIndex === undefined
-          ? null
-          : Number(out.playerIndex),
+      playerIndex: (out?.playerIndex === null || out?.playerIndex === undefined) ? null : Number(out.playerIndex),
+      e12: {
+        tierI: Array.isArray(out?.e12?.tierI) ? out.e12.tierI : FALLBACK.e12.tierI,
+        tierII: Array.isArray(out?.e12?.tierII) ? out.e12.tierII : FALLBACK.e12.tierII,
+        tierIII: Array.isArray(out?.e12?.tierIII) ? out.e12.tierIII : FALLBACK.e12.tierIII,
+        stopA: !!out?.e12?.stopA,
+        stopB: !!out?.e12?.stopB,
+        decisive: Array.isArray(out?.e12?.decisive) ? out.e12.decisive.slice(0, 4) : []
+      },
+      grounding: {
+        settingType: out?.grounding?.settingType || "unclear",
+        era: String(out?.grounding?.era || "").slice(0, 40)
+      }
     };
-    result.systemName = coerceSystemName(result.systemName, role + " " + (result.systemDesc || ""));
-    if (!ALLOWED_SYSTEMS.includes(result.systemName)) {
-      // fallback description/flavor from the canonical list
-      const canon = ALLOWED_SYSTEMS.find(n => n === result.systemName);
-    }
+
     res.json(result);
   } catch (e) {
     console.error("Error in /api/analyze-role:", e?.message || e);
     res.status(500).json({ error: "analyze-role failed" });
   }
 });
-// Ensure systemName is in the canonical list; if not, coerce with a light heuristic
-function coerceSystemName(name, text) {
-  if (ALLOWED_SYSTEMS.includes(name)) return name;
-  const t = (name + " " + (text || "")).toLowerCase();
-  if (/(king|queen|monarch|emperor|sultan|tsar)/.test(t)) return "Absolute Monarchy";
-  if (/(divine|holy|god)/.test(t)) return "Divine Right Monarchy";
-  if (/(priest|temple|church|cleric|theocrat)/.test(t)) return "Clerical Theocracy";
-  if (/(army|general|legion|junta|military)/.test(t)) return "Military Junta";
-  if (/(parliament|pm|coalition)/.test(t)) return "Parliamentary Democracy";
-  if (/(president).*(congress|legislature)/.test(t)) return "Presidential Democracy";
-  if (/(referendum|plebiscite|vote directly)/.test(t)) return "Direct Democracy";
-  if (/(representative|senate|assembly|congress|consul)/.test(t)) return "Representative Democracy";
-  if (/(federal|province|state|regional)/.test(t)) return "Federal Republic";
-  if (/(unitary|central)/.test(t)) return "Unitary Republic";
-  if (/(party).*(only|single|sole|one)/.test(t)) return "One-Party State";
-  if (/(oligarch|elite|patrician)/.test(t)) return "Oligarchy";
-  if (/(wealth|merchant|bank|commerce)/.test(t)) return "Plutocracy";
-  if (/(technocrat|engineer|scientist|expert)/.test(t)) return "Technocracy";
-  if (/(elder|old)/.test(t)) return "Gerontocracy";
-  if (/(anarchy|no government)/.test(t)) return "Anarchy";
-  if (/(steal|corrupt|klepto|graft)/.test(t)) return "Kleptocracy";
-  if (/(banana|puppet)/.test(t)) return "Banana Republic";
-  return "Representative Democracy";
-}
 
 
 
