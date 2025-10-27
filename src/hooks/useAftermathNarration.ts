@@ -42,6 +42,13 @@ export function useAftermathNarration(remembranceText: string | undefined) {
     let cancelled = false;
     (async () => {
       try {
+        // Skip TTS preparation if narration disabled
+        if (!narrationEnabled) {
+          console.log('[AftermathNarration] Skipping TTS preparation (narration disabled)');
+          setCanStartNarration(true);
+          return;
+        }
+
         console.log('[AftermathNarration] Preparing narration...');
         const p = await narrator.prepare(remembranceText, { voiceName: "alloy", format: "mp3" });
         if (cancelled) {
@@ -63,7 +70,7 @@ export function useAftermathNarration(remembranceText: string | undefined) {
       preparedNarrationRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remembranceText]);
+  }, [remembranceText, narrationEnabled, narrator]);
 
   // Monitor narrator.speaking state to detect narration completion
   useEffect(() => {

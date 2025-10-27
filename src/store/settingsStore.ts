@@ -81,7 +81,7 @@ export const useSettingsStore = create<SettingsState>()(
       toggleGenerateImages: () => set({ generateImages: !get().generateImages }),
 
       // Narration
-      narrationEnabled: true,
+      narrationEnabled: false,
       narrationVoice: null,
       setNarrationEnabled: (v) => set({ narrationEnabled: v }),
       toggleNarrationEnabled: () => set({ narrationEnabled: !get().narrationEnabled }),

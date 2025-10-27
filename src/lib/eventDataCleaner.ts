@@ -90,9 +90,13 @@ export async function cleanAndAdvanceDay(
   // ========================================================================
   // STEP 2A: Update minimum values tracking (for continuous goals)
   // ========================================================================
-  const { updateMinimumValues } = useDilemmaStore.getState();
-  updateMinimumValues();
-  console.log('[Cleaner] Minimum values updated for goal tracking');
+  const { selectedGoals, updateMinimumValues } = useDilemmaStore.getState();
+  if (selectedGoals.length > 0) {
+    updateMinimumValues();
+    console.log('[Cleaner] Minimum values updated for goal tracking');
+  } else {
+    console.log('[Cleaner] No goals selected - skipping minimum value tracking');
+  }
 
   // ========================================================================
   // STEP 3: Wait for coin animation (triggered by ActionDeck internally)

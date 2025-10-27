@@ -64,9 +64,11 @@ const bgReadyRef = useRef(false);
     let cancelled = false;
     (async () => {
       try {
-        const p = await narrator.prepare(DEFAULT_LINE, { voiceName: "alloy", format: "mp3" });
-        if (cancelled) { p.dispose(); return; }
-        preparedDefaultRef.current = p;
+        if (narrationEnabled) {
+          const p = await narrator.prepare(DEFAULT_LINE, { voiceName: "alloy", format: "mp3" });
+          if (cancelled) { p.dispose(); return; }
+          preparedDefaultRef.current = p;
+        }
         setPhase("idle"); // now we can reveal the default copy; we'll start TTS on fade-in start
       } catch (e) {
         console.warn("[BackgroundIntro] default prepare failed; showing text only", e);
@@ -80,7 +82,7 @@ const bgReadyRef = useRef(false);
       narrator.stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [narrationEnabled]);
 // Prefetch the generated paragraph + prepare its TTS AFTER the default narration completes
 useEffect(() => {
   if (phase !== "idle" || bgReadyRef.current || !defaultNarrationComplete || fetchingIntroRef.current) return;
@@ -106,10 +108,12 @@ useEffect(() => {
       if (cancelled) return;
       setPara(paragraph); // so UI has the text when we transition
 
-      // Prepare the TTS for the paragraph ahead of time
-      const p = await narrator.prepare(paragraph, { voiceName: "alloy", format: "mp3" });
-      if (cancelled) { p.dispose(); return; }
-      preparedIntroRef.current = p;
+      // Prepare the TTS for the paragraph ahead of time (only if narration enabled)
+      if (narrationEnabled) {
+        const p = await narrator.prepare(paragraph, { voiceName: "alloy", format: "mp3" });
+        if (cancelled) { p.dispose(); return; }
+        preparedIntroRef.current = p;
+      }
       bgReadyRef.current = true;
     } catch (e: any) {
       if (e?.name === "AbortError") return;
@@ -124,7 +128,7 @@ useEffect(() => {
     controller.abort();
   };
 // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [phase, roleText, gender, defaultNarrationComplete]);
+}, [phase, roleText, gender, defaultNarrationComplete, narrationEnabled]);
 
   // 2) Wake up → fade out, then load paragraph
   const onWake = () => {
@@ -190,6 +194,13 @@ useEffect(() => {
     let cancelled = false;
     (async () => {
       if (phase !== "preparingIntro") return;
+
+      // Skip TTS preparation if narration disabled
+      if (!narrationEnabled) {
+        setPhase("ready");
+        return;
+      }
+
       try {
         const p = await narrator.prepare(para, { voiceName: "alloy", format: "mp3" });
         if (cancelled) { p.dispose(); return; }
@@ -202,7 +213,7 @@ useEffect(() => {
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, para]);
+  }, [phase, para, narrationEnabled]);
 
   // 5) Log system-generated intro paragraph when it's ready
   useEffect(() => {

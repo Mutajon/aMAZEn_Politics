@@ -17,7 +17,7 @@ import type { FetchState, EnhancedPowerHolder } from "./usePowerDistributionStat
 // AI Analysis API call
 async function fetchAnalysis(role: string): Promise<AnalysisResult> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 25000);
+  const timer = setTimeout(() => controller.abort(), 130000); // 130s (server timeout is 120s)
 
   try {
     const res = await fetch("/api/analyze-role", {

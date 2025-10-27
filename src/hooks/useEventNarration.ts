@@ -36,6 +36,14 @@ export function useEventNarration() {
           setCanShowDilemma(true);
           return;
         }
+
+        // Skip TTS preparation if narration disabled
+        if (!narrationEnabled) {
+          console.log("[EventNarration] Skipping TTS preparation (narration disabled)");
+          setCanShowDilemma(true);
+          return;
+        }
+
         const p = await narrator.prepare(speech, { voiceName: "alloy", format: "mp3" });
         if (cancelled) {
           p.dispose();
@@ -55,7 +63,7 @@ export function useEventNarration() {
       preparedDilemmaRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.title, current?.description]);
+  }, [current?.title, current?.description, narrationEnabled, narrator]);
 
   // Start narration when we reveal the dilemma (once) - controlled by reveal sequence
   const startNarrationIfReady = useCallback((shouldShowDilemma: boolean = true) => {
