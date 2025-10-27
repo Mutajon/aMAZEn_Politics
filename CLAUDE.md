@@ -265,6 +265,300 @@ Four dimensions with 10 components each (40 total):
 - **How** (Means): Law, Markets, Mobilization, Mutual Aid, etc.
 - **Whither** (Recipients): Individual, Community, Nation, Global, etc.
 
+## Political System Analysis (E-12 Framework)
+
+**Overview:**
+The power distribution analysis uses the Exception-12 (E-12) framework to classify political systems based on who decides exceptions across 12 critical policy domains. This replaced the previous 25-system taxonomy with a more rigorous 11-polity classification.
+
+**Implementation Date:** 2025-10-22 (Sessions 1-4)
+
+### The 11 Polity Types
+
+Polities are classified based on Author/Eraser control patterns across three tiers of exception domains:
+
+1. **Democracy**
+   - Demos (the people) hold decisive authority in core domains through direct mechanisms
+   - Example: Classical Athens, modern referendums
+
+2. **Republican Oligarchy**
+   - Formal offices (Executive, Legislative, Judicial) divide power
+   - No single seat holds both pen and eraser across domains
+   - Examples: US Congress, German Bundestag, EU institutions
+
+3. **Hard-Power Oligarchy — Plutocracy**
+   - Wealth-holders control key exception domains
+   - Economic power translates to political veto
+
+4. **Hard-Power Oligarchy — Stratocracy**
+   - Military/security apparatus holds decisive seats
+   - Coercive force shapes policy exceptions
+   - Examples: Military juntas, praetorian systems
+
+5. **Mental-Might Oligarchy — Theocracy**
+   - Religious authorities control exception domains
+   - Sacred texts/clergy determine legitimacy
+
+6. **Mental-Might Oligarchy — Technocracy**
+   - Technical experts hold decisive authority
+   - Epistemic credentials gate power
+
+7. **Mental-Might Oligarchy — Telecracy**
+   - Media/information controllers shape exceptions
+   - Narrative power translates to political control
+
+8. **Autocratizing (Executive)**
+   - Executive accumulates both pen and eraser across multiple domains
+   - Institutional checks weakening but not yet eliminated
+   - Triggers Stop-rule B
+
+9. **Autocratizing (Military)**
+   - Coercive force launches/escalates conflict without effective checks
+   - Security apparatus expanding exception control
+   - Triggers Stop-rule A
+
+10. **Personalist Monarchy / Autocracy**
+    - Single individual holds decisive authority across domains
+    - Personal loyalty supersedes institutional rules
+
+11. **Theocratic Monarchy**
+    - Monarch derives authority from sacred sources
+    - Religious legitimacy backs personal rule
+
+### E-12 Exception Domains (Three Tiers)
+
+**Tier I: Existential** (typically determines polity type)
+- Security (war/peace declarations)
+- Civil Liberties (speech, assembly, movement)
+- Information Order (media, education content control)
+
+**Tier II: Constitutive** (shapes political order)
+- Diplomacy (foreign relations, treaties)
+- Justice (courts, enforcement, punishment)
+- Economy (fiscal/monetary policy)
+- Appointments (who fills key offices)
+
+**Tier III: Contextual** (refines polity subtype)
+- Infrastructure (roads, utilities, networks)
+- Curricula (what is taught)
+- Healthcare (access, standards)
+- Immigration (borders, citizenship)
+- Environment (pollution, conservation)
+
+### Author/Eraser Roles
+
+Power holders are classified by their relationship to rules and exceptions:
+
+**Author (A)**: Can write or change rules and facts
+- Creates new policies
+- Alters existing frameworks
+- Badge: ✍️ (blue)
+
+**Eraser (E)**: Can credibly veto or provide oversight
+- Blocks proposals
+- Reverses decisions
+- Checks other seats
+- Badge: 🛑 (red)
+
+Many seats have both roles (e.g., Legislature authors laws + erases executive overreach).
+
+### Subject-Type Classifications
+
+Power holders are further classified by their relationship to political authority:
+
+| Type | Description | Intensity |
+|------|-------------|-----------|
+| **Author** | Writes/changes rules across domains | - (weak), • (moderate), + (strong) |
+| **Eraser** | Credible veto/oversight power | - (weak), • (moderate), + (strong) |
+| **Agent** | Executes decisions made elsewhere | - (weak), • (moderate), + (strong) |
+| **Actor** | Autonomous but within constraints | - (weak), • (moderate), + (strong) |
+| **Acolyte** | Follower bound by doctrine/ideology | - (weak), • (moderate), + (strong) |
+| **Dictator** | Unconstrained personal rule | - (weak), • (moderate), + (strong) |
+
+**Visual Indicators:**
+- Strong (+): Purple badge
+- Moderate (•): Indigo badge
+- Weak (-): Gray badge
+
+### Stop Rules
+
+Automatic classification triggers when power concentration reaches critical thresholds:
+
+**Stop-rule A**: Coercive force launches/escalates war at will without effective checks
+→ Classification: **Stratocracy** or **Autocratizing (Military)**
+
+**Stop-rule B**: Executive routinely authors exceptions across multiple domains AND neutralizes erasers
+→ Classification: **Autocratizing (Executive)**
+
+### Grounding Context
+
+Analysis includes historical/fictional grounding:
+
+**Setting Type:**
+- `real`: Historical or current real-world context
+- `fictional`: Fantasy, sci-fi, alternate history
+- `unclear`: Ambiguous or insufficient information
+
+**Era**: Time period description (e.g., "Classical Athens, 5th century BCE")
+
+### API Implementation
+
+**Endpoint**: `/api/analyze-role`
+**File**: `server/index.mjs` (lines 75-563)
+**Model**: `MODEL_ANALYZE` (typically gpt-4o)
+**Temperature**: 0.2 (lowered from 0.4 for consistency)
+
+**Request:**
+```json
+{
+  "role": "Emperor of Tang China"
+}
+```
+
+**Response:**
+```json
+{
+  "systemName": "Theocratic Monarchy",
+  "systemDesc": "Monarch derives authority from sacred Mandate of Heaven...",
+  "flavor": "Absolute power wrapped in celestial legitimacy.",
+  "holders": [
+    {
+      "name": "Emperor",
+      "percent": 70,
+      "icon": "👑",
+      "note": "Holds Mandate of Heaven; ultimate authority",
+      "role": { "A": true, "E": true },
+      "stype": { "t": "Dictator", "i": "+" }
+    }
+    // ... 3-4 more seats
+  ],
+  "playerIndex": 0,
+  "e12": {
+    "tierI": ["Security", "CivilLib", "InfoOrder"],
+    "tierII": ["Diplomacy", "Justice", "Appointments", "Economy"],
+    "tierIII": ["Infrastructure", "Curricula"],
+    "stopA": false,
+    "stopB": false,
+    "decisive": ["Emperor", "Imperial Court"]
+  },
+  "grounding": {
+    "settingType": "real",
+    "era": "Tang Dynasty, 8th century CE"
+  }
+}
+```
+
+### Predefined Role Optimization
+
+**Critical**: Predefined roles bypass the API entirely using hardcoded power distributions. This optimization is preserved to avoid unnecessary API calls.
+
+**Implementation**: `src/data/predefinedPowerDistributions.ts`
+
+**Predefined Roles:**
+1. Citizen of the Assembly in Classical Athens → Democracy
+2. Senator of the Roman Republic → Republican Oligarchy
+3. Emperor of Tang China → Theocratic Monarchy
+4. Chancellor of Modern Germany → Republican Oligarchy
+
+Each predefined role includes complete E-12 analysis data (role, stype, e12, grounding fields).
+
+### Type System
+
+**PowerHolder Type** (`src/store/roleStore.ts`):
+```typescript
+export type PowerHolder = {
+  name: string;
+  percent: number;
+  icon?: string;
+  note?: string;
+  role?: { A: boolean; E: boolean }; // Author/Eraser flags
+  stype?: { // Subject-Type classification
+    t: "Author" | "Eraser" | "Agent" | "Actor" | "Acolyte" | "Dictator";
+    i: "-" | "•" | "+"; // intensity
+  };
+};
+```
+
+**AnalysisResult Type** (`src/store/roleStore.ts`):
+```typescript
+export type AnalysisResult = {
+  systemName: string;
+  systemDesc: string;
+  flavor: string;
+  holders: PowerHolder[];
+  playerIndex: number | null;
+  e12?: { // Exception-12 analysis
+    tierI: string[];
+    tierII: string[];
+    tierIII: string[];
+    stopA: boolean;
+    stopB: boolean;
+    decisive: string[];
+  };
+  grounding?: { // Setting context
+    settingType: "real" | "fictional" | "unclear";
+    era: string;
+  };
+};
+```
+
+### UI Components
+
+**PowerDistributionContent** (`src/components/PowerDistributionContent.tsx`):
+- Displays Author/Eraser badges inline with power holder names
+- Shows Subject-Type indicators with color-coded intensity
+- "View Analysis" button appears when e12Data exists
+
+**E12AnalysisModal** (`src/components/E12AnalysisModal.tsx`):
+- Modal overlay showing full E-12 analysis
+- Sections: Historical grounding, decisive seats, stop rules, tier breakdown
+- Triggered by "View Analysis" button in PowerDistributionContent
+
+**Visual Elements:**
+- Author badge: ✍️ (blue background)
+- Eraser badge: 🛑 (red background)
+- Subject-Type intensity colors: Purple (+), Indigo (•), Gray (-)
+- Political system button with HelpCircle icon
+- E-12 analysis button with Cog icon (purple theme)
+
+### Migration Notes (2025-10-22)
+
+**Changes from Previous System:**
+- Old: 25 political systems with simple classification
+- New: 11 polity types based on E-12 framework
+- Token cost for custom roles: ~2.7x increase (justified by analytical depth)
+- Predefined roles: No change in behavior (still skip API)
+
+**System Name Mappings:**
+- "Direct Democracy" → "Democracy"
+- "Representative Democracy" → "Republican Oligarchy"
+- "Early Republicanism" → "Republican Oligarchy"
+- "Absolute Monarchy" → "Personalist Monarchy / Autocracy"
+- "Military Dictatorship" → "Hard-Power Oligarchy — Stratocracy"
+- "Single-Party State" → "Autocratizing (Executive)"
+- etc.
+
+**Backward Compatibility:**
+- New fields (role, stype, e12, grounding) are optional in types
+- Old saved games without these fields display normally
+- UI components check for field existence before rendering badges
+
+**Files Modified:**
+- `server/index.mjs` - Complete /api/analyze-role rewrite
+- `src/store/roleStore.ts` - Extended PowerHolder and AnalysisResult types
+- `src/data/politicalSystems.ts` - Replaced with 11 polities
+- `src/data/predefinedPowerDistributions.ts` - Enriched all 4 roles with E-12 data
+- `src/components/PowerDistributionContent.tsx` - Added badges and analysis button
+- `src/components/E12AnalysisModal.tsx` - New component for detailed analysis
+- `src/screens/PowerDistributionScreen.tsx` - Pass e12Data and groundingData props
+- `src/screens/RoleSelectionScreen.tsx` - Updated system names
+- `src/data/highscores-default.ts` - Updated all 20 entries with new polity names
+
+**Anti-Jargon Rules:**
+The E-12 prompt enforces plain modern English:
+- Avoid: "ancien régime", "Rechtsstaat", "vanguard party", "corporatism"
+- Use: "old order", "rule of law", "elite party", "state-business alliance"
+- Target: Readable by modern English speakers without specialized knowledge
+
 ## Scoring System
 
 Score calculated in FinalScoreScreen only (stays at 0 during gameplay).

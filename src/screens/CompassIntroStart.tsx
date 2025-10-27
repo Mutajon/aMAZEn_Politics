@@ -74,6 +74,7 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
   const loadingQuotes = useTranslatedConst(LOADING_QUOTES);
 
   const generateImages = useSettingsStore((s) => s.generateImages);
+  const narrationEnabled = useSettingsStore((s) => s.narrationEnabled);
   const character = useRoleStore((s) => s.character);
   const selectedRole = useRoleStore((s) => s.selectedRole);
 
@@ -129,18 +130,24 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
 
     const prepareAndStartNarration = async () => {
       try {
-        console.log("[CompassIntroStart] 🎤 Preparing narration");
-        const prepared = await prepare(narrationText);
-        preparedTTSRef.current = prepared;
+        // Only prepare and play narration if enabled
+        if (narrationEnabled) {
+          console.log("[CompassIntroStart] 🎤 Preparing narration");
+          const prepared = await prepare(narrationText);
+          preparedTTSRef.current = prepared;
 
-        // Start narration immediately when ready
-        if (!prepared.disposed()) {
-          console.log("[CompassIntroStart] 🔊 Starting narration");
-          await prepared.start();
+          // Start narration immediately when ready
+          if (!prepared.disposed()) {
+            console.log("[CompassIntroStart] 🔊 Starting narration");
+            await prepared.start();
+          }
+          console.log("[CompassIntroStart] ✅ Narration complete");
+        } else {
+          console.log("[CompassIntroStart] ⏭️ Skipping narration (disabled)");
         }
 
-        console.log("[CompassIntroStart] ✅ Narration complete, revealing content");
-        // Only after narration is ready, start the reveal sequence
+        // Reveal content (with or without narration)
+        console.log("[CompassIntroStart] 🎨 Revealing content");
         setLoading(false);
         setShowImage(true);
         setTimeout(() => setShowText(true), 600);
@@ -166,7 +173,7 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
         preparedTTSRef.current = null;
       }
     };
-  }, [character?.name, roleText, prepare]);
+  }, [character?.name, roleText, prepare, narrationEnabled]);
 
   return (
     <div className="min-h-[100dvh] px-5 py-6" style={bgStyle}>

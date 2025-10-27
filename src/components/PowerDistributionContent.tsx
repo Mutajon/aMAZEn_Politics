@@ -26,6 +26,18 @@ interface PowerDistributionContentProps {
   systemDesc: string;
   systemFlavor: string;
   showSystemModal: boolean;
+  e12Data?: {
+    tierI: string[];
+    tierII: string[];
+    tierIII: string[];
+    stopA: boolean;
+    stopB: boolean;
+    decisive: string[];
+  };
+  groundingData?: {
+    settingType: "real" | "fictional" | "unclear";
+    era: string;
+  };
 
   // Handlers
   onRetry: () => void;
@@ -46,6 +58,8 @@ export default function PowerDistributionContent({
   systemDesc,
   systemFlavor,
   showSystemModal,
+  e12Data,
+  groundingData,
   onRetry,
   onChangePercent,
   onChangeName,
@@ -56,6 +70,9 @@ export default function PowerDistributionContent({
 }: PowerDistributionContentProps) {
   const logger = useLogger();
   const character = useRoleStore((s) => s.character);
+
+  // Determine if editing is enabled based on setting type
+  const isRealSetting = groundingData?.settingType === "real";
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
@@ -95,12 +112,14 @@ export default function PowerDistributionContent({
               <h1 className="text-3xl font-extrabold text-center tracking-tight bg-gradient-to-r from-yellow-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
                 Top Power Holders In This Game
               </h1>
-              <p className="text-center text-white/75 mt-1">
-                Not satisfied? Use sliders to adjust influence, or click names to edit.
-              </p>
+              {!isRealSetting && (
+                <p className="text-center text-white/75 mt-1">
+                  Not satisfied? Use sliders to adjust influence, or click names to edit.
+                </p>
+              )}
 
               {/* Political System row */}
-              <div className="mt-3 flex items-center justify-center gap-2 text-white/85">
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-white/85">
                 <span className="font-semibold">Political system:</span>
                 <button
                   onClick={() => {
@@ -169,10 +188,14 @@ export default function PowerDistributionContent({
                                 }, `User changed power holder #${rank} name from "${h.name}" to "${e.target.value}"`);
                                 onChangeName(h._id, e.target.value);
                               }}
-                              className="bg-transparent font-semibold text-white/95 outline-none flex-auto min-w-0"
+                              disabled={isRealSetting}
+                              className={`bg-transparent font-semibold outline-none flex-auto min-w-0 ${
+                                isRealSetting ? 'text-white/60 cursor-not-allowed' : 'text-white/95'
+                              }`}
                               placeholder="Enter a name…"
                               aria-label="Power holder name"
                             />
+
                             {isPlayer && (
                               <span className="text-amber-300 text-sm font-semibold whitespace-nowrap">
                                 (That's you!)
@@ -209,7 +232,8 @@ export default function PowerDistributionContent({
                             }, `User adjusted power holder #${rank} (${h.name}) from ${h.percent}% to ${newValue}%`);
                             onChangePercent(i, newValue);
                           }}
-                          className="w-full accent-violet-500"
+                          disabled={isRealSetting}
+                          className={`w-full ${isRealSetting ? 'opacity-50 cursor-not-allowed' : 'accent-violet-500'}`}
                           aria-label={`Adjust ${h.name || "this holder"}'s influence`}
                         />
                       </div>
@@ -220,19 +244,21 @@ export default function PowerDistributionContent({
             </LayoutGroup>
 
             {/* Action Buttons */}
-            <div className="flex items-center justify-between mt-6">
-              <button
-                onClick={() => {
-                  logger.log('button_click_power_reset', {
-                    currentHolders: holders.map(h => ({ name: h.name, percent: h.percent }))
-                  }, 'User clicked Reset button on power distribution screen');
-                  onReset();
-                }}
-                className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/7 active:scale-[.99] text-white/70"
-              >
-                <Cog className="w-4 h-4" />
-                Reset
-              </button>
+            <div className={`flex items-center mt-6 ${isRealSetting ? 'justify-end' : 'justify-between'}`}>
+              {!isRealSetting && (
+                <button
+                  onClick={() => {
+                    logger.log('button_click_power_reset', {
+                      currentHolders: holders.map(h => ({ name: h.name, percent: h.percent }))
+                    }, 'User clicked Reset button on power distribution screen');
+                    onReset();
+                  }}
+                  className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/7 active:scale-[.99] text-white/70"
+                >
+                  <Cog className="w-4 h-4" />
+                  Reset
+                </button>
+              )}
 
               <button
                 onClick={() => {

@@ -105,6 +105,8 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
         systemDesc={systemDesc}
         systemFlavor={systemFlavor}
         showSystemModal={showSystemModal}
+        e12Data={analysisStore?.e12}
+        groundingData={analysisStore?.grounding}
 
         // Handlers
         onRetry={handleRetry}

@@ -9,7 +9,8 @@ import { bgStyle } from "../lib/ui";
 import type { PushFn } from "../lib/router";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useSettingsStore } from "../store/settingsStore";
-import { lang } from "../i18n/lang";
+import { useTranslatedConst, createTranslatedConst } from "../i18n/useTranslatedConst";
+import { useLang } from "../i18n/lang";
 
 type DifficultyLevel = {
   id: "baby-boss" | "freshman" | "tactician" | "old-fox";
@@ -20,7 +21,7 @@ type DifficultyLevel = {
   scoreMod: string;
 };
 
-const difficulties: DifficultyLevel[] = [
+const createDifficulties = createTranslatedConst((lang): DifficultyLevel[] => [
   {
     id: "baby-boss",
     title: lang("BABY_BOSS_TITLE"),
@@ -53,9 +54,12 @@ const difficulties: DifficultyLevel[] = [
     budgetMod: lang("BUDGET_MOD_NEG_HIGH"),
     scoreMod: lang("SCORE_MOD_POS_HIGH"),
   },
-];
+]);
 
 export default function DifficultyScreen({ push }: { push: PushFn }) {
+  const lang = useLang();
+  const difficulties = useTranslatedConst(createDifficulties);
+
   const [selected, setSelected] = useState<DifficultyLevel["id"] | null>(null);
   const setDifficulty = useDilemmaStore((s) => s.setDifficulty);
   const showBudget = useSettingsStore((s) => s.showBudget);

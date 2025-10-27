@@ -59,47 +59,34 @@ const primeAnalysisFromRole = (roleLabel: string, systemName?: string) => {
   }
 };
 
-// Clear holders when entering role selection to ensure fresh API call
-// This prevents cached holders from skipping the API analysis
-useEffect(() => {
-  const currentAnalysis = useRoleStore.getState().analysis;
-  if (currentAnalysis?.holders && currentAnalysis.holders.length > 0) {
-    setAnalysis({
-      ...currentAnalysis,
-      holders: [],
-      playerIndex: null,
-    });
-  }
-}, [setAnalysis]);
-
   // Roles with political system + flavor text
   const roles: RoleItem[] = [
-    { 
-      icon: "🏛️", 
+    {
+      icon: "🏛️",
       label: lang("CITIZEN_ASSEMBLY_ATHENS"),
       subtitle: lang("ATHENS_SUBTITLE"),
-      system: lang("ROLE_DIRECT_DEMOCRACY"),
+      system: "Democracy", // Updated to E-12 polity name
       flavor: lang("ATHENS_FLAVOR")
     },
-    { 
-      icon: "🏺", 
+    {
+      icon: "🏺",
       label: lang("SENATOR_ROMAN_REPUBLIC"),
       subtitle: lang("ROME_SUBTITLE"),
-      system: lang("ROLE_EARLY_REPUBLICANISM"),
+      system: "Republican Oligarchy", // Updated to E-12 polity name
       flavor: lang("ROME_FLAVOR")
     },
-    { 
-      icon: "🐉", 
+    {
+      icon: "🐉",
       label: lang("EMPEROR_TANG_CHINA"),
       subtitle: lang("CHINA_SUBTITLE"),
-      system: lang("ROLE_ABSOLUTE_MONARCHY"),
+      system: "Theocratic Monarchy", // Updated to E-12 polity name
       flavor: lang("CHINA_FLAVOR")
     },
-    { 
-      icon: "🇩🇪", 
+    {
+      icon: "🇩🇪",
       label: lang("CHANCELLOR_MODERN_GERMANY"),
       subtitle: lang("GERMANY_SUBTITLE"),
-      system: lang("ROLE_REPRESENTATIVE_DEMOCRACY"),
+      system: "Republican Oligarchy", // Updated to E-12 polity name
       flavor: lang("GERMANY_FLAVOR")
     },
     { icon: "❓", label: lang("SUGGEST_YOUR_OWN"), suggest: true },

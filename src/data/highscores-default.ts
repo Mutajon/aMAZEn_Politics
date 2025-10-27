@@ -29,7 +29,7 @@ export const DEFAULT_HIGHSCORES: HighscoreEntry[] = [
     values: "What: Security/Safety; Whence: Personal; How: Enforce; Whither: In-Group",
     score: 1500,
     period: "r. 51–30 BCE",
-    politicalSystem: "Absolute Monarchy",
+    politicalSystem: "Personalist Monarchy / Autocracy",
   },
   {
     name: "Augustus",
@@ -40,7 +40,7 @@ export const DEFAULT_HIGHSCORES: HighscoreEntry[] = [
     values: "What: Security/Safety; Whence: Tradition; How: Law/Std.; Whither: Nation",
     score: 2240,
     period: "r. 27 BCE–14 CE",
-    politicalSystem: "Absolute Monarchy",
+    politicalSystem: "Personalist Monarchy / Autocracy",
   },
   {
     name: "Ashoka",
@@ -51,7 +51,7 @@ export const DEFAULT_HIGHSCORES: HighscoreEntry[] = [
     values: "What: Care/Solidarity; Whence: Revelation; How: Civic Culture; Whither: Humanity",
     score: 2910,
     period: "r. c. 268–232 BCE",
-    politicalSystem: "Absolute Monarchy",
+    politicalSystem: "Personalist Monarchy / Autocracy",
   },
   {
     name: "Charlemagne",
@@ -62,7 +62,7 @@ export const DEFAULT_HIGHSCORES: HighscoreEntry[] = [
     values: "What: Honor/Sacrifice; Whence: Tradition; How: Enforce; Whither: Civiliz.",
     score: 2090,
     period: "r. 768–814",
-    politicalSystem: "Divine Right Monarchy",
+    politicalSystem: "Theocratic Monarchy",
   },
   {
     name: "Genghis Khan",
@@ -73,7 +73,7 @@ export const DEFAULT_HIGHSCORES: HighscoreEntry[] = [
     values: "What: Honor/Sacrifice; Whence: Personal; How: Enforce; Whither: In-Group",
     score: 1720,
     period: "r. 1206–1227",
-    politicalSystem: "Stratocracy",
+    politicalSystem: "Hard-Power Oligarchy — Stratocracy",
   },
   {
     name: "Mansa Musa",
@@ -84,18 +84,18 @@ export const DEFAULT_HIGHSCORES: HighscoreEntry[] = [
     values: "What: Wellbeing; Whence: Revelation; How: Markets; Whither: Nation",
     score: 2310,
     period: "r. 1312–1337",
-    politicalSystem: "Absolute Monarchy",
+    politicalSystem: "Personalist Monarchy / Autocracy",
   },
   {
     name: "Elizabeth I",
     about:
-      "Queen of England who balanced factions, backed exploration and the arts, and secured the kingdom’s independence.",
+      "Queen of England who balanced factions, backed exploration and the arts, and secured the kingdom's independence.",
     democracy: "Medium",
     autonomy: "High",
     values: "What: Security/Safety; Whence: Public Reason; How: Law/Std.; Whither: Nation",
     score: 2665,
     period: "r. 1558–1603",
-    politicalSystem: "Constitutional Monarchy",
+    politicalSystem: "Republican Oligarchy",
   },
   {
     name: "Tokugawa Ieyasu",
@@ -106,7 +106,7 @@ export const DEFAULT_HIGHSCORES: HighscoreEntry[] = [
     values: "What: Security/Safety; Whence: Tradition; How: Law/Std.; Whither: Nation",
     score: 2000,
     period: "r. 1603–1605",
-    politicalSystem: "Stratocracy",
+    politicalSystem: "Hard-Power Oligarchy — Stratocracy",
   },
   {
     name: "Peter the Great",
@@ -117,7 +117,7 @@ export const DEFAULT_HIGHSCORES: HighscoreEntry[] = [
     values: "What: Create/Courage; Whence: Personal; How: Enforce; Whither: Nation",
     score: 2110,
     period: "r. 1682–1725",
-    politicalSystem: "Absolute Monarchy",
+    politicalSystem: "Personalist Monarchy / Autocracy",
   },
   {
     name: "George Washington",
@@ -128,7 +128,7 @@ export const DEFAULT_HIGHSCORES: HighscoreEntry[] = [
     values: "What: Liberty/Agency; Whence: Public Reason; How: Deliberation; Whither: Nation",
     score: 3095,
     period: "served 1789–1797",
-    politicalSystem: "Presidential Democracy",
+    politicalSystem: "Democracy",
   },
   {
     name: "Napoleon Bonaparte",
@@ -139,7 +139,7 @@ export const DEFAULT_HIGHSCORES: HighscoreEntry[] = [
     values: "What: Security/Safety; Whence: Personal; How: Law/Std.; Whither: Nation",
     score: 2200,
     period: "emperor 1804–1814/1815",
-    politicalSystem: "Dictatorship",
+    politicalSystem: "Personalist Monarchy / Autocracy",
   },
   {
     name: "Abraham Lincoln",
@@ -150,7 +150,7 @@ export const DEFAULT_HIGHSCORES: HighscoreEntry[] = [
     values: "What: Equality/Equity; Whence: Public Reason; How: Law/Std.; Whither: Nation",
     score: 3075,
     period: "served 1861–1865",
-    politicalSystem: "Presidential Democracy",
+    politicalSystem: "Democracy",
   },
   {
     name: "Otto von Bismarck",
@@ -161,7 +161,7 @@ export const DEFAULT_HIGHSCORES: HighscoreEntry[] = [
     values: "What: Security/Safety; Whence: Tradition; How: Law/Std.; Whither: Nation",
     score: 2355,
     period: "chancellor 1871–1890",
-    politicalSystem: "Constitutional Monarchy",
+    politicalSystem: "Republican Oligarchy",
   },
   {
     name: "Mahatma Gandhi",
@@ -172,7 +172,7 @@ export const DEFAULT_HIGHSCORES: HighscoreEntry[] = [
     values: "What: Liberty/Agency; Whence: Evidence; How: Mobilize; Whither: Humanity",
     score: 3250,
     period: "active 1915–1948",
-    politicalSystem: "Parliamentary Democracy",
+    politicalSystem: "Democracy",
   },
   {
     name: "Mustafa Kemal Atatürk",
@@ -183,7 +183,7 @@ export const DEFAULT_HIGHSCORES: HighscoreEntry[] = [
     values: "What: Create/Courage; Whence: Public Reason; How: Law/Std.; Whither: Nation",
     score: 2900,
     period: "president 1923–1938",
-    politicalSystem: "Unitary Republic",
+    politicalSystem: "Republican Oligarchy",
   },
   {
     name: "Franklin D. Roosevelt",
@@ -194,7 +194,7 @@ export const DEFAULT_HIGHSCORES: HighscoreEntry[] = [
     values: "What: Care/Solidarity; Whence: Public Reason; How: Deliberation; Whither: Nation",
     score: 2885,
     period: "served 1933–1945",
-    politicalSystem: "Presidential Democracy",
+    politicalSystem: "Democracy",
   },
   {
     name: "Winston Churchill",
@@ -205,39 +205,39 @@ export const DEFAULT_HIGHSCORES: HighscoreEntry[] = [
     values: "What: Honor/Sacrifice; Whence: Tradition; How: Deliberation; Whither: Nation",
     score: 2620,
     period: "PM 1940–45, 1951–55",
-    politicalSystem: "Parliamentary Democracy",
+    politicalSystem: "Democracy",
   },
   {
     name: "Deng Xiaoping",
     about:
-      "China’s paramount leader who opened markets while tightening party control, swapping dogma for pragmatic growth.",
+      "China's paramount leader who opened markets while tightening party control, swapping dogma for pragmatic growth.",
     democracy: "Low",
     autonomy: "Low",
     values: "What: Wellbeing; Whence: Personal; How: Markets; Whither: Nation",
     score: 2260,
     period: "paramount 1978–1992",
-    politicalSystem: "One-Party State",
+    politicalSystem: "Autocratizing (Executive)",
   },
   {
     name: "Nelson Mandela",
     about:
-      "South Africa’s peacemaker-president who transformed long imprisonment into reconciliation and a shared democratic project.",
+      "South Africa's peacemaker-president who transformed long imprisonment into reconciliation and a shared democratic project.",
     democracy: "Very High",
     autonomy: "Very High",
     values: "What: Equality/Equity; Whence: Public Reason; How: Deliberation; Whither: Humanity",
     score: 3350,
     period: "president 1994–1999",
-    politicalSystem: "Parliamentary Democracy",
+    politicalSystem: "Democracy",
   },
   {
     name: "Angela Merkel",
     about:
-      "Germany’s chancellor who practiced calm, incremental leadership through continental storms from debt to migration.",
+      "Germany's chancellor who practiced calm, incremental leadership through continental storms from debt to migration.",
     democracy: "High",
     autonomy: "High",
     values: "What: Wellbeing; Whence: Evidence; How: Deliberation; Whither: Nation",
     score: 2920,
     period: "chancellor 2005–2021",
-    politicalSystem: "Federal Republic",
+    politicalSystem: "Republican Oligarchy",
   },
 ];
