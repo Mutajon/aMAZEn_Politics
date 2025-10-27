@@ -194,14 +194,17 @@ async function aiText({ system, user, model = CHAT_MODEL_DEFAULT, temperature, m
       },
       body: JSON.stringify(body),
     });
+    console.log(`[aiText] Response received: status=${resp.status}`);
     if (!resp.ok) {
       const t = await resp.text().catch(() => "");
       throw new Error(`OpenAI chat error ${resp.status}: ${t}`);
     }
     const data = await resp.json();
+    console.log(`[aiText] JSON parsed successfully`);
     const choice = data?.choices?.[0];
     const content = choice?.message?.content ?? "";
     const finishReason = choice?.finish_reason;
+    console.log(`[aiText] Content length=${content.length}, finish_reason=${finishReason}`);
 
     // Log finish reason for debugging truncation issues
     if (finishReason && finishReason !== 'stop') {
@@ -329,15 +332,22 @@ app.post("/api/intro-paragraph", async (req, res) => {
     let paragraph = "";
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
+        console.log(`[server] intro-paragraph attempt ${attempt} starting for role: ${roleText.slice(0, 40)}...`);
         paragraph = await getParagraphOnce();
+        console.log(`[server] intro-paragraph attempt ${attempt} completed: got ${paragraph.length} chars`);
         if (paragraph) break;
+        console.log(`[server] intro-paragraph attempt ${attempt} returned empty, will retry`);
       } catch (err) {
         console.warn(`[server] intro-paragraph attempt ${attempt} failed:`, err?.message || err);
       }
       if (attempt === 1) await sleep(600); // simple backoff before the second try
     }
 
-    if (!paragraph) return res.status(503).json({ error: "No content returned" });
+    if (!paragraph) {
+      console.error('[server] intro-paragraph: ALL attempts exhausted, returning 503');
+      return res.status(503).json({ error: "No content returned" });
+    }
+    console.log('[server] intro-paragraph: SUCCESS, sending response');
     return res.json({ paragraph });
   } catch (e) {
     console.error("Error in /api/intro-paragraph:", e?.message || e);

@@ -57,6 +57,8 @@ const bgReadyRef = useRef(false);
   const paragraphLoggedRef = useRef(false);
   // Track if we're currently fetching the intro paragraph to prevent race condition
   const fetchingIntroRef = useRef(false);
+  // Store prefetch AbortController so we can cancel it from onWake
+  const prefetchAbortRef = useRef<AbortController | null>(null);
 
 
   // 1) On mount, PREPARE default line audio; show nothing until ready
@@ -89,43 +91,64 @@ useEffect(() => {
 
   let cancelled = false;
   const controller = new AbortController();
+  prefetchAbortRef.current = controller; // Store controller so onWake can cancel it
 
   (async () => {
     fetchingIntroRef.current = true;
+
+    // Wrap everything in try-finally to guarantee flag reset
     try {
-      const payload = { role: roleText || "Unknown role", gender };
-      const r = await fetch("/api/intro-paragraph", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        signal: controller.signal,
-      });
-      if (!r.ok) return; // stay silent; the click flow will try again
-      const data = await r.json();
-      const paragraph = (data?.paragraph || "").trim();
-      if (!paragraph) return;
+      try {
+        const payload = { role: roleText || "Unknown role", gender };
+        const r = await fetch("/api/intro-paragraph", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        if (!r.ok) {
+          console.warn(`[BackgroundIntro] Prefetch failed: ${r.status}`);
+          return;
+        }
+        const data = await r.json();
+        const paragraph = (data?.paragraph || "").trim();
+        if (!paragraph) {
+          console.warn("[BackgroundIntro] Prefetch returned empty paragraph");
+          return;
+        }
 
-      if (cancelled) return;
-      setPara(paragraph); // so UI has the text when we transition
+        if (cancelled) return;
+        setPara(paragraph); // so UI has the text when we transition
 
-      // Prepare the TTS for the paragraph ahead of time (only if narration enabled)
-      if (narrationEnabled) {
-        const p = await narrator.prepare(paragraph, { voiceName: "alloy", format: "mp3" });
-        if (cancelled) { p.dispose(); return; }
-        preparedIntroRef.current = p;
+        // Prepare the TTS for the paragraph ahead of time (only if narration enabled)
+        if (narrationEnabled) {
+          const p = await narrator.prepare(paragraph, { voiceName: "alloy", format: "mp3" });
+          if (cancelled) { p.dispose(); return; }
+          preparedIntroRef.current = p;
+        }
+        bgReadyRef.current = true;
+        console.log("[BackgroundIntro] Prefetch succeeded");
+      } catch (e: any) {
+        if (e?.name === "AbortError") {
+          console.log("[BackgroundIntro] Prefetch aborted");
+          return;
+        }
+        console.warn("[BackgroundIntro] Prefetch error:", e.message);
+        // silent fail; foreground flow will handle errors
       }
-      bgReadyRef.current = true;
-    } catch (e: any) {
-      if (e?.name === "AbortError") return;
-      // silent fail; foreground flow will handle errors
     } finally {
-      if (!cancelled) fetchingIntroRef.current = false;
+      // ALWAYS reset flag, even if cancelled or error
+      if (!cancelled) {
+        fetchingIntroRef.current = false;
+        console.log("[BackgroundIntro] Prefetch flag reset");
+      }
     }
   })();
 
   return () => {
     cancelled = true;
     controller.abort();
+    prefetchAbortRef.current = null; // Clear ref on cleanup
   };
 // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [phase, roleText, gender, defaultNarrationComplete, narrationEnabled]);
@@ -134,6 +157,14 @@ useEffect(() => {
   const onWake = () => {
     // Log player clicking "Wake up" button
     logger.log('button_click_wake_up', 'Wake up', 'User clicked Wake up button');
+
+    // Cancel prefetch if still running to prevent race condition
+    if (fetchingIntroRef.current && prefetchAbortRef.current) {
+      console.log("[BackgroundIntro] Cancelling prefetch before foreground fetch");
+      prefetchAbortRef.current.abort();
+      fetchingIntroRef.current = false; // Reset flag immediately
+      prefetchAbortRef.current = null;
+    }
 
     // If background prefetch finished, jump straight to ready; else do the normal loading flow
     if (bgReadyRef.current && preparedIntroRef.current && para.trim()) {
@@ -150,39 +181,43 @@ useEffect(() => {
     (async () => {
       if (phase !== "loading" || fetchingIntroRef.current) return;
       fetchingIntroRef.current = true;
+
+      // Wrap in try-finally to guarantee flag reset
       try {
-        const payload = { role: roleText || "Unknown role", gender };
-        const r = await fetch("/api/intro-paragraph", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          signal: abort.signal,
-        });
-        if (!r.ok) {
-          const detail = await r.text().catch(() => "");
-          console.warn("Intro API error:", r.status, detail);
+        try {
+          const payload = { role: roleText || "Unknown role", gender };
+          const r = await fetch("/api/intro-paragraph", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            signal: abort.signal,
+          });
+          if (!r.ok) {
+            const detail = await r.text().catch(() => "");
+            console.warn("Intro API error:", r.status, detail);
+            setPara("The morning arrives, but words fail to settle. Try again in a moment.");
+            setPhase("error");
+            return;
+          }
+          const data = await r.json();
+          const paragraph = (data?.paragraph || "").trim();
+          if (!paragraph) {
+            setPara("The morning arrives, but words fail to settle. Try again in a moment.");
+            setPhase("error");
+            return;
+          }
+          setPara(paragraph);
+          setPhase("preparingIntro"); // buffer TTS before revealing
+        } catch (e) {
+          if ((e as any)?.name === "AbortError") return;
+          console.warn("Intro generation error:", e);
           setPara("The morning arrives, but words fail to settle. Try again in a moment.");
           setPhase("error");
-          fetchingIntroRef.current = false;
-          return;
         }
-        const data = await r.json();
-        const paragraph = (data?.paragraph || "").trim();
-        if (!paragraph) {
-          setPara("The morning arrives, but words fail to settle. Try again in a moment.");
-          setPhase("error");
-          fetchingIntroRef.current = false;
-          return;
-        }
-        setPara(paragraph);
-        setPhase("preparingIntro"); // buffer TTS before revealing
+      } finally {
+        // ALWAYS reset flag
         fetchingIntroRef.current = false;
-      } catch (e) {
-        if ((e as any)?.name === "AbortError") return;
-        console.warn("Intro generation error:", e);
-        setPara("The morning arrives, but words fail to settle. Try again in a moment.");
-        setPhase("error");
-        fetchingIntroRef.current = false;
+        console.log("[BackgroundIntro] Foreground fetch flag reset");
       }
     })();
     return () => abort.abort();
