@@ -49,6 +49,7 @@ import { useAudioManager } from "../hooks/useAudioManager";
 import { useLogger } from "../hooks/useLogger";
 import { loggingService } from "../lib/loggingService";
 import type { PushFn } from "../lib/router";
+import { useLang } from "../i18n/lang";
 
 type Props = {
   push: PushFn;
@@ -94,14 +95,16 @@ type CategoryPiece = {
 /**
  * Map difficulty IDs to display names (matches DifficultyScreen titles)
  */
-const difficultyDisplayMap: Record<string, string> = {
-  "baby-boss": "Baby Boss (Easy)",
-  "freshman": "Freshman (Normal)",
-  "tactician": "Tactician (Hard)",
-  "old-fox": "Old Fox (Very Hard)",
-};
+const difficultyDisplayMap = (lang: (key: string) => string): Record<string, string> => ({
+  "baby-boss": lang("FINAL_SCORE_DIFFICULTY_BABY_BOSS"),
+  "freshman": lang("FINAL_SCORE_DIFFICULTY_FRESHMAN"),
+  "tactician": lang("FINAL_SCORE_DIFFICULTY_TACTICIAN"),
+  "old-fox": lang("FINAL_SCORE_DIFFICULTY_OLD_FOX"),
+});
 
 export default function FinalScoreScreen({ push }: Props) {
+  const lang = useLang();
+  
   // Load aftermath ratings from snapshot (saved by AftermathScreen)
   const [ratings, setRatings] = useState<{
     liberalism: AftermathRating;
@@ -167,35 +170,35 @@ export default function FinalScoreScreen({ push }: Props) {
       const allCategories: CategoryPiece[] = [
         {
           key: "support",
-          label: "Final Support",
+          label: lang("FINAL_SCORE_SUPPORT"),
           value: breakdown.support.total,
           icon: <Users className="h-5 w-5" />,
           tint: "bg-blue-500/10",
         },
         {
           key: "budget",
-          label: "Budget",
+          label: lang("FINAL_SCORE_BUDGET"),
           value: breakdown.budget.points,
           icon: <DollarSign className="h-5 w-5" />,
           tint: "bg-emerald-500/10",
         },
         {
           key: "ideology",
-          label: "Ideology",
+          label: lang("FINAL_SCORE_IDEOLOGY"),
           value: breakdown.ideology.total,
           icon: <Gauge className="h-5 w-5" />,
           tint: "bg-purple-500/10",
         },
         {
           key: "goals",
-          label: "Goals",
+          label: lang("FINAL_SCORE_GOALS"),
           value: breakdown.goals.total,
           icon: <Target className="h-5 w-5" />,
           tint: "bg-orange-500/10",
         },
         {
           key: "difficulty",
-          label: "Difficulty",
+          label: lang("FINAL_SCORE_DIFFICULTY"),
           value: breakdown.difficulty.points,
           icon: <Rocket className="h-5 w-5" />,
           tint: "bg-yellow-500/10",
@@ -488,7 +491,7 @@ export default function FinalScoreScreen({ push }: Props) {
     }, 'User clicked Visit Hall of Fame');
 
     // Navigate to highscores with player name for highlighting
-    const playerName = character?.name || "Unknown Leader";
+    const playerName = character?.name || lang("FINAL_SCORE_UNKNOWN_LEADER");
     push(`/highscores?highlight=${encodeURIComponent(playerName)}`);
   };
 
@@ -502,14 +505,14 @@ export default function FinalScoreScreen({ push }: Props) {
               onClick={handleBackToAftermath}
               className="rounded-xl px-4 py-2 bg-white/10 hover:bg-white/20 text-white/90 transition-colors"
             >
-              ← Back to Aftermath
+              ← {lang("FINAL_SCORE_BACK_TO_AFTERMATH")}
             </button>
           </div>
         )}
 
         {/* Title */}
         <h1 className="text-4xl font-extrabold text-center bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent mb-8">
-          Final Score
+          {lang("FINAL_SCORE_TITLE")}
         </h1>
 
         {/* Category Cards */}
@@ -556,7 +559,7 @@ export default function FinalScoreScreen({ push }: Props) {
                     <TocRow
                       left={
                         <span>
-                          Public support{" "}
+                          {lang("FINAL_SCORE_PUBLIC_SUPPORT")}{" "}
                           <span className="font-semibold">
                             {breakdown.support.people > 0
                               ? Math.round((breakdown.support.people / 600) * 100)
@@ -570,7 +573,7 @@ export default function FinalScoreScreen({ push }: Props) {
                     <TocRow
                       left={
                         <span>
-                          Power holders support{" "}
+                          {lang("FINAL_SCORE_POWER_HOLDERS_SUPPORT")}{" "}
                           <span className="font-semibold">
                             {breakdown.support.middle > 0
                               ? Math.round((breakdown.support.middle / 600) * 100)
@@ -584,7 +587,7 @@ export default function FinalScoreScreen({ push }: Props) {
                     <TocRow
                       left={
                         <span>
-                          Mom support{" "}
+                          {lang("FINAL_SCORE_MOM_SUPPORT")}{" "}
                           <span className="font-semibold">
                             {breakdown.support.mom > 0
                               ? Math.round((breakdown.support.mom / 600) * 100)
@@ -603,7 +606,7 @@ export default function FinalScoreScreen({ push }: Props) {
                     <TocRow
                       left={
                         <span>
-                          Budget:{" "}
+                          {lang("FINAL_SCORE_BUDGET_LABEL")}{" "}
                           <span className="font-semibold">
                             {breakdown.budget.budgetAmount}
                           </span>
@@ -619,7 +622,7 @@ export default function FinalScoreScreen({ push }: Props) {
                     <TocRow
                       left={
                         <span>
-                          Liberalism:{" "}
+                          {lang("FINAL_SCORE_LIBERALISM_LABEL")}{" "}
                           <span className="font-semibold">
                             {formatRating(breakdown.ideology.liberalism.rating)}
                           </span>
@@ -630,7 +633,7 @@ export default function FinalScoreScreen({ push }: Props) {
                     <TocRow
                       left={
                         <span>
-                          Autonomy:{" "}
+                          {lang("FINAL_SCORE_AUTONOMY_LABEL")}{" "}
                           <span className="font-semibold">
                             {formatRating(breakdown.ideology.autonomy.rating)}
                           </span>
@@ -650,7 +653,7 @@ export default function FinalScoreScreen({ push }: Props) {
                           <TocRow
                             left={
                               <span>
-                                Goals completed:{" "}
+                                {lang("FINAL_SCORE_GOALS_COMPLETED")}{" "}
                                 <span className="font-semibold">
                                   {breakdown.goals.completed} / 2
                                 </span>
@@ -671,7 +674,7 @@ export default function FinalScoreScreen({ push }: Props) {
                       </>
                     ) : (
                       <div className="text-sm text-white/60 italic">
-                        No goals selected
+                        {lang("FINAL_SCORE_NO_GOALS_SELECTED")}
                       </div>
                     )}
                   </div>
@@ -682,9 +685,9 @@ export default function FinalScoreScreen({ push }: Props) {
                     <TocRow
                       left={
                         <span>
-                          Level:{" "}
+                          {lang("FINAL_SCORE_LEVEL_LABEL")}{" "}
                           <span className="font-semibold">
-                            {difficultyDisplayMap[breakdown.difficulty.level] || breakdown.difficulty.level}
+                            {difficultyDisplayMap(lang)[breakdown.difficulty.level] || breakdown.difficulty.level}
                           </span>
                         </span>
                       }
@@ -762,11 +765,11 @@ export default function FinalScoreScreen({ push }: Props) {
                       ease: "easeInOut",
                     }}
                   >
-                    🎉 You made it to the Hall of Fame! Your current rank: <span className="text-amber-400">#{playerRank}</span>
+                    🎉 {lang("FINAL_SCORE_HALL_OF_FAME_MESSAGE").replace("{rank}", playerRank.toString())}
                   </motion.div>
                 ) : (
                   <div className="text-lg text-white/70">
-                    You did not make it to the Hall of Fame... maybe next time 😊
+                    {lang("FINAL_SCORE_NOT_HALL_OF_FAME_MESSAGE")}
                   </div>
                 )}
               </motion.div>
@@ -781,13 +784,13 @@ export default function FinalScoreScreen({ push }: Props) {
               onClick={handlePlayAgain}
               className="flex-1 px-6 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-amber-500/50"
             >
-              ↻ Play Again
+              ↻ {lang("FINAL_SCORE_PLAY_AGAIN")}
             </button>
             <button
               onClick={handleVisitHallOfFame}
               className="flex-1 px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold rounded-xl transition-all"
             >
-              🏆 Visit Hall of Fame
+              🏆 {lang("FINAL_SCORE_VISIT_HALL_OF_FAME")}
             </button>
           </div>
 
@@ -797,7 +800,7 @@ export default function FinalScoreScreen({ push }: Props) {
               onClick={restart}
               className="text-sm text-white/60 hover:text-white/90 underline"
             >
-              Replay Animation
+              {lang("FINAL_SCORE_REPLAY_ANIMATION")}
             </button>
           </div>
         </div>

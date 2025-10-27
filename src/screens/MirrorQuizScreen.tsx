@@ -16,6 +16,7 @@ import { mirrorBubbleTheme as T } from "../theme/mirrorBubbleTheme";
 import { saveMirrorReturnRoute } from "../lib/eventScreenSnapshot";
 import MirrorBubbleTyping from "../components/MirrorBubbleTyping";
 import { COMPONENTS, PALETTE } from "../data/compass-data";
+import { useTranslatedConst, createTranslatedConst } from "../i18n/useTranslatedConst";
 import { useLogger } from "../hooks/useLogger";
 
 
@@ -39,10 +40,13 @@ const DEFAULT_AVATAR_DATA_URL =
 const MIRROR_SRC = "/assets/images/mirror.png";
 
 /** fixed epilogue */
-const MIRROR_EPILOGUE =
-  "Well, that was unexpectedly insightful. We’ve sketched the first lines of your inner portrait; from here, every choice you make will add color and contour—and I’ll be here to show you what the mirror sees. Rest now. Tomorrow your new role begins.";
+const MIRROR_EPILOGUE = createTranslatedConst((lang) =>
+  lang("MIRROR_EPILOGUE_TEXT")
+);
 
 export default function MirrorQuizScreen({ push }: { push: PushFn }) {
+  const mirrorEpilogue = useTranslatedConst(MIRROR_EPILOGUE);
+
   // compass values + reset
   const values = useCompassStore((s) => s.values);
   const resetCompass = useCompassStore((s) => s.reset);
@@ -231,7 +235,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
             <div className="absolute inset-0 pointer-events-none flex items-center justify-center" style={{ zIndex: 40 }}>
               <AnimatePresence>
                 {pings.map((p, i) => {
-                  const color = (PALETTE as any)[p.prop]?.base ?? "#fff";
+                  const color = (PALETTE)[p.prop]?.base ?? "#fff";
                   const label = COMPONENTS[p.prop][p.idx]?.short ?? "";
                   const topPx = MIRROR_SIZE / 2 - i * 28; // Stack vertically
                   const delay = i * 0.15; // Stagger animation
@@ -394,7 +398,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
     {/* epilogue bubble (appears 2s after verdict finishes) */}
     {(epilogueShown || showEpilogue) && (
       <MirrorBubble
-        text={MIRROR_EPILOGUE}
+        text={mirrorEpilogue}
         typing={!epilogueShown}
         onDone={() => {
           if (!epilogueShown) markEpilogueShown();

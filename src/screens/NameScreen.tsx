@@ -4,6 +4,8 @@ import type { PushFn } from "../lib/router";
 import { bgStyle } from "../lib/ui";
 import { useRoleStore } from "../store/roleStore";
 import { useSettingsStore } from "../store/settingsStore";
+import { useLang } from "../i18n/lang";
+import { useTranslatedConst, createTranslatedConst } from "../i18n/useTranslatedConst";
 import type { Character } from "../store/roleStore";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { motion } from "framer-motion";
@@ -28,19 +30,7 @@ const DEFAULT_AVATAR_DATA_URL =
   );
 
 // Loading overlay content (edit here later if you want)
-const OVERLAY_TITLE = "Generating a character you can edit…";
-const LOADING_QUOTES = [
-  "Deciding whether your name should strike fear… or just mild confusion.",
-  "Polishing your future autobiography’s opening line.",
-  "Rolling dice to determine how photogenic your campaign portraits will be.",
-  "Giving you a name history teachers will definitely mispronounce.",
-  "Assigning you a birthplace that looks great on bumper stickers.",
-  "Checking if your haircut is constitutionally appropriate.",
-  "Balancing your charisma score against your ability to remember names.",
-  "Selecting the font your name will appear in on scandalous headlines.",
-  "Installing the dramatic pause before your full title is announced.",
-  "Making sure your initials don’t spell something embarrassing.",
-];
+// Will be defined inside component to access lang function
 
 type Trio = {
   male: { name: string; prompt: string };
@@ -49,20 +39,38 @@ type Trio = {
 };
 
 // Generic placeholders for custom roles (no API call needed)
-const GENERIC_CHARACTERS: Trio = {
+// Will be defined inside component to access lang function
+
+// Translated constants
+const GENERIC_CHARACTERS = createTranslatedConst((lang) => ({
   male: {
-    name: "James Anderson",
-    prompt: "with a professional demeanor, confident expression, and well-groomed appearance"
+    name: lang("GENERIC_MALE_NAME"),
+    prompt: lang("GENERIC_MALE_PROMPT")
   },
   female: {
-    name: "Sarah Chen",
-    prompt: "with a poised bearing, thoughtful gaze, and dignified presence"
+    name: lang("GENERIC_FEMALE_NAME"),
+    prompt: lang("GENERIC_FEMALE_PROMPT")
   },
   any: {
-    name: "Morgan Taylor",
-    prompt: "with an approachable demeanor, intelligent eyes, and professional appearance"
+    name: lang("GENERIC_ANY_NAME"),
+    prompt: lang("GENERIC_ANY_PROMPT")
   }
-};
+}));
+
+const LOADING_QUOTES = createTranslatedConst((lang) => [
+  lang("LOADING_QUOTE_1"),
+  lang("LOADING_QUOTE_2"),
+  lang("LOADING_QUOTE_3"),
+  lang("LOADING_QUOTE_4"),
+  lang("LOADING_QUOTE_5"),
+  lang("LOADING_QUOTE_6"),
+  lang("LOADING_QUOTE_7"),
+  lang("LOADING_QUOTE_8"),
+  lang("LOADING_QUOTE_9"),
+  lang("LOADING_QUOTE_10"),
+]);
+
+const OVERLAY_TITLE = createTranslatedConst((lang) => lang("GENERATING_CHARACTER"));
 
 function extractPhysical(input: string): string {
   if (!input) return "";
@@ -129,6 +137,13 @@ function buildFullPrompt(
 
 
 export default function NameScreen({ push }: { push: PushFn }) {
+  const lang = useLang();
+
+  // Use translated constants
+  const genericCharacters = useTranslatedConst(GENERIC_CHARACTERS);
+  const loadingQuotes = useTranslatedConst(LOADING_QUOTES);
+  const overlayTitle = useTranslatedConst(OVERLAY_TITLE);
+
   const logger = useLogger();
   const selectedRole = useRoleStore((s) => s.selectedRole);
   const character = useRoleStore((s) => s.character);
@@ -180,7 +195,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
       } else {
         console.log("[NameScreen] Using generic placeholders for custom role:", selectedRole);
         // Use generic placeholders for custom roles (no API call)
-        const data: Trio = GENERIC_CHARACTERS;
+        const data: Trio = genericCharacters;
         setTrio(data);
         const pick = data[gender] || data.any;
         setName(pick?.name || "");
@@ -188,7 +203,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
         setBgObject((prev) => prev || suggestBackgroundObject(selectedRole));
       }
     } catch (e: any) {
-      setErrorMsg(e?.message || "Failed to load character data");
+      setErrorMsg(e?.message || lang("FAILED_TO_LOAD"));
     } finally {
       setLoading(false);
     }
@@ -284,18 +299,18 @@ export default function NameScreen({ push }: { push: PushFn }) {
     <div className="min-h-[100dvh] px-5 py-8" style={bgStyle}>
       <LoadingOverlay
         visible={loading || (phase === "avatar" && avatarLoading)}
-        title={phase === "avatar" ? "Generating your avatar..." : OVERLAY_TITLE}
-        quotes={LOADING_QUOTES}
+        title={phase === "avatar" ? lang("GENERATING_AVATAR") : overlayTitle}
+        quotes={loadingQuotes}
       />
 
       <div className="w-full max-w-2xl mx-auto">
-        <h1 className="sr-only">Forge Your Character</h1>
+        <h1 className="sr-only">{lang("FORGE_YOUR_CHARACTER")}</h1>
 
         {errorMsg && (
           <div className="mt-5 rounded-xl border border-red-400/40 bg-red-500/10 text-red-200 px-3 py-2" role="alert">
             {errorMsg}
             <button onClick={loadSuggestions} className="ml-3 underline decoration-red-300 hover:opacity-80">
-              Try again
+              {lang("TRY_AGAIN")}
             </button>
           </div>
         )}
@@ -316,7 +331,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
                       setGender("male");
                     }}
                   />
-                  <span>Male</span>
+                  <span>{lang("MALE")}</span>
                 </label>
                 <label className="flex items-center gap-2 text-white">
                   <input
@@ -329,7 +344,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
                       setGender("female");
                     }}
                   />
-                  <span>Female</span>
+                  <span>{lang("FEMALE")}</span>
                 </label>
                 <label className="flex items-center gap-2 text-white">
                   <input
@@ -342,25 +357,25 @@ export default function NameScreen({ push }: { push: PushFn }) {
                       setGender("any");
                     }}
                   />
-                  <span>Any</span>
+                  <span>{lang("ANY")}</span>
                 </label>
               </div>
 
               <div className="mt-6">
-                <div className="text-white/90 mb-2">Name:</div>
+                <div className="text-white/90 mb-2">{lang("NAME_LABEL")}</div>
                 <input
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value);
                     logger.log('character_name', e.target.value, 'User entered character name');
                   }}
-                  placeholder="Character name"
+                  placeholder={lang("NAME_PLACEHOLDER")}
                   className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
                 />
               </div>
 
               <div className="mt-6">
-                <div className="text-white/90 mb-2">Description (mention any facial features and accessories you want present):</div>
+                <div className="text-white/90 mb-2">{lang("DESCRIPTION_LABEL")}</div>
                 <textarea
                   rows={6}
                   value={physical}
@@ -368,7 +383,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
                     setPhysical(e.target.value);
                     logger.log('character_description', e.target.value, 'User entered character description');
                   }}
-                  placeholder="with a dignified expression, long black hair tied in a topknot, a finely groomed beard…"
+                  placeholder={lang("DESCRIPTION_PLACEHOLDER")}
                   className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
                 />
               </div>
@@ -383,7 +398,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
                       : "bg-white/10 text-white/60 cursor-not-allowed"
                   }`}
                 >
-                  Create Character
+                  {lang("CREATE_CHARACTER")}
                 </button>
               </div>
             </>
@@ -437,7 +452,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
                       : "bg-white/10 text-white/60 cursor-not-allowed"
                   }`}
                 >
-                  Continue to power analysis
+                  {lang("CONTINUE_TO_POWER")}
                 </button>
               </motion.div>
             </motion.div>

@@ -32,12 +32,14 @@ import {
 } from "../lib/eventScreenSnapshot";
 import { useAftermathSequence } from "../hooks/useAftermathSequence";
 import AftermathContent from "../components/aftermath/AftermathContent";
+import { useLang } from "../i18n/lang";
 
 type Props = {
   push: PushFn;
 };
 
 export default function AftermathScreen({ push }: Props) {
+  const lang = useLang();
   const { loading, error, data, fetchAftermathData, restoreData } = useAftermathData();
   const { character } = useRoleStore();
   const { progress, start: startProgress, notifyReady } = useLoadingProgress();
@@ -94,7 +96,7 @@ export default function AftermathScreen({ push }: Props) {
     return (
       <CollectorLoadingOverlay
         progress={progress}
-        message="Aftermath pending..."
+        message={lang("AFTERMATH_PENDING")}
       />
     );
   }
@@ -106,7 +108,7 @@ export default function AftermathScreen({ push }: Props) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6" style={bgStyle}>
         <div className="max-w-md w-full bg-red-900/20 border border-red-500/50 rounded-lg p-6">
-          <h2 className="text-xl font-bold text-red-400 mb-3">Failed to Load Aftermath</h2>
+          <h2 className="text-xl font-bold text-red-400 mb-3">{lang("FAILED_TO_LOAD_AFTERMATH")}</h2>
           <p className="text-white/80 mb-4">{error}</p>
           <button
             onClick={() => {
@@ -115,7 +117,7 @@ export default function AftermathScreen({ push }: Props) {
             }}
             className="w-full px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg transition-colors"
           >
-            Retry
+            {lang("RETRY")}
           </button>
         </div>
       </div>

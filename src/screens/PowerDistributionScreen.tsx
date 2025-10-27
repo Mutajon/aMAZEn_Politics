@@ -16,16 +16,23 @@ import PowerDistributionContent from "../components/PowerDistributionContent";
 import { usePowerDistributionState, makeId, clampPct } from "../hooks/usePowerDistributionState";
 import { usePowerDistributionAnalysis } from "../hooks/usePowerDistributionAnalysis";
 import { useSettingsStore } from "../store/settingsStore";
-
-// Loading quotes for the overlay
-const LOADING_QUOTES = [
-  "Power is like water; it flows to the lowest resistance.",
-  "Influence is a currency; spend it wisely.",
-  "Balance is not equality; it's stability.",
-  "Power leaves quietly, but chaos throws a party.",
-];
+import { useLang } from "../i18n/lang";
+import { useTranslatedConst, createTranslatedConst } from "../i18n/useTranslatedConst";
 
 export default function PowerDistributionScreen({ push }: { push: PushFn }) {
+  const lang = useLang();
+  
+  // Loading quotes for the overlay
+  const LOADING_QUOTES = createTranslatedConst((lang) => [
+    lang("POWER_QUOTE_1"),
+    lang("POWER_QUOTE_2"),
+    lang("POWER_QUOTE_3"),
+    lang("POWER_QUOTE_4"),
+  ]);
+  
+  // Use translated constants
+  const loadingQuotes = useTranslatedConst(LOADING_QUOTES);
+  
   // Extract all state management
   const state = usePowerDistributionState();
   const {
@@ -51,7 +58,7 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
   } = state;
 
   // Memoize the quotes to avoid recreating on every render
-  const quotes = useMemo(() => LOADING_QUOTES, []);
+  const quotes = useMemo(() => loadingQuotes, [loadingQuotes]);
 
   // Extract analysis logic
   usePowerDistributionAnalysis({
@@ -86,7 +93,7 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
 
   return (
     <div className="min-h-dvh w-full" style={bgStyle}>
-      <LoadingOverlay visible={fetchState === "loading"} title="Analyzing your world…" quotes={quotes} />
+      <LoadingOverlay visible={fetchState === "loading"} title={lang("ANALYZING_YOUR_WORLD")} quotes={quotes} />
 
       <PowerDistributionContent
         // State

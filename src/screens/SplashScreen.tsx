@@ -1,7 +1,6 @@
 // src/screens/SplashScreen.tsx
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronDown } from "lucide-react";
 import { bgStyle } from "../lib/ui";
 import { useSettingsStore } from "../store/settingsStore";
 import { useNarrator } from "../hooks/useNarrator";
@@ -11,8 +10,10 @@ import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useMirrorQuizStore } from "../store/mirrorQuizStore";
 import { clearAllSnapshots } from "../lib/eventScreenSnapshot";
-import { useLogger } from "../hooks/useLogger";
 import { loggingService } from "../lib/loggingService";
+import { useLang } from "../i18n/lang";
+import { useLanguage } from "../i18n/LanguageContext";
+import LanguageSelector from "../components/LanguageSelector";
 
 const SUBTITLES = [
   "Choose your path. Discover yourself."
@@ -27,17 +28,27 @@ export default function SplashScreen({
   onHighscores?: () => void; // optional, so we don't break existing callers
   onAchievements?: () => void; // optional, navigates to achievements screen
 }) {
+  const lang = useLang();
+  const { language } = useLanguage();
 
   const [visibleSubtitles, setVisibleSubtitles] = useState(0);
   const [showButton, setShowButton] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
+  // Helper function to get correct transform for toggle
+  const getToggleTransform = (isEnabled: boolean) => {
+    if (language === 'he') {
+      // RTL: enabled = -translate-x-5 (left), disabled = translate-x-0 (right)
+      return isEnabled ? "-translate-x-5" : "translate-x-0";
+    } else {
+      // LTR: enabled = translate-x-5 (right), disabled = translate-x-0 (left)
+      return isEnabled ? "translate-x-5" : "translate-x-0";
+    }
+  };
+
   // Instantiate the OpenAI-backed narrator.
   // We call narrator.prime() on the Start button to unlock audio policies.
   const narrator = useNarrator();
-
-  // Logging hook for data collection
-  const logger = useLogger();
 
   // Audio manager for background music
   const { playMusic } = useAudioManager();
@@ -50,7 +61,7 @@ export default function SplashScreen({
   // Narration (voiceover)
   const narrationEnabled = useSettingsStore((s) => s.narrationEnabled);
   const setNarrationEnabled = useSettingsStore((s) => s.setNarrationEnabled);
-  
+
   //budget
   const showBudget = useSettingsStore((s) => s.showBudget);
   const setShowBudget = useSettingsStore((s) => s.setShowBudget);
@@ -94,7 +105,6 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
       style={bgStyle}
     >
       {/* Settings cog (top-right) */}
-    {/* Settings cog (top-right) */}
 <div className="absolute top-4 right-4 z-[40] pointer-events-auto">
   <button
     onClick={() => setShowSettings((v) => !v)}
@@ -120,14 +130,19 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     aria-label="Settings"
     onClick={(e) => e.stopPropagation()}
   >
-    <div className="font-semibold mb-3">Settings</div>
+    <div className="font-semibold mb-3">{lang("SETTINGS")}</div>
+
+    {/* Language Selection */}
+    <LanguageSelector variant="full" />
+
+    <div className="my-4 border-t border-white/10" />
 
     {/* --- Budget system toggle (same pattern as others) --- */}
     <div className="flex items-center justify-between gap-3 py-2">
       <div>
-        <div className="text-sm font-medium">Budget system</div>
+        <div className="text-sm font-medium">{lang("BUDGET_SYSTEM")}</div>
         <div className="text-xs text-white/60">
-          Show budget UI and apply costs to decisions.
+          {lang("BUDGET_SYSTEM_DESC")}
         </div>
       </div>
       <button
@@ -145,7 +160,7 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
         <span
           className={[
             "block w-5 h-5 rounded-full bg-white transition-transform",
-            showBudget ? "translate-x-5" : "translate-x-0",
+            getToggleTransform(showBudget),
           ].join(" ")}
         />
       </button>
@@ -154,9 +169,9 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     {/* Image generation ----------------------------------------------------- */}
     <div className="flex items-center justify-between gap-3">
       <div>
-        <div className="text-sm font-medium">Image generation</div>
+        <div className="text-sm font-medium">{lang("IMAGE_GENERATION")}</div>
         <div className="text-xs text-white/60">
-          Generate AI images in-game (default off)
+          {lang("IMAGE_GENERATION_DESC")}
         </div>
       </div>
       <button
@@ -174,7 +189,7 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
         <span
           className={[
             "block w-5 h-5 rounded-full bg-white transition-transform",
-            generateImages ? "translate-x-5" : "translate-x-0",
+            getToggleTransform(generateImages),
           ].join(" ")}
         />
       </button>
@@ -185,9 +200,9 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     {/* Narration (voiceover) ----------------------------------------------- */}
     <div className="flex items-center justify-between gap-3">
       <div>
-        <div className="text-sm font-medium">Narration (voiceover)</div>
+        <div className="text-sm font-medium">{lang("NARRATION_VOICEOVER")}</div>
         <div className="text-xs text-white/60">
-          Read story text aloud (default on)
+          {lang("NARRATION_VOICEOVER_DESC")}
         </div>
       </div>
       <button
@@ -205,7 +220,7 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
         <span
           className={[
             "block w-5 h-5 rounded-full bg-white transition-transform",
-            narrationEnabled ? "translate-x-5" : "translate-x-0",
+            getToggleTransform(narrationEnabled),
           ].join(" ")}
         />
       </button>
@@ -216,9 +231,9 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
 {/* Debug mode ------------------------------------------------------------- */}
 <div className="flex items-center justify-between gap-3">
   <div>
-    <div className="text-sm font-medium">Debug mode</div>
+    <div className="text-sm font-medium">{lang("DEBUG_MODE")}</div>
     <div className="text-xs text-white/60">
-      Show extra UI & logs (default off).
+      {lang("DEBUG_MODE_DESC")}
     </div>
   </div>
   <button
@@ -230,12 +245,12 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
       debugMode ? "bg-emerald-500/70" : "bg-white/20",
     ].join(" ")}
   >
-    <span
-      className={[
-        "block w-5 h-5 rounded-full bg-white transition-transform",
-        debugMode ? "translate-x-5" : "translate-x-0",
-      ].join(" ")}
-    />
+      <span
+        className={[
+          "block w-5 h-5 rounded-full bg-white transition-transform",
+          getToggleTransform(debugMode),
+        ].join(" ")}
+      />
   </button>
 </div>
 
@@ -243,9 +258,9 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
 <div className="mt-3">
   <div className="flex items-center justify-between gap-3">
     <div>
-      <div className="text-sm font-medium">Dilemmas subject</div>
+      <div className="text-sm font-medium">{lang("DILEMMAS_SUBJECT")}</div>
       <div className="text-xs text-white/60">
-        Gate events to a theme (default off).
+        {lang("DILEMMAS_SUBJECT_DESC")}
       </div>
     </div>
     <button
@@ -260,9 +275,9 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
       <span
         className={[
           "block w-5 h-5 rounded-full bg-white transition-transform",
-          dilemmasSubjectEnabled ? "translate-x-5" : "translate-x-0",
+          getToggleTransform(dilemmasSubjectEnabled),
         ].join(" ")}
-    />
+      />
     </button>
   </div>
 
@@ -271,7 +286,7 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     type="text"
     value={dilemmasSubject}
     onChange={(e) => setDilemmasSubject(e.currentTarget.value)}
-    placeholder="Subject (e.g., Personal freedom)"
+    placeholder={lang("SUBJECT_PLACEHOLDER")}
     className={[
       "mt-2 w-full rounded-lg px-3 py-2 bg-white/10 text-white/90 placeholder-white/40 outline-none border",
       dilemmasSubjectEnabled
@@ -287,9 +302,9 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
 {/* Enable modifiers ------------------------------------------------------------- */}
 <div className="flex items-center justify-between gap-3">
   <div>
-    <div className="text-sm font-medium">Enable modifiers</div>
+    <div className="text-sm font-medium">{lang("ENABLE_MODIFIERS")}</div>
     <div className="text-xs text-white/60">
-      Apply dynamic gameplay modifiers (default off).
+      {lang("ENABLE_MODIFIERS_DESC")}
     </div>
   </div>
   <button
@@ -304,7 +319,7 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     <span
       className={[
         "block w-5 h-5 rounded-full bg-white transition-transform",
-        enableModifiers ? "translate-x-5" : "translate-x-0",
+        getToggleTransform(enableModifiers),
       ].join(" ")}
     />
   </button>
@@ -353,7 +368,7 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
               }}
             >
               <p className="text-base sm:text-lg font-medium">
-                {SUBTITLES[0]}
+                {lang("GAME_SUBTITLE")}
               </p>
             </motion.div>
           </motion.div>
@@ -380,9 +395,6 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     transition={{ type: "spring", stiffness: 250, damping: 22 }}
     style={{ visibility: showButton ? "visible" : "hidden" }}
     onClick={async () => {
-      // Log button click (screen auto-captured by useLogger)
-      logger.log('button_click_start_game', {}, 'User clicked Start Game button');
-
       // Start new logging session
       await loggingService.startSession();
 
@@ -402,7 +414,7 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     }}
     className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
   >
-    Start!
+    {lang("START_BUTTON")}
   </motion.button>
 
   {/* Secondary: High Scores (subtle/glass) */}
@@ -412,9 +424,6 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
     style={{ visibility: showButton ? "visible" : "hidden" }}
     onClick={() => {
-      // Log button click (screen auto-captured by useLogger)
-      logger.log('button_click_hall_of_fame', {}, 'User clicked Hall of Fame button');
-
       // Start music on any user interaction
       playMusic('background', true);
 
@@ -425,7 +434,7 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
                bg-white/10 hover:bg-white/15 text-white/90 border border-white/15
                shadow-sm active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-white/20"
   >
-    Hall of Fame
+    {lang("HALL_OF_FAME")}
   </motion.button>
 
   {/* Tertiary: Book of Achievements (subtle/glass) */}
@@ -435,9 +444,6 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     transition={{ delay: 0.1, type: "spring", stiffness: 250, damping: 22 }}
     style={{ visibility: showButton ? "visible" : "hidden" }}
     onClick={() => {
-      // Log button click (screen auto-captured by useLogger)
-      logger.log('button_click_achievements', {}, 'User clicked Book of Achievements button');
-
       // Start music on any user interaction
       playMusic('background', true);
 
@@ -448,7 +454,7 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
                bg-white/10 hover:bg-white/15 text-white/90 border border-white/15
                shadow-sm active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-white/20"
   >
-    Book of Achievements
+    {lang("BOOK_OF_ACHIEVEMENTS")}
   </motion.button>
 </div>
 

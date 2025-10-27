@@ -8,6 +8,7 @@ import { useSettingsStore } from "../store/settingsStore";
 import MirrorBubble from "../components/MirrorBubble";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLogger } from "../hooks/useLogger";
+import { useLang } from "../i18n/lang";
 
 /** Built-in placeholder (no file asset needed) */
 const DEFAULT_AVATAR_DATA_URL =
@@ -60,6 +61,7 @@ function PlayerBubble({ text, onDone }: { text: string; onDone?: () => void }) {
 }
 
 export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
+  const lang = useLang();
   const generateImages = useSettingsStore((s) => s.generateImages);
   const character = useRoleStore((s) => s.character);
   const resetCompass = useCompassStore((s) => s.reset);
@@ -68,13 +70,13 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
   const logger = useLogger();
 
   // script
-  const playerName = character?.name || "Player";
+  const playerName = character?.name || lang("PLAYER_DEFAULT_NAME");
   const script: Array<{ side: "mirror" | "player"; text: string; italic?: boolean }> = [
-    { side: "mirror", text: "Finally... I found you!", italic: true },
-    { side: "player", text: "Who are you?" },
-    { side: "mirror", text: `Wrong question, my friend. What you should be asking is who are YOU, ${playerName}?`, italic: true },
-    { side: "mirror", text: "Look at yourself, a hollow avatar with no desires or values.", italic: true },
-    { side: "mirror", text: "Come, humor me for a moment, and let us uncover your soul — together.", italic: true },
+    { side: "mirror", text: lang("MIRROR_DIALOGUE_1"), italic: true },
+    { side: "player", text: lang("MIRROR_DIALOGUE_2") },
+    { side: "mirror", text: lang("MIRROR_DIALOGUE_3").replace("{playerName}", playerName), italic: true },
+    { side: "mirror", text: lang("MIRROR_DIALOGUE_4"), italic: true },
+    { side: "mirror", text: lang("MIRROR_DIALOGUE_5"), italic: true },
   ];
 
   const [chatIndex, setChatIndex] = useState(0);
@@ -128,7 +130,7 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
             {displayAvatar ? (
               <img src={displayAvatar} alt="Character avatar" className="w-full h-full object-cover" />
             ) : (
-              <div className="text-white/80">Preparing avatar…</div>
+              <div className="text-white/80">{lang("PREPARING_AVATAR")}</div>
             )}
           </motion.div>
         </div>
@@ -167,7 +169,7 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
                       }}
                       className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/15 text-white hover:bg-white/25 border border-white/30"
                     >
-                      Sure, let's go
+                      {lang("MIRROR_DIALOGUE_BUTTON")}
                     </motion.button>
                   </div>
                 )}

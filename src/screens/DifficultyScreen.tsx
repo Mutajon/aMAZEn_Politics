@@ -9,7 +9,7 @@ import { bgStyle } from "../lib/ui";
 import type { PushFn } from "../lib/router";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useSettingsStore } from "../store/settingsStore";
-import { useLogger } from "../hooks/useLogger";
+import { lang } from "../i18n/lang";
 
 type DifficultyLevel = {
   id: "baby-boss" | "freshman" | "tactician" | "old-fox";
@@ -23,52 +23,45 @@ type DifficultyLevel = {
 const difficulties: DifficultyLevel[] = [
   {
     id: "baby-boss",
-    title: "Baby Boss (Easy)",
+    title: lang("BABY_BOSS_TITLE"),
     image: "/assets/images/diffLevels/babyboss.jpg",
-    supportMod: "Support +10%",
-    budgetMod: "Budget +250",
-    scoreMod: "Score -200",
+    supportMod: lang("SUPPORT_MOD_POS"),
+    budgetMod: lang("BUDGET_MOD_POS"),
+    scoreMod: lang("SCORE_MOD_NEG"),
   },
   {
     id: "freshman",
-    title: "Freshman (Normal)",
+    title: lang("FRESHMAN_TITLE"),
     image: "/assets/images/diffLevels/freshman.jpg",
-    supportMod: "Support +0%",
-    budgetMod: "Budget +0",
-    scoreMod: "Score +0",
+    supportMod: lang("SUPPORT_MOD_NORMAL"),
+    budgetMod: lang("BUDGET_MOD_NORMAL"),
+    scoreMod: lang("SCORE_MOD_NORMAL"),
   },
   {
     id: "tactician",
-    title: "Tactician (Hard)",
+    title: lang("TACTICIAN_TITLE"),
     image: "/assets/images/diffLevels/tactician.jpg",
-    supportMod: "Support -10%",
-    budgetMod: "Budget -250",
-    scoreMod: "Score +200",
+    supportMod: lang("SUPPORT_MOD_NEG"),
+    budgetMod: lang("BUDGET_MOD_NEG"),
+    scoreMod: lang("SCORE_MOD_POS"),
   },
   {
     id: "old-fox",
-    title: "Old Fox (Very Hard)",
+    title: lang("OLD_FOX_TITLE"),
     image: "/assets/images/diffLevels/oldfox.jpg",
-    supportMod: "Support -20%",
-    budgetMod: "Budget -500",
-    scoreMod: "Score +500",
+    supportMod: lang("SUPPORT_MOD_NEG_HIGH"),
+    budgetMod: lang("BUDGET_MOD_NEG_HIGH"),
+    scoreMod: lang("SCORE_MOD_POS_HIGH"),
   },
 ];
 
 export default function DifficultyScreen({ push }: { push: PushFn }) {
-  const logger = useLogger();
   const [selected, setSelected] = useState<DifficultyLevel["id"] | null>(null);
   const setDifficulty = useDilemmaStore((s) => s.setDifficulty);
   const showBudget = useSettingsStore((s) => s.showBudget);
 
   const handleConfirm = () => {
     if (!selected) return;
-
-    const selectedDiff = difficulties.find(d => d.id === selected);
-    logger.log('button_click_difficulty_confirm', {
-      difficulty: selected,
-      difficultyTitle: selectedDiff?.title
-    }, `User confirmed difficulty: ${selectedDiff?.title}`);
 
     setDifficulty(selected);
     push("/goals");
@@ -83,7 +76,7 @@ export default function DifficultyScreen({ push }: { push: PushFn }) {
           animate={{ opacity: 1, y: 0 }}
           className="text-3xl sm:text-4xl font-extrabold text-center mb-2 bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent"
         >
-          Choose Your Difficulty
+          {lang("CHOOSE_DIFFICULTY")}
         </motion.h1>
 
         <motion.p
@@ -92,7 +85,7 @@ export default function DifficultyScreen({ push }: { push: PushFn }) {
           transition={{ delay: 0.1 }}
           className="text-center text-white/70 mb-8"
         >
-          Select the challenge level that suits your ambition
+          {lang("DIFFICULTY_DESC")}
         </motion.p>
 
         {/* Difficulty buttons */}
@@ -104,13 +97,6 @@ export default function DifficultyScreen({ push }: { push: PushFn }) {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 + index * 0.1 }}
               onClick={() => {
-                logger.log('difficulty_selection', {
-                  difficulty: diff.id,
-                  difficultyTitle: diff.title,
-                  supportMod: diff.supportMod,
-                  budgetMod: diff.budgetMod,
-                  scoreMod: diff.scoreMod
-                }, `User selected difficulty: ${diff.title}`);
                 setSelected(diff.id);
               }}
               className={[
@@ -170,7 +156,7 @@ export default function DifficultyScreen({ push }: { push: PushFn }) {
               : "cursor-not-allowed opacity-30",
           ].join(" ")}
         >
-          Confirm
+          {lang("CONFIRM")}
         </motion.button>
       </div>
     </div>

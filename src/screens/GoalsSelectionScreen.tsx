@@ -28,11 +28,10 @@ import {
   getGoalBorderClass,
   formatPoints,
   formatDifficulty,
-  getStartingBudget,
-  getStartingSupport,
   substituteGoalText,
 } from "../lib/goalHelpers";
 import type { PushFn } from "../lib/router";
+import { useLang } from "../i18n/lang";
 import { useLogger } from "../hooks/useLogger";
 
 type Props = {
@@ -64,6 +63,7 @@ function GoalCard({
   onToggle: () => void;
   middleEntity: string;
 }) {
+  const lang = useLang();
   const Icon = getIconComponent(goal.icon);
   const colorClass = getGoalColorClass(goal.color);
   const bgClass = getGoalBgClass(goal.color);
@@ -110,9 +110,9 @@ function GoalCard({
 
       {/* Bonus Points */}
       <div className="flex items-center justify-between pt-4 border-t border-white/10">
-        <span className="text-white/60 text-sm">Bonus if completed:</span>
+        <span className="text-white/60 text-sm">{lang("BONUS_IF_COMPLETED")}:</span>
         <span className={`text-lg font-bold ${colorClass}`}>
-          {formatPoints(goal.scoreBonusOnCompletion)} points
+          {formatPoints(goal.scoreBonusOnCompletion)} {lang("POINTS")}
         </span>
       </div>
     </motion.div>
@@ -120,6 +120,8 @@ function GoalCard({
 }
 
 export default function GoalsSelectionScreen({ push }: Props) {
+  const lang = useLang();
+
   // State
   const [availableGoals, setAvailableGoals] = useState<Goal[]>([]);
   const [selectedGoals, setSelectedGoals] = useState<Set<string>>(new Set());
@@ -223,10 +225,6 @@ export default function GoalsSelectionScreen({ push }: Props) {
     }
   };
 
-  // Calculate starting values based on difficulty
-  const startingBudget = getStartingBudget(difficulty);
-  const startingSupport = getStartingSupport(difficulty);
-
   // Determine if confirm button should be enabled
   const canConfirm = selectedGoals.size === 2;
 
@@ -240,10 +238,10 @@ export default function GoalsSelectionScreen({ push }: Props) {
           transition={{ duration: 0.5 }}
         >
           <h1 className="text-4xl font-extrabold text-center bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent mb-2">
-            Choose Your Goals
+            {lang("CHOOSE_YOUR_GOALS")}
           </h1>
           <p className="text-center text-white/70 text-lg">
-            Select exactly <span className="font-bold text-white">2 out of 3</span> goals to pursue during your rule
+            {lang("GOALS_SELECTION_DESC")}
           </p>
         </motion.div>
 
@@ -256,19 +254,19 @@ export default function GoalsSelectionScreen({ push }: Props) {
         >
           <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <LucideIcons.Info className="h-5 w-5" />
-            Your Starting State
+            {lang("YOUR_STARTING_STATE")}
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <div className="text-white/60 text-sm">Difficulty</div>
+              <div className="text-white/60 text-sm">{lang("DIFFICULTY_LABEL")}</div>
               <div className="text-white font-bold">{formatDifficulty(difficulty)}</div>
             </div>
             <div>
-              <div className="text-white/60 text-sm">Budget</div>
+              <div className="text-white/60 text-sm">{lang("BUDGET_LABEL")}</div>
               <div className="text-white font-bold">{budget}</div>
             </div>
             <div className="col-span-2">
-              <div className="text-white/60 text-sm">Initial Support Levels</div>
+              <div className="text-white/60 text-sm">{lang("INITIAL_SUPPORT_LEVELS")}</div>
               <div className="text-white font-bold">
                 Public: {supportPeople}% | {middleEntity}: {supportMiddle}% | Mom: {supportMom}%
               </div>
@@ -309,7 +307,7 @@ export default function GoalsSelectionScreen({ push }: Props) {
           className="text-center"
         >
           <div className="text-white/60">
-            Selected: <span className={`font-bold ${selectedGoals.size === 2 ? 'text-green-400' : 'text-white'}`}>
+            {lang("SELECTED")}: <span className={`font-bold ${selectedGoals.size === 2 ? 'text-green-400' : 'text-white'}`}>
               {selectedGoals.size} / 2
             </span>
           </div>
@@ -332,7 +330,7 @@ export default function GoalsSelectionScreen({ push }: Props) {
               }
             `}
           >
-            {canConfirm ? 'Confirm Selection & Begin' : 'Select 2 Goals to Continue'}
+            {canConfirm ? lang('CONFIRM_SELECTION_BEGIN') : lang('SELECT_2_GOALS_TO_CONTINUE')}
           </button>
         </motion.div>
       </div>

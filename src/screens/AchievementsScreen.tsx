@@ -16,6 +16,8 @@ import { motion } from "framer-motion";
 import * as LucideIcons from "lucide-react";
 import { bgStyle } from "../lib/ui";
 import { getAllAchievements, type Achievement } from "../data/achievements";
+import { useLang } from "../i18n/lang";
+import { useTranslatedConst } from "../i18n/useTranslatedConst";
 
 // Animation variants for staggered card appearance
 const containerVariants = {
@@ -106,7 +108,8 @@ function AchievementCard({ achievement }: { achievement: Achievement }) {
 }
 
 export default function AchievementsScreen() {
-  const achievements = getAllAchievements();
+  const lang = useLang();
+  const achievements = useTranslatedConst(getAllAchievements);
 
   return (
     <div className="min-h-screen px-5 py-8" style={bgStyle}>
@@ -120,7 +123,7 @@ export default function AchievementsScreen() {
               transition={{ duration: 0.5 }}
               className="text-4xl font-extrabold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent"
             >
-              Book of Achievements
+              {lang("ACHIEVEMENTS_TITLE")}
             </motion.h1>
             <motion.p
               initial={{ opacity: 0 }}
@@ -128,7 +131,7 @@ export default function AchievementsScreen() {
               transition={{ duration: 0.5, delay: 0.1 }}
               className="text-white/60 text-sm mt-1"
             >
-              (under construction, not functional yet)
+              {lang("ACHIEVEMENTS_UNDER_CONSTRUCTION")}
             </motion.p>
           </div>
           <motion.button
@@ -138,7 +141,7 @@ export default function AchievementsScreen() {
             onClick={() => window.history.back()}
             className="rounded-xl px-4 py-2 bg-white/10 hover:bg-white/15 text-white border border-white/10 transition-colors"
           >
-            ← Back
+            {lang("ACHIEVEMENTS_BACK")}
           </motion.button>
         </div>
 
@@ -153,8 +156,7 @@ export default function AchievementsScreen() {
             <LucideIcons.Info className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-white/80 text-sm leading-relaxed">
-                Achievements are currently under development. In future updates, you'll be able to unlock these
-                by completing specific challenges during gameplay. Check back soon!
+                {lang("ACHIEVEMENTS_INFO")}
               </p>
             </div>
           </div>

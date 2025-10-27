@@ -5,6 +5,7 @@ import { useHighscoreStore } from "../store/highscoreStore";
 import LeaderPopup from "../components/LeaderPopup";
 import type { HighscoreEntry } from "../data/highscores-default";
 import { motion, type Variants } from "framer-motion";
+import { useLang } from "../i18n/lang";
 
 // Parent controls stagger; children are the individual rows.
 // Parent controls stagger; children are the individual rows.
@@ -58,6 +59,7 @@ function rankColor(i: number): string | undefined {
 }
 
 export default function HighscoreScreen() {
+  const lang = useLang();
   const entries = useHighscoreStore((s) => s.entries);
   const [selected, setSelected] = useState<HighscoreEntry | null>(null);
   const highlightedRef = useRef<HTMLButtonElement | null>(null);
@@ -98,17 +100,17 @@ export default function HighscoreScreen() {
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-extrabold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
-              Hall of Famers
+              {lang("HIGHSCORE_TITLE")}
             </h1>
             <p className="text-white/60 text-sm mt-1">
-              click leaders to explore
+              {lang("HIGHSCORE_CLICK_LEADERS")}
             </p>
           </div>
           <button
             onClick={() => window.history.back()}
             className="rounded-xl px-3 py-2 bg-white/10 hover:bg-white/15 text-white"
           >
-            ← Back
+            {lang("HIGHSCORE_BACK")}
           </button>
         </div>
 
@@ -118,12 +120,12 @@ export default function HighscoreScreen() {
             className="grid gap-3 pl-1 pr-4 py-3 text-[12px] uppercase tracking-wide text-white/70 sticky top-0 bg-white/10 backdrop-blur z-10"
             style={{ gridTemplateColumns: "44px 1.2fr 1.1fr 1fr 1fr 0.7fr" }}
           >
-            <div className="text-right">#</div>
-            <div>Leader</div>
-            <div>System</div>
-            <div>Liberalism</div>
-            <div>Autonomy</div>
-            <div className="text-right">Score</div>
+            <div className="text-right">{lang("HIGHSCORE_RANK")}</div>
+            <div>{lang("HIGHSCORE_LEADER")}</div>
+            <div>{lang("HIGHSCORE_SYSTEM")}</div>
+            <div>{lang("HIGHSCORE_LIBERALISM")}</div>
+            <div>{lang("HIGHSCORE_AUTONOMY")}</div>
+            <div className="text-right">{lang("HIGHSCORE_SCORE")}</div>
           </div>
 
           {/* Scrollable body */}

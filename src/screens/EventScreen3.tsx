@@ -32,13 +32,16 @@ import { AnimatePresence } from "framer-motion";
 import { bgStyle } from "../lib/ui";
 import { Building2, Heart, Users } from "lucide-react";
 import type { CompassEffectPing } from "../components/MiniCompass";
-import { saveEventScreenSnapshot, loadEventScreenSnapshot, clearEventScreenSnapshot } from "../lib/eventScreenSnapshot";
+import { loadEventScreenSnapshot, clearEventScreenSnapshot } from "../lib/eventScreenSnapshot";
+import { useLang } from "../i18n/lang";
 
 type Props = {
   push: (path: string) => void;
 };
 
 export default function EventScreen3({ push }: Props) {
+  const lang = useLang();
+  
   // Global state (read only - single source of truth)
   const { day, totalDays, budget } = useDilemmaStore();
   const { character } = useRoleStore();
@@ -372,7 +375,7 @@ export default function EventScreen3({ push }: Props) {
     return (
       <CollectorLoadingOverlay
         progress={progress} // Real-time progress with auto-increment and catchup animation
-        message="Gathering political intelligence..."
+        message={lang("GATHERING_INTELLIGENCE")}
       />
     );
   }
@@ -435,9 +438,9 @@ export default function EventScreen3({ push }: Props) {
           <button
             onClick={jumpToFinalDay}
             className="fixed top-4 right-4 px-3 py-2 text-xs bg-red-900/80 border border-red-500/50 text-red-200 rounded hover:bg-red-800/80 transition-colors z-50"
-            title="Debug: Skip to final day with random choice"
+            title={lang("DEBUG_SKIP_TO_FINAL")}
           >
-            🚀 Jump to Final Day
+            {lang("JUMP_TO_FINAL_DAY")}
           </button>
         )}
 
@@ -469,7 +472,7 @@ export default function EventScreen3({ push }: Props) {
                 // Game conclusion - show aftermath card
                 <div className="bg-gray-900/70 backdrop-blur-sm border border-amber-500/30 rounded-lg p-6 shadow-xl">
                   <h2 className="text-2xl font-bold text-amber-400 mb-4">
-                    The Last Day
+                    {lang("THE_LAST_DAY")}
                   </h2>
                   <p className="text-lg text-gray-200 leading-relaxed mb-6 whitespace-pre-wrap">
                     {collectedData.dilemma.description}
@@ -551,7 +554,7 @@ export default function EventScreen3({ push }: Props) {
 
   return (
     <div className="min-h-screen flex items-center justify-center" style={bgStyle}>
-      <p className="text-white">Unknown phase: {phase}</p>
+      <p className="text-white">{lang("UNKNOWN_PHASE")}: {phase}</p>
     </div>
   );
 }

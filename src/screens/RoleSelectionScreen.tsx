@@ -9,6 +9,7 @@ import { useRoleStore } from "../store/roleStore";
 import { POLITICAL_SYSTEMS } from "../data/politicalSystems";
 import { getPredefinedPowerDistribution } from "../data/predefinedPowerDistributions";
 import { useLogger } from "../hooks/useLogger";
+import { useLang } from "../i18n/lang";
 
 // Map display names in the roles list to our canonical political systems.
 const SYSTEM_ALIAS: Record<string, string> = {
@@ -31,6 +32,7 @@ type RoleItem = {
 };
 
 export default function RoleSelectionScreen({ push }: { push: PushFn }) {
+  const lang = useLang();
   const logger = useLogger();
   const setRole = useRoleStore((s) => s.setRole);
   const setAnalysis = useRoleStore(s => s.setAnalysis);
@@ -74,33 +76,33 @@ useEffect(() => {
   const roles: RoleItem[] = [
     {
       icon: "🏛️",
-      label: "Citizen of the Assembly in Classical Athens",
-      subtitle: "5th century BCE",
-      system: "Democracy",
-      flavor: "Feel equal among your peers as you shape the destiny of the city."
+      label: lang("CITIZEN_ASSEMBLY_ATHENS"),
+      subtitle: lang("ATHENS_SUBTITLE"),
+      system: "Democracy", // Updated to E-12 polity name
+      flavor: lang("ATHENS_FLAVOR")
     },
     {
       icon: "🏺",
-      label: "Senator of the Roman Republic",
-      subtitle: "3rd century BCE",
-      system: "Republican Oligarchy",
-      flavor: "Balance ambition and duty in the crowded halls of the Republic."
+      label: lang("SENATOR_ROMAN_REPUBLIC"),
+      subtitle: lang("ROME_SUBTITLE"),
+      system: "Republican Oligarchy", // Updated to E-12 polity name
+      flavor: lang("ROME_FLAVOR")
     },
     {
       icon: "🐉",
-      label: "Emperor of Tang China",
-      subtitle: "8th century AD",
-      system: "Theocratic Monarchy",
-      flavor: "Wield the absolute power of the Dragon Throne."
+      label: lang("EMPEROR_TANG_CHINA"),
+      subtitle: lang("CHINA_SUBTITLE"),
+      system: "Theocratic Monarchy", // Updated to E-12 polity name
+      flavor: lang("CHINA_FLAVOR")
     },
     {
       icon: "🇩🇪",
-      label: "Chancellor of Modern Germany",
-      subtitle: "21st century",
-      system: "Republican Oligarchy",
-      flavor: "Navigate compromise and power in a modern democracy."
+      label: lang("CHANCELLOR_MODERN_GERMANY"),
+      subtitle: lang("GERMANY_SUBTITLE"),
+      system: "Republican Oligarchy", // Updated to E-12 polity name
+      flavor: lang("GERMANY_FLAVOR")
     },
-    { icon: "❓", label: "Suggest your own", suggest: true },
+    { icon: "❓", label: lang("SUGGEST_YOUR_OWN"), suggest: true },
   ];
 
   const [showSuggestModal, setShowSuggestModal] = useState(false);
@@ -126,9 +128,9 @@ useEffect(() => {
   };
 
   const amusingFallbacks = [
-    "That sounds like a vibe, not a role *with* a setting. Try “navigator in a Bronze Age fleet”.",
-    "Close! Give a role **and** a setting. e.g., “city treasurer in Renaissance Florence”.",
-    "Almost. Add a where/when: “cybernetics minister on Luna, 2199”.",
+    lang("AI_FALLBACK_1"),
+    lang("AI_FALLBACK_2"),
+    lang("AI_FALLBACK_3"),
   ];
 
   async function handleConfirmSuggest() {
@@ -156,9 +158,9 @@ useEffect(() => {
         return;
       }
 
+      setAiMsg(lang("AI_NICE_ROLE"));
       logger.log('role_confirm', input.trim(), 'User confirmed custom role');
 
-      setAiMsg("Nice! That's a clear role and setting.");
       setChecking(false);
       setRole(input.trim());
 
@@ -179,9 +181,9 @@ useEffect(() => {
       logger.log('role_validation_error', input, 'Error during custom role validation');
 
       if (err instanceof AIConnectionError) {
-        setAiError("We can't reach the AI service right now. Check your connection or API key and try again.");
+        setAiError(lang("AI_CONNECTION_ERROR"));
       } else {
-        setAiError("Unexpected error with AI validation.");
+        setAiError(lang("AI_UNEXPECTED_ERROR"));
       }
       setChecking(false);
     }
@@ -200,7 +202,7 @@ useEffect(() => {
     <div className="min-h-[100dvh] flex items-center justify-center px-5" style={bgStyle}>
       <div className="w-full max-w-md text-center select-none">
         <h2 className="text-3xl font-extrabold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
-          Choose Your Role
+          {lang("CHOOSE_YOUR_ROLE")}
         </h2>
 
         <motion.ul variants={container} initial="hidden" animate="show" className="mt-6 space-y-4">
@@ -260,11 +262,10 @@ useEffect(() => {
                   ×
                 </button>
                 <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
-                  Suggest your own role
+                  {lang("SUGGEST_ROLE_TITLE")}
                 </h3>
                 <p className="mt-2 text-white/80 text-sm">
-                  Write a <span className="font-semibold">role</span> and a <span className="font-semibold">setting</span>.
-                  For example: <em>“Mars colony leader in distant future”</em> or <em>“Partisan leader in World War II.”</em>
+                  {lang("SUGGEST_ROLE_DESC")}
                 </p>
                 <div className="mt-4">
                   <input
@@ -274,7 +275,7 @@ useEffect(() => {
                       setInput(e.target.value);
                       logger.log('custom_role_input', e.target.value, 'User typing custom role');
                     }}
-                    placeholder="Type a role and a setting (partisan leader in World War II, Mars colony leader in distant future etc.)"
+                    placeholder={lang("SUGGEST_ROLE_PLACEHOLDER")}
                     className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
                   />
                 </div>
@@ -309,7 +310,7 @@ useEffect(() => {
                     }}
                     className="rounded-xl px-4 py-2 text-sm bg-white/10 text-white hover:bg-white/15"
                   >
-                    Close
+                    {lang("CLOSE")}
                   </button>
                   <button
                     disabled={input.trim().length < 10 || checking || !!aiError}
@@ -320,7 +321,7 @@ useEffect(() => {
                         : "bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335]"
                     }`}
                   >
-                    {checking ? "Checking…" : "Confirm"}
+                    {checking ? lang("CHECKING") : lang("CONFIRM")}
                   </button>
                 </div>
               </motion.div>
@@ -358,7 +359,7 @@ useEffect(() => {
                     }}
                     className="rounded-xl px-4 py-2 text-sm bg-white/10 text-white hover:bg-white/15"
                   >
-                    Back
+                    {lang("BACK")}
                   </button>
                   <button
                     onClick={() => {
@@ -375,7 +376,7 @@ useEffect(() => {
                     }}
                     className="rounded-xl px-4 py-2 text-sm font-semibold shadow bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335]"
                   >
-                    Confirm
+                    {lang("CONFIRM")}
                   </button>
                 </div>
               </motion.div>
