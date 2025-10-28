@@ -488,12 +488,21 @@ Analysis includes historical/fictional grounding:
 **Implementation**: `src/data/predefinedPowerDistributions.ts`
 
 **Predefined Roles:**
-1. Citizen of the Assembly in Classical Athens → Democracy
-2. Senator of the Roman Republic → Republican Oligarchy
-3. Emperor of Tang China → Theocratic Monarchy
-4. Chancellor of Modern Germany → Republican Oligarchy
+1. Athens — The Day Democracy Died (-404) → Hard-Power Oligarchy — Stratocracy
+2. Alexandria — Fire over the Nile (-48) → Autocratizing (Military)
+3. Florence — The Fire and the Faith (1494) → Mental-Might Oligarchy — Theocracy
+4. North America — The First Encounter (1607) → Personalist Monarchy / Autocracy
+5. Japan — The Land at War's End (1600) → Hard-Power Oligarchy — Stratocracy
+6. Haiti — The Island in Revolt (1791) → Hard-Power Oligarchy — Stratocracy
+7. Russia — The Throne Crumbles (1917) → Personalist Monarchy / Autocracy
+8. India — The Midnight of Freedom (1947) → Hard-Power Oligarchy — Stratocracy
+9. South Africa — The End of Apartheid (1990) → Autocratizing (Executive)
+10. Mars Colony — The Red Frontier (2179) → Mental-Might Oligarchy — Technocracy
 
-Each predefined role includes complete E-12 analysis data (role, stype, e12, grounding fields).
+Each predefined role includes:
+- Complete E-12 analysis data (role, stype, e12, grounding fields)
+- Culturally appropriate character names (male/female/any options) in `src/data/predefinedCharacters.ts`
+- Expandable UI cards with historical context, role description, and confirm button
 
 ### Type System
 
