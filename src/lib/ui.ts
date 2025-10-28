@@ -51,3 +51,28 @@ export const bgStyleWithMaze: CSSProperties = {
   backgroundSize: "cover, cover, cover",
   backgroundPosition: "center, center, center",
 };
+
+/**
+ * Background for splash screen with main maze image.
+ * - Layer 1: Main maze background image
+ * - Layer 2: Dark overlay for text readability
+ * - Layer 3: Subtle glow for depth
+ */
+export const bgStyleSplash: CSSProperties = {
+  // Solid fallback
+  backgroundColor: "#0b1335",
+
+  // Three stacked backgrounds: subtle glow + dark overlay + main image
+  backgroundImage: [
+    // subtle glow for depth
+    "radial-gradient(1000px 600px at 50% -10%, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0) 60%)",
+    // dark overlay for text readability
+    "linear-gradient(to bottom, rgba(11, 19, 53, 0.4), rgba(11, 19, 53, 0.5))",
+    // main maze image
+    "url(/assets/images/BKGs/mainBKG.jpg)",
+  ].join(", "),
+
+  backgroundRepeat: "no-repeat, no-repeat, no-repeat",
+  backgroundSize: "cover, cover, cover",
+  backgroundPosition: "center, center, center",
+};
