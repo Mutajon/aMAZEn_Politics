@@ -121,32 +121,66 @@ PORT=3001  # Auto-set by Render, override if needed
 
 - **roleStore** - Selected role, political analysis, character data
 - **compassStore** - 4D political compass values (what/whence/how/whither)
-- **dilemmaStore** - Current game state, resources, support levels, subject streak tracking, selected goals, goal tracking state
+- **dilemmaStore** - Current game state, resources, support levels, subject streak tracking, selected goals, goal tracking state, **gameId** (hosted state conversation identifier)
 - **settingsStore** - User preferences (narration, music, sound effects, debug mode, enableModifiers)
 - **mirrorQuizStore** - Compass assessment progress
 - **aftermathStore** - Aftermath data prefetching
 - **dilemmaPrefetchStore** - First dilemma prefetching
 
+**Hosted State Architecture:**
+- `gameId` generated on game start (format: `game-{timestamp}-{random}`)
+- Persisted in localStorage for conversation continuity across page refreshes
+- Conversation lifecycle managed by `dilemmaStore.initializeGame()` and `dilemmaStore.endConversation()`
+- Backend stores message history in-memory with 24hr TTL
+- Automatic cleanup via periodic task
+
+**Natural Topic Variety (NEW):**
+- AI judges topic repetition using full conversation history (no manual tracking)
+- After 3 consecutive dilemmas on same topic: Summarizes in 1 sentence, transitions naturally
+- Replaces old hard-coded "Day 3 & 5 forbidden topics" system
+- Exception: Urgent follow-ups (vote results, crises) continue even if 3+ same-topic turns
+- Policy domains: Economy, Security, Diplomacy, Rights, Infrastructure, Environment, Health, Education, Justice, Culture, Foreign Relations, Technology
+
+**Dynamic Parameters Generation:**
+- AI generates 1-3 unique measurable consequences per turn (Day 2+ only)
+- Each parameter: 4-6 words max, specific outcome with icon and tone
+- Examples: "GDP growth +2.3%", "800K jobs lost", "Approval rating 68%"
+- Variety enforced: Economic, social, political aspects shown
+- Bug fix (2025-01-27): Prompt now shows 1-3 diverse examples to prevent duplication
+
 ### AI Endpoints
 
-**Dilemma Generation:**
-- `/api/dilemma-light` - Minimal payload with integrated support analysis (~15-20s, 85% token reduction vs legacy heavy API)
+**🎮 HOSTED STATE GAME ENGINE (NEW):**
+- `/api/game-turn` - **Unified endpoint for all event screen data using conversation state**
+  * Replaces: `/api/dilemma-light`, `/api/compass-analyze`, `/api/dynamic-parameters`, `/api/mirror-light`
+  * Benefits: AI maintains full 7-day context, ~50% token savings after Day 1, ~50% faster
+  * Architecture: Uses OpenAI Chat Completions API with persistent message history
+  * Day 1: Sends full game context (role, system, compass, power holders)
+  * Days 2-7: Sends minimal updates (player choice + compass delta)
+  * Returns: Unified JSON with dilemma, support shifts, mirror advice, dynamic params, compass hints
+  * Conversation lifecycle: Created on game start, cleaned up on game end
+  * Storage: In-memory conversation store with 24hr TTL
 
 **Mirror Dialogue:**
 - `/api/mirror-quiz-light` - Personality summary after quiz (1 sentence, Mushu/Genie personality)
-- `/api/mirror-light` - Event screen advice (1 sentence, dramatic sidekick personality)
 
 **Other Endpoints:**
 - `/api/validate-role`, `/api/analyze-role` - Role validation and political system analysis
 - `/api/generate-avatar`, `/api/tts` - Avatar and text-to-speech generation
-- `/api/compass-analyze` - Maps text to compass values (81% optimized)
 - `/api/aftermath` - Game epilogue generation
 - `/api/news-ticker` - **DISABLED** - Satirical news (code kept for future)
+
+**Legacy Endpoints (Deprecated):**
+- `/api/dilemma-light` - Stateless dilemma generation (replaced by `/api/game-turn`)
+- `/api/compass-analyze` - Standalone compass analysis (now integrated in `/api/game-turn`)
+- `/api/dynamic-parameters` - Standalone dynamic params (now integrated in `/api/game-turn`)
+- `/api/mirror-light` - Standalone mirror advice (now integrated in `/api/game-turn`)
 
 **Multi-Provider Support:**
 - Default: OpenAI GPT (requires `OPENAI_API_KEY`)
 - Optional: Anthropic Claude (requires `MODEL_DILEMMA_ANTHROPIC` and `MODEL_MIRROR_ANTHROPIC` in `.env`)
 - Switch via browser console: `switchToClaude()` / `switchToGPT()`
+- Note: Hosted state currently uses OpenAI only (Anthropic support planned)
 
 ## Game Flow
 

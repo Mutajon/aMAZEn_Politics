@@ -1,10 +1,52 @@
 // src/screens/IntroScreen.tsx
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { bgStyle } from "../lib/ui";
+import { motion, AnimatePresence } from "framer-motion";
+import { bgStyleWithMaze } from "../lib/ui";
 import type { PushFn } from "../lib/router";
 import { lang } from "../i18n/lang";
 import { useLogger } from "../hooks/useLogger";
+
+// Animated word component for cycling through synonyms
+function AnimatedWord() {
+  const words = [
+    "shifting",
+    "drifting",
+    "transitioning",
+    "evolving",
+    "morphing",
+    "emerging",
+    "flowing",
+    "unfolding",
+  ];
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % words.length);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <span className="inline-block relative mx-1" style={{ minWidth: "120px" }}>
+      <AnimatePresence mode="wait">
+        <motion.span
+          key={currentIndex}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.4 }}
+          className="absolute inset-0 text-amber-300"
+        >
+          {words[currentIndex]}
+        </motion.span>
+      </AnimatePresence>
+      {/* Invisible placeholder to maintain width */}
+      <span className="invisible">{words[0]}</span>
+    </span>
+  );
+}
 
 export default function IntroScreen({ push }: { push: PushFn }) {
   const logger = useLogger();
@@ -27,8 +69,24 @@ export default function IntroScreen({ push }: { push: PushFn }) {
 
   const allShown = visibleCount >= paragraphs.length;
 
+  // Helper to render text with animated "shifting" word
+  const renderTextWithAnimation = (text: string, index: number) => {
+    // Only apply animation to the maze politics paragraph
+    if (index === 2 && text.includes("shifting")) {
+      const parts = text.split("shifting");
+      return (
+        <>
+          {parts[0]}
+          <AnimatedWord />
+          {parts[1]}
+        </>
+      );
+    }
+    return text;
+  };
+
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center px-5" style={bgStyle}>
+    <div className="min-h-[100dvh] flex items-center justify-center px-5" style={bgStyleWithMaze}>
       <div className="w-full max-w-md text-center space-y-5">
         {paragraphs.map((text, i) => (
           <motion.p
@@ -44,38 +102,30 @@ export default function IntroScreen({ push }: { push: PushFn }) {
                 : "text-lg sm:text-xl text-white/90"
             }
           >
-            {text}
+            {renderTextWithAnimation(text, i)}
           </motion.p>
         ))}
 
-        <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center min-h-[104px]">
+        <div className="mt-8 flex justify-center min-h-[60px]">
           {allShown && (
-            <>
-              <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.5 }}
-                onClick={() => {
-                  logger.log('button_click', 'Free Play', 'User clicked Free Play button');
-                  push("/role");
-                }}
-                className="w-[14rem] rounded-2xl px-5 py-3 font-semibold text-lg bg-gradient-to-r from-indigo-400 to-purple-500 text-white shadow-lg hover:scale-[1.02] active:scale-[0.98] mx-auto sm:mx-0"
-              >
-                {lang("FREE_PLAY")}
-              </motion.button>
-              <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.1, duration: 0.5 }}
-                onClick={() => {/* Coming soon - do nothing */}}
-                className="w-[14rem] rounded-2xl px-5 py-3 font-semibold text-lg bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] shadow-lg hover:scale-[1.02] active:scale-[0.98] mx-auto sm:mx-0 opacity-60 cursor-default"
-              >
-                <div className="flex flex-col items-center gap-0.5">
-                  <span>{lang("CAMPAIGN_MODE")}</span>
-                  <span className="text-xs font-normal">{lang("COMING_SOON")}</span>
-                </div>
-              </motion.button>
-            </>
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{
+                type: "spring",
+                stiffness: 300,
+                damping: 20
+              }}
+              onClick={() => {
+                logger.log('button_click', 'Yes!', 'User clicked Yes! button to proceed to role selection');
+                push("/role");
+              }}
+              className="rounded-full px-6 py-2 font-bold text-lg bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg"
+            >
+              Yes!
+            </motion.button>
           )}
         </div>
       </div>

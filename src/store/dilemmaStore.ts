@@ -38,6 +38,10 @@ type DilemmaState = {
   day: number;
   totalDays: number;
 
+  // Hosted state conversation tracking
+  gameId: string | null;           // Unique ID for this playthrough (persists conversation)
+  conversationActive: boolean;     // True when using hosted state API
+
   current: Dilemma | null;
   history: Dilemma[];
   loading: boolean;
@@ -135,6 +139,10 @@ type DilemmaState = {
   evaluateGoals: () => GoalStatusChange[];
   incrementCustomActions: () => void;
   updateMinimumValues: () => void;
+
+  // Hosted state conversation methods
+  initializeGame: () => void;      // Generate gameId and prepare for new game
+  endConversation: () => void;     // Cleanup after game ends
 };
 
 // Type for goal status changes (used for audio/visual feedback)
@@ -150,6 +158,10 @@ export const useDilemmaStore = create<DilemmaState>()(
     (set, get) => ({
   day: 1,
   totalDays: 7,
+
+  // Hosted state conversation
+  gameId: null,
+  conversationActive: false,
 
   current: null,
   history: [],
@@ -293,6 +305,8 @@ export const useDilemmaStore = create<DilemmaState>()(
     dlog("reset dilemmas");
     set({
       day: 1,
+      gameId: null,
+      conversationActive: false,
       current: null,
       history: [],
       loading: false,
@@ -619,10 +633,51 @@ export const useDilemmaStore = create<DilemmaState>()(
       mom: newMinMom,
     });
   },
+
+  // ========================================================================
+  // HOSTED STATE CONVERSATION METHODS
+  // ========================================================================
+
+  initializeGame() {
+    // Generate unique gameId for this playthrough
+    // Format: timestamp + random string for uniqueness
+    const gameId = `game-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+    dlog("initializeGame -> gameId:", gameId);
+
+    set({
+      gameId,
+      conversationActive: true
+    });
+  },
+
+  endConversation() {
+    const { gameId } = get();
+
+    if (gameId) {
+      // Call backend to cleanup conversation
+      fetch("/api/game-turn/cleanup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId })
+      }).catch(err => {
+        console.warn("[dilemmaStore] Failed to cleanup conversation:", err);
+      });
+
+      dlog("endConversation -> gameId:", gameId);
+    }
+
+    set({
+      gameId: null,
+      conversationActive: false
+    });
+  },
     }),
     {
-      name: "amaze-politics-difficulty-v1",
+      name: "amaze-politics-game-state-v2", // Updated version to include gameId
       partialize: (state) => ({
+        gameId: state.gameId, // Persist gameId for conversation continuity
+        conversationActive: state.conversationActive,
         difficulty: state.difficulty,
         selectedGoals: state.selectedGoals,
         finalScoreSubmitted: state.finalScoreSubmitted

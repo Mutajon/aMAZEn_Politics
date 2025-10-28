@@ -6,6 +6,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import path from "path";
 import { fileURLToPath } from "url";
 import loggingRouter from "./api/logging.mjs";
+import {
+  storeConversation,
+  getConversation,
+  touchConversation,
+  deleteConversation,
+  startCleanupTask
+} from "./conversationStore.mjs";
 
 const app = express();
 app.use(bodyParser.json());
@@ -2308,11 +2315,403 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
       rank: "The Leader",
       decisions: [],
       ratings: { autonomy: "medium", liberalism: "medium" },
-      valuesSummary: "A leader who navigated complex political terrain.",
+      valuesSummary: "A leader who navigated custom political terrain.",
       haiku: "Power came and went\nDecisions echo through time\nHistory records"
     });
   }
 });
+
+// -------------------- NEW: Unified Game Turn API (Hosted State) -------
+/**
+ * /api/game-turn - Single endpoint for all event screen data using conversation state
+ *
+ * Replaces: /api/dilemma-light, /api/compass-analyze, /api/dynamic-parameters, /api/mirror-light
+ *
+ * Benefits:
+ * - AI maintains full game context across all 7 days
+ * - Single API call instead of 4 separate calls
+ * - Better narrative continuity and consequences
+ * - ~50% token savings after Day 1
+ * - ~50% faster response time
+ */
+app.post("/api/game-turn", async (req, res) => {
+  try {
+    console.log("\n========================================");
+    console.log("🎮 [GAME-TURN] /api/game-turn called");
+    console.log("========================================\n");
+
+    const {
+      gameId,
+      day,
+      playerChoice,
+      compassUpdate,
+      gameContext // Day 1 only: full game initialization data
+    } = req.body;
+
+    // Validate required fields
+    if (!gameId || typeof gameId !== 'string') {
+      return res.status(400).json({ error: "Missing or invalid gameId" });
+    }
+
+    if (!day || typeof day !== 'number' || day < 1 || day > 8) {
+      return res.status(400).json({ error: "Missing or invalid day (must be 1-8)" });
+    }
+
+    console.log(`[GAME-TURN] gameId=${gameId}, day=${day}`);
+
+    // Check if we have an existing conversation
+    let conversation = getConversation(gameId);
+    let messages = [];
+
+    // ============================================================================
+    // DAY 1: Initialize conversation with full game context
+    // ============================================================================
+    if (day === 1) {
+      if (!gameContext) {
+        return res.status(400).json({ error: "Day 1 requires gameContext" });
+      }
+
+      console.log("[GAME-TURN] Day 1: Initializing conversation with full game context");
+
+      // Build comprehensive system prompt for the entire game
+      const systemPrompt = buildGameSystemPrompt(gameContext);
+
+      // Initial user message requesting first dilemma
+      const userMessage = buildDay1UserPrompt(gameContext);
+
+      messages = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage }
+      ];
+
+      console.log(`[GAME-TURN] System prompt: ${systemPrompt.length} chars`);
+      console.log(`[GAME-TURN] User prompt: ${userMessage.length} chars`);
+
+      // Store conversation (messages will be stored after AI response)
+      storeConversation(gameId, "pending", "openai");
+
+    // ============================================================================
+    // DAY 2-8: Continue existing conversation with player's choice
+    // ============================================================================
+    } else {
+      if (!conversation) {
+        console.error(`[GAME-TURN] ❌ No conversation found for gameId=${gameId}`);
+        return res.status(404).json({
+          error: "Conversation not found. Game may have expired. Please start a new game."
+        });
+      }
+
+      if (!playerChoice) {
+        return res.status(400).json({ error: `Day ${day} requires playerChoice` });
+      }
+
+      console.log(`[GAME-TURN] Day ${day}: Continuing conversation`);
+      console.log(`[GAME-TURN] Player chose: "${playerChoice.title}"`);
+
+      // Retrieve stored message history
+      messages = conversation.messages || [];
+
+      // Build user message for this turn (minimal - just the choice and compass update)
+      const userMessage = buildTurnUserPrompt(day, playerChoice, compassUpdate);
+
+      messages.push({ role: "user", content: userMessage });
+
+      console.log(`[GAME-TURN] Message history: ${messages.length} messages`);
+      console.log(`[GAME-TURN] Turn prompt: ${userMessage.length} chars`);
+    }
+
+    // ============================================================================
+    // Call OpenAI Chat Completions API
+    // ============================================================================
+    console.log(`[GAME-TURN] Calling OpenAI with ${messages.length} messages...`);
+
+    const aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
+
+    if (!aiResponse || !aiResponse.content) {
+      throw new Error("Empty response from AI");
+    }
+
+    console.log(`[GAME-TURN] ✅ AI responded: ${aiResponse.content.length} chars`);
+
+    // Parse JSON response
+    const turnData = safeParseJSON(aiResponse.content);
+
+    if (!turnData) {
+      console.error(`[GAME-TURN] ❌ Failed to parse AI response as JSON`);
+      console.error(`[GAME-TURN] Raw response: ${aiResponse.content.substring(0, 500)}...`);
+      throw new Error("Invalid JSON response from AI");
+    }
+
+    // Validate response structure
+    if (!turnData.title || !turnData.description) {
+      throw new Error("Missing required fields in AI response (title, description)");
+    }
+
+    // ============================================================================
+    // Update conversation history
+    // ============================================================================
+    messages.push({ role: "assistant", content: aiResponse.content });
+
+    // Update conversation store
+    conversation = getConversation(gameId);
+    if (conversation) {
+      conversation.messages = messages;
+      touchConversation(gameId);
+    } else {
+      // First turn - store new conversation with messages
+      storeConversation(gameId, JSON.stringify({messages}), "openai");
+      const newConv = getConversation(gameId);
+      newConv.messages = messages;
+    }
+
+    console.log(`[GAME-TURN] Conversation updated: ${messages.length} messages total`);
+
+    // ============================================================================
+    // Return unified response
+    // ============================================================================
+    const response = {
+      title: String(turnData.title || "").slice(0, 120),
+      description: String(turnData.description || "").slice(0, 500),
+      actions: Array.isArray(turnData.actions) ? turnData.actions : [],
+      topic: String(turnData.topic || "Security"),
+      scope: String(turnData.scope || "National"),
+
+      // Support shifts (Day 2+ only)
+      supportShift: turnData.supportShift || null,
+
+      // Mirror advice
+      mirrorAdvice: String(turnData.mirrorAdvice || "The mirror squints, light pooling in the glass..."),
+
+      // Dynamic parameters (Day 2+ only)
+      dynamicParams: Array.isArray(turnData.dynamicParams) ? turnData.dynamicParams : [],
+
+      // Compass hints (Day 2+ only)
+      compassHints: Array.isArray(turnData.compassHints) ? turnData.compassHints : [],
+
+      // Game end flag
+      isGameEnd: !!turnData.isGameEnd
+    };
+
+    console.log(`[GAME-TURN] ✅ Returning unified response: ${response.actions.length} actions`);
+
+    return res.json(response);
+
+  } catch (e) {
+    console.error("[GAME-TURN] ❌ Error:", e?.message || e);
+    return res.status(500).json({
+      error: "Game turn generation failed",
+      message: e?.message || "Unknown error"
+    });
+  }
+});
+
+/**
+ * Helper: Build comprehensive system prompt for entire game
+ */
+function buildGameSystemPrompt(gameContext) {
+  const {
+    role,
+    systemName,
+    systemDesc,
+    powerHolders,
+    playerCompass,
+    totalDays,
+    thematicGuidance
+  } = gameContext;
+
+  // Format power holders
+  const holdersText = Array.isArray(powerHolders) && powerHolders.length > 0
+    ? powerHolders.map(h => `- ${h.name} (${h.percent}% power)`).join('\n')
+    : "- No specific power holders defined";
+
+  // Format player compass values (top values per dimension)
+  const compassText = playerCompass ? `
+TOP PLAYER VALUES:
+- What (goals): ${playerCompass.what || "undefined"}
+- Whence (justification): ${playerCompass.whence || "undefined"}
+- How (means): ${playerCompass.how || "undefined"}
+- Whither (recipients): ${playerCompass.whither || "undefined"}` : "";
+
+  // Include thematic guidance if provided
+  const thematicText = thematicGuidance ? `\n\nTHEMATIC GUIDANCE:\n${thematicGuidance}` : "";
+
+  return `${ANTI_JARGON_RULES}
+
+You are the AI game engine for a ${totalDays}-day political simulation game.
+You maintain full narrative context and generate ALL event screen data in a single response.
+
+PLAYER ROLE & CONTEXT:
+- Role: ${role}
+- Political System: ${systemName}
+- System Description: ${systemDesc}
+
+POWER HOLDERS:
+${holdersText}
+${compassText}${thematicText}
+
+YOUR RESPONSIBILITIES:
+1. Generate one concrete political dilemma per turn (title, description, 3 actions with costs)
+2. Calculate support shifts based on previous player choices (Day 2+ only)
+3. Provide mirror advice (1-2 sentences, dramatic sidekick personality - think Mushu/Genie)
+4. Identify compass effects from previous choice (Day 2+ only)
+5. Generate 1-3 dynamic parameters showing measurable consequences (Day 2+ only)
+   - Each parameter = ultra-concise outcome (4-6 words max)
+   - Examples: "GDP growth +2.3%", "800K jobs lost", "Approval rating 68%"
+   - Include relevant icon (TrendingUp/Down, Users, DollarSign, Shield, Heart, etc.)
+   - Set tone: "up" (positive), "down" (negative), or "neutral"
+   - VARIETY: Show different aspects of the decision's impact (economic, social, political)
+   - AVOID: Generating the same parameter multiple times
+6. Maintain narrative continuity across all ${totalDays} days
+
+CONTINUITY & MEMORY:
+- You remember ALL previous dilemmas and player choices
+- Consequences carry forward naturally (votes have results, policies affect future situations)
+- Apply SYSTEM FEEL: outcomes play differently across political systems
+  * Monarchy/Autocracy → Swift, unilateral, muted resistance
+  * Parliamentary → Negotiated, pushback, debate, oversight
+  * Direct Democracy → Public voice dominates, referendums, unpredictable
+  * Bureaucratic → Slow, procedural, technical
+- On Day ${totalDays}, create an EPIC FINALE: unrelated national crisis, defining moment, high stakes
+
+TOPIC VARIETY (Natural Flow):
+- Allow each political situation to develop naturally across 2-3 turns if consequences warrant
+- After 3 consecutive dilemmas on the same general topic area, provide closure:
+  * Summarize the outcome in 1 sentence
+  * Example: "The healthcare crisis stabilizes as reforms take hold."
+  * Then transition to a different policy domain naturally
+  * Maintain consequence continuity (e.g., "Meanwhile, economic concerns resurface...")
+- Policy domains: Economy, Security, Diplomacy, Rights, Infrastructure,
+  Environment, Health, Education, Justice, Culture, Foreign Relations, Technology
+- Trust your memory: You can see the full conversation history
+- Natural variety > forced variety (let political reality breathe)
+- Exception: If player's previous action created urgent follow-up (vote results, crisis escalation),
+  continue that thread even if 3+ turns on same topic
+
+STYLE:
+${buildLightSystemPrompt()}
+
+OUTPUT FORMAT (JSON):
+{
+  "title": "<60 chars, punchy situation title>",
+  "description": "<2-3 sentences, concrete and vivid>",
+  "actions": [
+    {
+      "id": "a",
+      "title": "<action title>",
+      "summary": "<cynical advisor summary, 15-25 words>",
+      "cost": <number from {0,±50,±100,±150,±200,±250}>,
+      "iconHint": "<security|speech|diplomacy|money|tech|heart|scale>"
+    },
+    // ... 3 actions total
+  ],
+  "topic": "<Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture>",
+  "scope": "<Local|National|International>",
+  "supportShift": {  // Day 2+ only, based on previous choice
+    "people": {"delta": <-20 to +20>, "why": "<short reason>"},
+    "mom": {"delta": <-20 to +20>, "why": "<short reason>"},
+    "holders": {"delta": <-20 to +20>, "why": "<short reason>"}
+  },
+  "mirrorAdvice": "<1-2 sentences, dramatic sidekick giving advice on current situation>",
+  "dynamicParams": [  // Day 2+ only, 1-3 consequences of previous choice (VARY THE COUNT & CONTENT)
+    {"id": "param1", "icon": "TrendingUp", "text": "GDP growth +2.3%", "tone": "up"},
+    {"id": "param2", "icon": "Users", "text": "800K new jobs created", "tone": "up"},
+    {"id": "param3", "icon": "DollarSign", "text": "National debt +$12B", "tone": "down"}
+    // Generate 1-3 params showing DIFFERENT aspects of the decision's impact
+    // Use varied icons: TrendingUp/Down, Users, DollarSign, Shield, Heart, Zap, Building2, etc.
+  ],
+  "compassHints": [  // Day 2+ only, how previous choice affected compass
+    {"prop": "what|whence|how|whither", "idx": <0-9>, "polarity": "positive|negative", "strength": "weak|strong"}
+  ],
+  "isGameEnd": <true on Day ${totalDays + 1} for aftermath, false otherwise>
+}
+
+CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no prose.`;
+}
+
+/**
+ * Helper: Build Day 1 user prompt
+ */
+function buildDay1UserPrompt(gameContext) {
+  const {
+    role,
+    systemName,
+    topWhatValues
+  } = gameContext;
+
+  let prompt = `ROLE & SETTING: ${role}\nSYSTEM: ${systemName}\n\nDAY 1 - FIRST DILEMMA\n`;
+
+  if (topWhatValues && Array.isArray(topWhatValues) && topWhatValues.length > 0) {
+    prompt += `\nTOP PLAYER VALUES: ${topWhatValues.join(', ')}\n`;
+    prompt += 'Create a situation that naturally tests or challenges these values (without naming them explicitly).\n';
+  }
+
+  prompt += `\nTASK: Generate the first political situation for Day 1.
+- Ground it in the specific political context above
+- Use setting-appropriate issues, stakeholders, terminology
+- Create 3 actions with clear trade-offs
+- Return complete JSON as specified in system prompt`;
+
+  return prompt;
+}
+
+/**
+ * Helper: Build turn user prompt (Day 2+)
+ */
+function buildTurnUserPrompt(day, playerChoice, compassUpdate) {
+  let prompt = `DAY ${day}\n\n`;
+
+  prompt += `PREVIOUS CHOICE: "${playerChoice.title}"\n`;
+  prompt += `Summary: ${playerChoice.summary || playerChoice.title}\n`;
+  prompt += `Cost: ${playerChoice.cost}\n\n`;
+
+  if (compassUpdate) {
+    // Summarize compass changes (just mention they were updated)
+    prompt += `Player's compass values have been updated based on this choice.\n\n`;
+  }
+
+  if (day === 7) {
+    prompt += `⚠️ DAY 7 - EPIC FINALE\n`;
+    prompt += `- Create an UNRELATED national crisis (ignore previous story)\n`;
+    prompt += `- But STILL calculate supportShift from previous choice (factions remember)\n`;
+    prompt += `- Make it: national scope, defining moment, high stakes, hard choices\n`;
+    prompt += `- Mention this is the final day or defining moment\n\n`;
+  }
+
+  prompt += `TASK: Generate the next turn with ALL required data (dilemma + supportShift + mirrorAdvice + dynamicParams + compassHints).
+Return complete JSON as specified in system prompt.`;
+
+  return prompt;
+}
+
+/**
+ * Helper: Call OpenAI Chat Completions API with message history
+ */
+async function callOpenAIChat(messages, model) {
+  const response = await fetch(CHAT_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${OPENAI_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: model || CHAT_MODEL_DEFAULT,
+      messages: messages,
+      temperature: 1,
+      max_completion_tokens: 4096
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenAI API error ${response.status}: ${errorText}`);
+  }
+
+  const data = await response.json();
+  return {
+    content: data?.choices?.[0]?.message?.content || "",
+    finishReason: data?.choices?.[0]?.finish_reason
+  };
+}
 
 // -------------------- Serve static files in production -------
 // ES module equivalent of __dirname
@@ -2337,4 +2736,7 @@ if (process.env.NODE_ENV === "production") {
 const PORT = Number(process.env.PORT) || 3001;
 app.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);
+
+  // Start conversation cleanup task
+  startCleanupTask();
 });

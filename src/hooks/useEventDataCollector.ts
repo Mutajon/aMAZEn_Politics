@@ -176,42 +176,133 @@ function topOverallWithNames(compassValues: any, k = 3): Array<{ name: string; s
 }
 
 /**
- * Fetch dilemma from API (uses light API)
- * REQUIRED - throws error if fails (no fallback)
+ * UNIFIED GAME TURN API - Fetches ALL data in one call using hosted state
+ *
+ * Replaces: fetchDilemma(), fetchCompassPills(), fetchDynamicParams(), fetchMirrorText()
+ *
+ * Benefits:
+ * - AI maintains full conversation context across all 7 days
+ * - Single API call instead of 4 separate calls (~50% faster)
+ * - Better narrative continuity
+ * - ~50% token savings after Day 1
  */
-async function fetchDilemma(): Promise<Dilemma> {
-  const { day, supportPeople, supportMiddle, supportMom, setSupportPeople, setSupportMiddle, setSupportMom, updateSubjectStreak } = useDilemmaStore.getState();
+async function fetchGameTurn(): Promise<{
+  dilemma: Dilemma;
+  supportEffects: SupportEffect[] | null;
+  compassPills: CompassPill[] | null;
+  dynamicParams: DynamicParam[] | null;
+  mirrorText: string;
+}> {
+  const {
+    gameId,
+    day,
+    lastChoice,
+    supportPeople,
+    supportMiddle,
+    supportMom,
+    setSupportPeople,
+    setSupportMiddle,
+    setSupportMom,
+    updateSubjectStreak,
+    initializeGame
+  } = useDilemmaStore.getState();
 
-  const snapshot = buildLightSnapshot();
+  const { values: compassValues } = useCompassStore.getState();
 
-  const response = await fetch("/api/dilemma-light", {
+  // Day 1: Initialize game if no gameId exists
+  if (day === 1 && !gameId) {
+    initializeGame();
+  }
+
+  const currentGameId = useDilemmaStore.getState().gameId;
+
+  if (!currentGameId) {
+    throw new Error("No gameId - unable to create conversation");
+  }
+
+  // Build request payload
+  const payload: any = {
+    gameId: currentGameId,
+    day
+  };
+
+  // Day 1: Send full game context
+  if (day === 1) {
+    const roleState = useRoleStore.getState();
+    const topWhatValues = getTop2WhatValues();
+    const { dilemmasSubjectEnabled, dilemmasSubject } = useSettingsStore.getState();
+
+    payload.gameContext = {
+      role: roleState.selectedRole || "Unicorn King",
+      systemName: roleState.analysis?.systemName || "Divine Right Monarchy",
+      systemDesc: roleState.analysis?.systemDesc || "Power flows from divine mandate",
+      powerHolders: roleState.analysis?.holders || [],
+      playerCompass: {
+        what: topWhatValues.join(', '),
+        whence: topKWithNames(compassValues?.whence, 'whence', 2).map(v => v.name).join(', '),
+        how: topKWithNames(compassValues?.how, 'how', 2).map(v => v.name).join(', '),
+        whither: topKWithNames(compassValues?.whither, 'whither', 2).map(v => v.name).join(', ')
+      },
+      topWhatValues,
+      totalDays: 7,
+      thematicGuidance: dilemmasSubjectEnabled && dilemmasSubject
+        ? `Focus on: ${dilemmasSubject}`
+        : null
+    };
+  }
+
+  // Day 2+: Send player choice and compass update
+  if (day > 1 && lastChoice) {
+    payload.playerChoice = {
+      title: lastChoice.title,
+      summary: lastChoice.summary || lastChoice.title,
+      cost: lastChoice.cost
+    };
+
+    payload.compassUpdate = compassValues;
+  }
+
+  console.log(`[fetchGameTurn] Calling /api/game-turn for Day ${day}, gameId=${currentGameId}`);
+
+  const response = await fetch("/api/game-turn", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(snapshot)
+    body: JSON.stringify(payload)
   });
 
   if (!response.ok) {
-    throw new Error(`Light Dilemma API failed: ${response.status}`);
+    const errorText = await response.text();
+    throw new Error(`Game turn API failed (${response.status}): ${errorText}`);
   }
 
-  const data: LightDilemmaResponse = await response.json();
+  const data = await response.json();
 
   // Validate required fields
   if (!data.title || !data.description || !Array.isArray(data.actions)) {
-    throw new Error("Invalid dilemma response: missing required fields");
+    throw new Error("Invalid game turn response: missing required fields");
   }
 
   // Allow empty actions array ONLY when isGameEnd is true
   if (!data.isGameEnd && data.actions.length !== 3) {
-    throw new Error("Invalid dilemma response: expected 3 actions for normal dilemma");
+    throw new Error("Invalid game turn response: expected 3 actions for normal dilemma");
   }
 
   // Game end must have empty actions
   if (data.isGameEnd && data.actions.length !== 0) {
-    throw new Error("Invalid dilemma response: game end must have empty actions array");
+    throw new Error("Invalid game turn response: game end must have empty actions array");
   }
 
-  // Apply support shifts if they exist (Day 2+)
+  // Extract dilemma
+  const dilemma: Dilemma = {
+    title: data.title,
+    description: data.description,
+    actions: data.actions,
+    isGameEnd: data.isGameEnd
+  };
+
+  // Extract support effects (Day 2+ only)
+  let supportEffects: SupportEffect[] | null = null;
+
   if (data.supportShift && day > 1) {
     const { people, mom, holders } = data.supportShift;
 
@@ -224,22 +315,19 @@ async function fetchDilemma(): Promise<Dilemma> {
     setSupportMiddle(newMiddle);
 
     // CRITICAL: Update minimum values for continuous goal tracking
-    // This must happen after support shifts to capture new lows
     const { updateMinimumValues, evaluateGoals } = useDilemmaStore.getState();
     updateMinimumValues();
-    console.log('[fetchDilemma] ✅ Minimum values updated after support shifts');
+    console.log('[fetchGameTurn] ✅ Minimum values updated after support shifts');
 
-    // Re-evaluate goals to check if any just failed/completed
+    // Re-evaluate goals
     const goalChanges = evaluateGoals();
-    console.log('[fetchDilemma] ✅ Goals re-evaluated after support shifts');
+    console.log('[fetchGameTurn] ✅ Goals re-evaluated after support shifts');
 
     // Play achievement sound if any goal status changed
     if (goalChanges.length > 0) {
-      console.log('[fetchDilemma] 🎵 Goal status changed, playing achievement sound:', goalChanges);
+      console.log('[fetchGameTurn] 🎵 Goal status changed, playing achievement sound:', goalChanges);
       audioManager.playSfx('achievement');
 
-      // TODO: Trigger visual feedback (flash goal pills) - handled in GoalsCompact
-      // We'll emit the changes through a custom event
       goalChanges.forEach(change => {
         window.dispatchEvent(new CustomEvent('goal-status-changed', {
           detail: change
@@ -247,8 +335,8 @@ async function fetchDilemma(): Promise<Dilemma> {
       });
     }
 
-    // Store support effects in the dilemma object for the collector
-    (data as any).supportEffects = [
+    // Store support effects for UI
+    supportEffects = [
       { id: "people", delta: people.delta, explain: people.why },
       { id: "mom", delta: mom.delta, explain: mom.why },
       { id: "middle", delta: holders.delta, explain: holders.why }
@@ -260,13 +348,82 @@ async function fetchDilemma(): Promise<Dilemma> {
     updateSubjectStreak(data.topic);
   }
 
-  return data;
+  // Extract compass pills (Day 2+ only)
+  const compassPills: CompassPill[] = Array.isArray(data.compassHints)
+    ? data.compassHints
+        .map((hint: any) => {
+          const prop = hint.prop;
+          const idx = Number(hint.idx);
+          const polarity = String(hint.polarity || "").toLowerCase();
+          const strength = String(hint.strength || "").toLowerCase();
+
+          if (!["what", "whence", "how", "whither"].includes(prop)) return null;
+          if (!Number.isFinite(idx) || idx < 0 || idx > 9) return null;
+
+          let delta = 0;
+          if (polarity === "positive") {
+            delta = strength === "strong" ? 2 : 1;
+          } else if (polarity === "negative") {
+            delta = strength === "strong" ? -2 : -1;
+          }
+
+          if (delta === 0) return null;
+
+          return { prop: prop as any, idx, delta };
+        })
+        .filter(Boolean) as CompassPill[]
+    : [];
+
+  // Extract dynamic parameters (Day 2+ only)
+  const dynamicParams: DynamicParam[] = Array.isArray(data.dynamicParams)
+    ? data.dynamicParams
+    : [];
+
+  // Extract mirror advice
+  const mirrorText = String(data.mirrorAdvice || "The mirror squints, light pooling in the glass...");
+
+  console.log(`[fetchGameTurn] ✅ Unified response received: ${data.actions.length} actions, ${compassPills.length} pills, ${dynamicParams.length} params`);
+
+  return {
+    dilemma,
+    supportEffects,
+    compassPills,
+    dynamicParams,
+    mirrorText
+  };
 }
 
+// Helper: Get top 2 "what" compass values for Day 1 personalization
+function getTop2WhatValues(): string[] {
+  const compassValues = useCompassStore.getState().values;
+  const whatValues = compassValues?.what || [];
+
+  return whatValues
+    .map((v, i) => ({
+      v: Number(v) || 0,
+      i,
+      name: COMPONENTS.what?.[i]?.short || `What #${i + 1}`
+    }))
+    .sort((a, b) => b.v - a.v)
+    .slice(0, 2)
+    .map(x => x.name);
+}
+
+// ============================================================================
+// DEPRECATED - These functions are replaced by fetchGameTurn()
+// Kept for reference only
+// ============================================================================
+
 /**
- * Analyze compass changes from previous action (Day 2+ only)
- * Fallback: [] (empty array)
+ * @deprecated Use fetchGameTurn() instead
+ *
+ * OLD FUNCTIONS BELOW - COMMENTED OUT
+ * These functions are replaced by the unified fetchGameTurn() API call
+ * Keeping for reference only
  */
+
+/*
+// Analyze compass changes from previous action (Day 2+ only)
 async function fetchCompassPills(lastChoice: DilemmaAction): Promise<CompassPill[]> {
   const text = `${lastChoice.title}. ${lastChoice.summary}`;
 
@@ -313,10 +470,7 @@ async function fetchCompassPills(lastChoice: DilemmaAction): Promise<CompassPill
   }
 }
 
-/**
- * Fetch dynamic parameters from previous action (Day 2+ only)
- * Fallback: [] (empty array)
- */
+// Fetch dynamic parameters from previous action (Day 2+ only)
 async function fetchDynamicParams(lastChoice: DilemmaAction): Promise<DynamicParam[]> {
   const { day, totalDays } = useDilemmaStore.getState();
   const { selectedRole, analysis } = useRoleStore.getState();
@@ -350,13 +504,7 @@ async function fetchDynamicParams(lastChoice: DilemmaAction): Promise<DynamicPar
   }
 }
 
-/**
- * Fetch mirror dialogue with dilemma context
- * USES MIRROR LIGHT API: Top 2 "what" values + dilemma only
- * CRITICAL: Always sorts current "what" values by strength descending before taking top 2
- * Returns: 2-3 sentence dramatic sidekick advice (Mushu/Genie personality)
- * Fallback: "The mirror squints… then grins mischievously."
- */
+// Fetch mirror dialogue with dilemma context
 async function fetchMirrorText(dilemma: Dilemma): Promise<string> {
   const { values: compassValues } = useCompassStore.getState();
   const { useLightDilemmaAnthropic } = useSettingsStore.getState();
@@ -417,6 +565,7 @@ async function fetchMirrorText(dilemma: Dilemma): Promise<string> {
     return "The mirror's too hyped to talk right now!";
   }
 }
+*/
 
 // ============================================================================
 // MAIN HOOK
@@ -458,67 +607,35 @@ export function useEventDataCollector() {
     setIsCollecting(true);
     setCollectionError(null);
 
-    const { day, lastChoice } = useDilemmaStore.getState();
+    const { day } = useDilemmaStore.getState();
 
     try {
       // ========================================================================
-      // PHASE 1: Critical Path - Dilemma ONLY
+      // UNIFIED API CALL - Get ALL data in one request using hosted state
       // ========================================================================
-      const dilemmaResponse = await fetchDilemma();
+      console.log(`[Collector] Day ${day}: Fetching unified game turn data...`);
 
-      // Extract dilemma data
-      const dilemma: Dilemma = {
-        title: dilemmaResponse.title,
-        description: dilemmaResponse.description,
-        actions: dilemmaResponse.actions
-      };
+      const turnData = await fetchGameTurn();
 
-      // Verify dilemma completeness (context-aware for game conclusion)
-      const isGameEnd = dilemmaResponse.isGameEnd || false;
+      // Extract all data from unified response
+      const { dilemma, supportEffects, compassPills, dynamicParams, mirrorText } = turnData;
 
-      if (!dilemma.title || !dilemma.description) {
-        console.error('[Collector] ❌ Invalid dilemma data: missing title or description');
-        setCollectionError("Invalid dilemma data received");
-        setIsCollecting(false);
-        return;
-      }
+      console.log(`[Collector] ✅ Unified data received for Day ${day}`);
 
-      // Normal dilemma must have 3 actions
-      if (!isGameEnd && dilemma.actions?.length !== 3) {
-        console.error('[Collector] ❌ Invalid dilemma data: expected 3 actions for normal dilemma');
-        setCollectionError("Invalid dilemma data received");
-        setIsCollecting(false);
-        return;
-      }
-
-      // Game conclusion must have 0 actions
-      if (isGameEnd && dilemma.actions?.length !== 0) {
-        console.error('[Collector] ❌ Invalid dilemma data: game conclusion must have empty actions');
-        setCollectionError("Invalid dilemma data received");
-        setIsCollecting(false);
-        return;
-      }
-
-      // Extract supportEffects from dilemma response (Day 2+ only)
-      const supportEffects: SupportEffect[] | null =
-        (day > 1 && dilemmaResponse.supportEffects)
-          ? dilemmaResponse.supportEffects
-          : null;
-
-      // Build Phase 1 data
+      // Build Phase 1 data (critical path)
       const p1: Phase1Data = {
         dilemma,
         supportEffects,
         newsItems: [] // Disabled
       };
 
-      // CRITICAL: Set Phase 1 data immediately - triggers UI render!
+      // Set Phase 1 data immediately - triggers UI render!
       setPhase1Data(p1);
 
       // Update global dilemma store for narration
       useDilemmaStore.setState({ current: dilemma });
 
-      // CRITICAL: Mark collecting as done NOW - UI can render!
+      // Mark collecting as done - UI can render!
       setIsCollecting(false);
 
       // Notify listeners that data is ready (for loading progress animation)
@@ -526,46 +643,13 @@ export function useEventDataCollector() {
         onReadyCallbackRef.current();
       }
 
-      // ========================================================================
-      // PHASE 2: Secondary Data - Compass + Dynamic Params (Day 2+ only)
-      // NON-BLOCKING: Runs in background after Phase 1 shows
-      // ========================================================================
-      if (day > 1 && lastChoice) {
-        Promise.allSettled([
-          fetchCompassPills(lastChoice),
-          fetchDynamicParams(lastChoice)
-        ])
-          .then(([compassResult, dynamicResult]) => {
-            const compassPills: CompassPill[] | null =
-              compassResult.status === "fulfilled" ? compassResult.value : null;
-            const dynamicParams: DynamicParam[] | null =
-              dynamicResult.status === "fulfilled" ? dynamicResult.value : null;
+      // Set Phase 2 data (compass pills + dynamic params)
+      setPhase2Data({ compassPills, dynamicParams });
 
-            console.log(`[Collector] 💊 Phase 2: ${compassPills?.length || 0} compass pills, ${dynamicParams?.length || 0} params`);
+      // Set Phase 3 data (mirror advice)
+      setPhase3Data({ mirrorText });
 
-            // Set Phase 2 data - triggers PlayerStatusStrip update
-            setPhase2Data({ compassPills, dynamicParams });
-          })
-          .catch(error => {
-            console.warn('[Collector] ⚠️ Phase 2 failed:', error);
-          });
-      }
-
-      // ========================================================================
-      // PHASE 3: Tertiary Data - Mirror Dialogue
-      // NON-BLOCKING: Runs in background after Phase 1 shows
-      // ========================================================================
-      fetchMirrorText(dilemma)
-        .then(mirrorText => {
-          // Set Phase 3 data - triggers MirrorCard text replacement
-          setPhase3Data({ mirrorText });
-        })
-        .catch(error => {
-          console.warn('[Collector] ⚠️ Phase 3 (mirror) failed:', error);
-        });
-
-      // Function returns immediately after Phase 1 completes
-      // Phase 2/3 continue running in background
+      console.log(`[Collector] ✅ All 3 phases populated from unified response`)
 
     } catch (error: any) {
       console.error('[Collector] ❌ Collection failed:', error);
