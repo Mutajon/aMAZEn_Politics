@@ -14,6 +14,7 @@ export type Dilemma = {
   topic?: string;
   source?: string;
   supportEffects?: any; // Added dynamically by light API for Day 2+ support shifts
+  isGameEnd?: boolean; // True when game reaches Day 8 (aftermath trigger)
 };
 
 export type DilemmaHistoryEntry = {
