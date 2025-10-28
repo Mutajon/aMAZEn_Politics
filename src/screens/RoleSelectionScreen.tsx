@@ -6,29 +6,17 @@ import { bgStyleWithMaze } from "../lib/ui";
 import type { PushFn } from "../lib/router";
 import { validateRoleStrict, AIConnectionError } from "../lib/validation";
 import { useRoleStore } from "../store/roleStore";
-import { POLITICAL_SYSTEMS } from "../data/politicalSystems";
 import { getPredefinedPowerDistribution } from "../data/predefinedPowerDistributions";
 import { useLogger } from "../hooks/useLogger";
 import { useLang } from "../i18n/lang";
 
-// Map display names in the roles list to our canonical political systems.
-const SYSTEM_ALIAS: Record<string, string> = {
-  "Early Republicanism": "Unitary Republic", // <- one-time mapping you asked for
-};
-
-function findPoliticalSystemByName(name: string | undefined) {
-  if (!name) return undefined;
-  const canonical = SYSTEM_ALIAS[name] ?? name;
-  return POLITICAL_SYSTEMS.find(ps => ps.name.toLowerCase() === canonical.toLowerCase());
-}
-
-type RoleItem = { 
-  icon: string; 
-  label: string; 
-  subtitle?: string; 
-  suggest?: boolean;
-  system?: string; // NEW: political system
-  flavor?: string; // NEW: flavor text for modal
+type RoleItem = {
+  key: string; // Unique key for the role (matches predefinedPowerDistributions keys)
+  title: string; // Title (e.g., "Athens — The Day Democracy Died")
+  year: string; // Year badge (e.g., "(-404)")
+  intro: string; // Intro paragraph (situation description)
+  youAre: string; // "You are:" role description
+  suggest?: boolean; // Flag for "Suggest your own" button
 };
 
 export default function RoleSelectionScreen({ push }: { push: PushFn }) {
@@ -37,68 +25,99 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const setRole = useRoleStore((s) => s.setRole);
   const setAnalysis = useRoleStore(s => s.setAnalysis);
 
-// Prime the complete analysis (system + holders) for pre-defined roles.
-// If predefined power distribution exists, use it; otherwise just set system info.
-const primeAnalysisFromRole = (roleLabel: string, systemName?: string) => {
-  // Check if we have a predefined power distribution for this role
-  const predefinedAnalysis = getPredefinedPowerDistribution(roleLabel);
-
-  if (predefinedAnalysis) {
-    // Use the complete predefined analysis (no AI call needed later)
-    setAnalysis(predefinedAnalysis);
-  } else {
-    // Fall back to just priming the political system (AI will analyze holders later)
-    const ps = findPoliticalSystemByName(systemName);
-    setAnalysis({
-      systemName: ps?.name ?? "",
-      systemDesc: ps?.description ?? "",
-      flavor: ps?.flavor ?? "",
-      holders: [],          // holders will be determined on the Power screen via AI
-      playerIndex: null,
-    });
-  }
-};
-
-  // Roles with political system + flavor text
   const roles: RoleItem[] = [
     {
-      icon: "🏛️",
-      label: lang("CITIZEN_ASSEMBLY_ATHENS"),
-      subtitle: lang("ATHENS_SUBTITLE"),
-      system: "Democracy", // Updated to E-12 polity name
-      flavor: lang("ATHENS_FLAVOR")
+      key: "Athens — The Day Democracy Died (-404)",
+      title: lang("ATHENS_TITLE"),
+      year: "-404",
+      intro: lang("ATHENS_INTRO"),
+      youAre: lang("ATHENS_YOU_ARE")
     },
     {
-      icon: "🏺",
-      label: lang("SENATOR_ROMAN_REPUBLIC"),
-      subtitle: lang("ROME_SUBTITLE"),
-      system: "Republican Oligarchy", // Updated to E-12 polity name
-      flavor: lang("ROME_FLAVOR")
+      key: "Alexandria — Fire over the Nile (-48)",
+      title: lang("ALEXANDRIA_TITLE"),
+      year: "-48",
+      intro: lang("ALEXANDRIA_INTRO"),
+      youAre: lang("ALEXANDRIA_YOU_ARE")
     },
     {
-      icon: "🐉",
-      label: lang("EMPEROR_TANG_CHINA"),
-      subtitle: lang("CHINA_SUBTITLE"),
-      system: "Theocratic Monarchy", // Updated to E-12 polity name
-      flavor: lang("CHINA_FLAVOR")
+      key: "Florence — The Fire and the Faith (1494)",
+      title: lang("FLORENCE_TITLE"),
+      year: "1494",
+      intro: lang("FLORENCE_INTRO"),
+      youAre: lang("FLORENCE_YOU_ARE")
     },
     {
-      icon: "🇩🇪",
-      label: lang("CHANCELLOR_MODERN_GERMANY"),
-      subtitle: lang("GERMANY_SUBTITLE"),
-      system: "Republican Oligarchy", // Updated to E-12 polity name
-      flavor: lang("GERMANY_FLAVOR")
+      key: "North America — The First Encounter (1607)",
+      title: lang("NORTH_AMERICA_TITLE"),
+      year: "1607",
+      intro: lang("NORTH_AMERICA_INTRO"),
+      youAre: lang("NORTH_AMERICA_YOU_ARE")
     },
-    { icon: "❓", label: lang("SUGGEST_YOUR_OWN"), suggest: true },
+    {
+      key: "Japan — The Land at War's End (1600)",
+      title: lang("JAPAN_TITLE"),
+      year: "1600",
+      intro: lang("JAPAN_INTRO"),
+      youAre: lang("JAPAN_YOU_ARE")
+    },
+    {
+      key: "Haiti — The Island in Revolt (1791)",
+      title: lang("HAITI_TITLE"),
+      year: "1791",
+      intro: lang("HAITI_INTRO"),
+      youAre: lang("HAITI_YOU_ARE")
+    },
+    {
+      key: "Russia — The Throne Crumbles (1917)",
+      title: lang("RUSSIA_TITLE"),
+      year: "1917",
+      intro: lang("RUSSIA_INTRO"),
+      youAre: lang("RUSSIA_YOU_ARE")
+    },
+    {
+      key: "India — The Midnight of Freedom (1947)",
+      title: lang("INDIA_TITLE"),
+      year: "1947",
+      intro: lang("INDIA_INTRO"),
+      youAre: lang("INDIA_YOU_ARE")
+    },
+    {
+      key: "South Africa — The End of Apartheid (1990)",
+      title: lang("SOUTH_AFRICA_TITLE"),
+      year: "1990",
+      intro: lang("SOUTH_AFRICA_INTRO"),
+      youAre: lang("SOUTH_AFRICA_YOU_ARE")
+    },
+    {
+      key: "Mars Colony — The Red Frontier (2179)",
+      title: lang("MARS_TITLE"),
+      year: "2179",
+      intro: lang("MARS_INTRO"),
+      youAre: lang("MARS_YOU_ARE")
+    }
   ];
 
+  const [expandedRole, setExpandedRole] = useState<string | null>(null);
   const [showSuggestModal, setShowSuggestModal] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<RoleItem | null>(null); // NEW: for flavor modal
   const [input, setInput] = useState("");
   const [aiMsg, setAiMsg] = useState("");
   const [aiError, setAiError] = useState("");
   const [checking, setChecking] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Click outside to collapse
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-role-card]')) {
+        setExpandedRole(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   const openSuggest = () => {
     setInput("");
@@ -108,6 +127,7 @@ const primeAnalysisFromRole = (roleLabel: string, systemName?: string) => {
     setShowSuggestModal(true);
     setTimeout(() => inputRef.current?.focus(), 50);
   };
+
   const closeSuggest = () => {
     setShowSuggestModal(false);
     setAiMsg("");
@@ -151,8 +171,7 @@ const primeAnalysisFromRole = (roleLabel: string, systemName?: string) => {
       setChecking(false);
       setRole(input.trim());
 
-      // BUGFIX: Clear stale political system data when entering custom role
-      // This ensures AI will analyze the custom role fresh instead of using cached predefined data
+      // Clear stale political system data when entering custom role
       setAnalysis({
         systemName: "",
         systemDesc: "",
@@ -161,7 +180,6 @@ const primeAnalysisFromRole = (roleLabel: string, systemName?: string) => {
         playerIndex: null,
       });
 
-      // Navigation will be logged automatically by router
       push("/name");
       closeSuggest();
     } catch (err) {
@@ -176,51 +194,120 @@ const primeAnalysisFromRole = (roleLabel: string, systemName?: string) => {
     }
   }
 
+  const handleRoleConfirm = (role: RoleItem) => {
+    logger.log('role_confirm', role.key, `User confirmed predefined role: ${role.key}`);
+
+    setRole(role.key);
+
+    // Prime analysis from predefined power distributions
+    const predefinedAnalysis = getPredefinedPowerDistribution(role.key);
+    if (predefinedAnalysis) {
+      setAnalysis(predefinedAnalysis);
+    }
+
+    push("/name");
+  };
+
   const container: Variants = {
     hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.08, delayChildren: 0.2 } },
+    show: { opacity: 1, transition: { staggerChildren: 0.05, delayChildren: 0.1 } },
   };
+
   const itemVariants: Variants = {
     hidden: { opacity: 0, y: 8, scale: 0.98 },
     show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 260, damping: 22 } },
   };
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center px-5" style={bgStyleWithMaze}>
-      <div className="w-full max-w-md text-center select-none">
+    <div className="min-h-[100dvh] flex items-center justify-center px-5 py-8" style={bgStyleWithMaze}>
+      <div className="w-full max-w-2xl text-center select-none">
         <h2 className="text-3xl font-extrabold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
           {lang("CHOOSE_YOUR_ROLE")}
         </h2>
 
-        <motion.ul variants={container} initial="hidden" animate="show" className="mt-6 space-y-4">
-          {roles.map((r, idx) => (
-            <motion.li key={idx} variants={itemVariants}>
-              <button
-                onClick={() => {
-                  if (r.suggest) {
-                    logger.log('button_click', 'Suggest Your Own', 'User clicked "Suggest your own" button');
-                    return openSuggest();
-                  }
-                  logger.log('role_click', r.label, `User clicked role: ${r.label}`);
-                  setSelectedRole(r); // open flavor modal
-                }}
-                className="relative w-full px-5 py-4 rounded-2xl bg-white/5 text-white/90 border border-white/10 hover:bg-white/10 hover:border-white/20 transition active:scale-[0.98] flex items-center gap-3 text-left shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]"
-              >
-                <span className="text-xl leading-none">{r.icon}</span>
-                <span className="flex-1">
-                  <span className="block text-base">{r.label}</span>
-                  {r.subtitle && <span className="block text-xs text-white/70">{r.subtitle}</span>}
-                </span>
-                {/* Political System in bottom-right */}
-                {r.system && (
-                  <span className="absolute bottom-2 right-3 text-[11px] text-amber-200/80 italic">
-                    {r.system}
-                  </span>
-                )}
-              </button>
-            </motion.li>
+        <motion.div variants={container} initial="hidden" animate="show" className="mt-6 space-y-3">
+          {roles.map((role) => (
+            <motion.div key={role.key} variants={itemVariants} data-role-card>
+              {/* Golden frame wrapper that contains both title and expanded content */}
+              <div className={`rounded-2xl overflow-hidden shadow-xl transition-all duration-300 ${
+                expandedRole === role.key
+                  ? 'ring-2 ring-amber-400/80 shadow-amber-500/20 shadow-2xl'
+                  : 'ring-1 ring-amber-400/40 hover:ring-amber-400/60'
+              }`}>
+                {/* Title row - always visible with sleek navy gradient background */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    logger.log('role_click', role.key, `User clicked role: ${role.key}`);
+                    setExpandedRole(expandedRole === role.key ? null : role.key);
+                  }}
+                  className="w-full px-6 py-4 flex items-center justify-between text-left transition-all duration-300 bg-gradient-to-r from-slate-900/95 via-blue-950/95 to-slate-900/95 hover:from-slate-800/98 hover:via-blue-900/98 hover:to-slate-800/98"
+                >
+                  <span className="text-base text-white font-cinzel font-semibold tracking-wide drop-shadow-md">{role.title}</span>
+                  <span className="text-sm text-amber-300 font-light tracking-wider drop-shadow-md">{role.year}</span>
+                </button>
+
+                {/* Expandable content with black semi-transparent background */}
+                <AnimatePresence>
+                  {expandedRole === role.key && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="bg-black/60 backdrop-blur-sm border-t border-slate-700/50">
+                        <div className="px-6 py-5 space-y-4">
+                          {/* Framed content area */}
+                          <div className="rounded-xl border border-slate-700/50 bg-black/30 p-4 space-y-3">
+                            {/* Intro paragraph */}
+                            <p className="text-sm text-white/95 leading-relaxed">
+                              {role.intro}
+                            </p>
+
+                            {/* "You are:" section */}
+                            <div className="pt-2 border-t border-slate-700/40">
+                              <p className="text-sm text-white/95">
+                                <span className="font-semibold text-amber-300">You are:</span>{" "}
+                                <span className="text-white/90">{role.youAre}</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Confirm button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRoleConfirm(role);
+                            }}
+                            className="w-full rounded-xl px-4 py-3 font-semibold text-sm shadow-lg bg-gradient-to-r from-amber-400 to-amber-600 text-gray-900 hover:from-amber-300 hover:to-amber-500 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                          >
+                            {lang("CONFIRM")}
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.div>
           ))}
-        </motion.ul>
+
+          {/* Suggest your own button */}
+          <motion.div variants={itemVariants}>
+            <button
+              onClick={() => {
+                logger.log('button_click', 'Suggest Your Own', 'User clicked "Suggest your own" button');
+                openSuggest();
+              }}
+              className="w-full px-6 py-4 rounded-2xl bg-gradient-to-r from-purple-900/90 to-purple-700/90 hover:from-purple-800/95 hover:to-purple-700/95 text-white border border-purple-500/30 hover:border-purple-400/40 transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-3 shadow-xl"
+            >
+              <span className="text-xl leading-none">❓</span>
+              <span className="text-base font-medium tracking-wide drop-shadow-sm">{lang("SUGGEST_YOUR_OWN")}</span>
+            </button>
+          </motion.div>
+        </motion.div>
 
         {/* Suggest-your-own Modal */}
         <AnimatePresence>
@@ -309,61 +396,6 @@ const primeAnalysisFromRole = (roleLabel: string, systemName?: string) => {
                     }`}
                   >
                     {checking ? lang("CHECKING") : lang("CONFIRM")}
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Flavor Modal for predefined roles */}
-        <AnimatePresence>
-          {selectedRole && (
-            <motion.div
-              className="fixed inset-0 z-50 grid place-items-center"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <div className="absolute inset-0 bg-black/60" onClick={() => setSelectedRole(null)} />
-              <motion.div
-                role="dialog"
-                aria-modal="true"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ type: "spring", stiffness: 300, damping: 24 }}
-                className="relative w-[92%] max-w-md rounded-2xl p-6 bg-neutral-900/95 backdrop-blur border border-white/10 shadow-xl text-center"
-              >
-                <h3 className="text-lg font-semibold text-amber-200 mb-3">{selectedRole.label}</h3>
-                <p className="text-white/80 text-sm">{selectedRole.flavor}</p>
-
-                <div className="mt-6 flex gap-4 justify-center">
-                  <button
-                    onClick={() => {
-                      logger.log('button_click', 'Back', 'User clicked Back in flavor modal');
-                      setSelectedRole(null);
-                    }}
-                    className="rounded-xl px-4 py-2 text-sm bg-white/10 text-white hover:bg-white/15"
-                  >
-                    {lang("BACK")}
-                  </button>
-                  <button
-                    onClick={() => {
-                      // Extract role name without time period (e.g., "Senator of the Roman Republic" instead of full label)
-                      const roleName = selectedRole.label.replace(/\s*\(.*?\)\s*/g, '').trim();
-
-                      logger.log('role_confirm', roleName, `User confirmed predefined role: ${roleName}`);
-
-                      setRole(selectedRole.label);
-                      primeAnalysisFromRole(selectedRole.label, selectedRole.system);
-
-                      // Navigation will be logged automatically by router
-                      push("/name");
-                    }}
-                    className="rounded-xl px-4 py-2 text-sm font-semibold shadow bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335]"
-                  >
-                    {lang("CONFIRM")}
                   </button>
                 </div>
               </motion.div>

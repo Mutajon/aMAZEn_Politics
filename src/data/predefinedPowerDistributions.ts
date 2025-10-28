@@ -1,251 +1,617 @@
 // src/data/predefinedPowerDistributions.ts
-// Predefined power distribution analysis for the four preset roles
+// Predefined power distribution analysis for the 10 preset roles
 // This eliminates the need for AI analysis when players choose these roles
 
 import type { AnalysisResult } from "../store/roleStore";
 
 export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
-  "Citizen of the Assembly in Classical Athens": {
-    systemName: "Democracy",
-    systemDesc: "Major policy decisions are made by citizens voting directly in popular assemblies.",
-    flavor: "Town-square politics, loud debate, lots decided by show of hands.",
+  "Athens — The Day Democracy Died (-404)": {
+    systemName: "Hard-Power Oligarchy — Stratocracy",
+    systemDesc: "Military-backed oligarchy: Spartan garrison with local rulers set rules; courts muted, citizens sidelined.",
+    flavor: "Spartan steel props the new order; a few rule, most keep heads down.",
     holders: [
       {
-        name: "Assembly (Citizens)",
-        percent: 60,
-        icon: "🏛",
-        note: "Adult male citizens debate and vote directly; primary legislative authority.",
-        role: { A: true, E: true }, // Authors laws and erases executive overreach
-        stype: { t: "Author", i: "+" } // Strong Author
-      },
-      {
-        name: "Council (Boule)",
-        percent: 18,
-        icon: "📜",
-        note: "Council of representatives prepares agendas and manages day-to-day administration.",
-        role: { A: true, E: false }, // Authors agenda but limited erasure
-        stype: { t: "Agent", i: "•" } // Implements Assembly will
-      },
-      {
-        name: "Generals (Strategoi)",
-        percent: 8,
+        name: "Coercive Force",
+        percent: 35,
         icon: "⚔️",
-        note: "Elected military leaders with significant political sway, especially in wartime.",
-        role: { A: false, E: false }, // Execute orders but don't author/erase
-        stype: { t: "Actor", i: "•" } // Actors with conditional influence
+        note: "Spartan garrison and local enforcers",
+        role: { A: true, E: true },
+        stype: { t: "Author", i: "+" }
       },
       {
-        name: "Magistrates & Courts",
-        percent: 9,
-        icon: "⚖️",
-        note: "Officials who enforce laws and preside over trials; many chosen by lot or election.",
-        role: { A: false, E: true }, // Erase through judicial review
-        stype: { t: "Eraser", i: "•" } // Moderate Eraser
+        name: "Executive",
+        percent: 30,
+        icon: "👤",
+        note: "Thirty rulers and their core allies",
+        role: { A: true, E: true },
+        stype: { t: "Author", i: "+" }
       },
       {
-        name: "Non‑Citizen Influencers",
-        percent: 5,
+        name: "Wealth",
+        percent: 15,
+        icon: "💰",
+        note: "Elite backers fund and profit from seizures",
+        role: { A: true, E: false },
+        stype: { t: "Author", i: "•" }
+      },
+      {
+        name: "Bureaucracy",
+        percent: 10,
+        icon: "📜",
+        note: "Clerks and boards under oligarch control",
+        role: { A: false, E: false },
+        stype: { t: "Agent", i: "•" }
+      },
+      {
+        name: "Demos",
+        percent: 10,
         icon: "👥",
-        note: "Metics, women, slaves, and wealthy patrons affecting policy indirectly.",
-        role: { A: false, E: false }, // No formal power
-        stype: { t: "Acolyte", i: "-" } // Minimal agency
+        note: "Citizens/exiles; suppressed but restive",
+        role: { A: false, E: true },
+        stype: { t: "Eraser", i: "-" }
       }
     ],
-    playerIndex: 0,
+    playerIndex: null,
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
-      tierII: ["Justice", "Economy", "Diplomacy"],
-      tierIII: ["Infrastructure", "Curricula"],
-      stopA: false, // Military does not escalate at will
-      stopB: false, // No executive consolidation
-      decisive: ["Assembly (Citizens)", "Magistrates & Courts"]
+      tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
+      tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
+      stopA: true,
+      stopB: true,
+      decisive: ["Coercive Force", "Executive"]
     },
     grounding: {
       settingType: "real",
-      era: "Classical Athens, 5th century BCE"
+      era: "404–403 BCE Athens"
     }
   },
 
-  "Senator of the Roman Republic": {
-    systemName: "Republican Oligarchy",
-    systemDesc: "Political power concentrated in senatorial elite with formal institutions dominated by a few families.",
-    flavor: "An aristocratic res publica where senatorial houses steer policy through patronage and prestige.",
+  "Alexandria — Fire over the Nile (-48)": {
+    systemName: "Autocratizing (Military)",
+    systemDesc: "Under siege, the foreign general and local army overrule the court; force sets terms, others adapt.",
+    flavor: "Siege politics: swords pick rulers, scrolls risk the fire.",
     holders: [
       {
-        name: "Senatorial Elite",
-        percent: 45,
-        icon: "🏛",
-        note: "Hereditary & aristocratic families who control legislation, senatorial decrees.",
-        role: { A: true, E: true }, // Authors and erases through influence
-        stype: { t: "Author", i: "+" } // Strong Author
-      },
-      {
-        name: "Consuls & Magistrates",
-        percent: 20,
-        icon: "⚖️",
-        note: "Elected executives who implement policy, command authority, and preside over assemblies.",
-        role: { A: true, E: false }, // Authors decrees but limited veto
-        stype: { t: "Author", i: "•" } // Moderate Author
-      },
-      {
-        name: "Equestrian/Wealth Class",
-        percent: 15,
-        icon: "💼",
-        note: "Wealthy non-senatorial elites influencing finance, contracts, and provincial administration.",
-        role: { A: false, E: false }, // Influence but no formal authority
-        stype: { t: "Actor", i: "•" } // Economic actors
-      },
-      {
-        name: "Popular Assemblies",
-        percent: 15,
-        icon: "🗳",
-        note: "Citizen bodies with formal voting power, often guided by elite proposals and patronage.",
-        role: { A: false, E: true }, // Can veto but don't initiate
-        stype: { t: "Eraser", i: "-" } // Weak Eraser (manipulated)
-      },
-      {
-        name: "Military Leaders",
-        percent: 5,
-        icon: "🛡",
-        note: "Generals whose command of troops grants bargaining power and political leverage.",
-        role: { A: false, E: false }, // Execute orders
-        stype: { t: "Actor", i: "-" } // Conditional actors
-      }
-    ],
-    playerIndex: 0,
-    e12: {
-      tierI: ["Security", "InfoOrder", "CivilLib"],
-      tierII: ["Economy", "Appointments", "Justice", "Diplomacy"],
-      tierIII: ["Infrastructure", "Curricula"],
-      stopA: false, // Military restrained by Senate
-      stopB: false, // Power distributed among offices
-      decisive: ["Senatorial Elite", "Consuls & Magistrates"]
-    },
-    grounding: {
-      settingType: "real",
-      era: "Roman Republic, 3rd century BCE"
-    }
-  },
-
-  "Emperor of Tang China": {
-    systemName: "Theocratic Monarchy",
-    systemDesc: "A hereditary sovereign claims legitimacy from divine mandate; emperor holds supreme legal authority.",
-    flavor: "The Son of Heaven sits at the center of court intrigue, scholar-official rule, and regional power-brokers.",
-    holders: [
-      {
-        name: "Emperor",
+        name: "Roman General & Legions",
         percent: 40,
-        icon: "👑",
-        note: "Formal sovereign with ultimate legal authority and ritual legitimacy (Mandate of Heaven).",
-        role: { A: true, E: true }, // Authors and erases through decree
-        stype: { t: "Dictator", i: "+" } // Strong Dictator (de jure absolute)
+        icon: "🏛",
+        note: "Foreign general holds city by force",
+        role: { A: true, E: true },
+        stype: { t: "Dictator", i: "+" }
       },
       {
-        name: "Imperial Bureaucracy",
+        name: "Egyptian Army & Palace Guards",
         percent: 25,
-        icon: "📜",
-        note: "Meritocratic scholar-officials (chancellors, ministries) who run administration and draft policy.",
-        role: { A: true, E: false }, // Authors implementation but can't veto Emperor
-        stype: { t: "Agent", i: "+" } // Strong agents (filter Emperor's will)
-      },
-      {
-        name: "Aristocratic Clans",
-        percent: 15,
-        icon: "🏺",
-        note: "Powerful noble families that influence court appointments, marriage alliances, and patronage.",
-        role: { A: false, E: false }, // Influence but no formal authority
-        stype: { t: "Actor", i: "•" } // Social/economic actors
-      },
-      {
-        name: "Regional Military Governors",
-        percent: 12,
         icon: "⚔️",
-        note: "Jiedushi and generals who control troops and local resources; can check central authority.",
-        role: { A: false, E: true }, // Can resist/veto central directives
-        stype: { t: "Eraser", i: "•" } // Regional erasers
+        note: "Besieges city; swaps leverage into terms",
+        role: { A: true, E: true },
+        stype: { t: "Author", i: "+" }
       },
       {
-        name: "Eunuch & Court Factions",
+        name: "Royal Court (Cleopatra/Ptolemy)",
+        percent: 15,
+        icon: "👑",
+        note: "Decrees depend on which army backs them",
+        role: { A: true, E: false },
+        stype: { t: "Author", i: "•" }
+      },
+      {
+        name: "City Wealth & Grain Merchants",
+        percent: 12,
+        icon: "💰",
+        note: "Funds supplies; rations shape endurance",
+        role: { A: true, E: false },
+        stype: { t: "Author", i: "-" }
+      },
+      {
+        name: "Alexandrian Crowd & Dockworkers",
         percent: 8,
-        icon: "🎭",
-        note: "Palace insiders who broker access and information, often meddling in succession and policy.",
-        role: { A: false, E: false }, // Manipulate but don't formally decide
-        stype: { t: "Actor", i: "-" } // Behind-the-scenes actors
+        icon: "👥",
+        note: "Riots and harbor labor can tip moments",
+        role: { A: false, E: true },
+        stype: { t: "Eraser", i: "•" }
       }
     ],
-    playerIndex: 0,
+    playerIndex: null,
     e12: {
-      tierI: ["Security", "Appointments", "InfoOrder"],
-      tierII: ["Economy", "Justice", "Diplomacy"],
-      tierIII: ["Infrastructure", "Curricula", "Healthcare"],
-      stopA: false, // Military governors restrained
-      stopB: true, // Emperor accumulates pen+eraser across domains
-      decisive: ["Emperor", "Imperial Bureaucracy"]
+      tierI: ["Security", "CivilLib", "InfoOrder"],
+      tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
+      tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
+      stopA: true,
+      stopB: false,
+      decisive: ["Roman General & Legions", "Egyptian Army & Palace Guards", "Royal Court (Cleopatra/Ptolemy)"]
     },
     grounding: {
       settingType: "real",
-      era: "Tang Dynasty China, 8th century AD"
+      era: "48–47 BCE Alexandria"
     }
   },
 
-  "Chancellor of Modern Germany": {
-    systemName: "Republican Oligarchy",
-    systemDesc: "Government is formed from and accountable to an elected legislature; executive depends on parliamentary confidence.",
-    flavor: "Coalition-driven executive in a federal, consensus-oriented polity.",
+  "Florence — The Fire and the Faith (1494)": {
+    systemName: "Mental-Might Oligarchy — Theocracy",
+    systemDesc: "Wide-vote republic led by a strong preacher; laws and diplomacy follow sermons and public piety.",
+    flavor: "Great Council votes; a friar's fire shapes the city.",
     holders: [
       {
-        name: "Parliament (Bundestag & Parties)",
-        percent: 38,
+        name: "Ideology/Religious (Savonarola & Friars)",
+        percent: 32,
+        icon: "✝️",
+        note: "Savonarola's sermons drive laws; moral patrols, censors.",
+        role: { A: true, E: true },
+        stype: { t: "Author", i: "+" }
+      },
+      {
+        name: "Legislative (Great Council)",
+        percent: 24,
         icon: "🏛",
-        note: "Primary lawmaking body and source of confidence for governments.",
-        role: { A: true, E: true }, // Authors laws and can withdraw confidence
-        stype: { t: "Author", i: "+" } // Strong Author (legislative primacy)
+        note: "3,000-member citizen council passes laws and taxes.",
+        role: { A: true, E: false },
+        stype: { t: "Author", i: "•" }
       },
       {
-        name: "Chancellor & Cabinet",
-        percent: 30,
-        icon: "👔",
-        note: "Executive leadership, implements policy but reliant on parliamentary support.",
-        role: { A: true, E: false }, // Authors executive orders but can't veto legislature
-        stype: { t: "Author", i: "•" } // Moderate Author (constrained)
-      },
-      {
-        name: "State Governments (Länder / Bundesrat)",
+        name: "Executive (City Leaders & Chief Magistrate)",
         percent: 18,
-        icon: "🏙",
-        note: "Regional authority with influence via Bundesrat and policy domains.",
-        role: { A: true, E: true }, // Authors regional policy and vetoes federal laws
-        stype: { t: "Author", i: "•" } // Moderate Author+Eraser (federalism)
+        icon: "👤",
+        note: "City leaders run daily rule, deals, and enforcement.",
+        role: { A: true, E: true },
+        stype: { t: "Agent", i: "•" }
       },
       {
-        name: "Judiciary (Constitutional Court & courts)",
-        percent: 7,
+        name: "Wealth (Bankers & Guild Elders)",
+        percent: 14,
+        icon: "💰",
+        note: "Funding, credit, and tax leverage stall or speed policy.",
+        role: { A: false, E: true },
+        stype: { t: "Eraser", i: "•" }
+      },
+      {
+        name: "Judicial/Police",
+        percent: 12,
         icon: "⚖️",
-        note: "Judicial review and rights protection.",
-        role: { A: false, E: true }, // Erases unconstitutional laws
-        stype: { t: "Eraser", i: "+" } // Strong Eraser (constitutional review)
-      },
-      {
-        name: "Federal President",
-        percent: 7,
-        icon: "🕊",
-        note: "Ceremonial head with limited reserve powers.",
-        role: { A: false, E: false }, // Symbolic, minimal authority
-        stype: { t: "Acolyte", i: "•" } // Figurehead
+        note: "Courts and guards enforce bans and punish dissent.",
+        role: { A: false, E: true },
+        stype: { t: "Eraser", i: "•" }
       }
     ],
-    playerIndex: 1,
+    playerIndex: null,
     e12: {
-      tierI: ["CivilLib", "InfoOrder", "Security"],
-      tierII: ["Economy", "Justice", "Appointments", "Diplomacy"],
-      tierIII: ["Healthcare", "Infrastructure", "Environment", "Immigration"],
-      stopA: false, // Civilian control of military
-      stopB: false, // Power distributed among Parliament, Chancellor, Länder, Courts
-      decisive: ["Parliament (Bundestag & Parties)", "Judiciary (Constitutional Court & courts)"]
+      tierI: ["Security", "CivilLib", "InfoOrder"],
+      tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
+      tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
+      stopA: false,
+      stopB: false,
+      decisive: ["Ideology/Religious (Savonarola & Friars)", "Executive (City Leaders & Chief Magistrate)", "Legislative (Great Council)"]
     },
     grounding: {
       settingType: "real",
-      era: "Federal Republic of Germany, 21st century"
+      era: "Florence 1494–1498 (Savonarola era)"
+    }
+  },
+
+  "North America — The First Encounter (1607)": {
+    systemName: "Personalist Monarchy / Autocracy",
+    systemDesc: "Single paramount chief directs war, trade, and justice; councils advise, but his word usually decides.",
+    flavor: "Strong chief steering first contact with Jamestown; war or trade by his word.",
+    holders: [
+      {
+        name: "Executive (Paramount Chief)",
+        percent: 42,
+        icon: "👑",
+        note: "Commands alliance; sets war, trade, justice.",
+        role: { A: true, E: true },
+        stype: { t: "Dictator", i: "+" }
+      },
+      {
+        name: "Coercive Force (War Captains & Warriors)",
+        percent: 23,
+        icon: "⚔️",
+        note: "Raids and blockades can force policy shifts.",
+        role: { A: true, E: false },
+        stype: { t: "Author", i: "•" }
+      },
+      {
+        name: "Council of Chiefs/Elders",
+        percent: 14,
+        icon: "👥",
+        note: "Advice and consent; can slow risky moves.",
+        role: { A: false, E: true },
+        stype: { t: "Eraser", i: "•" }
+      },
+      {
+        name: "Ideology/Religious (Spiritual Advisers)",
+        percent: 11,
+        icon: "✨",
+        note: "Ritual sanction shapes go/no-go on war/trade.",
+        role: { A: false, E: true },
+        stype: { t: "Eraser", i: "•" }
+      },
+      {
+        name: "Wealth (Food/Trade Gatekeepers)",
+        percent: 10,
+        icon: "🌾",
+        note: "Controls corn, tribute, and gifts to outsiders.",
+        role: { A: true, E: false },
+        stype: { t: "Agent", i: "•" }
+      }
+    ],
+    playerIndex: null,
+    e12: {
+      tierI: ["Security", "CivilLib", "InfoOrder"],
+      tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
+      tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
+      stopA: false,
+      stopB: true,
+      decisive: ["Executive (Paramount Chief)", "Coercive Force (War Captains & Warriors)"]
+    },
+    grounding: {
+      settingType: "real",
+      era: "Tidewater Virginia, 1607–1609"
+    }
+  },
+
+  "Japan — The Land at War's End (1600)": {
+    systemName: "Hard-Power Oligarchy — Stratocracy",
+    systemDesc: "Warlord coalitions rule by force; law follows the armies, not councils.",
+    flavor: "Swords decide law; pick a side before the dust settles.",
+    holders: [
+      {
+        name: "Coercive Force (Armies & Warlords)",
+        percent: 38,
+        icon: "⚔️",
+        note: "Decides war/peace; seizes lands; compels loyalties",
+        role: { A: true, E: true },
+        stype: { t: "Author", i: "+" }
+      },
+      {
+        name: "Executive (Coalition Chiefs)",
+        percent: 30,
+        icon: "👤",
+        note: "Top commanders coordinating alliances and orders",
+        role: { A: true, E: true },
+        stype: { t: "Author", i: "+" }
+      },
+      {
+        name: "Wealth (Rice Yields & Merchants)",
+        percent: 12,
+        icon: "🌾",
+        note: "Funds rice stipends, supplies, loans for campaigns",
+        role: { A: false, E: false },
+        stype: { t: "Agent", i: "•" }
+      },
+      {
+        name: "Bureaucracy (Clan Stewards)",
+        percent: 10,
+        icon: "📜",
+        note: "Runs castles, tax rolls, must obey the victors",
+        role: { A: false, E: false },
+        stype: { t: "Agent", i: "•" }
+      },
+      {
+        name: "Ideology/Religious (Imperial Court & Temples)",
+        percent: 10,
+        icon: "⛩",
+        note: "Grants titles, blessings; boosts legitimacy, not control",
+        role: { A: false, E: false },
+        stype: { t: "Actor", i: "•" }
+      }
+    ],
+    playerIndex: null,
+    e12: {
+      tierI: ["Security", "CivilLib", "InfoOrder"],
+      tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
+      tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
+      stopA: true,
+      stopB: false,
+      decisive: ["Coercive Force (Armies & Warlords)", "Executive (Coalition Chiefs)"]
+    },
+    grounding: {
+      settingType: "real",
+      era: "Japan, 1600 (late Sengoku)"
+    }
+  },
+
+  "Haiti — The Island in Revolt (1791)": {
+    systemName: "Hard-Power Oligarchy — Stratocracy",
+    systemDesc: "Warring armed factions decide outcomes; civil authority is weak.",
+    flavor: "Guns and torches rule the sugar island.",
+    holders: [
+      {
+        name: "Rebel Slave Armies (Coercive Force)",
+        percent: 36,
+        icon: "🔥",
+        note: "Burn plantations, seize towns, set facts on the ground",
+        role: { A: true, E: true },
+        stype: { t: "Author", i: "+" }
+      },
+      {
+        name: "Colonial Militias & Troops (Coercive Force)",
+        percent: 30,
+        icon: "⚔️",
+        note: "Planter-led forces defend estates, punish rebels",
+        role: { A: true, E: true },
+        stype: { t: "Author", i: "+" }
+      },
+      {
+        name: "Planter Elite (Wealth)",
+        percent: 14,
+        icon: "💰",
+        note: "Money, supplies, and orders to militias",
+        role: { A: true, E: false },
+        stype: { t: "Author", i: "•" }
+      },
+      {
+        name: "Colonial Governor & Bureaucracy (Executive)",
+        percent: 8,
+        icon: "👤",
+        note: "Issues decrees; depends on militias to act",
+        role: { A: true, E: false },
+        stype: { t: "Agent", i: "•" }
+      },
+      {
+        name: "Vodou & Rebel Organizers (Ideology/Religious)",
+        percent: 12,
+        icon: "✨",
+        note: "Rituals, oaths, and messages unify the revolt",
+        role: { A: true, E: false },
+        stype: { t: "Author", i: "•" }
+      }
+    ],
+    playerIndex: null,
+    e12: {
+      tierI: ["Security", "CivilLib", "InfoOrder"],
+      tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
+      tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
+      stopA: true,
+      stopB: false,
+      decisive: ["Rebel Slave Armies (Coercive Force)", "Colonial Militias & Troops (Coercive Force)", "Vodou & Rebel Organizers (Ideology/Religious)"]
+    },
+    grounding: {
+      settingType: "real",
+      era: "Saint-Domingue, 1791"
+    }
+  },
+
+  "Russia — The Throne Crumbles (1917)": {
+    systemName: "Personalist Monarchy / Autocracy",
+    systemDesc: "Tsar rules personally; army compliance and urban revolt now decide what sticks.",
+    flavor: "One man on a crumbling throne, flanked by generals and crowds.",
+    holders: [
+      {
+        name: "Coercive Force (Army & Garrison)",
+        percent: 35,
+        icon: "⚔️",
+        note: "High Command, Petrograd troops decide to obey or refuse",
+        role: { A: true, E: true },
+        stype: { t: "Eraser", i: "+" }
+      },
+      {
+        name: "Executive (Tsar)",
+        percent: 25,
+        icon: "👑",
+        note: "Nicholas II issues orders; authority eroding fast",
+        role: { A: true, E: true },
+        stype: { t: "Dictator", i: "•" }
+      },
+      {
+        name: "Demos (Workers' & Soldiers' Councils)",
+        percent: 20,
+        icon: "👥",
+        note: "Mass protests and mutinies can topple any plan",
+        role: { A: false, E: true },
+        stype: { t: "Eraser", i: "•" }
+      },
+      {
+        name: "Legislative (Duma Leaders)",
+        percent: 15,
+        icon: "🏛",
+        note: "Duma committee claims government; needs army compliance",
+        role: { A: true, E: false },
+        stype: { t: "Author", i: "•" }
+      },
+      {
+        name: "Wealth (Nobles & Big Industry)",
+        percent: 5,
+        icon: "💰",
+        note: "Funding and elite pressure behind Duma and court",
+        role: { A: false, E: false },
+        stype: { t: "Agent", i: "-" }
+      }
+    ],
+    playerIndex: null,
+    e12: {
+      tierI: ["Security", "CivilLib", "InfoOrder"],
+      tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
+      tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
+      stopA: false,
+      stopB: false,
+      decisive: ["Coercive Force (Army & Garrison)", "Executive (Tsar)", "Legislative (Duma Leaders)", "Demos (Workers' & Soldiers' Councils)"]
+    },
+    grounding: {
+      settingType: "real",
+      era: "Russia, Feb–Mar 1917"
+    }
+  },
+
+  "India — The Midnight of Freedom (1947)": {
+    systemName: "Hard-Power Oligarchy — Stratocracy",
+    systemDesc: "Armed forces and communal leaders shape rules; administrators improvise to contain violence amid state breakdown.",
+    flavor: "Curfews, convoys, and rumors decide who lives through the night.",
+    holders: [
+      {
+        name: "Coercive Force",
+        percent: 40,
+        icon: "⚔️",
+        note: "Army, police, and militias set terms with force",
+        role: { A: true, E: true },
+        stype: { t: "Author", i: "+" }
+      },
+      {
+        name: "Ideology/Religious",
+        percent: 25,
+        icon: "✨",
+        note: "Community leaders and clerics mobilize and veto",
+        role: { A: true, E: true },
+        stype: { t: "Author", i: "•" }
+      },
+      {
+        name: "Executive",
+        percent: 20,
+        icon: "👤",
+        note: "District chief and provincial chiefs issue orders",
+        role: { A: true, E: false },
+        stype: { t: "Author", i: "•" }
+      },
+      {
+        name: "Demos",
+        percent: 10,
+        icon: "👥",
+        note: "Crowds can overwhelm plans or force retreats",
+        role: { A: false, E: true },
+        stype: { t: "Actor", i: "+" }
+      },
+      {
+        name: "Media/Platforms",
+        percent: 5,
+        icon: "📰",
+        note: "Rumors, leaflets, and print drive panic or calm",
+        role: { A: true, E: false },
+        stype: { t: "Agent", i: "•" }
+      }
+    ],
+    playerIndex: null,
+    e12: {
+      tierI: ["Security", "CivilLib", "InfoOrder"],
+      tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
+      tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
+      stopA: true,
+      stopB: false,
+      decisive: ["Coercive Force", "Ideology/Religious", "Executive"]
+    },
+    grounding: {
+      settingType: "real",
+      era: "India Partition, 1947"
+    }
+  },
+
+  "South Africa — The End of Apartheid (1990)": {
+    systemName: "Autocratizing (Executive)",
+    systemDesc: "Late-apartheid South Africa: executive-led minority rule with strong security forces and rising mass opposition.",
+    flavor: "Orders from above, pressure from below, cameras watching.",
+    holders: [
+      {
+        name: "Executive",
+        percent: 32,
+        icon: "👤",
+        note: "State President and cabinet set rules and budgets.",
+        role: { A: true, E: false },
+        stype: { t: "Author", i: "+" }
+      },
+      {
+        name: "Coercive Force",
+        percent: 28,
+        icon: "⚔️",
+        note: "Police and military enforce, suppress, and shape facts on ground",
+        role: { A: true, E: true },
+        stype: { t: "Author", i: "+" }
+      },
+      {
+        name: "Demos",
+        percent: 22,
+        icon: "👥",
+        note: "Mass movements, unions, ANC/UDF force concessions via action",
+        role: { A: false, E: true },
+        stype: { t: "Eraser", i: "+" }
+      },
+      {
+        name: "Wealth",
+        percent: 12,
+        icon: "💰",
+        note: "Big business pressures for stability and reform.",
+        role: { A: true, E: false },
+        stype: { t: "Author", i: "•" }
+      },
+      {
+        name: "Media/Platforms",
+        percent: 6,
+        icon: "📰",
+        note: "Domestic and foreign press raise costs of crackdowns.",
+        role: { A: false, E: true },
+        stype: { t: "Eraser", i: "•" }
+      }
+    ],
+    playerIndex: null,
+    e12: {
+      tierI: ["Security", "CivilLib", "InfoOrder"],
+      tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
+      tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
+      stopA: false,
+      stopB: true,
+      decisive: ["Executive", "Coercive Force", "Demos"]
+    },
+    grounding: {
+      settingType: "real",
+      era: "South Africa, 1990 transition"
+    }
+  },
+
+  "Mars Colony — The Red Frontier (2179)": {
+    systemName: "Mental-Might Oligarchy — Technocracy",
+    systemDesc: "Engineers and safety rules steer decisions; an elected governor balances Earth supply leverage and local freedoms.",
+    flavor: "Survival-first Mars town where engineers hold the real brakes.",
+    holders: [
+      {
+        name: "Executive",
+        percent: 28,
+        icon: "👤",
+        note: "Elected governor; emergency orders and budgets",
+        role: { A: true, E: true },
+        stype: { t: "Author", i: "+" }
+      },
+      {
+        name: "Science/Philosophy",
+        percent: 24,
+        icon: "🔬",
+        note: "Life-support and safety board; can halt risky plans",
+        role: { A: true, E: true },
+        stype: { t: "Eraser", i: "+" }
+      },
+      {
+        name: "Wealth",
+        percent: 22,
+        icon: "🌐",
+        note: "Earth supply consortium; embargo/price veto power",
+        role: { A: true, E: true },
+        stype: { t: "Eraser", i: "+" }
+      },
+      {
+        name: "Legislative",
+        percent: 16,
+        icon: "🏛",
+        note: "Colony council; charters, audits, recalls",
+        role: { A: true, E: true },
+        stype: { t: "Author", i: "•" }
+      },
+      {
+        name: "Coercive Force",
+        percent: 10,
+        icon: "🛡",
+        note: "Peacekeepers; enforce lockdowns under civilian control",
+        role: { A: false, E: false },
+        stype: { t: "Agent", i: "•" }
+      }
+    ],
+    playerIndex: null,
+    e12: {
+      tierI: ["Security", "CivilLib", "InfoOrder"],
+      tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
+      tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
+      stopA: false,
+      stopB: false,
+      decisive: ["Executive", "Science/Philosophy", "Wealth"]
+    },
+    grounding: {
+      settingType: "fictional",
+      era: "late 22nd century"
     }
   }
 };
