@@ -9,6 +9,7 @@ import { useRoleStore } from "../store/roleStore";
 import { getPredefinedPowerDistribution } from "../data/predefinedPowerDistributions";
 import { useLogger } from "../hooks/useLogger";
 import { useLang } from "../i18n/lang";
+import { getRoleImages } from "../data/roleImages";
 
 type RoleItem = {
   key: string; // Unique key for the role (matches predefinedPowerDistributions keys)
@@ -16,6 +17,8 @@ type RoleItem = {
   year: string; // Year badge (e.g., "(-404)")
   intro: string; // Intro paragraph (situation description)
   youAre: string; // "You are:" role description
+  bannerImage?: string; // Banner image path (small, shown when collapsed)
+  fullImage?: string; // Full image path (large, shown when expanded)
   suggest?: boolean; // Flag for "Suggest your own" button
 };
 
@@ -31,70 +34,110 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
       title: lang("ATHENS_TITLE"),
       year: "-404",
       intro: lang("ATHENS_INTRO"),
-      youAre: lang("ATHENS_YOU_ARE")
+      youAre: lang("ATHENS_YOU_ARE"),
+      ...getRoleImages("Athens — The Day Democracy Died (-404)") && {
+        bannerImage: getRoleImages("Athens — The Day Democracy Died (-404)")!.banner,
+        fullImage: getRoleImages("Athens — The Day Democracy Died (-404)")!.full
+      }
     },
     {
       key: "Alexandria — Fire over the Nile (-48)",
       title: lang("ALEXANDRIA_TITLE"),
       year: "-48",
       intro: lang("ALEXANDRIA_INTRO"),
-      youAre: lang("ALEXANDRIA_YOU_ARE")
+      youAre: lang("ALEXANDRIA_YOU_ARE"),
+      ...getRoleImages("Alexandria — Fire over the Nile (-48)") && {
+        bannerImage: getRoleImages("Alexandria — Fire over the Nile (-48)")!.banner,
+        fullImage: getRoleImages("Alexandria — Fire over the Nile (-48)")!.full
+      }
     },
     {
       key: "Florence — The Fire and the Faith (1494)",
       title: lang("FLORENCE_TITLE"),
       year: "1494",
       intro: lang("FLORENCE_INTRO"),
-      youAre: lang("FLORENCE_YOU_ARE")
+      youAre: lang("FLORENCE_YOU_ARE"),
+      ...getRoleImages("Florence — The Fire and the Faith (1494)") && {
+        bannerImage: getRoleImages("Florence — The Fire and the Faith (1494)")!.banner,
+        fullImage: getRoleImages("Florence — The Fire and the Faith (1494)")!.full
+      }
     },
     {
       key: "North America — The First Encounter (1607)",
       title: lang("NORTH_AMERICA_TITLE"),
       year: "1607",
       intro: lang("NORTH_AMERICA_INTRO"),
-      youAre: lang("NORTH_AMERICA_YOU_ARE")
+      youAre: lang("NORTH_AMERICA_YOU_ARE"),
+      ...getRoleImages("North America — The First Encounter (1607)") && {
+        bannerImage: getRoleImages("North America — The First Encounter (1607)")!.banner,
+        fullImage: getRoleImages("North America — The First Encounter (1607)")!.full
+      }
     },
     {
       key: "Japan — The Land at War's End (1600)",
       title: lang("JAPAN_TITLE"),
       year: "1600",
       intro: lang("JAPAN_INTRO"),
-      youAre: lang("JAPAN_YOU_ARE")
+      youAre: lang("JAPAN_YOU_ARE"),
+      ...getRoleImages("Japan — The Land at War's End (1600)") && {
+        bannerImage: getRoleImages("Japan — The Land at War's End (1600)")!.banner,
+        fullImage: getRoleImages("Japan — The Land at War's End (1600)")!.full
+      }
     },
     {
       key: "Haiti — The Island in Revolt (1791)",
       title: lang("HAITI_TITLE"),
       year: "1791",
       intro: lang("HAITI_INTRO"),
-      youAre: lang("HAITI_YOU_ARE")
+      youAre: lang("HAITI_YOU_ARE"),
+      ...getRoleImages("Haiti — The Island in Revolt (1791)") && {
+        bannerImage: getRoleImages("Haiti — The Island in Revolt (1791)")!.banner,
+        fullImage: getRoleImages("Haiti — The Island in Revolt (1791)")!.full
+      }
     },
     {
       key: "Russia — The Throne Crumbles (1917)",
       title: lang("RUSSIA_TITLE"),
       year: "1917",
       intro: lang("RUSSIA_INTRO"),
-      youAre: lang("RUSSIA_YOU_ARE")
+      youAre: lang("RUSSIA_YOU_ARE"),
+      ...getRoleImages("Russia — The Throne Crumbles (1917)") && {
+        bannerImage: getRoleImages("Russia — The Throne Crumbles (1917)")!.banner,
+        fullImage: getRoleImages("Russia — The Throne Crumbles (1917)")!.full
+      }
     },
     {
       key: "India — The Midnight of Freedom (1947)",
       title: lang("INDIA_TITLE"),
       year: "1947",
       intro: lang("INDIA_INTRO"),
-      youAre: lang("INDIA_YOU_ARE")
+      youAre: lang("INDIA_YOU_ARE"),
+      ...getRoleImages("India — The Midnight of Freedom (1947)") && {
+        bannerImage: getRoleImages("India — The Midnight of Freedom (1947)")!.banner,
+        fullImage: getRoleImages("India — The Midnight of Freedom (1947)")!.full
+      }
     },
     {
       key: "South Africa — The End of Apartheid (1990)",
       title: lang("SOUTH_AFRICA_TITLE"),
       year: "1990",
       intro: lang("SOUTH_AFRICA_INTRO"),
-      youAre: lang("SOUTH_AFRICA_YOU_ARE")
+      youAre: lang("SOUTH_AFRICA_YOU_ARE"),
+      ...getRoleImages("South Africa — The End of Apartheid (1990)") && {
+        bannerImage: getRoleImages("South Africa — The End of Apartheid (1990)")!.banner,
+        fullImage: getRoleImages("South Africa — The End of Apartheid (1990)")!.full
+      }
     },
     {
       key: "Mars Colony — The Red Frontier (2179)",
       title: lang("MARS_TITLE"),
       year: "2179",
       intro: lang("MARS_INTRO"),
-      youAre: lang("MARS_YOU_ARE")
+      youAre: lang("MARS_YOU_ARE"),
+      ...getRoleImages("Mars Colony — The Red Frontier (2179)") && {
+        bannerImage: getRoleImages("Mars Colony — The Red Frontier (2179)")!.banner,
+        fullImage: getRoleImages("Mars Colony — The Red Frontier (2179)")!.full
+      }
     }
   ];
 
@@ -241,9 +284,28 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                     logger.log('role_click', role.key, `User clicked role: ${role.key}`);
                     setExpandedRole(expandedRole === role.key ? null : role.key);
                   }}
-                  className="w-full px-6 py-4 flex items-center justify-between text-left transition-all duration-300 bg-gradient-to-r from-slate-900/95 via-blue-950/95 to-slate-900/95 hover:from-slate-800/98 hover:via-blue-900/98 hover:to-slate-800/98"
+                  className="w-full px-6 py-.5 flex items-center gap-4 text-left transition-all duration-300 bg-gradient-to-r from-slate-900/95 via-blue-950/95 to-slate-900/95 hover:from-slate-800/98 hover:via-blue-900/98 hover:to-slate-800/98"
                 >
-                  <span className="text-base text-white font-cinzel font-semibold tracking-wide drop-shadow-md">{role.title}</span>
+                  <span className="text-base text-white font-cinzel font-semibold tracking-wide drop-shadow-md flex-1">{role.title}</span>
+
+                  {/* Banner image - fades out when expanded */}
+                  {role.bannerImage && (
+                    <AnimatePresence>
+                      {expandedRole !== role.key && (
+                        <motion.img
+                          key={`banner-${role.key}`}
+                          src={role.bannerImage}
+                          alt={`${role.title} banner`}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="h-14 w-auto rounded-lg object-cover shadow-md"
+                        />
+                      )}
+                    </AnimatePresence>
+                  )}
+
                   <span className="text-sm text-amber-300 font-light tracking-wider drop-shadow-md">{role.year}</span>
                 </button>
 
@@ -259,19 +321,40 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                     >
                       <div className="bg-black/60 backdrop-blur-sm border-t border-slate-700/50">
                         <div className="px-6 py-5 space-y-4">
-                          {/* Framed content area */}
-                          <div className="rounded-xl border border-slate-700/50 bg-black/30 p-4 space-y-3">
-                            {/* Intro paragraph */}
-                            <p className="text-sm text-white/95 leading-relaxed">
-                              {role.intro}
-                            </p>
+                          {/* Framed content area with two-column layout */}
+                          <div className="rounded-xl border border-slate-700/50 bg-black/30 p-4">
+                            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4">
+                              {/* Left column: Text content */}
+                              <div className="space-y-3">
+                                {/* Intro paragraph */}
+                                <p className="text-sm text-white/95 leading-relaxed">
+                                  {role.intro}
+                                </p>
 
-                            {/* "You are:" section */}
-                            <div className="pt-2 border-t border-slate-700/40">
-                              <p className="text-sm text-white/95">
-                                <span className="font-semibold text-amber-300">You are:</span>{" "}
-                                <span className="text-white/90">{role.youAre}</span>
-                              </p>
+                                {/* "You are:" section */}
+                                <div className="pt-2 border-t border-slate-700/40">
+                                  <p className="text-sm text-white/95">
+                                    <span className="font-semibold text-amber-300">You are:</span>{" "}
+                                    <span className="text-white/90">{role.youAre}</span>
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Right column: Full image */}
+                              {role.fullImage && (
+                                <motion.div
+                                  initial={{ opacity: 0, scale: 0.95 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ duration: 0.3, delay: 0.1, ease: "easeInOut" }}
+                                  className="flex items-center justify-center"
+                                >
+                                  <img
+                                    src={role.fullImage}
+                                    alt={`${role.title} scene`}
+                                    className="rounded-xl object-cover w-full md:w-[300px] max-h-[200px] shadow-lg"
+                                  />
+                                </motion.div>
+                              )}
                             </div>
                           </div>
 

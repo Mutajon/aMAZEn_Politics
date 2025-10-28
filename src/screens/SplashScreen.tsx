@@ -1,7 +1,7 @@
 // src/screens/SplashScreen.tsx
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { bgStyle } from "../lib/ui";
+import { bgStyleSplash } from "../lib/ui";
 import { useSettingsStore } from "../store/settingsStore";
 import { useNarrator } from "../hooks/useNarrator";
 import { useAudioManager } from "../hooks/useAudioManager";
@@ -102,7 +102,7 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
   return (
     <div
       className="relative min-h-[100dvh] flex items-center justify-center px-5"
-      style={bgStyle}
+      style={bgStyleSplash}
     >
       {/* Settings cog (top-right) */}
 <div className="absolute top-4 right-4 z-[40] pointer-events-auto">
