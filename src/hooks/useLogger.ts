@@ -8,7 +8,7 @@
 // Automatically includes metadata (screen, day, role) from application state
 
 import { useCallback, useMemo } from 'react';
-import { useLoggingStore } from '../store/loggingStore';
+import { useSettingsStore } from '../store/settingsStore';
 import { useDilemmaStore } from '../store/dilemmaStore';
 import { useRoleStore } from '../store/roleStore';
 import { loggingService } from '../lib/loggingService';
@@ -24,7 +24,7 @@ function getCurrentRoute(): string {
 }
 
 export function useLogger() {
-  const enabled = useLoggingStore((s) => s.enabled);
+  const enabled = useSettingsStore((s) => s.dataCollectionEnabled);
   const day = useDilemmaStore((s) => s.day);
   const selectedRole = useRoleStore((s) => s.selectedRole);
 

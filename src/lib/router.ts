@@ -1,7 +1,7 @@
 // src/lib/router.ts
 import { useEffect, useState, useCallback, useRef } from "react";
 import { loggingService } from "./loggingService";
-import { useLoggingStore } from "../store/loggingStore";
+import { useSettingsStore } from "../store/settingsStore";
 
 export type PushFn = (path: string) => void;
 
@@ -41,8 +41,8 @@ export function useHashRoute() {
       const previousRoute = previousRouteRef.current || '/';  // Guard against empty/undefined
 
       // Log navigation if logging is enabled
-      const { enabled } = useLoggingStore.getState();
-      if (enabled && newRoute !== previousRoute) {
+      const { dataCollectionEnabled } = useSettingsStore.getState();
+      if (dataCollectionEnabled && newRoute !== previousRoute) {
         loggingService.log(
           'navigation',
           newRoute,  // Simple value: where user is going

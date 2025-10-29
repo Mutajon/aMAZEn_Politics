@@ -9,6 +9,7 @@
 // - Non-blocking (never blocks UI)
 
 import { useLoggingStore, ensureUserId } from '../store/loggingStore';
+import { useSettingsStore } from '../store/settingsStore';
 import type { LogEntry, BatchLogRequest, SessionStartRequest, LoggingStatusResponse } from '../types/logging';
 
 // Configuration
@@ -46,7 +47,7 @@ class LoggingService {
 
       if (!status.enabled) {
         console.log('[Logging] Data collection is disabled on backend');
-        useLoggingStore.setState({ enabled: false });
+        useSettingsStore.setState({ dataCollectionEnabled: false });
         return;
       }
 
@@ -73,7 +74,7 @@ class LoggingService {
 
     } catch (error) {
       console.error('[Logging] Initialization failed:', error);
-      useLoggingStore.setState({ enabled: false });
+      useSettingsStore.setState({ dataCollectionEnabled: false });
     }
   }
 
@@ -82,9 +83,10 @@ class LoggingService {
    * Generates sessionId and logs session start event
    */
   async startSession(): Promise<string | null> {
-    const { enabled, userId, gameVersion, treatment } = useLoggingStore.getState();
+    const { dataCollectionEnabled } = useSettingsStore.getState();
+    const { userId, gameVersion, treatment } = useLoggingStore.getState();
 
-    if (!enabled || !userId) {
+    if (!dataCollectionEnabled || !userId) {
       console.log('[Logging] Session start skipped (logging disabled or no userId)');
       return null;
     }
@@ -195,9 +197,10 @@ class LoggingService {
     comments?: string,
     metadata?: { screen?: string; day?: number; role?: string }
   ): void {
-    const { enabled, userId, gameVersion, treatment } = useLoggingStore.getState();
+    const { dataCollectionEnabled } = useSettingsStore.getState();
+    const { userId, gameVersion, treatment } = useLoggingStore.getState();
 
-    if (!enabled || !userId) {
+    if (!dataCollectionEnabled || !userId) {
       // Silently skip if logging is disabled
       return;
     }
@@ -246,9 +249,10 @@ class LoggingService {
       return;
     }
 
-    const { enabled, sessionId } = useLoggingStore.getState();
+    const { dataCollectionEnabled } = useSettingsStore.getState();
+    const { sessionId } = useLoggingStore.getState();
 
-    if (!enabled) {
+    if (!dataCollectionEnabled) {
       // If logging was disabled, clear queue
       this.queue = [];
       return;
@@ -373,9 +377,10 @@ export const loggingService = new LoggingService();
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
     // Use sendBeacon for reliable delivery on page unload
-    const { enabled, sessionId, userId, gameVersion, treatment } = useLoggingStore.getState();
+    const { dataCollectionEnabled } = useSettingsStore.getState();
+    const { sessionId, userId, gameVersion, treatment } = useLoggingStore.getState();
 
-    if (enabled && loggingService.getQueue().length > 0) {
+    if (dataCollectionEnabled && loggingService.getQueue().length > 0) {
       const queue = loggingService.getQueue();
 
       // Prepare batch request

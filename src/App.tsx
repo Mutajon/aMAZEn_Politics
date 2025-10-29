@@ -73,7 +73,7 @@ function LoadingScreen() {
 export default function App() {
   const { route, push } = useHashRoute();
   const enableModifiers = useSettingsStore((s) => s.enableModifiers);
-  const loggingEnabled = useLoggingStore((s) => s.enabled);
+  const dataCollectionEnabled = useSettingsStore((s) => s.dataCollectionEnabled);
   const consented = useLoggingStore((s) => s.consented);
 
   console.debug("[App] 📍 Current route:", route);
@@ -85,22 +85,22 @@ export default function App() {
 
   // Initialize logging service when consented
   useEffect(() => {
-    if (consented && loggingEnabled) {
+    if (consented && dataCollectionEnabled) {
       loggingService.init();
     }
-  }, [consented, loggingEnabled]);
+  }, [consented, dataCollectionEnabled]);
 
   // Handle browser close - flush remaining logs
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (loggingEnabled) {
+      if (dataCollectionEnabled) {
         loggingService.flush(true);
       }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [loggingEnabled]);
+  }, [dataCollectionEnabled]);
 
   // Render current screen with global audio controls
   return (

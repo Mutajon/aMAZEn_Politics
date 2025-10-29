@@ -146,7 +146,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       // Bump key so no stale objects hide the new fields
-      name: "settings-v12",
+      name: "settings-v13",
       partialize: (s) => ({
         generateImages: s.generateImages,
         narrationEnabled: s.narrationEnabled,
