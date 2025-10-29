@@ -150,7 +150,7 @@ export default function PowerDistributionContent({
                       layout
                       layoutId={h._id}
                       transition={{ type: "spring", stiffness: 450, damping: 38 }}
-                      className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-4 relative"
+                      className="border-slate-700/50 bg-black/60 backdrop-blur-sm ring-1 ring-amber-400/40 rounded-3xl p-4 relative"
                     >
                       <div className="flex items-center gap-3">
                         {/* Rank Badge */}

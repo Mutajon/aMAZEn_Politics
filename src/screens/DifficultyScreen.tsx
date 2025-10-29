@@ -3,12 +3,13 @@
 // Allows player to choose between four difficulty levels that affect initial budget, support, and score.
 // Connected to dilemmaStore for persistent difficulty settings.
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { bgStyle } from "../lib/ui";
+import { bgStyleWithRoleImage } from "../lib/ui";
 import type { PushFn } from "../lib/router";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useSettingsStore } from "../store/settingsStore";
+import { useRoleStore } from "../store/roleStore";
 import { useTranslatedConst, createTranslatedConst } from "../i18n/useTranslatedConst";
 import { useLang } from "../i18n/lang";
 
@@ -63,6 +64,8 @@ export default function DifficultyScreen({ push }: { push: PushFn }) {
   const [selected, setSelected] = useState<DifficultyLevel["id"] | null>(null);
   const setDifficulty = useDilemmaStore((s) => s.setDifficulty);
   const showBudget = useSettingsStore((s) => s.showBudget);
+  const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
+  const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
 
   const handleConfirm = () => {
     if (!selected) return;
@@ -72,7 +75,7 @@ export default function DifficultyScreen({ push }: { push: PushFn }) {
   };
 
   return (
-    <div className="min-h-[100dvh] px-5 py-8" style={bgStyle}>
+    <div className="min-h-[100dvh] px-5 py-8" style={roleBgStyle}>
       <div className="w-full max-w-2xl mx-auto">
         {/* Title */}
         <motion.h1
@@ -104,11 +107,11 @@ export default function DifficultyScreen({ push }: { push: PushFn }) {
                 setSelected(diff.id);
               }}
               className={[
-                "w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all",
+                "w-full flex items-center gap-4 p-4 rounded-2xl border transition-all",
                 "hover:scale-[1.02] active:scale-[0.99]",
                 selected === diff.id
-                  ? "border-amber-400 bg-amber-400/10 shadow-lg shadow-amber-500/20"
-                  : "border-white/10 bg-white/5 hover:border-white/20",
+                  ? "border-slate-700/50 bg-black/60 backdrop-blur-sm ring-2 ring-amber-400/80 shadow-lg shadow-amber-500/20"
+                  : "border-slate-700/50 bg-black/60 backdrop-blur-sm ring-1 ring-amber-400/40 hover:ring-amber-400/60",
               ].join(" ")}
             >
               {/* Image */}

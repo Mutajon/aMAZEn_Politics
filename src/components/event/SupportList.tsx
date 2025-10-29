@@ -59,16 +59,18 @@ export default function SupportList({
   animateDurationMs = 1000,
 }: Props) {
   return (
-    <div className="space-y-1.5">
-      {items.map((it, index) => (
-        <SupportCard
-          key={it.id}
-          item={it}
-          index={index}
-          animatePercent={animatePercent}
-          animateDurationMs={animateDurationMs}
-        />
-      ))}
+    <div className="border-slate-400/30 bg-slate-900/60 backdrop-blur-sm rounded-2xl p-4">
+      <div className="space-y-2">
+        {items.map((it, index) => (
+          <SupportCard
+            key={it.id}
+            item={it}
+            index={index}
+            animatePercent={animatePercent}
+            animateDurationMs={animateDurationMs}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -159,7 +161,7 @@ function SupportCard({
 
   return (
     <motion.div
-      className="rounded-2xl bg-white/6 border border-white/10 text-white px-3 py-3 shadow-sm"
+      className="rounded-xl bg-white/3 border border-white/5 text-white px-3 py-2.5"
       initial={{ opacity: 0, x: -30 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{

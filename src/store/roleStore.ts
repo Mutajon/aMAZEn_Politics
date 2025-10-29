@@ -54,6 +54,8 @@ type RoleState = {
   selectedRole: string | null;
   analysis: AnalysisResult | null;
   character: Character | null;
+  /** Path to role's background image (full image for predefined roles, splash for custom) */
+  roleBackgroundImage: string | null;
 
   setRole: (r: string | null) => void;
   setAnalysis: (a: AnalysisResult | null) => void;
@@ -64,6 +66,9 @@ type RoleState = {
   /** Merge a partial patch into the current character (safe even if null) */
   updateCharacter: (patch: Partial<Character>) => void;
 
+  /** Set the role's background image path */
+  setRoleBackgroundImage: (path: string | null) => void;
+
   reset: () => void;
 };
 
@@ -73,6 +78,7 @@ export const useRoleStore = create<RoleState>()(
       selectedRole: null,
       analysis: null,
       character: null,
+      roleBackgroundImage: null,
 
       setRole: (r) => set({ selectedRole: r }),
       setAnalysis: (a) => set({ analysis: a }),
@@ -91,7 +97,9 @@ export const useRoleStore = create<RoleState>()(
         set({ character: { ...prev, ...patch } });
       },
 
-      reset: () => set({ selectedRole: null, analysis: null, character: null }),
+      setRoleBackgroundImage: (path) => set({ roleBackgroundImage: path }),
+
+      reset: () => set({ selectedRole: null, analysis: null, character: null, roleBackgroundImage: null }),
     }),
     {
       name: "amaze-politics-role-store", // localStorage key

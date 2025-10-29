@@ -2,9 +2,11 @@
 // Enhanced loading overlay for day progression with multi-phase states.
 // Shows rotating hourglass, days remaining bar, and analysis progress.
 
-import React from "react";
+import React, { useMemo } from "react";
 import { Hourglass } from "lucide-react";
 import { motion } from "framer-motion";
+import { bgStyleWithRoleImage } from "../../lib/ui";
+import { useRoleStore } from "../../store/roleStore";
 
 type Props = {
   show?: boolean; // when true, blocks the UI
@@ -30,6 +32,9 @@ export default function EventLoadingOverlay({
   isAnimatingCounter = false,
   analysisComplete
 }: Props) {
+  const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
+  const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
+
   if (!show) return null;
 
   // Calculate progress for day progression
@@ -47,13 +52,14 @@ export default function EventLoadingOverlay({
     <div
       role="status"
       aria-live="polite"
-      className="fixed inset-0 z-[998] flex items-center justify-center bg-black/65 backdrop-blur-sm"
+      className="fixed inset-0 z-[998] flex items-center justify-center"
+      style={roleBgStyle}
     >
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ type: "spring", stiffness: 240, damping: 22 }}
-        className="flex flex-col items-center gap-6 rounded-2xl bg-neutral-900/85 p-8 ring-1 ring-white/10 shadow-xl max-w-sm w-80"
+        className="flex flex-col items-center gap-6 rounded-2xl border-slate-700/50 bg-black/60 backdrop-blur-sm ring-1 ring-amber-400/40 p-8 shadow-xl max-w-sm w-80"
       >
         {showDayProgression ? (
           <>

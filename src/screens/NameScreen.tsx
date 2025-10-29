@@ -1,7 +1,7 @@
 // src/screens/NameScreen.tsx
 import { useEffect, useMemo, useState, useRef } from "react";
 import type { PushFn } from "../lib/router";
-import { bgStyle } from "../lib/ui";
+import { bgStyleWithRoleImage } from "../lib/ui";
 import { useRoleStore } from "../store/roleStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useLang } from "../i18n/lang";
@@ -147,9 +147,13 @@ export default function NameScreen({ push }: { push: PushFn }) {
   const logger = useLogger();
   const selectedRole = useRoleStore((s) => s.selectedRole);
   const character = useRoleStore((s) => s.character);
+  const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
   const setCharacter = useRoleStore((s) => s.setCharacter);
   const updateCharacter = useRoleStore((s) => s.updateCharacter);
   const generateImages = useSettingsStore((s) => s.generateImages);
+
+  // Create role-based background style
+  const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
 
   const [gender, setGender] = useState<"male" | "female" | "any">(character?.gender || "any");
   const [name, setName] = useState<string>(character?.name || "");
@@ -296,7 +300,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
   };
 
   return (
-    <div className="min-h-[100dvh] px-5 py-8" style={bgStyle}>
+    <div className="min-h-[100dvh] px-5 py-8" style={roleBgStyle}>
       <LoadingOverlay
         visible={loading || (phase === "avatar" && avatarLoading)}
         title={phase === "avatar" ? lang("GENERATING_AVATAR") : overlayTitle}
@@ -315,7 +319,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
           </div>
         )}
 
-        <div className="mt-2 rounded-3xl p-6 bg-white/5 border border-white/10 shadow-xl">
+        <div className="mt-2 rounded-3xl p-6 bg-black/60 backdrop-blur-sm border border-slate-700/50 ring-1 ring-amber-400/40 shadow-xl">
           {phase === "input" ? (
             // Phase 1: Input form
             <>

@@ -1,7 +1,7 @@
 // src/screens/MirrorDialogueScreen.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PushFn } from "../lib/router";
-import { bgStyle } from "../lib/ui";
+import { bgStyleWithRoleImage } from "../lib/ui";
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
 import { useSettingsStore } from "../store/settingsStore";
@@ -64,7 +64,11 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
   const lang = useLang();
   const generateImages = useSettingsStore((s) => s.generateImages);
   const character = useRoleStore((s) => s.character);
+  const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
   const resetCompass = useCompassStore((s) => s.reset);
+
+  // Create role-based background style
+  const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
 
   // Logging hook for data collection
   const logger = useLogger();
@@ -101,7 +105,7 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
   const MIRROR = 180;
 
   return (
-    <div className="min-h-[100dvh] px-5 py-5" style={bgStyle}>
+    <div className="min-h-[100dvh] px-5 py-5" style={roleBgStyle}>
       <div className="w-full max-w-xl mx-auto">
         {/* TOP ROW: aligned at TOP */}
         <div className="flex items-start justify-between gap-4 mt-2">

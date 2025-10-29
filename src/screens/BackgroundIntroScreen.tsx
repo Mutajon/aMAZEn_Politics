@@ -1,7 +1,7 @@
 // src/screens/BackgroundIntroScreen.tsx
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PushFn } from "../lib/router";
-import { bgStyle } from "../lib/ui";
+import { bgStyleWithRoleImage } from "../lib/ui";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNarrator } from "../hooks/useNarrator";
 import type { PreparedTTS } from "../hooks/useNarrator";
@@ -35,12 +35,16 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
   // Role data (forgiving shape)
   const selectedRoleRaw = useRoleStore((s: any) => s.selectedRole);
   const genderRaw = useRoleStore((s: any) => s?.character?.gender);
+  const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
   const roleText: string =
     typeof selectedRoleRaw === "string"
       ? selectedRoleRaw
       : selectedRoleRaw?.label || selectedRoleRaw?.name || "";
   const gender: "male" | "female" | "any" =
     genderRaw === "male" || genderRaw === "female" ? genderRaw : "any";
+
+  // Create role-based background style
+  const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
 
   const DEFAULT_LINE = lang("BACKGROUND_INTRO_DEFAULT_LINE");
 
@@ -263,7 +267,7 @@ useEffect(() => {
   }, [phase, para, logger]);
 
   return (
-    <div className="min-h-[100dvh] px-5 py-6" style={bgStyle}>
+    <div className="min-h-[100dvh] px-5 py-6" style={roleBgStyle}>
       <div className="max-w-2xl mx-auto">
 
         {/* Stage A: default content (only after TTS is buffered) ------------------- */}

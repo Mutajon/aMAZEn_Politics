@@ -1,7 +1,7 @@
 // src/theme/mirrorBubbleTheme.ts
 // Single source of truth for the "mirror bubble" look & feel.
 export const mirrorBubbleTheme = {
-    bg: "rgba(0,0,0,0.40)",                 // bubble background
+    bg: "rgba(42, 31, 99, 0.6)",            // bubble background (purple, slightly transparent)
     textColor: "#5eead4",                    // teal-ish text
     fontFamily: "Inter, ui-sans-serif, system-ui",
     fontSizePx: 20,                          // change size globally

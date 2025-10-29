@@ -51,7 +51,7 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
         stype: { t: "Eraser", i: "-" }
       }
     ],
-    playerIndex: null,
+    playerIndex: 1, // "Respected citizen chosen to help rebuild" → Executive (Thirty rulers)
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -112,7 +112,7 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
         stype: { t: "Eraser", i: "•" }
       }
     ],
-    playerIndex: null,
+    playerIndex: 2, // "Scholar and advisor" → Royal Court (Cleopatra/Ptolemy)
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -173,7 +173,7 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
         stype: { t: "Eraser", i: "•" }
       }
     ],
-    playerIndex: null,
+    playerIndex: 1, // "Council member" → Legislative (Great Council)
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -234,7 +234,7 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
         stype: { t: "Agent", i: "•" }
       }
     ],
-    playerIndex: null,
+    playerIndex: 0, // "Tribal chief" → Executive (Paramount Chief)
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -295,7 +295,7 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
         stype: { t: "Actor", i: "•" }
       }
     ],
-    playerIndex: null,
+    playerIndex: 0, // "Leader of a small clan" → Coercive Force (Armies & Warlords) - Clan leaders were warlords
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -356,7 +356,7 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
         stype: { t: "Author", i: "•" }
       }
     ],
-    playerIndex: null,
+    playerIndex: 2, // "Mixed-race overseer" → Planter Elite (Wealth) - Overseers were plantation middle management
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -417,7 +417,7 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
         stype: { t: "Agent", i: "-" }
       }
     ],
-    playerIndex: null,
+    playerIndex: 1, // "The Tsar" → Executive (Tsar)
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -478,7 +478,7 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
         stype: { t: "Agent", i: "•" }
       }
     ],
-    playerIndex: null,
+    playerIndex: 2, // "District officer" → Executive - "District chief and provincial chiefs issue orders"
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -539,7 +539,7 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
         stype: { t: "Eraser", i: "•" }
       }
     ],
-    playerIndex: null,
+    playerIndex: 1, // "Senior police commander" → Coercive Force - Police/military enforcement (BUG FIX)
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -600,7 +600,7 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
         stype: { t: "Agent", i: "•" }
       }
     ],
-    playerIndex: null,
+    playerIndex: 0, // "Elected leader of the first Mars colony" → Executive - "Elected governor"
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],

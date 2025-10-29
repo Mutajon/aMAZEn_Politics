@@ -27,6 +27,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const logger = useLogger();
   const setRole = useRoleStore((s) => s.setRole);
   const setAnalysis = useRoleStore(s => s.setAnalysis);
+  const setRoleBackgroundImage = useRoleStore(s => s.setRoleBackgroundImage);
 
   const roles: RoleItem[] = [
     {
@@ -223,6 +224,9 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
         playerIndex: null,
       });
 
+      // For custom roles, use the splash screen maze image as background
+      setRoleBackgroundImage("/assets/images/BKGs/mainBKG.jpg");
+
       push("/name");
       closeSuggest();
     } catch (err) {
@@ -246,6 +250,12 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
     const predefinedAnalysis = getPredefinedPowerDistribution(role.key);
     if (predefinedAnalysis) {
       setAnalysis(predefinedAnalysis);
+    }
+
+    // Save the role's full image path for background use throughout the game
+    const roleImages = getRoleImages(role.key);
+    if (roleImages?.full) {
+      setRoleBackgroundImage(roleImages.full);
     }
 
     push("/name");

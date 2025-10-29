@@ -72,9 +72,10 @@ export default function ResourceBar({ daysLeft, budget, showBudget = true, avata
             icon={<Hourglass className="w-4 h-4" />}
             label="Days Left"
             value={String(daysLeft)}
-            iconBgClass="bg-sky-500/20"
-            iconTextClass="text-sky-200"
+            iconBgClass="bg-sky-600"
+            iconTextClass="text-cyan-200"
             width={120}
+            bgClass="bg-[rgba(15,23,42,0.8)] border border-cyan-400/40"
           />
           {showBudget && (
             <ResourcePill
@@ -130,6 +131,7 @@ function ResourcePill({
   iconBgClass = "bg-white/10",
   iconTextClass = "text-white/90",
   width,
+  bgClass = "bg-white/10 border border-white/15",
 }: {
   icon: React.ReactNode;
   label: string;
@@ -137,13 +139,15 @@ function ResourcePill({
   iconBgClass?: string;
   iconTextClass?: string;
   width: number;
+  bgClass?: string;
 }) {
   return (
     <div
       className={[
         "shrink-0",
         "px-3 rounded-2xl",
-        "bg-white/10 border border-white/15 shadow-sm",
+        bgClass,
+        "shadow-sm",
         "backdrop-blur-sm",
         "text-white",
         "flex items-center", // Center content vertically

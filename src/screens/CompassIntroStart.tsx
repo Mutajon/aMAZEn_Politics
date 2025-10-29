@@ -1,7 +1,7 @@
 // src/screens/CompassIntroStart.tsx
 import { useEffect, useState, useMemo, useRef } from "react";
 import type { PushFn } from "../lib/router";
-import { bgStyle } from "../lib/ui";
+import { bgStyleWithRoleImage } from "../lib/ui";
 import { useRoleStore } from "../store/roleStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useNarrator, type PreparedTTS } from "../hooks/useNarrator";
@@ -77,6 +77,10 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
   const narrationEnabled = useSettingsStore((s) => s.narrationEnabled);
   const character = useRoleStore((s) => s.character);
   const selectedRole = useRoleStore((s) => s.selectedRole);
+  const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
+
+  // Create role-based background style
+  const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
 
   console.log("[CompassIntroStart] Character data:", {
     name: character?.name,
@@ -176,7 +180,7 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
   }, [character?.name, roleText, prepare, narrationEnabled]);
 
   return (
-    <div className="min-h-[100dvh] px-5 py-6" style={bgStyle}>
+    <div className="min-h-[100dvh] px-5 py-6" style={roleBgStyle}>
       <LoadingOverlay visible={loading} title={lang("COMPASS_INTRO_TITLE")} quotes={loadingQuotes} />
 
       <div className="w-full max-w-xl mx-auto">

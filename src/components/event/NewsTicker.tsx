@@ -212,12 +212,8 @@ export function TickerChip({ item }: { item: TickerItem }) {
     iconTint = "text-fuchsia-300";
   }
 
-  const toneClass =
-    item.tone === "up"
-      ? "bg-emerald-500/15 ring-emerald-500/30"
-      : item.tone === "down"
-      ? "bg-rose-500/15 ring-rose-500/30"
-      : "bg-sky-500/15 ring-sky-500/30";
+  // Unified navy gradient background for all capsules (10% transparency)
+  const capsuleClass = "bg-gradient-to-br from-slate-800/90 to-slate-900/90 ring-slate-600/50";
 
   const ToneIcon =
     item.tone === "up"
@@ -227,7 +223,7 @@ export function TickerChip({ item }: { item: TickerItem }) {
       : null;
 
   return (
-    <div className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 ring-1 ${toneClass} backdrop-blur-sm`}>
+    <div className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 ring-1 ${capsuleClass} backdrop-blur-sm`}>
       <IconKind className={`w-4 h-4 ${iconTint}`} strokeWidth={2.2} />
       {ToneIcon && <ToneIcon />}
       <span className={`whitespace-nowrap ${TICKER_TEXT_CLASS}`}>{item.text}</span>

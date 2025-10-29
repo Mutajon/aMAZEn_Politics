@@ -9,8 +9,10 @@
 // Used by: EventScreen3 during data collection
 // Props: day, totalDays
 
+import { useMemo } from "react";
 import { Hourglass } from "lucide-react";
-import { bgStyle } from "../../lib/ui";
+import { bgStyleWithRoleImage } from "../../lib/ui";
+import { useRoleStore } from "../../store/roleStore";
 import { useRotatingLeader } from "../../hooks/useRotatingLeader";
 import LeaderProfileCard from "./LeaderProfileCard";
 
@@ -25,57 +27,64 @@ export default function CollectorLoadingOverlay({
 }: Props) {
   const { currentLeader, currentRank, fadeState } = useRotatingLeader();
 
+  // Get role background image from store and create background style
+  const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
+  const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
+
   return (
-    <div className="min-h-screen flex items-center justify-center" style={bgStyle}>
-      <div className="text-center">
-        {/* Spinning Hourglass - Golden Yellow */}
-        <div className="flex justify-center mb-6">
-          <div className="relative">
-            <Hourglass
-              className="w-16 h-16 text-amber-400 animate-spin"
-              style={{ animationDuration: "2s" }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-amber-300/10 to-transparent animate-pulse" />
+    <div className="min-h-screen flex items-center justify-center" style={roleBgStyle}>
+      {/* Golden frame container wrapping all loading content */}
+      <div className="rounded-2xl border-slate-700/50 bg-black/60 backdrop-blur-sm ring-1 ring-amber-400/40 p-8 shadow-xl max-w-2xl">
+        <div className="text-center">
+          {/* Spinning Hourglass - Golden Yellow */}
+          <div className="flex justify-center mb-6">
+            <div className="relative">
+              <Hourglass
+                className="w-16 h-16 text-amber-400 animate-spin"
+                style={{ animationDuration: "2s" }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-amber-300/10 to-transparent animate-pulse" />
+            </div>
           </div>
-        </div>
 
-        {/* Loading Message */}
-        <p className="text-white/90 text-lg font-medium mb-4">
-          {message}
-        </p>
-
-        {/* Collection Progress Percentage */}
-        <div className="mb-10">
-          <p className="text-6xl font-bold text-white/95 tabular-nums">
-            {Math.round(progress)}%
+          {/* Loading Message */}
+          <p className="text-white/90 text-lg font-medium mb-4">
+            {message}
           </p>
-        </div>
 
-        {/* Hall of Fame Section */}
-        <div className="mb-6 mt-8">
-          {/* Title */}
-          <h3 className="text-lg uppercase tracking-wide text-amber-300/90 mb-6">
-            Top Hall of Famers:
-          </h3>
-
-          {/* Leader Profile Card */}
-          <div className="min-h-[160px] flex items-center justify-center">
-            <LeaderProfileCard leader={currentLeader} rank={currentRank} fadeState={fadeState} />
+          {/* Collection Progress Percentage */}
+          <div className="mb-10">
+            <p className="text-6xl font-bold text-white/95 tabular-nums">
+              {Math.round(progress)}%
+            </p>
           </div>
-        </div>
 
-        {/* Pulsing dots */}
-        <div className="flex justify-center gap-1">
-          {[0, 1, 2].map(i => (
-            <div
-              key={i}
-              className="w-2 h-2 rounded-full bg-amber-400/60 animate-pulse"
-              style={{
-                animationDelay: `${i * 0.2}s`,
-                animationDuration: "1.4s"
-              }}
-            />
-          ))}
+          {/* Hall of Fame Section */}
+          <div className="mb-6 mt-8">
+            {/* Title */}
+            <h3 className="text-lg uppercase tracking-wide text-amber-300/90 mb-6">
+              Top Hall of Famers:
+            </h3>
+
+            {/* Leader Profile Card */}
+            <div className="min-h-[160px] flex items-center justify-center">
+              <LeaderProfileCard leader={currentLeader} rank={currentRank} fadeState={fadeState} />
+            </div>
+          </div>
+
+          {/* Pulsing dots */}
+          <div className="flex justify-center gap-1">
+            {[0, 1, 2].map(i => (
+              <div
+                key={i}
+                className="w-2 h-2 rounded-full bg-amber-400/60 animate-pulse"
+                style={{
+                  animationDelay: `${i * 0.2}s`,
+                  animationDuration: "1.4s"
+                }}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </div>
