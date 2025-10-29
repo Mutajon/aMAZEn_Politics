@@ -234,6 +234,9 @@ async function fetchGameTurn(): Promise<{
 
     payload.gameContext = {
       role: roleState.selectedRole || "Unicorn King",
+      roleTitle: roleState.roleTitle || null,          // Scenario title (predefined only)
+      roleIntro: roleState.roleIntro || null,          // Historical context paragraph (predefined only)
+      roleYear: roleState.roleYear || null,            // Year/era (predefined only)
       systemName: roleState.analysis?.systemName || "Divine Right Monarchy",
       systemDesc: roleState.analysis?.systemDesc || "Power flows from divine mandate",
       powerHolders: roleState.analysis?.holders || [],

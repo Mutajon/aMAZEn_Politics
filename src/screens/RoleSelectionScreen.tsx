@@ -28,6 +28,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const setRole = useRoleStore((s) => s.setRole);
   const setAnalysis = useRoleStore(s => s.setAnalysis);
   const setRoleBackgroundImage = useRoleStore(s => s.setRoleBackgroundImage);
+  const setRoleContext = useRoleStore(s => s.setRoleContext);
 
   const roles: RoleItem[] = [
     {
@@ -227,6 +228,9 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
       // For custom roles, use the splash screen maze image as background
       setRoleBackgroundImage("/assets/images/BKGs/mainBKG.jpg");
 
+      // Clear role context (custom roles have no intro/year data)
+      setRoleContext(null, null, null);
+
       push("/name");
       closeSuggest();
     } catch (err) {
@@ -257,6 +261,9 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
     if (roleImages?.full) {
       setRoleBackgroundImage(roleImages.full);
     }
+
+    // Save rich role context for AI (title, intro, year) - predefined roles only
+    setRoleContext(role.title, role.intro, role.year);
 
     push("/name");
   };

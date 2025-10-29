@@ -2511,6 +2511,9 @@ app.post("/api/game-turn", async (req, res) => {
 function buildGameSystemPrompt(gameContext) {
   const {
     role,
+    roleTitle,
+    roleIntro,
+    roleYear,
     systemName,
     systemDesc,
     powerHolders,
@@ -2541,13 +2544,20 @@ You are the AI game engine for a ${totalDays}-day political simulation game.
 You maintain full narrative context and generate ALL event screen data in a single response.
 
 PLAYER ROLE & CONTEXT:
-- Role: ${role}
+- Role: ${role}${roleTitle ? `\n- Scenario: ${roleTitle}` : ''}${roleYear ? `\n- Historical Period: ${roleYear}` : ''}${roleIntro ? `\n- Historical Context: ${roleIntro}` : ''}
 - Political System: ${systemName}
 - System Description: ${systemDesc}
 
 POWER HOLDERS:
 ${holdersText}
 ${compassText}${thematicText}
+
+⚠️ GROUNDING REQUIREMENT (CRITICAL):
+${roleIntro ? `- ALL dilemmas must be deeply rooted in the specific historical/fictional context described above
+- Use period-appropriate issues, stakeholders, geography, and political tensions from this exact scenario
+- Reference the specific circumstances: ${roleIntro.slice(0, 100)}...
+- Example grounding: If the context mentions "Sparta defeated Athens," create dilemmas about occupation, collaboration vs resistance, rebuilding under foreign rule
+- DO NOT generate generic leadership dilemmas—make them specific to THIS historical moment and setting` : '- Ground all dilemmas in the specific role and political system context provided'}
 
 YOUR RESPONSIBILITIES:
 1. Generate one concrete political dilemma per turn (title, description, 3 actions with costs)

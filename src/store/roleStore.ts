@@ -56,6 +56,12 @@ type RoleState = {
   character: Character | null;
   /** Path to role's background image (full image for predefined roles, splash for custom) */
   roleBackgroundImage: string | null;
+  /** Full scenario title (e.g., "Athens — The Day Democracy Died (-404)") - for predefined roles only */
+  roleTitle: string | null;
+  /** Historical context paragraph describing the scenario - for predefined roles only */
+  roleIntro: string | null;
+  /** Year/era of the scenario (e.g., "-404", "1791", "2179") - for predefined roles only */
+  roleYear: string | null;
 
   setRole: (r: string | null) => void;
   setAnalysis: (a: AnalysisResult | null) => void;
@@ -69,6 +75,9 @@ type RoleState = {
   /** Set the role's background image path */
   setRoleBackgroundImage: (path: string | null) => void;
 
+  /** Set role context fields (title, intro, year) - used for predefined roles */
+  setRoleContext: (title: string | null, intro: string | null, year: string | null) => void;
+
   reset: () => void;
 };
 
@@ -79,6 +88,9 @@ export const useRoleStore = create<RoleState>()(
       analysis: null,
       character: null,
       roleBackgroundImage: null,
+      roleTitle: null,
+      roleIntro: null,
+      roleYear: null,
 
       setRole: (r) => set({ selectedRole: r }),
       setAnalysis: (a) => set({ analysis: a }),
@@ -99,7 +111,21 @@ export const useRoleStore = create<RoleState>()(
 
       setRoleBackgroundImage: (path) => set({ roleBackgroundImage: path }),
 
-      reset: () => set({ selectedRole: null, analysis: null, character: null, roleBackgroundImage: null }),
+      setRoleContext: (title, intro, year) => set({
+        roleTitle: title,
+        roleIntro: intro,
+        roleYear: year
+      }),
+
+      reset: () => set({
+        selectedRole: null,
+        analysis: null,
+        character: null,
+        roleBackgroundImage: null,
+        roleTitle: null,
+        roleIntro: null,
+        roleYear: null
+      }),
     }),
     {
       name: "amaze-politics-role-store", // localStorage key
