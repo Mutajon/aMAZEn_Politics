@@ -11,9 +11,11 @@ import { useRoleStore } from "../store/roleStore";
 import { useMirrorQuizStore } from "../store/mirrorQuizStore";
 import { clearAllSnapshots } from "../lib/eventScreenSnapshot";
 import { loggingService } from "../lib/loggingService";
+import { useLoggingStore } from "../store/loggingStore";
 import { useLang } from "../i18n/lang";
 import { useLanguage } from "../i18n/LanguageContext";
 import LanguageSelector from "../components/LanguageSelector";
+import IDCollectionModal from "../components/IDCollectionModal";
 
 const SUBTITLES = [
   "Choose your path. Discover yourself."
@@ -35,6 +37,8 @@ export default function SplashScreen({
   const [showButton, setShowButton] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showIDModal, setShowIDModal] = useState(false);
+  const [isCollectingID, setIsCollectingID] = useState(false);
 
   // Helper function to get correct transform for toggle
   const getToggleTransform = (isEnabled: boolean) => {
@@ -80,7 +84,40 @@ const setDilemmasSubject = useSettingsStore((s) => s.setDilemmasSubject);
 const enableModifiers = useSettingsStore((s) => s.enableModifiers);
 const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
 
+// Data collection
+const dataCollectionEnabled = useSettingsStore((s) => s.dataCollectionEnabled);
+const setDataCollectionEnabled = useSettingsStore((s) => s.setDataCollectionEnabled);
+
   // -------------------------------------------------------------------------
+
+  // Handle ID submission from modal
+  const handleIDSubmit = async (id: string) => {
+    // Save ID to loggingStore (replaces auto-generated UUID)
+    useLoggingStore.getState().setUserId(id);
+
+    // Close modal
+    setShowIDModal(false);
+
+    // Proceed with game start
+    setIsLoading(true);
+    setShowSettings(false);
+
+    // Start new logging session (will use the ID we just set)
+    await loggingService.startSession();
+
+    // Reset all game stores for fresh start
+    useCompassStore.getState().reset();
+    useDilemmaStore.getState().reset();
+    useRoleStore.getState().reset();
+    useMirrorQuizStore.getState().resetAll();
+    clearAllSnapshots();
+
+    // Prime narrator and start music (user interaction unlocks browser autoplay)
+    narrator.prime();
+    playMusic('background', true);
+
+    onStart();
+  };
 
   // Simple subtitle reveal: show title, wait 0.5s, fade in all subtitles
   useEffect(() => {
@@ -328,6 +365,35 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
   </button>
 </div>
 
+{/* Divider */}
+<div className="my-4 border-t border-white/10" />
+
+{/* Data collection ------------------------------------------------------------- */}
+<div className="flex items-center justify-between gap-3">
+  <div>
+    <div className="text-sm font-medium">{lang("DATA_COLLECTION")}</div>
+    <div className="text-xs text-white/60">
+      {lang("DATA_COLLECTION_DESC")}
+    </div>
+  </div>
+  <button
+    onClick={() => setDataCollectionEnabled(!dataCollectionEnabled)}
+    role="switch"
+    aria-checked={dataCollectionEnabled}
+    className={[
+      "w-12 h-7 rounded-full p-1 transition-colors",
+      dataCollectionEnabled ? "bg-emerald-500/70" : "bg-white/20",
+    ].join(" ")}
+  >
+    <span
+      className={[
+        "block w-5 h-5 rounded-full bg-white transition-transform",
+        getToggleTransform(dataCollectionEnabled),
+      ].join(" ")}
+    />
+  </button>
+</div>
+
   </motion.div>
 )}
 
@@ -408,27 +474,37 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
       }
     }}
     transition={{ type: "spring", stiffness: 250, damping: 22 }}
-    style={{ visibility: showButton ? "visible" : "hidden" }}
+    style={{ visibility: showButton && !isCollectingID ? "visible" : "hidden" }}
     onClick={async () => {
-      // Immediately show loading state
-      setIsLoading(true);
-      setShowSettings(false);
+      const { dataCollectionEnabled } = useSettingsStore.getState();
 
-      // Start new logging session
-      await loggingService.startSession();
+      if (dataCollectionEnabled) {
+        // Show ID collection modal
+        setIsCollectingID(true);
+        setShowIDModal(true);
+        setShowSettings(false);
+        // Don't proceed yet - wait for ID submission via handleIDSubmit
+      } else {
+        // Original flow: proceed immediately
+        setIsLoading(true);
+        setShowSettings(false);
 
-      // Reset all game stores for fresh start
-      useCompassStore.getState().reset();
-      useDilemmaStore.getState().reset();
-      useRoleStore.getState().reset();
-      useMirrorQuizStore.getState().resetAll();
-      clearAllSnapshots();
+        // Start new logging session
+        await loggingService.startSession();
 
-      // Prime narrator and start music (user interaction unlocks browser autoplay)
-      narrator.prime();
-      playMusic('background', true);
+        // Reset all game stores for fresh start
+        useCompassStore.getState().reset();
+        useDilemmaStore.getState().reset();
+        useRoleStore.getState().reset();
+        useMirrorQuizStore.getState().resetAll();
+        clearAllSnapshots();
 
-      onStart();
+        // Prime narrator and start music (user interaction unlocks browser autoplay)
+        narrator.prime();
+        playMusic('background', true);
+
+        onStart();
+      }
     }}
     className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
   >
@@ -438,9 +514,9 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
   {/* Secondary: High Scores (subtle/glass) */}
   <motion.button
     initial={{ opacity: 0 }}
-    animate={{ opacity: showButton ? 1 : 0 }}
+    animate={{ opacity: showButton && !isCollectingID ? 1 : 0 }}
     transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
-    style={{ visibility: showButton ? "visible" : "hidden" }}
+    style={{ visibility: showButton && !isCollectingID ? "visible" : "hidden" }}
     onClick={() => {
       // Start music on any user interaction
       playMusic('background', true);
@@ -458,9 +534,9 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
   {/* Tertiary: Book of Achievements (subtle/glass) */}
   <motion.button
     initial={{ opacity: 0 }}
-    animate={{ opacity: showButton ? 1 : 0 }}
+    animate={{ opacity: showButton && !isCollectingID ? 1 : 0 }}
     transition={{ delay: 0.1, type: "spring", stiffness: 250, damping: 22 }}
-    style={{ visibility: showButton ? "visible" : "hidden" }}
+    style={{ visibility: showButton && !isCollectingID ? "visible" : "hidden" }}
     onClick={() => {
       // Start music on any user interaction
       playMusic('background', true);
@@ -478,6 +554,9 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
           </>
         )}
       </div>
+
+      {/* ID Collection Modal */}
+      <IDCollectionModal isOpen={showIDModal} onSubmit={handleIDSubmit} />
     </div>
   );
 }

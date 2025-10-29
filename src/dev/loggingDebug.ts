@@ -3,32 +3,36 @@
 // Provides browser console commands for testing and debugging
 
 import { useLoggingStore, resetLoggingStore } from '../store/loggingStore';
+import { useSettingsStore } from '../store/settingsStore';
 import { loggingService } from '../lib/loggingService';
 
 /**
  * Enable logging (for testing)
  */
 function enableLogging() {
-  const { setEnabled, setConsented } = useLoggingStore.getState();
-  setEnabled(true);
+  const { setConsented } = useLoggingStore.getState();
+  const { setDataCollectionEnabled } = useSettingsStore.getState();
+  setDataCollectionEnabled(true);
   setConsented(true);
 
   // Initialize if not already initialized
   loggingService.init();
 
   console.log('[Logging Debug] ✅ Logging enabled');
-  console.log('State:', useLoggingStore.getState());
+  console.log('Logging State:', useLoggingStore.getState());
+  console.log('Settings (dataCollectionEnabled):', useSettingsStore.getState().dataCollectionEnabled);
 }
 
 /**
  * Disable logging (for testing)
  */
 function disableLogging() {
-  const { setEnabled } = useLoggingStore.getState();
-  setEnabled(false);
+  const { setDataCollectionEnabled } = useSettingsStore.getState();
+  setDataCollectionEnabled(false);
 
   console.log('[Logging Debug] ❌ Logging disabled');
-  console.log('State:', useLoggingStore.getState());
+  console.log('Logging State:', useLoggingStore.getState());
+  console.log('Settings (dataCollectionEnabled):', useSettingsStore.getState().dataCollectionEnabled);
 }
 
 /**
@@ -98,18 +102,19 @@ function testLog() {
  * Show current logging state (for debugging)
  */
 function showState() {
-  const state = useLoggingStore.getState();
+  const loggingState = useLoggingStore.getState();
+  const { dataCollectionEnabled } = useSettingsStore.getState();
   console.log('[Logging Debug] 📊 Current state:');
   console.table({
-    enabled: state.enabled,
-    consented: state.consented,
-    userId: state.userId,
-    sessionId: state.sessionId,
-    gameVersion: state.gameVersion,
-    treatment: state.treatment,
-    isInitialized: state.isInitialized,
+    dataCollectionEnabled: dataCollectionEnabled,
+    consented: loggingState.consented,
+    userId: loggingState.userId,
+    sessionId: loggingState.sessionId,
+    gameVersion: loggingState.gameVersion,
+    treatment: loggingState.treatment,
+    isInitialized: loggingState.isInitialized,
   });
-  return state;
+  return { ...loggingState, dataCollectionEnabled };
 }
 
 /**

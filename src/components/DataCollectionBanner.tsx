@@ -7,12 +7,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLoggingStore } from '../store/loggingStore';
+import { useSettingsStore } from '../store/settingsStore';
 import { loggingService } from '../lib/loggingService';
 
 export default function DataCollectionBanner() {
   const consented = useLoggingStore((s) => s.consented);
   const setConsented = useLoggingStore((s) => s.setConsented);
-  const setEnabled = useLoggingStore((s) => s.setEnabled);
 
   const [show, setShow] = useState(false);
   const [backendEnabled, setBackendEnabled] = useState(false);
@@ -39,7 +39,7 @@ export default function DataCollectionBanner() {
   // Handle accept button
   const handleAccept = () => {
     setConsented(true);
-    setEnabled(true);
+    useSettingsStore.getState().setDataCollectionEnabled(true);
     setShow(false);
 
     // Initialize logging service
@@ -51,7 +51,7 @@ export default function DataCollectionBanner() {
   // Handle decline button
   const handleDecline = () => {
     setConsented(true);  // Mark as consented but keep disabled
-    setEnabled(false);
+    useSettingsStore.getState().setDataCollectionEnabled(false);
     setShow(false);
 
     console.log('[DataCollectionBanner] User declined data collection');

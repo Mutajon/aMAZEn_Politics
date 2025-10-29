@@ -14,13 +14,8 @@ import { persist } from "zustand/middleware";
 // ===== DATA LOGGING VARIABLES =====
 
 type LoggingState = {
-  // --- Logging enabled/disabled ---
-  enabled: boolean;                  // Is data collection active?
-  setEnabled: (v: boolean) => void;
-  toggleEnabled: () => void;
-
   // --- User identification (anonymous) ---
-  userId: string | null;             // Anonymous UUID (persisted)
+  userId: string | null;             // Anonymous UUID (auto-generated) OR researcher-provided ID number (9 digits)
   setUserId: (id: string) => void;
 
   // --- Session tracking ---
@@ -59,11 +54,6 @@ function generateUUID(): string {
 export const useLoggingStore = create<LoggingState>()(
   persist(
     (set, get) => ({
-      // --- Logging enabled/disabled ---
-      enabled: false,  // Default: disabled (user must consent)
-      setEnabled: (v) => set({ enabled: v }),
-      toggleEnabled: () => set({ enabled: !get().enabled }),
-
       // --- User identification ---
       userId: null,  // Will be generated on first use
       setUserId: (id) => set({ userId: id }),
@@ -89,15 +79,15 @@ export const useLoggingStore = create<LoggingState>()(
       setInitialized: (v) => set({ isInitialized: v }),
     }),
     {
-      name: "logging-v1",  // localStorage key
+      name: "logging-v2",  // localStorage key (bumped from v1 to v2)
       partialize: (s) => ({
         // Only persist these fields
-        enabled: s.enabled,
         userId: s.userId,
         gameVersion: s.gameVersion,
         treatment: s.treatment,
         consented: s.consented,
         // DON'T persist: sessionId, isInitialized
+        // NOTE: 'enabled' removed - now controlled by settingsStore.dataCollectionEnabled
       }),
     }
   )
@@ -126,7 +116,6 @@ export function ensureUserId(): string {
  */
 export function resetLoggingStore() {
   useLoggingStore.setState({
-    enabled: false,
     userId: null,
     sessionId: null,
     gameVersion: '0.0.0',
