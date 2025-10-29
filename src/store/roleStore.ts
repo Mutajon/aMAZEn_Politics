@@ -21,6 +21,11 @@ export type AnalysisResult = {
   flavor: string;
   holders: PowerHolder[];
   playerIndex: number | null;
+  challengerSeat?: { // NEW: Primary institutional opponent (top non-player structured seat)
+    name: string;
+    percent: number;
+    index: number | null;
+  };
   e12?: { // NEW: Exception-12 analysis
     tierI: string[];
     tierII: string[];

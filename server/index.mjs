@@ -433,6 +433,52 @@ app.post("/api/bg-suggestion", async (req, res) => {
   }
 });
 
+// -------------------- Challenger Seat Selection Helper ---------------
+/**
+ * Select the Challenger Seat (top non-player structured seat)
+ *
+ * Excludes:
+ * - Player seat (based on playerIndex)
+ * - Unstructured seats: Demos, Plebs, People, Populace, Citizens
+ * - Caring anchor: Mom, Elder, Partner, Chaplain, Mentor, Advisor
+ *
+ * Returns the highest-percentage structured seat that isn't the player.
+ */
+function selectChallengerSeat(holders, playerIndex) {
+  const EXCLUDE_KEYWORDS = [
+    // Unstructured (popular) seats
+    "Demos", "Plebs", "People", "Populace", "Citizens", "Masses",
+    // Caring anchor variants
+    "Mom", "Elder", "Partner", "Chaplain", "Mentor", "Advisor", "Confidant"
+  ];
+
+  const candidates = holders
+    .map((h, i) => ({ ...h, originalIndex: i }))
+    .filter((h, i) => i !== playerIndex) // Exclude player
+    .filter(h => {
+      // Exclude if name contains any excluded keyword (case-insensitive)
+      return !EXCLUDE_KEYWORDS.some(keyword =>
+        h.name.toLowerCase().includes(keyword.toLowerCase())
+      );
+    });
+
+  // Return highest percentage candidate (first in filtered list, since holders already sorted by AI)
+  if (candidates.length > 0) {
+    return {
+      name: candidates[0].name,
+      percent: candidates[0].percent,
+      index: candidates[0].originalIndex
+    };
+  }
+
+  // Fallback if no structured seats found (shouldn't happen in practice)
+  return {
+    name: "Council",
+    percent: 25,
+    index: null
+  };
+}
+
 // -------------------- Power analysis with E-12 framework ---------------
 app.post("/api/analyze-role", async (req, res) => {
   // Increase timeout to 120 seconds for GPT-5 processing
@@ -555,12 +601,19 @@ Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setti
     // Enforce allowed polities
     const systemName = ALLOWED_POLITIES.includes(out?.systemName) ? out.systemName : FALLBACK.systemName;
 
+    // Determine player index
+    const playerIndex = (out?.playerIndex === null || out?.playerIndex === undefined) ? null : Number(out.playerIndex);
+
+    // Select challenger seat (top non-player structured seat)
+    const challengerSeat = selectChallengerSeat(holders, playerIndex);
+
     const result = {
       systemName,
       systemDesc: String(out?.systemDesc || FALLBACK.systemDesc).slice(0, 120),
       flavor: String(out?.flavor || FALLBACK.flavor).slice(0, 80),
       holders,
-      playerIndex: (out?.playerIndex === null || out?.playerIndex === undefined) ? null : Number(out.playerIndex),
+      playerIndex,
+      challengerSeat,  // NEW: Primary institutional opponent
       e12: {
         tierI: Array.isArray(out?.e12?.tierI) ? out.e12.tierI : FALLBACK.e12.tierI,
         tierII: Array.isArray(out?.e12?.tierII) ? out.e12.tierII : FALLBACK.e12.tierII,
@@ -2517,6 +2570,7 @@ function buildGameSystemPrompt(gameContext) {
     systemName,
     systemDesc,
     powerHolders,
+    challengerSeat,  // NEW: Primary institutional opponent
     playerCompass,
     totalDays,
     thematicGuidance
@@ -2527,8 +2581,18 @@ function buildGameSystemPrompt(gameContext) {
     ? powerHolders.map(h => `- ${h.name} (${h.percent}% power)`).join('\n')
     : "- No specific power holders defined";
 
+  // Format challenger seat (primary institutional opponent)
+  const challengerText = challengerSeat ? `
+
+PRIMARY INSTITUTIONAL OPPONENT:
+- ${challengerSeat.name} (${challengerSeat.percent}% power)
+- This is your main institutional adversary—the power holder most likely to oppose, challenge, or create friction with your decisions
+- Generate dilemmas that frequently involve conflict, tension, or negotiation with this entity
+- This opponent's actions, demands, or resistance should be a recurring source of political pressure` : "";
+
   // Format player compass values (top values per dimension)
   const compassText = playerCompass ? `
+
 TOP PLAYER VALUES:
 - What (goals): ${playerCompass.what || "undefined"}
 - Whence (justification): ${playerCompass.whence || "undefined"}
@@ -2549,8 +2613,7 @@ PLAYER ROLE & CONTEXT:
 - System Description: ${systemDesc}
 
 POWER HOLDERS:
-${holdersText}
-${compassText}${thematicText}
+${holdersText}${challengerText}${compassText}${thematicText}
 
 ⚠️ GROUNDING REQUIREMENT (CRITICAL):
 ${roleIntro ? `- ALL dilemmas must be deeply rooted in the specific historical/fictional context described above

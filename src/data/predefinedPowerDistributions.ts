@@ -52,6 +52,11 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
       }
     ],
     playerIndex: 1, // "Respected citizen chosen to help rebuild" → Executive (Thirty rulers)
+    challengerSeat: { // Primary institutional opponent: Spartan occupation force
+      name: "Coercive Force",
+      percent: 35,
+      index: 0
+    },
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -113,6 +118,11 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
       }
     ],
     playerIndex: 2, // "Scholar and advisor" → Royal Court (Cleopatra/Ptolemy)
+    challengerSeat: { // Primary institutional opponent: Roman occupation
+      name: "Roman General & Legions",
+      percent: 40,
+      index: 0
+    },
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -174,6 +184,11 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
       }
     ],
     playerIndex: 1, // "Council member" → Legislative (Great Council)
+    challengerSeat: { // Primary institutional opponent: Savonarola's religious movement
+      name: "Ideology/Religious (Savonarola & Friars)",
+      percent: 32,
+      index: 0
+    },
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -235,6 +250,11 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
       }
     ],
     playerIndex: 0, // "Tribal chief" → Executive (Paramount Chief)
+    challengerSeat: { // Primary institutional opponent: War captains who can force policy shifts
+      name: "Coercive Force (War Captains & Warriors)",
+      percent: 23,
+      index: 1
+    },
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -296,6 +316,11 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
       }
     ],
     playerIndex: 0, // "Leader of a small clan" → Coercive Force (Armies & Warlords) - Clan leaders were warlords
+    challengerSeat: { // Primary institutional opponent: Coalition chiefs coordinating rival alliances
+      name: "Executive (Coalition Chiefs)",
+      percent: 30,
+      index: 1
+    },
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -357,6 +382,11 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
       }
     ],
     playerIndex: 2, // "Mixed-race overseer" → Planter Elite (Wealth) - Overseers were plantation middle management
+    challengerSeat: { // Primary institutional opponent: Rebel armies burning plantations
+      name: "Rebel Slave Armies (Coercive Force)",
+      percent: 36,
+      index: 0
+    },
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -418,6 +448,11 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
       }
     ],
     playerIndex: 1, // "The Tsar" → Executive (Tsar)
+    challengerSeat: { // Primary institutional opponent: Army deciding whether to obey
+      name: "Coercive Force (Army & Garrison)",
+      percent: 35,
+      index: 0
+    },
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -479,6 +514,11 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
       }
     ],
     playerIndex: 2, // "District officer" → Executive - "District chief and provincial chiefs issue orders"
+    challengerSeat: { // Primary institutional opponent: Military forces setting terms
+      name: "Coercive Force",
+      percent: 40,
+      index: 0
+    },
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -540,6 +580,11 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
       }
     ],
     playerIndex: 1, // "Senior police commander" → Coercive Force - Police/military enforcement (BUG FIX)
+    challengerSeat: { // Primary institutional opponent: State executive setting policy
+      name: "Executive",
+      percent: 32,
+      index: 0
+    },
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
@@ -601,6 +646,11 @@ export const PREDEFINED_POWER_DISTRIBUTIONS: Record<string, AnalysisResult> = {
       }
     ],
     playerIndex: 0, // "Elected leader of the first Mars colony" → Executive - "Elected governor"
+    challengerSeat: { // Primary institutional opponent: Safety board with halt authority
+      name: "Science/Philosophy",
+      percent: 24,
+      index: 1
+    },
     e12: {
       tierI: ["Security", "CivilLib", "InfoOrder"],
       tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],

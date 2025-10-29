@@ -193,11 +193,11 @@ export function buildSupportItems(
   const { supportPeople, supportMiddle, supportMom } = useDilemmaStore.getState();
   const { analysis } = useRoleStore.getState();
 
-  // Get middle entity info from analysis
-  const playerIndex = typeof analysis?.playerIndex === "number" ? analysis.playerIndex : 0;
-  const middleEntity = Array.isArray(analysis?.holders) && analysis.holders.length > playerIndex + 1
-    ? analysis.holders[playerIndex + 1]
-    : { name: "Council", icon: "🏛️" };
+  // Get middle entity info from challenger seat (primary institutional opponent)
+  const challengerSeat = analysis?.challengerSeat;
+  const middleEntity = challengerSeat
+    ? { name: challengerSeat.name, icon: "🏛️" } // Use challenger seat name
+    : { name: "Council", icon: "🏛️" }; // Fallback to generic "Council"
 
   // Show deltas only after Step 2 (presentationStep >= 2)
   const showDeltas = presentationStep >= 2;

@@ -240,6 +240,7 @@ async function fetchGameTurn(): Promise<{
       systemName: roleState.analysis?.systemName || "Divine Right Monarchy",
       systemDesc: roleState.analysis?.systemDesc || "Power flows from divine mandate",
       powerHolders: roleState.analysis?.holders || [],
+      challengerSeat: roleState.analysis?.challengerSeat || null,  // NEW: Primary institutional opponent
       playerCompass: {
         what: topWhatValues.join(', '),
         whence: topKWithNames(compassValues?.whence, 'whence', 2).map(v => v.name).join(', '),
