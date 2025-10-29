@@ -9,18 +9,21 @@
  */
 
 import { useMemo } from "react";
-import { bgStyle } from "../lib/ui";
+import { bgStyleWithRoleImage } from "../lib/ui";
 import type { PushFn } from "../lib/router";
 import LoadingOverlay from "../components/LoadingOverlay";
 import PowerDistributionContent from "../components/PowerDistributionContent";
 import { usePowerDistributionState, makeId, clampPct } from "../hooks/usePowerDistributionState";
 import { usePowerDistributionAnalysis } from "../hooks/usePowerDistributionAnalysis";
 import { useSettingsStore } from "../store/settingsStore";
+import { useRoleStore } from "../store/roleStore";
 import { useLang } from "../i18n/lang";
 import { useTranslatedConst, createTranslatedConst } from "../i18n/useTranslatedConst";
 
 export default function PowerDistributionScreen({ push }: { push: PushFn }) {
   const lang = useLang();
+  const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
+  const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
   
   // Loading quotes for the overlay
   const LOADING_QUOTES = createTranslatedConst((lang) => [
@@ -92,7 +95,7 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
   };
 
   return (
-    <div className="min-h-dvh w-full" style={bgStyle}>
+    <div className="min-h-dvh w-full" style={roleBgStyle}>
       <LoadingOverlay visible={fetchState === "loading"} title={lang("ANALYZING_YOUR_WORLD")} quotes={quotes} />
 
       <PowerDistributionContent

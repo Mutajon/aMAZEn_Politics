@@ -1,6 +1,6 @@
 // src/screens/HighscoreScreen.tsx
 import { useMemo, useState, useEffect, useRef } from "react";
-import { bgStyle } from "../lib/ui";
+import { bgStyleSplash } from "../lib/ui";
 import { useHighscoreStore } from "../store/highscoreStore";
 import LeaderPopup from "../components/LeaderPopup";
 import type { HighscoreEntry } from "../data/highscores-default";
@@ -95,7 +95,7 @@ export default function HighscoreScreen() {
   }, [highlightName]);
 
   return (
-    <div className="min-h-[100dvh] px-5 py-8" style={bgStyle}>
+    <div className="min-h-[100dvh] px-5 py-8" style={bgStyleSplash}>
       <div className="w-full max-w-5xl mx-auto">
         <div className="mb-4 flex items-center justify-between">
           <div>

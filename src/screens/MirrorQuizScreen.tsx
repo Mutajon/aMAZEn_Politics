@@ -1,7 +1,7 @@
 // src/screens/MirrorQuizScreen.tsx
 import { useEffect, useMemo, useState, useRef } from "react";
 import type { PushFn } from "../lib/router";
-import { bgStyle } from "../lib/ui";
+import { bgStyleWithRoleImage } from "../lib/ui";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCompassStore, VALUE_RULES } from "../store/compassStore";
 import { resolveLabel } from "../data/compass-data";
@@ -56,12 +56,16 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
 
   // avatar selection (uses flipped avatar if your hook already saved it)
   const character = useRoleStore((s) => s.character);
+  const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
   const generateImages = useSettingsStore((s) => s.generateImages);
   const displayAvatar = useMemo(() => {
     if (character?.avatarUrl) return character.avatarUrl;
     if (!generateImages) return DEFAULT_AVATAR_DATA_URL;
     return "";
   }, [character?.avatarUrl, generateImages]);
+
+  // Create role-based background style
+  const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
 
   // quiz state (persists across routes)
   const { quiz, idx, done, summary, epilogueShown, init, advance, setDone, setSummary, markEpilogueShown } =
@@ -212,7 +216,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   };
 
   return (
-    <div className="min-h-[100dvh] px-5 py-5" style={bgStyle}>
+    <div className="min-h-[100dvh] px-5 py-5" style={roleBgStyle}>
       <div className="w-full max-w-xl mx-auto">
         {/* TOP ROW — aligned at top */}
         <div className="flex items-start justify-between gap-4 mt-1">

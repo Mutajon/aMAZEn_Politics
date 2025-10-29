@@ -15,10 +15,10 @@
 // - src/screens/BackgroundIntroScreen.tsx: Navigates here
 // - src/screens/EventScreen3.tsx: Navigates to event screen after selection
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import * as LucideIcons from "lucide-react";
-import { bgStyle } from "../lib/ui";
+import { bgStyleWithRoleImage } from "../lib/ui";
 import { getRandomGoals, type Goal } from "../data/goals";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
@@ -77,7 +77,7 @@ function GoalCard({
       onClick={disabled && !selected ? undefined : onToggle}
       className={`
         relative rounded-xl border p-6 cursor-pointer transition-all
-        ${selected ? `${borderClass} border-2 ${bgClass}` : 'border-white/10 bg-white/5'}
+        ${selected ? `${borderClass} border-2 ${bgClass} ring-2 ring-amber-400/80` : 'border-slate-700/50 bg-black/60 backdrop-blur-sm ring-1 ring-amber-400/40'}
         ${disabled && !selected ? 'cursor-not-allowed' : 'hover:border-white/30 hover:bg-white/10'}
       `}
     >
@@ -136,8 +136,12 @@ export default function GoalsSelectionScreen({ push }: Props) {
 
   // Get middle entity name dynamically from power distribution
   const analysis = useRoleStore((s) => s.analysis);
+  const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
   const playerIndex = analysis?.playerIndex ?? 0;
   const middleEntity = analysis?.holders?.[playerIndex + 1]?.name ?? "Power Holders";
+
+  // Create role-based background style
+  const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
 
   // Logging hook for data collection
   const logger = useLogger();
@@ -229,7 +233,7 @@ export default function GoalsSelectionScreen({ push }: Props) {
   const canConfirm = selectedGoals.size === 2;
 
   return (
-    <div className="min-h-screen px-5 py-8" style={bgStyle}>
+    <div className="min-h-screen px-5 py-8" style={roleBgStyle}>
       <div className="w-full max-w-4xl mx-auto space-y-6">
         {/* Title */}
         <motion.div

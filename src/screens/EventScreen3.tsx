@@ -29,7 +29,7 @@ import ActionDeck, { type ActionCard } from "../components/event/ActionDeck";
 import { actionsToDeckCards } from "../components/event/actionVisuals";
 import { useCoinFlights, CoinFlightOverlay } from "../components/event/CoinFlightSystem";
 import { AnimatePresence } from "framer-motion";
-import { bgStyle } from "../lib/ui";
+import { bgStyleWithRoleImage } from "../lib/ui";
 import { Building2, Heart, Users } from "lucide-react";
 import type { CompassEffectPing } from "../components/MiniCompass";
 import { loadEventScreenSnapshot, clearEventScreenSnapshot } from "../lib/eventScreenSnapshot";
@@ -41,12 +41,15 @@ type Props = {
 
 export default function EventScreen3({ push }: Props) {
   const lang = useLang();
-  
+
   // Global state (read only - single source of truth)
   const { day, totalDays, budget } = useDilemmaStore();
-  const { character } = useRoleStore();
+  const { character, roleBackgroundImage } = useRoleStore();
   const showBudget = useSettingsStore((s) => s.showBudget);
   const debugMode = useSettingsStore((s) => s.debugMode);
+
+  // Create role-based background style
+  const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
 
   // Data collection (progressive 3-phase loading)
   const {
@@ -432,7 +435,7 @@ export default function EventScreen3({ push }: Props) {
     );
 
     return (
-      <div className="min-h-screen p-6 pb-24" style={bgStyle}>
+      <div className="min-h-screen p-6 pb-24" style={roleBgStyle}>
         {/* Debug: Jump to Final Day button */}
         {debugMode && day < 7 && phase === 'interacting' && (
           <button
@@ -553,7 +556,7 @@ export default function EventScreen3({ push }: Props) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={bgStyle}>
+    <div className="min-h-screen flex items-center justify-center" style={roleBgStyle}>
       <p className="text-white">{lang("UNKNOWN_PHASE")}: {phase}</p>
     </div>
   );

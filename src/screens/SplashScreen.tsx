@@ -34,6 +34,7 @@ export default function SplashScreen({
   const [visibleSubtitles, setVisibleSubtitles] = useState(0);
   const [showButton, setShowButton] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Helper function to get correct transform for toggle
   const getToggleTransform = (isEnabled: boolean) => {
@@ -104,7 +105,8 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
       className="relative min-h-[100dvh] flex items-center justify-center px-5"
       style={bgStyleSplash}
     >
-      {/* Settings cog (top-right) */}
+      {/* Settings cog (top-right) - hidden when loading */}
+{!isLoading && (
 <div className="absolute top-4 right-4 z-[40] pointer-events-auto">
   <button
     onClick={() => setShowSettings((v) => !v)}
@@ -117,6 +119,7 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     <span aria-hidden className="text-lg leading-none">⚙</span>
   </button>
 </div>
+)}
 
 {/* Settings panel (fixed, above gear, outside its wrapper) */}
 {showSettings && (
@@ -331,14 +334,26 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
 
       {/* Center content */}
       <div className="w-full max-w-md text-center select-none space-y-5">
-        <motion.h1
-          initial={{ opacity: 0, y: 20, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ type: "spring", stiffness: 200, damping: 18 }}
-          className="text-4xl sm:text-5xl font-extrabold leading-tight tracking-tight bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]"
-        >
-          aMAZE'n Politics
-        </motion.h1>
+        {isLoading ? (
+          // Loading spinner
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 18 }}
+            className="flex flex-col items-center justify-center gap-4"
+          >
+            <div className="w-12 h-12 border-4 border-amber-300/30 border-t-amber-300 rounded-full animate-spin" />
+          </motion.div>
+        ) : (
+          <>
+            <motion.h1
+              initial={{ opacity: 0, y: 20, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 18 }}
+              className="text-4xl sm:text-5xl font-extrabold leading-tight tracking-tight bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]"
+            >
+              aMAZE'n Politics
+            </motion.h1>
 
         {/* Animated subtitle - simple fade in */}
         <div className="relative min-h-[80px] flex flex-col items-center justify-start pt-4">
@@ -395,6 +410,10 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     transition={{ type: "spring", stiffness: 250, damping: 22 }}
     style={{ visibility: showButton ? "visible" : "hidden" }}
     onClick={async () => {
+      // Immediately show loading state
+      setIsLoading(true);
+      setShowSettings(false);
+
       // Start new logging session
       await loggingService.startSession();
 
@@ -410,7 +429,6 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
       playMusic('background', true);
 
       onStart();
-      setShowSettings(false);
     }}
     className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
   >
@@ -457,7 +475,8 @@ const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
     {lang("BOOK_OF_ACHIEVEMENTS")}
   </motion.button>
 </div>
-
+          </>
+        )}
       </div>
     </div>
   );
