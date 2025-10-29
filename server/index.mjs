@@ -2398,7 +2398,8 @@ app.post("/api/game-turn", async (req, res) => {
       day,
       playerChoice,
       compassUpdate,
-      gameContext // Day 1 only: full game initialization data
+      gameContext, // Day 1 only: full game initialization data
+      crisisMode // Optional: crisis mode flag when support < 20%
     } = req.body;
 
     // Validate required fields
@@ -2440,8 +2441,12 @@ app.post("/api/game-turn", async (req, res) => {
       console.log(`[GAME-TURN] System prompt: ${systemPrompt.length} chars`);
       console.log(`[GAME-TURN] User prompt: ${userMessage.length} chars`);
 
-      // Store conversation (messages will be stored after AI response)
-      storeConversation(gameId, "pending", "openai");
+      // Store conversation with challenger seat info (messages will be stored after AI response)
+      // challengerSeat stored for crisis mode prompt building on Day 2+
+      const conversationMeta = {
+        challengerSeat: gameContext.challengerSeat || null
+      };
+      storeConversation(gameId, "pending", "openai", conversationMeta);
 
     // ============================================================================
     // DAY 2-8: Continue existing conversation with player's choice
@@ -2464,13 +2469,17 @@ app.post("/api/game-turn", async (req, res) => {
       // Retrieve stored message history
       messages = conversation.messages || [];
 
-      // Build user message for this turn (minimal - just the choice and compass update)
-      const userMessage = buildTurnUserPrompt(day, playerChoice, compassUpdate);
+      // Build user message for this turn (includes crisis mode if applicable)
+      const challengerSeat = conversation.meta?.challengerSeat || null;
+      const userMessage = buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode, challengerSeat);
 
       messages.push({ role: "user", content: userMessage });
 
       console.log(`[GAME-TURN] Message history: ${messages.length} messages`);
       console.log(`[GAME-TURN] Turn prompt: ${userMessage.length} chars`);
+      if (crisisMode) {
+        console.log(`[GAME-TURN] ⚠️ CRISIS MODE: ${crisisMode}`);
+      }
     }
 
     // ============================================================================
@@ -2730,7 +2739,7 @@ function buildDay1UserPrompt(gameContext) {
 /**
  * Helper: Build turn user prompt (Day 2+)
  */
-function buildTurnUserPrompt(day, playerChoice, compassUpdate) {
+function buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode = null, challengerSeat = null) {
   let prompt = `DAY ${day}\n\n`;
 
   prompt += `PREVIOUS CHOICE: "${playerChoice.title}"\n`;
@@ -2742,7 +2751,41 @@ function buildTurnUserPrompt(day, playerChoice, compassUpdate) {
     prompt += `Player's compass values have been updated based on this choice.\n\n`;
   }
 
-  if (day === 7) {
+  // CRISIS MODE: Support level consequences
+  if (crisisMode) {
+    prompt += `🚨 CRISIS MODE: "${crisisMode}"\n`;
+    prompt += `⚠️ CRITICAL: Support level(s) dropped below 20% threshold!\n\n`;
+
+    if (crisisMode === "downfall") {
+      prompt += `**DOWNFALL CRISIS** (ALL three support tracks < 20%):\n`;
+      prompt += `- This is a TERMINAL CRISIS - the player's rule is collapsing\n`;
+      prompt += `- Generate a dramatic final scenario showing the consequences of total loss of support\n`;
+      prompt += `- The "dilemma" should be narrative-only (no actions) describing their downfall\n`;
+      prompt += `- Set "isGameEnd": true in response\n`;
+      prompt += `- This is the END OF THE GAME - no Day ${day + 1}\n\n`;
+    } else if (crisisMode === "people") {
+      prompt += `**PEOPLE CRISIS** (Public support < 20%):\n`;
+      prompt += `- Mass uprising, protests, strikes, or riots erupting\n`;
+      prompt += `- Public has lost faith in the player's leadership\n`;
+      prompt += `- Generate a dilemma focused on mass backlash and public unrest\n`;
+      prompt += `- High stakes: How does the player respond to widespread discontent?\n\n`;
+    } else if (crisisMode === "challenger") {
+      const challengerName = challengerSeat?.name || "the institutional opposition";
+      prompt += `**CHALLENGER CRISIS** (${challengerName} support < 20%):\n`;
+      prompt += `- ${challengerName} is turning against the player\n`;
+      prompt += `- Institutional retaliation, coup threats, or power struggle escalating\n`;
+      prompt += `- Generate a dilemma focused on the challenger's actions against the player\n`;
+      prompt += `- High stakes: How does the player deal with institutional opposition?\n\n`;
+    } else if (crisisMode === "caring") {
+      prompt += `**PERSONAL CRISIS** (Caring anchor support < 20%):\n`;
+      prompt += `- The player's closest confidant/advisor has lost faith\n`;
+      prompt += `- Personal isolation, betrayal, or emotional breaking point\n`;
+      prompt += `- Generate a dilemma focused on the personal toll of leadership\n`;
+      prompt += `- High stakes: Can the player maintain their humanity under pressure?\n\n`;
+    }
+  }
+
+  if (day === 7 && !crisisMode) { // Only show epic finale if not in crisis mode
     prompt += `⚠️ DAY 7 - EPIC FINALE\n`;
     prompt += `- Create an UNRELATED national crisis (ignore previous story)\n`;
     prompt += `- But STILL calculate supportShift from previous choice (factions remember)\n`;
