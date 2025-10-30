@@ -12,6 +12,7 @@
  * @property {number} createdAt - Unix timestamp
  * @property {number} lastUsedAt - Unix timestamp
  * @property {number} turnCount - Number of turns in this conversation
+ * @property {object} meta - Additional game metadata (challengerSeat, supportProfiles, etc.)
  */
 
 // In-memory store
@@ -25,14 +26,16 @@ const CONVERSATION_TTL = 24 * 60 * 60 * 1000; // 24 hours
  * @param {string} gameId - Unique game identifier
  * @param {string} conversationId - OpenAI Responses API conversation ID
  * @param {string} provider - AI provider ('openai' or 'anthropic')
+ * @param {object} customMeta - Optional custom metadata (e.g., challengerSeat info)
  */
-export function storeConversation(gameId, conversationId, provider = 'openai') {
+export function storeConversation(gameId, conversationId, provider = 'openai', customMeta = null) {
   const metadata = {
     conversationId,
     provider,
     createdAt: Date.now(),
     lastUsedAt: Date.now(),
-    turnCount: 0
+    turnCount: 0,
+    meta: customMeta || {} // Store custom metadata (e.g., challengerSeat)
   };
 
   conversations.set(gameId, metadata);

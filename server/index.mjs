@@ -433,6 +433,149 @@ app.post("/api/bg-suggestion", async (req, res) => {
   }
 });
 
+// -------------------- Challenger Seat Selection Helper ---------------
+/**
+ * Select the Challenger Seat (top non-player structured seat)
+ *
+ * Excludes:
+ * - Player seat (based on playerIndex)
+ * - Unstructured seats: Demos, Plebs, People, Populace, Citizens
+ * - Caring anchor: Mom, Elder, Partner, Chaplain, Mentor, Advisor
+ *
+ * Returns the highest-percentage structured seat that isn't the player.
+ */
+function selectChallengerSeat(holders, playerIndex) {
+  const EXCLUDE_KEYWORDS = [
+    // Unstructured (popular) seats
+    "Demos", "Plebs", "People", "Populace", "Citizens", "Masses",
+    // Caring anchor variants
+    "Mom", "Elder", "Partner", "Chaplain", "Mentor", "Advisor", "Confidant"
+  ];
+
+  const candidates = holders
+    .map((h, i) => ({ ...h, originalIndex: i }))
+    .filter((h, i) => i !== playerIndex) // Exclude player
+    .filter(h => {
+      // Exclude if name contains any excluded keyword (case-insensitive)
+      return !EXCLUDE_KEYWORDS.some(keyword =>
+        h.name.toLowerCase().includes(keyword.toLowerCase())
+      );
+    });
+
+  // Return highest percentage candidate (first in filtered list, since holders already sorted by AI)
+  if (candidates.length > 0) {
+    return {
+      name: candidates[0].name,
+      percent: candidates[0].percent,
+      index: candidates[0].originalIndex
+    };
+  }
+
+  // Fallback if no structured seats found (shouldn't happen in practice)
+  return {
+    name: "Council",
+    percent: 25,
+    index: null
+  };
+}
+
+// -------------------- Support profile helpers ----------------------
+const ISSUE_KEYS = ["governance", "order", "economy", "justice", "culture", "foreign"];
+const ISSUE_LABELS = {
+  governance: "Governance",
+  order: "Order/Security",
+  economy: "Economy",
+  justice: "Justice",
+  culture: "Culture/Religion",
+  foreign: "Foreign/External"
+};
+
+function truncateText(value, max) {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, max);
+}
+
+function sanitizeSupportProfile(entry, defaultOrigin) {
+  if (!entry || typeof entry !== "object") return null;
+  const summary = truncateText(entry.summary || "", 140);
+  const stances = {};
+  const raw = entry.stances && typeof entry.stances === "object" ? entry.stances : {};
+  ISSUE_KEYS.forEach((key) => {
+    const v = truncateText(raw[key] || "", 90);
+    if (v) {
+      stances[key] = v;
+    }
+  });
+  if (!summary && Object.keys(stances).length === 0) {
+    return null;
+  }
+  const origin = entry.origin === "predefined" ? "predefined" : (entry.origin === "ai" || entry.origin === "provisional" ? entry.origin : defaultOrigin);
+  return {
+    summary: summary || null,
+    stances,
+    origin
+  };
+}
+
+function sanitizeSupportProfiles(raw, defaultOrigin = "ai") {
+  if (!raw || typeof raw !== "object") return null;
+  const people = sanitizeSupportProfile(raw.people, defaultOrigin);
+  const challenger = sanitizeSupportProfile(raw.challenger, defaultOrigin);
+  if (!people && !challenger) return null;
+  return {
+    people: people ?? null,
+    challenger: challenger ?? null
+  };
+}
+
+function summarizeStances(profile) {
+  if (!profile || !profile.stances) return "";
+  const parts = [];
+  ISSUE_KEYS.forEach((key) => {
+    const text = profile.stances[key];
+    if (text) {
+      parts.push(`${ISSUE_LABELS[key]}: ${text}`);
+    }
+  });
+  return parts.join("; ");
+}
+
+function formatSupportProfilesForPrompt(profiles) {
+  if (!profiles) {
+    return "- No baseline stances provided (infer from narrative).";
+  }
+
+  const blocks = [];
+  const makeBlock = (label, profile) => {
+    if (!profile) {
+      return `- ${label}: No baseline supplied.`;
+    }
+    const baseLine = `- ${label}: ${profile.summary || "Baseline not provided."}`;
+    const stanceText = summarizeStances(profile);
+    return stanceText ? `${baseLine}\n  • ${stanceText.split("; ").join("\n  • ")}` : baseLine;
+  };
+
+  blocks.push(makeBlock("People", profiles.people));
+  blocks.push(makeBlock("Challenger", profiles.challenger));
+  return blocks.join("\n");
+}
+
+function buildSupportProfileReminder(profiles) {
+  if (!profiles) return "";
+  const lines = [];
+  if (profiles.people) {
+    const stance = summarizeStances(profiles.people);
+    const summary = profiles.people.summary || "No explicit summary provided.";
+    lines.push(`- People baseline: ${summary}${stance ? ` | ${stance}` : ""}`);
+  }
+  if (profiles.challenger) {
+    const stance = summarizeStances(profiles.challenger);
+    const summary = profiles.challenger.summary || "No explicit summary provided.";
+    lines.push(`- Challenger baseline: ${summary}${stance ? ` | ${stance}` : ""}`);
+  }
+  return lines.join("\n");
+}
+
 // -------------------- Power analysis with E-12 framework ---------------
 app.post("/api/analyze-role", async (req, res) => {
   // Increase timeout to 120 seconds for GPT-5 processing
@@ -461,7 +604,8 @@ app.post("/api/analyze-role", async (req, res) => {
         stopB: false,
         decisive: []
       },
-      grounding: { settingType: "unclear", era: "" }
+      grounding: { settingType: "unclear", era: "" },
+      supportProfiles: null
     };
 
     const system = `${ANTI_JARGON_RULES}
@@ -508,9 +652,35 @@ Return STRICT JSON only as:
     "stopB": false,
     "decisive": ["<seat names that decided exceptions>"]
   },
-  "grounding": {
+ "grounding": {
     "settingType": "real|fictional|unclear",
     "era": "<40 chars max>"
+  },
+  "supportProfiles": {
+    "people": {
+      "summary": "<80 chars max>",
+      "stances": {
+        "governance": "<60 chars>",
+        "order": "<60 chars>",
+        "economy": "<60 chars>",
+        "justice": "<60 chars>",
+        "culture": "<60 chars>",
+        "foreign": "<60 chars>"
+      },
+      "origin": "ai|provisional"
+    } | null,
+    "challenger": {
+      "summary": "<80 chars max>",
+      "stances": {
+        "governance": "<60 chars>",
+        "order": "<60 chars>",
+        "economy": "<60 chars>",
+        "justice": "<60 chars>",
+        "culture": "<60 chars>",
+        "foreign": "<60 chars>"
+      },
+      "origin": "ai|provisional"
+    } | null
   }
 }
 
@@ -555,12 +725,22 @@ Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setti
     // Enforce allowed polities
     const systemName = ALLOWED_POLITIES.includes(out?.systemName) ? out.systemName : FALLBACK.systemName;
 
+    // Determine player index
+    const playerIndex = (out?.playerIndex === null || out?.playerIndex === undefined) ? null : Number(out.playerIndex);
+
+    // Select challenger seat (top non-player structured seat)
+    const challengerSeat = selectChallengerSeat(holders, playerIndex);
+    const originHint = out?.grounding?.settingType === "real" ? "ai" : "provisional";
+    const supportProfiles = sanitizeSupportProfiles(out?.supportProfiles, originHint);
+
     const result = {
       systemName,
       systemDesc: String(out?.systemDesc || FALLBACK.systemDesc).slice(0, 120),
       flavor: String(out?.flavor || FALLBACK.flavor).slice(0, 80),
       holders,
-      playerIndex: (out?.playerIndex === null || out?.playerIndex === undefined) ? null : Number(out.playerIndex),
+      playerIndex,
+      challengerSeat,  // NEW: Primary institutional opponent
+      supportProfiles,
       e12: {
         tierI: Array.isArray(out?.e12?.tierI) ? out.e12.tierI : FALLBACK.e12.tierI,
         tierII: Array.isArray(out?.e12?.tierII) ? out.e12.tierII : FALLBACK.e12.tierII,
@@ -1946,7 +2126,7 @@ app.post("/api/dilemma-light", async (req, res) => {
 // --- Validate "Suggest your own" (relevance to the current dilemma) ---
 app.post("/api/validate-suggestion", async (req, res) => {
   try {
-    const { text, title, description } = req.body || {};
+    const { text, title, description, era, settingType, year } = req.body || {};
     if (typeof text !== "string" || typeof title !== "string" || typeof description !== "string") {
       return res.status(400).json({ error: "Missing text/title/description" });
     }
@@ -1958,21 +2138,46 @@ app.post("/api/validate-suggestion", async (req, res) => {
       process.env.CHAT_MODEL ||
       "gpt-5-mini";
 
+    // Build historical context section if provided
+    let historicalContext = "";
+    if (era || year) {
+      const eraText = era || year || "unknown time period";
+      historicalContext = [
+        "",
+        "HISTORICAL CONTEXT:",
+        `- Time period: ${eraText}`,
+        `- Setting type: ${settingType || "unclear"}`,
+        "",
+        "ANACHRONISM CHECK:",
+        "- REJECT suggestions that contain clear anachronisms (technologies, concepts, or institutions that didn't exist in this time period)",
+        "- Examples of what to reject:",
+        "  • Ancient times (e.g., -404, -48): 'launch Twitter campaign', 'send email', 'use drones', 'install cameras', 'call emergency Zoom meeting'",
+        "  • Early modern (e.g., 1494, 1607, 1791): 'deploy surveillance cameras', 'broadcast on television', 'issue press release online', 'use helicopters'",
+        "  • Modern (e.g., 1917, 1947, 1990): Generally accept most technology, but reject futuristic concepts",
+        "  • Future (e.g., 2179): Reject outdated tech like 'send telegram', 'deploy musket battalions', 'town criers'",
+        "- If uncertain whether something is anachronistic, ACCEPT it (benefit of the doubt)",
+        "",
+      ].join("\n");
+    }
+
     const system = [
-      "You are a PERMISSIVE validator for a strategy game.",
+      "You are a PERMISSIVE validator for a historical/political strategy game.",
       "Given a DILEMMA (title + description) and a SUGGESTION from the player, your job is to accept anything that shows reasonable engagement.",
-      "",
+      historicalContext,
       "ACCEPT the suggestion if it:",
       "- Shows ANY attempt to engage with the dilemma (even if tangentially related)",
       "- Contains actual words/sentences (not random keyboard mashing)",
       "- Suggests any kind of action, policy, or response",
+      "- Uses period-appropriate language and concepts (OR if you're uncertain about the time period)",
       "",
       "REJECT only if:",
       "- Empty or whitespace-only input",
       "- Pure gibberish (random characters like 'asdfgh', 'xyz123')",
       "- Completely irrelevant to politics/governance (e.g., 'I like pizza', 'random thoughts')",
+      "- Contains clear, obvious anachronisms (technologies/concepts that definitively didn't exist in the time period)",
       "",
       "DEFAULT STANCE: If in doubt, ACCEPT the suggestion.",
+      "For anachronisms: provide a brief, helpful rejection message like 'Cameras didn't exist in 1607. Try period-appropriate actions.'",
       "Only return compact JSON: { \"valid\": boolean, \"reason\": string }.",
     ].join("\n");
 
@@ -2345,7 +2550,8 @@ app.post("/api/game-turn", async (req, res) => {
       day,
       playerChoice,
       compassUpdate,
-      gameContext // Day 1 only: full game initialization data
+      gameContext, // Day 1 only: full game initialization data
+      crisisMode // Optional: crisis mode flag when support < 20%
     } = req.body;
 
     // Validate required fields
@@ -2373,11 +2579,14 @@ app.post("/api/game-turn", async (req, res) => {
 
       console.log("[GAME-TURN] Day 1: Initializing conversation with full game context");
 
+      const sanitizedProfiles = sanitizeSupportProfiles(gameContext.supportProfiles, "predefined");
+      const enrichedContext = { ...gameContext, supportProfiles: sanitizedProfiles };
+
       // Build comprehensive system prompt for the entire game
-      const systemPrompt = buildGameSystemPrompt(gameContext);
+      const systemPrompt = buildGameSystemPrompt(enrichedContext);
 
       // Initial user message requesting first dilemma
-      const userMessage = buildDay1UserPrompt(gameContext);
+      const userMessage = buildDay1UserPrompt(enrichedContext);
 
       messages = [
         { role: "system", content: systemPrompt },
@@ -2387,8 +2596,13 @@ app.post("/api/game-turn", async (req, res) => {
       console.log(`[GAME-TURN] System prompt: ${systemPrompt.length} chars`);
       console.log(`[GAME-TURN] User prompt: ${userMessage.length} chars`);
 
-      // Store conversation (messages will be stored after AI response)
-      storeConversation(gameId, "pending", "openai");
+      // Store conversation with challenger seat info (messages will be stored after AI response)
+      // challengerSeat stored for crisis mode prompt building on Day 2+
+      const conversationMeta = {
+        challengerSeat: enrichedContext.challengerSeat || null,
+        supportProfiles: sanitizedProfiles
+      };
+      storeConversation(gameId, "pending", "openai", conversationMeta);
 
     // ============================================================================
     // DAY 2-8: Continue existing conversation with player's choice
@@ -2411,40 +2625,106 @@ app.post("/api/game-turn", async (req, res) => {
       // Retrieve stored message history
       messages = conversation.messages || [];
 
-      // Build user message for this turn (minimal - just the choice and compass update)
-      const userMessage = buildTurnUserPrompt(day, playerChoice, compassUpdate);
+      // Build user message for this turn (includes crisis mode if applicable)
+      const challengerSeat = conversation.meta?.challengerSeat || null;
+      const supportProfiles = conversation.meta?.supportProfiles || null;
+      const userMessage = buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode, challengerSeat, supportProfiles);
 
       messages.push({ role: "user", content: userMessage });
 
       console.log(`[GAME-TURN] Message history: ${messages.length} messages`);
       console.log(`[GAME-TURN] Turn prompt: ${userMessage.length} chars`);
+      if (crisisMode) {
+        console.log(`[GAME-TURN] ⚠️ CRISIS MODE: ${crisisMode}`);
+      }
     }
 
     // ============================================================================
-    // Call OpenAI Chat Completions API
+    // Call OpenAI Chat Completions API with retry logic
     // ============================================================================
-    console.log(`[GAME-TURN] Calling OpenAI with ${messages.length} messages...`);
+    const maxAttempts = 5;
+    let turnData = null;
+    let aiResponse = null;
 
-    const aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.log(`[GAME-TURN] Attempt ${attempt}/${maxAttempts}: Calling OpenAI with ${messages.length} messages...`);
 
-    if (!aiResponse || !aiResponse.content) {
-      throw new Error("Empty response from AI");
+        aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
+
+        if (!aiResponse || !aiResponse.content) {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Empty response from AI`);
+          aiResponse = null;
+          continue;
+        }
+
+        console.log(`[GAME-TURN] ✅ AI responded: ${aiResponse.content.length} chars`);
+
+        // Check finish_reason for truncation
+        if (aiResponse.finishReason && aiResponse.finishReason !== 'stop') {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} warning: finish_reason=${aiResponse.finishReason} (expected 'stop')`);
+          if (aiResponse.finishReason === 'length') {
+            console.warn(`[GAME-TURN] 🚨 Response TRUNCATED due to token limit - retrying...`);
+            aiResponse = null;
+            continue;
+          }
+        }
+
+        // Parse JSON response
+        turnData = safeParseJSON(aiResponse.content);
+
+        if (!turnData) {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Could not parse JSON`);
+          console.warn(`[GAME-TURN] Raw response start: ${aiResponse.content.substring(0, 200)}...`);
+          aiResponse = null;
+          turnData = null;
+          continue;
+        }
+
+        // Validate response structure
+        if (!turnData.title) {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Missing 'title' field`);
+          aiResponse = null;
+          turnData = null;
+          continue;
+        }
+
+        if (!turnData.description) {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Missing 'description' field`);
+          aiResponse = null;
+          turnData = null;
+          continue;
+        }
+
+        if (!Array.isArray(turnData.actions) || turnData.actions.length === 0) {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Invalid or empty 'actions' array`);
+          aiResponse = null;
+          turnData = null;
+          continue;
+        }
+
+        // Success! Exit retry loop
+        console.log(`[GAME-TURN] ✅ Attempt ${attempt} succeeded - valid response received`);
+        break;
+
+      } catch (e) {
+        console.error(`[GAME-TURN] ❌ Attempt ${attempt} exception:`, e?.message || e);
+        aiResponse = null;
+        turnData = null;
+      }
+
+      // Exponential backoff before retry (except after last attempt)
+      if (attempt < maxAttempts && !turnData) {
+        const delay = Math.min(2000, 500 * attempt);
+        console.log(`[GAME-TURN] Waiting ${delay}ms before retry...`);
+        await new Promise(r => setTimeout(r, delay));
+      }
     }
 
-    console.log(`[GAME-TURN] ✅ AI responded: ${aiResponse.content.length} chars`);
-
-    // Parse JSON response
-    const turnData = safeParseJSON(aiResponse.content);
-
-    if (!turnData) {
-      console.error(`[GAME-TURN] ❌ Failed to parse AI response as JSON`);
-      console.error(`[GAME-TURN] Raw response: ${aiResponse.content.substring(0, 500)}...`);
-      throw new Error("Invalid JSON response from AI");
-    }
-
-    // Validate response structure
-    if (!turnData.title || !turnData.description) {
-      throw new Error("Missing required fields in AI response (title, description)");
+    // Final validation after all attempts
+    if (!turnData || !aiResponse) {
+      console.error(`[GAME-TURN] ❌ All ${maxAttempts} attempts failed`);
+      throw new Error(`Game turn generation failed after ${maxAttempts} attempts`);
     }
 
     // ============================================================================
@@ -2511,12 +2791,17 @@ app.post("/api/game-turn", async (req, res) => {
 function buildGameSystemPrompt(gameContext) {
   const {
     role,
+    roleTitle,
+    roleIntro,
+    roleYear,
     systemName,
     systemDesc,
     powerHolders,
+    challengerSeat,  // NEW: Primary institutional opponent
     playerCompass,
     totalDays,
-    thematicGuidance
+    thematicGuidance,
+    supportProfiles
   } = gameContext;
 
   // Format power holders
@@ -2524,8 +2809,18 @@ function buildGameSystemPrompt(gameContext) {
     ? powerHolders.map(h => `- ${h.name} (${h.percent}% power)`).join('\n')
     : "- No specific power holders defined";
 
+  // Format challenger seat (primary institutional opponent)
+  const challengerText = challengerSeat ? `
+
+PRIMARY INSTITUTIONAL OPPONENT:
+- ${challengerSeat.name} (${challengerSeat.percent}% power)
+- This is your main institutional adversary—the power holder most likely to oppose, challenge, or create friction with your decisions
+- Generate dilemmas that frequently involve conflict, tension, or negotiation with this entity
+- This opponent's actions, demands, or resistance should be a recurring source of political pressure` : "";
+
   // Format player compass values (top values per dimension)
   const compassText = playerCompass ? `
+
 TOP PLAYER VALUES:
 - What (goals): ${playerCompass.what || "undefined"}
 - Whence (justification): ${playerCompass.whence || "undefined"}
@@ -2534,6 +2829,7 @@ TOP PLAYER VALUES:
 
   // Include thematic guidance if provided
   const thematicText = thematicGuidance ? `\n\nTHEMATIC GUIDANCE:\n${thematicGuidance}` : "";
+  const supportBaselineText = formatSupportProfilesForPrompt(supportProfiles);
 
   return `${ANTI_JARGON_RULES}
 
@@ -2541,13 +2837,22 @@ You are the AI game engine for a ${totalDays}-day political simulation game.
 You maintain full narrative context and generate ALL event screen data in a single response.
 
 PLAYER ROLE & CONTEXT:
-- Role: ${role}
+- Role: ${role}${roleTitle ? `\n- Scenario: ${roleTitle}` : ''}${roleYear ? `\n- Historical Period: ${roleYear}` : ''}${roleIntro ? `\n- Historical Context: ${roleIntro}` : ''}
 - Political System: ${systemName}
 - System Description: ${systemDesc}
 
 POWER HOLDERS:
-${holdersText}
-${compassText}${thematicText}
+${holdersText}${challengerText}${compassText}${thematicText}
+
+SUPPORT BASELINES:
+${supportBaselineText}
+
+⚠️ GROUNDING REQUIREMENT (CRITICAL):
+${roleIntro ? `- ALL dilemmas must be deeply rooted in the specific historical/fictional context described above
+- Use period-appropriate issues, stakeholders, geography, and political tensions from this exact scenario
+- Reference the specific circumstances: ${roleIntro.slice(0, 100)}...
+- Example grounding: If the context mentions "Sparta defeated Athens," create dilemmas about occupation, collaboration vs resistance, rebuilding under foreign rule
+- DO NOT generate generic leadership dilemmas—make them specific to THIS historical moment and setting` : '- Ground all dilemmas in the specific role and political system context provided'}
 
 YOUR RESPONSIBILITIES:
 1. Generate one concrete political dilemma per turn (title, description, 3 actions with costs)
@@ -2562,6 +2867,7 @@ YOUR RESPONSIBILITIES:
    - VARIETY: Show different aspects of the decision's impact (economic, social, political)
    - AVOID: Generating the same parameter multiple times
 6. Maintain narrative continuity across all ${totalDays} days
+7. Align supportShift reasoning with the baseline attitudes above; explicitly cite how each faction's stance agrees or clashes with the player's previous action.
 
 CONTINUITY & MEMORY:
 - You remember ALL previous dilemmas and player choices
@@ -2607,6 +2913,7 @@ OUTPUT FORMAT (JSON):
   "topic": "<Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture>",
   "scope": "<Local|National|International>",
   "supportShift": {  // Day 2+ only, based on previous choice
+    // WHY must cite alignment or friction with baseline stances above
     "people": {"delta": <-20 to +20>, "why": "<short reason>"},
     "mom": {"delta": <-20 to +20>, "why": "<short reason>"},
     "holders": {"delta": <-20 to +20>, "why": "<short reason>"}
@@ -2657,7 +2964,7 @@ function buildDay1UserPrompt(gameContext) {
 /**
  * Helper: Build turn user prompt (Day 2+)
  */
-function buildTurnUserPrompt(day, playerChoice, compassUpdate) {
+function buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode = null, challengerSeat = null, supportProfiles = null) {
   let prompt = `DAY ${day}\n\n`;
 
   prompt += `PREVIOUS CHOICE: "${playerChoice.title}"\n`;
@@ -2669,7 +2976,48 @@ function buildTurnUserPrompt(day, playerChoice, compassUpdate) {
     prompt += `Player's compass values have been updated based on this choice.\n\n`;
   }
 
-  if (day === 7) {
+  if (supportProfiles) {
+    const reminder = buildSupportProfileReminder(supportProfiles);
+    if (reminder) {
+      prompt += `BASELINE REFERENCE:\n${reminder}\n\n`;
+    }
+  }
+
+  // CRISIS MODE: Support level consequences
+  if (crisisMode) {
+    prompt += `🚨 CRISIS MODE: "${crisisMode}"\n`;
+    prompt += `⚠️ CRITICAL: Support level(s) dropped below 20% threshold!\n\n`;
+
+    if (crisisMode === "downfall") {
+      prompt += `**DOWNFALL CRISIS** (ALL three support tracks < 20%):\n`;
+      prompt += `- This is a TERMINAL CRISIS - the player's rule is collapsing\n`;
+      prompt += `- Generate a dramatic final scenario showing the consequences of total loss of support\n`;
+      prompt += `- The "dilemma" should be narrative-only (no actions) describing their downfall\n`;
+      prompt += `- Set "isGameEnd": true in response\n`;
+      prompt += `- This is the END OF THE GAME - no Day ${day + 1}\n\n`;
+    } else if (crisisMode === "people") {
+      prompt += `**PEOPLE CRISIS** (Public support < 20%):\n`;
+      prompt += `- Mass uprising, protests, strikes, or riots erupting\n`;
+      prompt += `- Public has lost faith in the player's leadership\n`;
+      prompt += `- Generate a dilemma focused on mass backlash and public unrest\n`;
+      prompt += `- High stakes: How does the player respond to widespread discontent?\n\n`;
+    } else if (crisisMode === "challenger") {
+      const challengerName = challengerSeat?.name || "the institutional opposition";
+      prompt += `**CHALLENGER CRISIS** (${challengerName} support < 20%):\n`;
+      prompt += `- ${challengerName} is turning against the player\n`;
+      prompt += `- Institutional retaliation, coup threats, or power struggle escalating\n`;
+      prompt += `- Generate a dilemma focused on the challenger's actions against the player\n`;
+      prompt += `- High stakes: How does the player deal with institutional opposition?\n\n`;
+    } else if (crisisMode === "caring") {
+      prompt += `**PERSONAL CRISIS** (Caring anchor support < 20%):\n`;
+      prompt += `- The player's closest confidant/advisor has lost faith\n`;
+      prompt += `- Personal isolation, betrayal, or emotional breaking point\n`;
+      prompt += `- Generate a dilemma focused on the personal toll of leadership\n`;
+      prompt += `- High stakes: Can the player maintain their humanity under pressure?\n\n`;
+    }
+  }
+
+  if (day === 7 && !crisisMode) { // Only show epic finale if not in crisis mode
     prompt += `⚠️ DAY 7 - EPIC FINALE\n`;
     prompt += `- Create an UNRELATED national crisis (ignore previous story)\n`;
     prompt += `- But STILL calculate supportShift from previous choice (factions remember)\n`;
@@ -2697,7 +3045,7 @@ async function callOpenAIChat(messages, model) {
       model: model || CHAT_MODEL_DEFAULT,
       messages: messages,
       temperature: 1,
-      max_completion_tokens: 4096
+      max_completion_tokens: 6144  // Increased from 4096 to reduce truncation risk
     })
   });
 

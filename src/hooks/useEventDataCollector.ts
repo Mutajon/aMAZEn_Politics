@@ -234,9 +234,14 @@ async function fetchGameTurn(): Promise<{
 
     payload.gameContext = {
       role: roleState.selectedRole || "Unicorn King",
+      roleTitle: roleState.roleTitle || null,          // Scenario title (predefined only)
+      roleIntro: roleState.roleIntro || null,          // Historical context paragraph (predefined only)
+      roleYear: roleState.roleYear || null,            // Year/era (predefined only)
       systemName: roleState.analysis?.systemName || "Divine Right Monarchy",
       systemDesc: roleState.analysis?.systemDesc || "Power flows from divine mandate",
       powerHolders: roleState.analysis?.holders || [],
+      challengerSeat: roleState.analysis?.challengerSeat || null,  // NEW: Primary institutional opponent
+      supportProfiles: roleState.supportProfiles || roleState.analysis?.supportProfiles || null,
       playerCompass: {
         what: topWhatValues.join(', '),
         whence: topKWithNames(compassValues?.whence, 'whence', 2).map(v => v.name).join(', '),
@@ -260,6 +265,30 @@ async function fetchGameTurn(): Promise<{
     };
 
     payload.compassUpdate = compassValues;
+  }
+
+  // CRISIS DETECTION: Check support thresholds (<20% triggers consequences)
+  // Frontend-driven crisis detection sends specialized mode to backend
+  const CRISIS_THRESHOLD = 20;
+  const peopleInCrisis = supportPeople < CRISIS_THRESHOLD;
+  const challengerInCrisis = supportMiddle < CRISIS_THRESHOLD;
+  const caringInCrisis = supportMom < CRISIS_THRESHOLD;
+
+  if (peopleInCrisis || challengerInCrisis || caringInCrisis) {
+    // Determine crisis mode (priority: downfall > people > challenger > caring)
+    if (peopleInCrisis && challengerInCrisis && caringInCrisis) {
+      payload.crisisMode = "downfall"; // All three < 20% → game ends
+      console.log(`[fetchGameTurn] ⚠️ DOWNFALL CRISIS: All support tracks below ${CRISIS_THRESHOLD}%`);
+    } else if (peopleInCrisis) {
+      payload.crisisMode = "people"; // Public < 20% → mass backlash
+      console.log(`[fetchGameTurn] ⚠️ PEOPLE CRISIS: Public support at ${supportPeople}%`);
+    } else if (challengerInCrisis) {
+      payload.crisisMode = "challenger"; // Challenger < 20% → institutional retaliation
+      console.log(`[fetchGameTurn] ⚠️ CHALLENGER CRISIS: Challenger support at ${supportMiddle}%`);
+    } else if (caringInCrisis) {
+      payload.crisisMode = "caring"; // Caring anchor < 20% → personal crisis
+      console.log(`[fetchGameTurn] ⚠️ CARING CRISIS: Caring anchor support at ${supportMom}%`);
+    }
   }
 
   console.log(`[fetchGameTurn] Calling /api/game-turn for Day ${day}, gameId=${currentGameId}`);

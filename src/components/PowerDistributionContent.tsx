@@ -22,6 +22,7 @@ interface PowerDistributionContentProps {
   error: string | null;
   holders: EnhancedPowerHolder[];
   playerHolderId: string | null;
+  challengerSeatIndex: number | null; // NEW: Index of the primary institutional opponent
   systemName: string;
   systemDesc: string;
   systemFlavor: string;
@@ -54,6 +55,7 @@ export default function PowerDistributionContent({
   error,
   holders,
   playerHolderId,
+  challengerSeatIndex,
   systemName,
   systemDesc,
   systemFlavor,
@@ -143,6 +145,7 @@ export default function PowerDistributionContent({
                 {holders.map((h, i) => {
                   const rank = i + 1;
                   const isPlayer = playerHolderId != null && h._id === playerHolderId;
+                  const isChallenger = challengerSeatIndex != null && i === challengerSeatIndex;
 
                   return (
                     <motion.div
@@ -199,6 +202,12 @@ export default function PowerDistributionContent({
                             {isPlayer && (
                               <span className="text-amber-300 text-sm font-semibold whitespace-nowrap">
                                 (That's you!)
+                              </span>
+                            )}
+
+                            {isChallenger && (
+                              <span className="text-rose-400 text-sm font-semibold whitespace-nowrap">
+                                (Major Challenger)
                               </span>
                             )}
                           </div>

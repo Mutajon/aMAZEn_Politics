@@ -57,7 +57,8 @@ export type ValidationResult = {
   // --- Suggestion validation (client -> server AI) ---
 export async function validateSuggestionStrict(
   text: string,
-  ctx: { title: string; description: string }
+  ctx: { title: string; description: string },
+  roleCtx?: { era: string; settingType: string; year: string }
 ): Promise<ValidationResult> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -66,7 +67,14 @@ export async function validateSuggestionStrict(
     const res = await fetch("/api/validate-suggestion", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, title: ctx.title, description: ctx.description }),
+      body: JSON.stringify({
+        text,
+        title: ctx.title,
+        description: ctx.description,
+        era: roleCtx?.era || "",
+        settingType: roleCtx?.settingType || "",
+        year: roleCtx?.year || ""
+      }),
       signal: controller.signal,
     });
 

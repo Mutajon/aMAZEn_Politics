@@ -485,7 +485,14 @@ Analysis includes historical/fictional grounding:
 
 **Critical**: Predefined roles bypass the API entirely using hardcoded power distributions. This optimization is preserved to avoid unnecessary API calls.
 
-**Implementation**: `src/data/predefinedPowerDistributions.ts`
+**Implementation**: `src/data/predefinedRoles.ts` (centralized database)
+
+**Architecture**:
+- All role data (power distributions, characters, images, i18n keys) centralized in single file
+- Role count is dynamic (automatically adjusts to array length)
+- RoleSelectionScreen maps roles from `PREDEFINED_ROLES_ARRAY` with runtime translation via `lang()` function
+- Translation system fully preserved (text stored in `en.json` / `he.json`)
+- Legacy helper functions (`getPredefinedPowerDistribution`, `getPredefinedCharacters`, `getRoleImages`) redirect to new database for backward compatibility
 
 **Predefined Roles:**
 1. Athens — The Day Democracy Died (-404) → Hard-Power Oligarchy — Stratocracy
@@ -499,10 +506,19 @@ Analysis includes historical/fictional grounding:
 9. South Africa — The End of Apartheid (1990) → Autocratizing (Executive)
 10. Mars Colony — The Red Frontier (2179) → Mental-Might Oligarchy — Technocracy
 
-Each predefined role includes:
+**Each predefined role includes**:
 - Complete E-12 analysis data (role, stype, e12, grounding fields)
-- Culturally appropriate character names (male/female/any options) in `src/data/predefinedCharacters.ts`
+- Culturally appropriate character names (male/female/any options)
+- Image identifiers (banner and full images)
+- i18n translation key references (titleKey, introKey, youAreKey)
 - Expandable UI cards with historical context, role description, and confirm button
+
+**Adding a new role** (simplified workflow):
+1. Add role object to `PREDEFINED_ROLES_ARRAY` in `src/data/predefinedRoles.ts` (~80 lines)
+2. Add 3 translation keys to `src/i18n/languages/en.json` (ROLE_TITLE, ROLE_INTRO, ROLE_YOU_ARE)
+3. Add 3 translation keys to `src/i18n/languages/he.json` (Hebrew translations)
+4. Add 2 image files to `/assets/images/BKGs/Roles/` (banner and full)
+5. Role automatically appears in UI (no RoleSelectionScreen edits needed)
 
 ### Type System
 
@@ -601,6 +617,39 @@ The E-12 prompt enforces plain modern English:
 - Avoid: "ancien régime", "Rechtsstaat", "vanguard party", "corporatism"
 - Use: "old order", "rule of law", "elite party", "state-business alliance"
 - Target: Readable by modern English speakers without specialized knowledge
+
+### Centralized Roles Database Refactor (2025-10-30)
+
+**Change**: Consolidated scattered role data into single centralized database.
+
+**Motivation**:
+- Old system: Role data split across 5 files + 2 translation files
+- Adding/editing a role required changes in multiple locations
+- Difficult to maintain consistency
+
+**New Architecture**:
+- Single source of truth: `src/data/predefinedRoles.ts`
+- Contains all role data: power distributions, characters, images, i18n key references
+- Dynamic role count (auto-adjusts to array length)
+- Translation system preserved (text still in language files)
+- Legacy helper functions redirect to new database for backward compatibility
+
+**Files Created**:
+- `src/data/predefinedRoles.ts` - Centralized role database (~850 lines)
+
+**Files Modified**:
+- `src/screens/RoleSelectionScreen.tsx` - Now dynamically maps from `PREDEFINED_ROLES_ARRAY`
+- `src/data/predefinedPowerDistributions.ts` - Helper functions now redirect to central database
+- `src/data/predefinedCharacters.ts` - Helper functions now redirect to central database
+- `src/data/roleImages.ts` - Helper functions now redirect to central database
+- `src/i18n/languages/he.json` - Added 30 missing role translation keys
+
+**Benefits**:
+- Single-file workflow for adding/editing roles
+- Consistent data structure across all roles
+- Easier to maintain and extend
+- Full i18n support preserved
+- Backward compatible with existing code
 
 ## Scoring System
 
