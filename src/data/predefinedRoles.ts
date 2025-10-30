@@ -13,6 +13,7 @@ export interface PredefinedRoleData {
   id: string;                          // Simple identifier (e.g., "athens_404")
   legacyKey: string;                   // Original key for backward compatibility
   titleKey: string;                    // i18n key for title
+  subtitleKey: string;                 // i18n key for subtitle (2-4 word theme)
   introKey: string;                    // i18n key for intro paragraph
   youAreKey: string;                   // i18n key for role description
   year: string;                        // Year badge display
@@ -30,6 +31,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     id: "athens_404",
     legacyKey: "Athens — The Day Democracy Died (-404)",
     titleKey: "ATHENS_TITLE",
+    subtitleKey: "ATHENS_SUBTITLE",
     introKey: "ATHENS_INTRO",
     youAreKey: "ATHENS_YOU_ARE",
     year: "-404",
@@ -119,6 +121,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     id: "alexandria_48",
     legacyKey: "Alexandria — Fire over the Nile (-48)",
     titleKey: "ALEXANDRIA_TITLE",
+    subtitleKey: "ALEXANDRIA_SUBTITLE",
     introKey: "ALEXANDRIA_INTRO",
     youAreKey: "ALEXANDRIA_YOU_ARE",
     year: "-48",
@@ -208,6 +211,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     id: "florence_1494",
     legacyKey: "Florence — The Fire and the Faith (1494)",
     titleKey: "FLORENCE_TITLE",
+    subtitleKey: "FLORENCE_SUBTITLE",
     introKey: "FLORENCE_INTRO",
     youAreKey: "FLORENCE_YOU_ARE",
     year: "1494",
@@ -297,6 +301,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     id: "north_america_1607",
     legacyKey: "North America — The First Encounter (1607)",
     titleKey: "NORTH_AMERICA_TITLE",
+    subtitleKey: "NORTH_AMERICA_SUBTITLE",
     introKey: "NORTH_AMERICA_INTRO",
     youAreKey: "NORTH_AMERICA_YOU_ARE",
     year: "1607",
@@ -386,6 +391,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     id: "japan_1600",
     legacyKey: "Japan — The Land at War's End (1600)",
     titleKey: "JAPAN_TITLE",
+    subtitleKey: "JAPAN_SUBTITLE",
     introKey: "JAPAN_INTRO",
     youAreKey: "JAPAN_YOU_ARE",
     year: "1600",
@@ -475,6 +481,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     id: "haiti_1791",
     legacyKey: "Haiti — The Island in Revolt (1791)",
     titleKey: "HAITI_TITLE",
+    subtitleKey: "HAITI_SUBTITLE",
     introKey: "HAITI_INTRO",
     youAreKey: "HAITI_YOU_ARE",
     year: "1791",
@@ -564,6 +571,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     id: "russia_1917",
     legacyKey: "Russia — The Throne Crumbles (1917)",
     titleKey: "RUSSIA_TITLE",
+    subtitleKey: "RUSSIA_SUBTITLE",
     introKey: "RUSSIA_INTRO",
     youAreKey: "RUSSIA_YOU_ARE",
     year: "1917",
@@ -653,6 +661,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     id: "india_1947",
     legacyKey: "India — The Midnight of Freedom (1947)",
     titleKey: "INDIA_TITLE",
+    subtitleKey: "INDIA_SUBTITLE",
     introKey: "INDIA_INTRO",
     youAreKey: "INDIA_YOU_ARE",
     year: "1947",
@@ -742,6 +751,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     id: "south_africa_1990",
     legacyKey: "South Africa — The End of Apartheid (1990)",
     titleKey: "SOUTH_AFRICA_TITLE",
+    subtitleKey: "SOUTH_AFRICA_SUBTITLE",
     introKey: "SOUTH_AFRICA_INTRO",
     youAreKey: "SOUTH_AFRICA_YOU_ARE",
     year: "1990",
@@ -831,6 +841,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     id: "mars_2179",
     legacyKey: "Mars Colony — The Red Frontier (2179)",
     titleKey: "MARS_TITLE",
+    subtitleKey: "MARS_SUBTITLE",
     introKey: "MARS_INTRO",
     youAreKey: "MARS_YOU_ARE",
     year: "2179",

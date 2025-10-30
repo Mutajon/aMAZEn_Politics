@@ -2483,30 +2483,91 @@ app.post("/api/game-turn", async (req, res) => {
     }
 
     // ============================================================================
-    // Call OpenAI Chat Completions API
+    // Call OpenAI Chat Completions API with retry logic
     // ============================================================================
-    console.log(`[GAME-TURN] Calling OpenAI with ${messages.length} messages...`);
+    const maxAttempts = 5;
+    let turnData = null;
+    let aiResponse = null;
 
-    const aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.log(`[GAME-TURN] Attempt ${attempt}/${maxAttempts}: Calling OpenAI with ${messages.length} messages...`);
 
-    if (!aiResponse || !aiResponse.content) {
-      throw new Error("Empty response from AI");
+        aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
+
+        if (!aiResponse || !aiResponse.content) {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Empty response from AI`);
+          aiResponse = null;
+          continue;
+        }
+
+        console.log(`[GAME-TURN] ✅ AI responded: ${aiResponse.content.length} chars`);
+
+        // Check finish_reason for truncation
+        if (aiResponse.finishReason && aiResponse.finishReason !== 'stop') {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} warning: finish_reason=${aiResponse.finishReason} (expected 'stop')`);
+          if (aiResponse.finishReason === 'length') {
+            console.warn(`[GAME-TURN] 🚨 Response TRUNCATED due to token limit - retrying...`);
+            aiResponse = null;
+            continue;
+          }
+        }
+
+        // Parse JSON response
+        turnData = safeParseJSON(aiResponse.content);
+
+        if (!turnData) {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Could not parse JSON`);
+          console.warn(`[GAME-TURN] Raw response start: ${aiResponse.content.substring(0, 200)}...`);
+          aiResponse = null;
+          turnData = null;
+          continue;
+        }
+
+        // Validate response structure
+        if (!turnData.title) {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Missing 'title' field`);
+          aiResponse = null;
+          turnData = null;
+          continue;
+        }
+
+        if (!turnData.description) {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Missing 'description' field`);
+          aiResponse = null;
+          turnData = null;
+          continue;
+        }
+
+        if (!Array.isArray(turnData.actions) || turnData.actions.length === 0) {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Invalid or empty 'actions' array`);
+          aiResponse = null;
+          turnData = null;
+          continue;
+        }
+
+        // Success! Exit retry loop
+        console.log(`[GAME-TURN] ✅ Attempt ${attempt} succeeded - valid response received`);
+        break;
+
+      } catch (e) {
+        console.error(`[GAME-TURN] ❌ Attempt ${attempt} exception:`, e?.message || e);
+        aiResponse = null;
+        turnData = null;
+      }
+
+      // Exponential backoff before retry (except after last attempt)
+      if (attempt < maxAttempts && !turnData) {
+        const delay = Math.min(2000, 500 * attempt);
+        console.log(`[GAME-TURN] Waiting ${delay}ms before retry...`);
+        await new Promise(r => setTimeout(r, delay));
+      }
     }
 
-    console.log(`[GAME-TURN] ✅ AI responded: ${aiResponse.content.length} chars`);
-
-    // Parse JSON response
-    const turnData = safeParseJSON(aiResponse.content);
-
-    if (!turnData) {
-      console.error(`[GAME-TURN] ❌ Failed to parse AI response as JSON`);
-      console.error(`[GAME-TURN] Raw response: ${aiResponse.content.substring(0, 500)}...`);
-      throw new Error("Invalid JSON response from AI");
-    }
-
-    // Validate response structure
-    if (!turnData.title || !turnData.description) {
-      throw new Error("Missing required fields in AI response (title, description)");
+    // Final validation after all attempts
+    if (!turnData || !aiResponse) {
+      console.error(`[GAME-TURN] ❌ All ${maxAttempts} attempts failed`);
+      throw new Error(`Game turn generation failed after ${maxAttempts} attempts`);
     }
 
     // ============================================================================
@@ -2813,7 +2874,7 @@ async function callOpenAIChat(messages, model) {
       model: model || CHAT_MODEL_DEFAULT,
       messages: messages,
       temperature: 1,
-      max_completion_tokens: 4096
+      max_completion_tokens: 6144  // Increased from 4096 to reduce truncation risk
     })
   });
 

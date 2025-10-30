@@ -13,6 +13,7 @@ import { PREDEFINED_ROLES_ARRAY, getRoleImagePaths } from "../data/predefinedRol
 type RoleItem = {
   key: string; // Unique key for the role (matches predefinedPowerDistributions keys)
   title: string; // Title (e.g., "Athens — The Day Democracy Died")
+  subtitle: string; // Subtitle theme (e.g., "Power and Legitimacy")
   year: string; // Year badge (e.g., "(-404)")
   intro: string; // Intro paragraph (situation description)
   youAre: string; // "You are:" role description
@@ -35,6 +36,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
     return {
       key: roleData.legacyKey,
       title: lang(roleData.titleKey),      // Translated at runtime
+      subtitle: lang(roleData.subtitleKey), // Translated at runtime
       year: roleData.year,
       intro: lang(roleData.introKey),      // Translated at runtime
       youAre: lang(roleData.youAreKey),    // Translated at runtime
@@ -198,7 +200,10 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                   }}
                   className="w-full px-6 py-.5 flex items-center gap-4 text-left transition-all duration-300 bg-gradient-to-r from-slate-900/95 via-blue-950/95 to-slate-900/95 hover:from-slate-800/98 hover:via-blue-900/98 hover:to-slate-800/98"
                 >
-                  <span className="text-base text-white font-cinzel font-semibold tracking-wide drop-shadow-md flex-1">{role.title}</span>
+                  <div className="flex-1 flex flex-col gap-0.5">
+                    <span className="text-base text-white font-cinzel font-semibold tracking-wide drop-shadow-md">{role.title}</span>
+                    <span className="text-xs text-gray-400 font-normal tracking-normal">{role.subtitle}</span>
+                  </div>
 
                   {/* Banner image - fades out when expanded */}
                   {role.bannerImage && (
