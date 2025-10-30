@@ -2126,7 +2126,7 @@ app.post("/api/dilemma-light", async (req, res) => {
 // --- Validate "Suggest your own" (relevance to the current dilemma) ---
 app.post("/api/validate-suggestion", async (req, res) => {
   try {
-    const { text, title, description } = req.body || {};
+    const { text, title, description, era, settingType, year } = req.body || {};
     if (typeof text !== "string" || typeof title !== "string" || typeof description !== "string") {
       return res.status(400).json({ error: "Missing text/title/description" });
     }
@@ -2138,21 +2138,46 @@ app.post("/api/validate-suggestion", async (req, res) => {
       process.env.CHAT_MODEL ||
       "gpt-5-mini";
 
+    // Build historical context section if provided
+    let historicalContext = "";
+    if (era || year) {
+      const eraText = era || year || "unknown time period";
+      historicalContext = [
+        "",
+        "HISTORICAL CONTEXT:",
+        `- Time period: ${eraText}`,
+        `- Setting type: ${settingType || "unclear"}`,
+        "",
+        "ANACHRONISM CHECK:",
+        "- REJECT suggestions that contain clear anachronisms (technologies, concepts, or institutions that didn't exist in this time period)",
+        "- Examples of what to reject:",
+        "  • Ancient times (e.g., -404, -48): 'launch Twitter campaign', 'send email', 'use drones', 'install cameras', 'call emergency Zoom meeting'",
+        "  • Early modern (e.g., 1494, 1607, 1791): 'deploy surveillance cameras', 'broadcast on television', 'issue press release online', 'use helicopters'",
+        "  • Modern (e.g., 1917, 1947, 1990): Generally accept most technology, but reject futuristic concepts",
+        "  • Future (e.g., 2179): Reject outdated tech like 'send telegram', 'deploy musket battalions', 'town criers'",
+        "- If uncertain whether something is anachronistic, ACCEPT it (benefit of the doubt)",
+        "",
+      ].join("\n");
+    }
+
     const system = [
-      "You are a PERMISSIVE validator for a strategy game.",
+      "You are a PERMISSIVE validator for a historical/political strategy game.",
       "Given a DILEMMA (title + description) and a SUGGESTION from the player, your job is to accept anything that shows reasonable engagement.",
-      "",
+      historicalContext,
       "ACCEPT the suggestion if it:",
       "- Shows ANY attempt to engage with the dilemma (even if tangentially related)",
       "- Contains actual words/sentences (not random keyboard mashing)",
       "- Suggests any kind of action, policy, or response",
+      "- Uses period-appropriate language and concepts (OR if you're uncertain about the time period)",
       "",
       "REJECT only if:",
       "- Empty or whitespace-only input",
       "- Pure gibberish (random characters like 'asdfgh', 'xyz123')",
       "- Completely irrelevant to politics/governance (e.g., 'I like pizza', 'random thoughts')",
+      "- Contains clear, obvious anachronisms (technologies/concepts that definitively didn't exist in the time period)",
       "",
       "DEFAULT STANCE: If in doubt, ACCEPT the suggestion.",
+      "For anachronisms: provide a brief, helpful rejection message like 'Cameras didn't exist in 1607. Try period-appropriate actions.'",
       "Only return compact JSON: { \"valid\": boolean, \"reason\": string }.",
     ].join("\n");
 

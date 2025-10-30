@@ -12,6 +12,7 @@ import { useCallback } from "react";
 import { validateSuggestionStrict, AIConnectionError } from "../lib/validation";
 import { useSettingsStore } from "../store/settingsStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
+import { useRoleStore } from "../store/roleStore";
 
 // Build a safe dilemma context for validation (props → store → empty)
 function getDilemmaContext(d?: { title: string; description: string }): { title: string; description: string } {
@@ -22,6 +23,15 @@ function getDilemmaContext(d?: { title: string; description: string }): { title:
   const title = typeof curr?.title === "string" ? curr.title : "";
   const description = typeof curr?.description === "string" ? curr.description : "";
   return { title, description };
+}
+
+// Build role context for historical validation
+function getRoleContext(): { era: string; settingType: string; year: string } {
+  const roleStore = useRoleStore.getState();
+  const era = roleStore.analysis?.grounding?.era || "";
+  const settingType = roleStore.analysis?.grounding?.settingType || "unclear";
+  const year = roleStore.roleYear || "";
+  return { era, settingType, year };
 }
 
 // Gated debug logger (Settings → Debug mode)
@@ -77,13 +87,16 @@ export function useActionSuggestion({
       setValidatingSuggest(true);
 
       const ctx = getDilemmaContext(dilemma);
+      const roleCtx = getRoleContext();
       debugLog("validateSuggestionStrict -> request", {
         hasProp: Boolean(dilemma),
         titleLen: ctx.title.length,
         descriptionLen: ctx.description.length,
+        roleEra: roleCtx.era,
+        roleYear: roleCtx.year,
       });
 
-      const result = await validateSuggestionStrict(trimmedText, ctx);
+      const result = await validateSuggestionStrict(trimmedText, ctx, roleCtx);
       debugLog("validateSuggestionStrict -> response", result);
 
       if (!result.valid) {

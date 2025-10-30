@@ -28,7 +28,7 @@ const CARD_BASE = "rounded-2xl ring-1 ring-white/20 shadow-sm";
 const CONFIRM_BTN_CLASS =
   "px-3 py-1.5 rounded-full bg-emerald-500 text-white text-[12px] font-semibold shadow hover:bg-emerald-600 active:scale-[0.99]";
 const SUGGEST_BTN_CLASS =
-  "w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-full bg-white/8 ring-1 ring-white/10 text-white shadow-sm";
+  "w-full inline-flex items-center justify-between gap-2 px-3 py-2 rounded-full bg-blue-950/70 ring-2 ring-cyan-400/60 text-cyan-400 shadow-sm hover:bg-blue-950/80 hover:ring-cyan-400/70 transition-all duration-200";
 
 const OVERLAY_BACKDROP = "absolute inset-0 bg-black/70";
 
@@ -267,7 +267,7 @@ export default function ActionDeckContent({
         </div>
 
         {/* Suggest-your-own pill (part of stagger sequence) */}
-        <motion.div className="mt-3" layout
+        <motion.div className="mt-3 flex justify-center" layout
           variants={{
             hidden: { opacity: 0, scale: 0.85 },
             show: {
@@ -281,6 +281,7 @@ export default function ActionDeckContent({
             },
           }}
         >
+          <div className="w-full max-w-[calc(33.333%-0.5rem)]">
           <motion.button
             type="button"
             layout
@@ -300,6 +301,7 @@ export default function ActionDeckContent({
               </span>
             )}
           </motion.button>
+          </div>
         </motion.div>
         </motion.div>
 
