@@ -9,6 +9,7 @@ import { useRoleStore } from "../store/roleStore";
 import { useLogger } from "../hooks/useLogger";
 import { useLang } from "../i18n/lang";
 import { PREDEFINED_ROLES_ARRAY, getRoleImagePaths } from "../data/predefinedRoles";
+import { useSettingsStore } from "../store/settingsStore";
 
 type RoleItem = {
   key: string; // Unique key for the role (matches predefinedPowerDistributions keys)
@@ -29,6 +30,8 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const setAnalysis = useRoleStore(s => s.setAnalysis);
   const setRoleBackgroundImage = useRoleStore(s => s.setRoleBackgroundImage);
   const setRoleContext = useRoleStore(s => s.setRoleContext);
+  const setSupportProfiles = useRoleStore(s => s.setSupportProfiles);
+  const debugMode = useSettingsStore(s => s.debugMode);
 
   // Generate roles array dynamically from centralized database
   const roles: RoleItem[] = PREDEFINED_ROLES_ARRAY.map((roleData) => {
@@ -132,6 +135,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
 
       // Clear role context (custom roles have no intro/year data)
       setRoleContext(null, null, null);
+      setSupportProfiles(null);
 
       push("/name");
       closeSuggest();
@@ -157,6 +161,13 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
     if (roleData) {
       setAnalysis(roleData.powerDistribution);
       setRoleBackgroundImage(getRoleImagePaths(roleData.imageId).full);
+      setSupportProfiles(roleData.powerDistribution.supportProfiles ?? null);
+      if (debugMode && roleData.powerDistribution.supportProfiles) {
+        console.log("[RoleSelection][Debug] Support baselines for predefined role:", {
+          role: role.key,
+          profiles: roleData.powerDistribution.supportProfiles,
+        });
+      }
     }
 
     // Save rich role context for AI (title, intro, year) - predefined roles only

@@ -5,6 +5,7 @@
 
 import type { AnalysisResult } from "../store/roleStore";
 import type { RoleCharacters } from "./predefinedCharacters";
+import { ROLE_SUPPORT_PROFILES } from "./supportProfiles";
 
 /**
  * Complete predefined role data structure
@@ -99,7 +100,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       grounding: {
         settingType: "real",
         era: "404–403 BCE Athens"
-      }
+      },
+      supportProfiles: ROLE_SUPPORT_PROFILES["Athens — The Day Democracy Died (-404)"] ?? null
     },
     characters: {
       male: {
@@ -189,7 +191,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       grounding: {
         settingType: "real",
         era: "48–47 BCE Alexandria"
-      }
+      },
+      supportProfiles: ROLE_SUPPORT_PROFILES["Alexandria — Fire over the Nile (-48)"] ?? null
     },
     characters: {
       male: {
@@ -279,7 +282,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       grounding: {
         settingType: "real",
         era: "Florence 1494–1498 (Savonarola era)"
-      }
+      },
+      supportProfiles: ROLE_SUPPORT_PROFILES["Florence — The Fire and the Faith (1494)"] ?? null
     },
     characters: {
       male: {
@@ -369,7 +373,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       grounding: {
         settingType: "real",
         era: "Tidewater Virginia, 1607–1609"
-      }
+      },
+      supportProfiles: ROLE_SUPPORT_PROFILES["North America — The First Encounter (1607)"] ?? null
     },
     characters: {
       male: {
@@ -459,7 +464,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       grounding: {
         settingType: "real",
         era: "Japan, 1600 (late Sengoku)"
-      }
+      },
+      supportProfiles: ROLE_SUPPORT_PROFILES["Japan — The Land at War's End (1600)"] ?? null
     },
     characters: {
       male: {
@@ -549,7 +555,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       grounding: {
         settingType: "real",
         era: "Saint-Domingue, 1791"
-      }
+      },
+      supportProfiles: ROLE_SUPPORT_PROFILES["Haiti — The Island in Revolt (1791)"] ?? null
     },
     characters: {
       male: {
@@ -639,7 +646,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       grounding: {
         settingType: "real",
         era: "Russia, Feb–Mar 1917"
-      }
+      },
+      supportProfiles: ROLE_SUPPORT_PROFILES["Russia — The Throne Crumbles (1917)"] ?? null
     },
     characters: {
       male: {
@@ -729,7 +737,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       grounding: {
         settingType: "real",
         era: "India Partition, 1947"
-      }
+      },
+      supportProfiles: ROLE_SUPPORT_PROFILES["India — The Midnight of Freedom (1947)"] ?? null
     },
     characters: {
       male: {
@@ -819,7 +828,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       grounding: {
         settingType: "real",
         era: "South Africa, 1990 transition"
-      }
+      },
+      supportProfiles: ROLE_SUPPORT_PROFILES["South Africa — The End of Apartheid (1990)"] ?? null
     },
     characters: {
       male: {
@@ -909,7 +919,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       grounding: {
         settingType: "fictional",
         era: "late 22nd century"
-      }
+      },
+      supportProfiles: ROLE_SUPPORT_PROFILES["Mars Colony — The Red Frontier (2179)"] ?? null
     },
     characters: {
       male: {
