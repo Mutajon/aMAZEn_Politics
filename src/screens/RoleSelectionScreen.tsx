@@ -6,10 +6,9 @@ import { bgStyleWithMaze } from "../lib/ui";
 import type { PushFn } from "../lib/router";
 import { validateRoleStrict, AIConnectionError } from "../lib/validation";
 import { useRoleStore } from "../store/roleStore";
-import { getPredefinedPowerDistribution } from "../data/predefinedPowerDistributions";
 import { useLogger } from "../hooks/useLogger";
 import { useLang } from "../i18n/lang";
-import { getRoleImages } from "../data/roleImages";
+import { PREDEFINED_ROLES_ARRAY, getRoleImagePaths } from "../data/predefinedRoles";
 
 type RoleItem = {
   key: string; // Unique key for the role (matches predefinedPowerDistributions keys)
@@ -30,118 +29,19 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const setRoleBackgroundImage = useRoleStore(s => s.setRoleBackgroundImage);
   const setRoleContext = useRoleStore(s => s.setRoleContext);
 
-  const roles: RoleItem[] = [
-    {
-      key: "Athens — The Day Democracy Died (-404)",
-      title: lang("ATHENS_TITLE"),
-      year: "-404",
-      intro: lang("ATHENS_INTRO"),
-      youAre: lang("ATHENS_YOU_ARE"),
-      ...getRoleImages("Athens — The Day Democracy Died (-404)") && {
-        bannerImage: getRoleImages("Athens — The Day Democracy Died (-404)")!.banner,
-        fullImage: getRoleImages("Athens — The Day Democracy Died (-404)")!.full
-      }
-    },
-    {
-      key: "Alexandria — Fire over the Nile (-48)",
-      title: lang("ALEXANDRIA_TITLE"),
-      year: "-48",
-      intro: lang("ALEXANDRIA_INTRO"),
-      youAre: lang("ALEXANDRIA_YOU_ARE"),
-      ...getRoleImages("Alexandria — Fire over the Nile (-48)") && {
-        bannerImage: getRoleImages("Alexandria — Fire over the Nile (-48)")!.banner,
-        fullImage: getRoleImages("Alexandria — Fire over the Nile (-48)")!.full
-      }
-    },
-    {
-      key: "Florence — The Fire and the Faith (1494)",
-      title: lang("FLORENCE_TITLE"),
-      year: "1494",
-      intro: lang("FLORENCE_INTRO"),
-      youAre: lang("FLORENCE_YOU_ARE"),
-      ...getRoleImages("Florence — The Fire and the Faith (1494)") && {
-        bannerImage: getRoleImages("Florence — The Fire and the Faith (1494)")!.banner,
-        fullImage: getRoleImages("Florence — The Fire and the Faith (1494)")!.full
-      }
-    },
-    {
-      key: "North America — The First Encounter (1607)",
-      title: lang("NORTH_AMERICA_TITLE"),
-      year: "1607",
-      intro: lang("NORTH_AMERICA_INTRO"),
-      youAre: lang("NORTH_AMERICA_YOU_ARE"),
-      ...getRoleImages("North America — The First Encounter (1607)") && {
-        bannerImage: getRoleImages("North America — The First Encounter (1607)")!.banner,
-        fullImage: getRoleImages("North America — The First Encounter (1607)")!.full
-      }
-    },
-    {
-      key: "Japan — The Land at War's End (1600)",
-      title: lang("JAPAN_TITLE"),
-      year: "1600",
-      intro: lang("JAPAN_INTRO"),
-      youAre: lang("JAPAN_YOU_ARE"),
-      ...getRoleImages("Japan — The Land at War's End (1600)") && {
-        bannerImage: getRoleImages("Japan — The Land at War's End (1600)")!.banner,
-        fullImage: getRoleImages("Japan — The Land at War's End (1600)")!.full
-      }
-    },
-    {
-      key: "Haiti — The Island in Revolt (1791)",
-      title: lang("HAITI_TITLE"),
-      year: "1791",
-      intro: lang("HAITI_INTRO"),
-      youAre: lang("HAITI_YOU_ARE"),
-      ...getRoleImages("Haiti — The Island in Revolt (1791)") && {
-        bannerImage: getRoleImages("Haiti — The Island in Revolt (1791)")!.banner,
-        fullImage: getRoleImages("Haiti — The Island in Revolt (1791)")!.full
-      }
-    },
-    {
-      key: "Russia — The Throne Crumbles (1917)",
-      title: lang("RUSSIA_TITLE"),
-      year: "1917",
-      intro: lang("RUSSIA_INTRO"),
-      youAre: lang("RUSSIA_YOU_ARE"),
-      ...getRoleImages("Russia — The Throne Crumbles (1917)") && {
-        bannerImage: getRoleImages("Russia — The Throne Crumbles (1917)")!.banner,
-        fullImage: getRoleImages("Russia — The Throne Crumbles (1917)")!.full
-      }
-    },
-    {
-      key: "India — The Midnight of Freedom (1947)",
-      title: lang("INDIA_TITLE"),
-      year: "1947",
-      intro: lang("INDIA_INTRO"),
-      youAre: lang("INDIA_YOU_ARE"),
-      ...getRoleImages("India — The Midnight of Freedom (1947)") && {
-        bannerImage: getRoleImages("India — The Midnight of Freedom (1947)")!.banner,
-        fullImage: getRoleImages("India — The Midnight of Freedom (1947)")!.full
-      }
-    },
-    {
-      key: "South Africa — The End of Apartheid (1990)",
-      title: lang("SOUTH_AFRICA_TITLE"),
-      year: "1990",
-      intro: lang("SOUTH_AFRICA_INTRO"),
-      youAre: lang("SOUTH_AFRICA_YOU_ARE"),
-      ...getRoleImages("South Africa — The End of Apartheid (1990)") && {
-        bannerImage: getRoleImages("South Africa — The End of Apartheid (1990)")!.banner,
-        fullImage: getRoleImages("South Africa — The End of Apartheid (1990)")!.full
-      }
-    },
-    {
-      key: "Mars Colony — The Red Frontier (2179)",
-      title: lang("MARS_TITLE"),
-      year: "2179",
-      intro: lang("MARS_INTRO"),
-      youAre: lang("MARS_YOU_ARE"),
-      ...getRoleImages("Mars Colony — The Red Frontier (2179)") && {
-        bannerImage: getRoleImages("Mars Colony — The Red Frontier (2179)")!.banner,
-        fullImage: getRoleImages("Mars Colony — The Red Frontier (2179)")!.full
-      }
-    }
-  ];
+  // Generate roles array dynamically from centralized database
+  const roles: RoleItem[] = PREDEFINED_ROLES_ARRAY.map((roleData) => {
+    const images = getRoleImagePaths(roleData.imageId);
+    return {
+      key: roleData.legacyKey,
+      title: lang(roleData.titleKey),      // Translated at runtime
+      year: roleData.year,
+      intro: lang(roleData.introKey),      // Translated at runtime
+      youAre: lang(roleData.youAreKey),    // Translated at runtime
+      bannerImage: images.banner,
+      fullImage: images.full,
+    };
+  });
 
   const [expandedRole, setExpandedRole] = useState<string | null>(null);
   const [showSuggestModal, setShowSuggestModal] = useState(false);
@@ -250,16 +150,11 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
 
     setRole(role.key);
 
-    // Prime analysis from predefined power distributions
-    const predefinedAnalysis = getPredefinedPowerDistribution(role.key);
-    if (predefinedAnalysis) {
-      setAnalysis(predefinedAnalysis);
-    }
-
-    // Save the role's full image path for background use throughout the game
-    const roleImages = getRoleImages(role.key);
-    if (roleImages?.full) {
-      setRoleBackgroundImage(roleImages.full);
+    // Prime analysis from centralized predefined roles database
+    const roleData = PREDEFINED_ROLES_ARRAY.find(r => r.legacyKey === role.key);
+    if (roleData) {
+      setAnalysis(roleData.powerDistribution);
+      setRoleBackgroundImage(getRoleImagePaths(roleData.imageId).full);
     }
 
     // Save rich role context for AI (title, intro, year) - predefined roles only

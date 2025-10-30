@@ -9,7 +9,7 @@ import { useTranslatedConst, createTranslatedConst } from "../i18n/useTranslated
 import type { Character } from "../store/roleStore";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { motion } from "framer-motion";
-import { getPredefinedCharacters } from "../data/predefinedCharacters";
+import { getPredefinedRole } from "../data/predefinedRoles";
 import { useLogger } from "../hooks/useLogger";
 
 /** Small built-in placeholder (no asset file needed). */
@@ -181,7 +181,8 @@ export default function NameScreen({ push }: { push: PushFn }) {
 
     try {
       // Check if we have predefined characters for this role
-      const predefined = getPredefinedCharacters(selectedRole);
+      const roleData = getPredefinedRole(selectedRole);
+      const predefined = roleData?.characters;
 
       if (predefined) {
         console.log("[NameScreen] Using predefined characters for role:", selectedRole);
