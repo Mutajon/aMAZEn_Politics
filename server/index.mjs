@@ -433,6 +433,52 @@ app.post("/api/bg-suggestion", async (req, res) => {
   }
 });
 
+// -------------------- Challenger Seat Selection Helper ---------------
+/**
+ * Select the Challenger Seat (top non-player structured seat)
+ *
+ * Excludes:
+ * - Player seat (based on playerIndex)
+ * - Unstructured seats: Demos, Plebs, People, Populace, Citizens
+ * - Caring anchor: Mom, Elder, Partner, Chaplain, Mentor, Advisor
+ *
+ * Returns the highest-percentage structured seat that isn't the player.
+ */
+function selectChallengerSeat(holders, playerIndex) {
+  const EXCLUDE_KEYWORDS = [
+    // Unstructured (popular) seats
+    "Demos", "Plebs", "People", "Populace", "Citizens", "Masses",
+    // Caring anchor variants
+    "Mom", "Elder", "Partner", "Chaplain", "Mentor", "Advisor", "Confidant"
+  ];
+
+  const candidates = holders
+    .map((h, i) => ({ ...h, originalIndex: i }))
+    .filter((h, i) => i !== playerIndex) // Exclude player
+    .filter(h => {
+      // Exclude if name contains any excluded keyword (case-insensitive)
+      return !EXCLUDE_KEYWORDS.some(keyword =>
+        h.name.toLowerCase().includes(keyword.toLowerCase())
+      );
+    });
+
+  // Return highest percentage candidate (first in filtered list, since holders already sorted by AI)
+  if (candidates.length > 0) {
+    return {
+      name: candidates[0].name,
+      percent: candidates[0].percent,
+      index: candidates[0].originalIndex
+    };
+  }
+
+  // Fallback if no structured seats found (shouldn't happen in practice)
+  return {
+    name: "Council",
+    percent: 25,
+    index: null
+  };
+}
+
 // -------------------- Power analysis with E-12 framework ---------------
 app.post("/api/analyze-role", async (req, res) => {
   // Increase timeout to 120 seconds for GPT-5 processing
@@ -555,12 +601,19 @@ Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setti
     // Enforce allowed polities
     const systemName = ALLOWED_POLITIES.includes(out?.systemName) ? out.systemName : FALLBACK.systemName;
 
+    // Determine player index
+    const playerIndex = (out?.playerIndex === null || out?.playerIndex === undefined) ? null : Number(out.playerIndex);
+
+    // Select challenger seat (top non-player structured seat)
+    const challengerSeat = selectChallengerSeat(holders, playerIndex);
+
     const result = {
       systemName,
       systemDesc: String(out?.systemDesc || FALLBACK.systemDesc).slice(0, 120),
       flavor: String(out?.flavor || FALLBACK.flavor).slice(0, 80),
       holders,
-      playerIndex: (out?.playerIndex === null || out?.playerIndex === undefined) ? null : Number(out.playerIndex),
+      playerIndex,
+      challengerSeat,  // NEW: Primary institutional opponent
       e12: {
         tierI: Array.isArray(out?.e12?.tierI) ? out.e12.tierI : FALLBACK.e12.tierI,
         tierII: Array.isArray(out?.e12?.tierII) ? out.e12.tierII : FALLBACK.e12.tierII,
@@ -2345,7 +2398,8 @@ app.post("/api/game-turn", async (req, res) => {
       day,
       playerChoice,
       compassUpdate,
-      gameContext // Day 1 only: full game initialization data
+      gameContext, // Day 1 only: full game initialization data
+      crisisMode // Optional: crisis mode flag when support < 20%
     } = req.body;
 
     // Validate required fields
@@ -2387,8 +2441,12 @@ app.post("/api/game-turn", async (req, res) => {
       console.log(`[GAME-TURN] System prompt: ${systemPrompt.length} chars`);
       console.log(`[GAME-TURN] User prompt: ${userMessage.length} chars`);
 
-      // Store conversation (messages will be stored after AI response)
-      storeConversation(gameId, "pending", "openai");
+      // Store conversation with challenger seat info (messages will be stored after AI response)
+      // challengerSeat stored for crisis mode prompt building on Day 2+
+      const conversationMeta = {
+        challengerSeat: gameContext.challengerSeat || null
+      };
+      storeConversation(gameId, "pending", "openai", conversationMeta);
 
     // ============================================================================
     // DAY 2-8: Continue existing conversation with player's choice
@@ -2411,13 +2469,17 @@ app.post("/api/game-turn", async (req, res) => {
       // Retrieve stored message history
       messages = conversation.messages || [];
 
-      // Build user message for this turn (minimal - just the choice and compass update)
-      const userMessage = buildTurnUserPrompt(day, playerChoice, compassUpdate);
+      // Build user message for this turn (includes crisis mode if applicable)
+      const challengerSeat = conversation.meta?.challengerSeat || null;
+      const userMessage = buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode, challengerSeat);
 
       messages.push({ role: "user", content: userMessage });
 
       console.log(`[GAME-TURN] Message history: ${messages.length} messages`);
       console.log(`[GAME-TURN] Turn prompt: ${userMessage.length} chars`);
+      if (crisisMode) {
+        console.log(`[GAME-TURN] ⚠️ CRISIS MODE: ${crisisMode}`);
+      }
     }
 
     // ============================================================================
@@ -2511,9 +2573,13 @@ app.post("/api/game-turn", async (req, res) => {
 function buildGameSystemPrompt(gameContext) {
   const {
     role,
+    roleTitle,
+    roleIntro,
+    roleYear,
     systemName,
     systemDesc,
     powerHolders,
+    challengerSeat,  // NEW: Primary institutional opponent
     playerCompass,
     totalDays,
     thematicGuidance
@@ -2524,8 +2590,18 @@ function buildGameSystemPrompt(gameContext) {
     ? powerHolders.map(h => `- ${h.name} (${h.percent}% power)`).join('\n')
     : "- No specific power holders defined";
 
+  // Format challenger seat (primary institutional opponent)
+  const challengerText = challengerSeat ? `
+
+PRIMARY INSTITUTIONAL OPPONENT:
+- ${challengerSeat.name} (${challengerSeat.percent}% power)
+- This is your main institutional adversary—the power holder most likely to oppose, challenge, or create friction with your decisions
+- Generate dilemmas that frequently involve conflict, tension, or negotiation with this entity
+- This opponent's actions, demands, or resistance should be a recurring source of political pressure` : "";
+
   // Format player compass values (top values per dimension)
   const compassText = playerCompass ? `
+
 TOP PLAYER VALUES:
 - What (goals): ${playerCompass.what || "undefined"}
 - Whence (justification): ${playerCompass.whence || "undefined"}
@@ -2541,13 +2617,19 @@ You are the AI game engine for a ${totalDays}-day political simulation game.
 You maintain full narrative context and generate ALL event screen data in a single response.
 
 PLAYER ROLE & CONTEXT:
-- Role: ${role}
+- Role: ${role}${roleTitle ? `\n- Scenario: ${roleTitle}` : ''}${roleYear ? `\n- Historical Period: ${roleYear}` : ''}${roleIntro ? `\n- Historical Context: ${roleIntro}` : ''}
 - Political System: ${systemName}
 - System Description: ${systemDesc}
 
 POWER HOLDERS:
-${holdersText}
-${compassText}${thematicText}
+${holdersText}${challengerText}${compassText}${thematicText}
+
+⚠️ GROUNDING REQUIREMENT (CRITICAL):
+${roleIntro ? `- ALL dilemmas must be deeply rooted in the specific historical/fictional context described above
+- Use period-appropriate issues, stakeholders, geography, and political tensions from this exact scenario
+- Reference the specific circumstances: ${roleIntro.slice(0, 100)}...
+- Example grounding: If the context mentions "Sparta defeated Athens," create dilemmas about occupation, collaboration vs resistance, rebuilding under foreign rule
+- DO NOT generate generic leadership dilemmas—make them specific to THIS historical moment and setting` : '- Ground all dilemmas in the specific role and political system context provided'}
 
 YOUR RESPONSIBILITIES:
 1. Generate one concrete political dilemma per turn (title, description, 3 actions with costs)
@@ -2657,7 +2739,7 @@ function buildDay1UserPrompt(gameContext) {
 /**
  * Helper: Build turn user prompt (Day 2+)
  */
-function buildTurnUserPrompt(day, playerChoice, compassUpdate) {
+function buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode = null, challengerSeat = null) {
   let prompt = `DAY ${day}\n\n`;
 
   prompt += `PREVIOUS CHOICE: "${playerChoice.title}"\n`;
@@ -2669,7 +2751,41 @@ function buildTurnUserPrompt(day, playerChoice, compassUpdate) {
     prompt += `Player's compass values have been updated based on this choice.\n\n`;
   }
 
-  if (day === 7) {
+  // CRISIS MODE: Support level consequences
+  if (crisisMode) {
+    prompt += `🚨 CRISIS MODE: "${crisisMode}"\n`;
+    prompt += `⚠️ CRITICAL: Support level(s) dropped below 20% threshold!\n\n`;
+
+    if (crisisMode === "downfall") {
+      prompt += `**DOWNFALL CRISIS** (ALL three support tracks < 20%):\n`;
+      prompt += `- This is a TERMINAL CRISIS - the player's rule is collapsing\n`;
+      prompt += `- Generate a dramatic final scenario showing the consequences of total loss of support\n`;
+      prompt += `- The "dilemma" should be narrative-only (no actions) describing their downfall\n`;
+      prompt += `- Set "isGameEnd": true in response\n`;
+      prompt += `- This is the END OF THE GAME - no Day ${day + 1}\n\n`;
+    } else if (crisisMode === "people") {
+      prompt += `**PEOPLE CRISIS** (Public support < 20%):\n`;
+      prompt += `- Mass uprising, protests, strikes, or riots erupting\n`;
+      prompt += `- Public has lost faith in the player's leadership\n`;
+      prompt += `- Generate a dilemma focused on mass backlash and public unrest\n`;
+      prompt += `- High stakes: How does the player respond to widespread discontent?\n\n`;
+    } else if (crisisMode === "challenger") {
+      const challengerName = challengerSeat?.name || "the institutional opposition";
+      prompt += `**CHALLENGER CRISIS** (${challengerName} support < 20%):\n`;
+      prompt += `- ${challengerName} is turning against the player\n`;
+      prompt += `- Institutional retaliation, coup threats, or power struggle escalating\n`;
+      prompt += `- Generate a dilemma focused on the challenger's actions against the player\n`;
+      prompt += `- High stakes: How does the player deal with institutional opposition?\n\n`;
+    } else if (crisisMode === "caring") {
+      prompt += `**PERSONAL CRISIS** (Caring anchor support < 20%):\n`;
+      prompt += `- The player's closest confidant/advisor has lost faith\n`;
+      prompt += `- Personal isolation, betrayal, or emotional breaking point\n`;
+      prompt += `- Generate a dilemma focused on the personal toll of leadership\n`;
+      prompt += `- High stakes: Can the player maintain their humanity under pressure?\n\n`;
+    }
+  }
+
+  if (day === 7 && !crisisMode) { // Only show epic finale if not in crisis mode
     prompt += `⚠️ DAY 7 - EPIC FINALE\n`;
     prompt += `- Create an UNRELATED national crisis (ignore previous story)\n`;
     prompt += `- But STILL calculate supportShift from previous choice (factions remember)\n`;

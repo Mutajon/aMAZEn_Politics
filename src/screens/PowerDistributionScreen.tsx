@@ -104,6 +104,7 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
         error={error}
         holders={holders}
         playerHolderId={playerHolderId}
+        challengerSeatIndex={analysisStore?.challengerSeat?.index ?? null}
         systemName={systemName}
         systemDesc={systemDesc}
         systemFlavor={systemFlavor}
