@@ -10,9 +10,13 @@
 
 import { useEffect } from "react";
 import type { AnalysisResult, PowerHolder } from "../store/roleStore";
+import { useRoleStore } from "../store/roleStore";
 import { AIConnectionError } from "../lib/validation";
 import { POLITICAL_SYSTEMS } from "../data/politicalSystems";
 import type { FetchState, EnhancedPowerHolder } from "./usePowerDistributionState";
+import { ROLE_SUPPORT_PROFILES } from "../data/supportProfiles";
+import type { RoleSupportProfiles } from "../data/supportProfiles";
+import { useSettingsStore } from "../store/settingsStore";
 
 // AI Analysis API call
 async function fetchAnalysis(role: string): Promise<AnalysisResult> {
@@ -225,6 +229,7 @@ export function usePowerDistributionAnalysis({
         // If we already have holders, reuse; else fetch
         const base: AnalysisResult =
           analysisStore?.holders?.length ? (analysisStore as AnalysisResult) : await fetchAnalysis(role!);
+        const predefinedProfiles = ROLE_SUPPORT_PROFILES[role!] || null;
 
         const inferredIndex =
           base.playerIndex != null ? base.playerIndex : inferPlayerIndex(role!, base.holders ?? []);
@@ -255,17 +260,34 @@ export function usePowerDistributionAnalysis({
         // Initialize the component state
         initializeData(decorated, playerHolderId, name, desc, flavor);
 
-        // Save current snapshot (strip _id) + political system fields
-        setAnalysis({
+        const supportProfiles: RoleSupportProfiles | null =
+          base.supportProfiles ?? predefinedProfiles ?? null;
+
+        if (supportProfiles && useSettingsStore.getState().debugMode) {
+          console.log("[PowerDistribution][Debug] Support baselines:", {
+            role,
+            origin: supportProfiles.people?.origin ?? supportProfiles.challenger?.origin ?? "unknown",
+            people: supportProfiles.people,
+            challenger: supportProfiles.challenger,
+          });
+        }
+
+        const finalPlayerIndex = playerHolderId != null
+          ? decorated.findIndex((h) => h._id === playerHolderId)
+          : inferredIndex;
+
+        const analysisResult: AnalysisResult = {
           ...base,
           systemName: name,
           systemDesc: desc,
           flavor,
           holders: decorated.map(({ _id, ...rest }) => rest),
-          playerIndex: playerHolderId != null
-            ? decorated.findIndex((h) => h._id === playerHolderId)
-            : inferredIndex,
-        });
+          playerIndex: finalPlayerIndex,
+          supportProfiles,
+        };
+
+        setAnalysis(analysisResult);
+        useRoleStore.getState().setSupportProfiles(supportProfiles);
 
         setState("done");
       } catch (e: any) {

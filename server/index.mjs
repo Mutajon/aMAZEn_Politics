@@ -479,6 +479,103 @@ function selectChallengerSeat(holders, playerIndex) {
   };
 }
 
+// -------------------- Support profile helpers ----------------------
+const ISSUE_KEYS = ["governance", "order", "economy", "justice", "culture", "foreign"];
+const ISSUE_LABELS = {
+  governance: "Governance",
+  order: "Order/Security",
+  economy: "Economy",
+  justice: "Justice",
+  culture: "Culture/Religion",
+  foreign: "Foreign/External"
+};
+
+function truncateText(value, max) {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, max);
+}
+
+function sanitizeSupportProfile(entry, defaultOrigin) {
+  if (!entry || typeof entry !== "object") return null;
+  const summary = truncateText(entry.summary || "", 140);
+  const stances = {};
+  const raw = entry.stances && typeof entry.stances === "object" ? entry.stances : {};
+  ISSUE_KEYS.forEach((key) => {
+    const v = truncateText(raw[key] || "", 90);
+    if (v) {
+      stances[key] = v;
+    }
+  });
+  if (!summary && Object.keys(stances).length === 0) {
+    return null;
+  }
+  const origin = entry.origin === "predefined" ? "predefined" : (entry.origin === "ai" || entry.origin === "provisional" ? entry.origin : defaultOrigin);
+  return {
+    summary: summary || null,
+    stances,
+    origin
+  };
+}
+
+function sanitizeSupportProfiles(raw, defaultOrigin = "ai") {
+  if (!raw || typeof raw !== "object") return null;
+  const people = sanitizeSupportProfile(raw.people, defaultOrigin);
+  const challenger = sanitizeSupportProfile(raw.challenger, defaultOrigin);
+  if (!people && !challenger) return null;
+  return {
+    people: people ?? null,
+    challenger: challenger ?? null
+  };
+}
+
+function summarizeStances(profile) {
+  if (!profile || !profile.stances) return "";
+  const parts = [];
+  ISSUE_KEYS.forEach((key) => {
+    const text = profile.stances[key];
+    if (text) {
+      parts.push(`${ISSUE_LABELS[key]}: ${text}`);
+    }
+  });
+  return parts.join("; ");
+}
+
+function formatSupportProfilesForPrompt(profiles) {
+  if (!profiles) {
+    return "- No baseline stances provided (infer from narrative).";
+  }
+
+  const blocks = [];
+  const makeBlock = (label, profile) => {
+    if (!profile) {
+      return `- ${label}: No baseline supplied.`;
+    }
+    const baseLine = `- ${label}: ${profile.summary || "Baseline not provided."}`;
+    const stanceText = summarizeStances(profile);
+    return stanceText ? `${baseLine}\n  • ${stanceText.split("; ").join("\n  • ")}` : baseLine;
+  };
+
+  blocks.push(makeBlock("People", profiles.people));
+  blocks.push(makeBlock("Challenger", profiles.challenger));
+  return blocks.join("\n");
+}
+
+function buildSupportProfileReminder(profiles) {
+  if (!profiles) return "";
+  const lines = [];
+  if (profiles.people) {
+    const stance = summarizeStances(profiles.people);
+    const summary = profiles.people.summary || "No explicit summary provided.";
+    lines.push(`- People baseline: ${summary}${stance ? ` | ${stance}` : ""}`);
+  }
+  if (profiles.challenger) {
+    const stance = summarizeStances(profiles.challenger);
+    const summary = profiles.challenger.summary || "No explicit summary provided.";
+    lines.push(`- Challenger baseline: ${summary}${stance ? ` | ${stance}` : ""}`);
+  }
+  return lines.join("\n");
+}
+
 // -------------------- Power analysis with E-12 framework ---------------
 app.post("/api/analyze-role", async (req, res) => {
   // Increase timeout to 120 seconds for GPT-5 processing
@@ -507,7 +604,8 @@ app.post("/api/analyze-role", async (req, res) => {
         stopB: false,
         decisive: []
       },
-      grounding: { settingType: "unclear", era: "" }
+      grounding: { settingType: "unclear", era: "" },
+      supportProfiles: null
     };
 
     const system = `${ANTI_JARGON_RULES}
@@ -554,9 +652,35 @@ Return STRICT JSON only as:
     "stopB": false,
     "decisive": ["<seat names that decided exceptions>"]
   },
-  "grounding": {
+ "grounding": {
     "settingType": "real|fictional|unclear",
     "era": "<40 chars max>"
+  },
+  "supportProfiles": {
+    "people": {
+      "summary": "<80 chars max>",
+      "stances": {
+        "governance": "<60 chars>",
+        "order": "<60 chars>",
+        "economy": "<60 chars>",
+        "justice": "<60 chars>",
+        "culture": "<60 chars>",
+        "foreign": "<60 chars>"
+      },
+      "origin": "ai|provisional"
+    } | null,
+    "challenger": {
+      "summary": "<80 chars max>",
+      "stances": {
+        "governance": "<60 chars>",
+        "order": "<60 chars>",
+        "economy": "<60 chars>",
+        "justice": "<60 chars>",
+        "culture": "<60 chars>",
+        "foreign": "<60 chars>"
+      },
+      "origin": "ai|provisional"
+    } | null
   }
 }
 
@@ -606,6 +730,8 @@ Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setti
 
     // Select challenger seat (top non-player structured seat)
     const challengerSeat = selectChallengerSeat(holders, playerIndex);
+    const originHint = out?.grounding?.settingType === "real" ? "ai" : "provisional";
+    const supportProfiles = sanitizeSupportProfiles(out?.supportProfiles, originHint);
 
     const result = {
       systemName,
@@ -614,6 +740,7 @@ Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setti
       holders,
       playerIndex,
       challengerSeat,  // NEW: Primary institutional opponent
+      supportProfiles,
       e12: {
         tierI: Array.isArray(out?.e12?.tierI) ? out.e12.tierI : FALLBACK.e12.tierI,
         tierII: Array.isArray(out?.e12?.tierII) ? out.e12.tierII : FALLBACK.e12.tierII,
@@ -2427,11 +2554,14 @@ app.post("/api/game-turn", async (req, res) => {
 
       console.log("[GAME-TURN] Day 1: Initializing conversation with full game context");
 
+      const sanitizedProfiles = sanitizeSupportProfiles(gameContext.supportProfiles, "predefined");
+      const enrichedContext = { ...gameContext, supportProfiles: sanitizedProfiles };
+
       // Build comprehensive system prompt for the entire game
-      const systemPrompt = buildGameSystemPrompt(gameContext);
+      const systemPrompt = buildGameSystemPrompt(enrichedContext);
 
       // Initial user message requesting first dilemma
-      const userMessage = buildDay1UserPrompt(gameContext);
+      const userMessage = buildDay1UserPrompt(enrichedContext);
 
       messages = [
         { role: "system", content: systemPrompt },
@@ -2444,7 +2574,8 @@ app.post("/api/game-turn", async (req, res) => {
       // Store conversation with challenger seat info (messages will be stored after AI response)
       // challengerSeat stored for crisis mode prompt building on Day 2+
       const conversationMeta = {
-        challengerSeat: gameContext.challengerSeat || null
+        challengerSeat: enrichedContext.challengerSeat || null,
+        supportProfiles: sanitizedProfiles
       };
       storeConversation(gameId, "pending", "openai", conversationMeta);
 
@@ -2471,7 +2602,8 @@ app.post("/api/game-turn", async (req, res) => {
 
       // Build user message for this turn (includes crisis mode if applicable)
       const challengerSeat = conversation.meta?.challengerSeat || null;
-      const userMessage = buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode, challengerSeat);
+      const supportProfiles = conversation.meta?.supportProfiles || null;
+      const userMessage = buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode, challengerSeat, supportProfiles);
 
       messages.push({ role: "user", content: userMessage });
 
@@ -2643,7 +2775,8 @@ function buildGameSystemPrompt(gameContext) {
     challengerSeat,  // NEW: Primary institutional opponent
     playerCompass,
     totalDays,
-    thematicGuidance
+    thematicGuidance,
+    supportProfiles
   } = gameContext;
 
   // Format power holders
@@ -2671,6 +2804,7 @@ TOP PLAYER VALUES:
 
   // Include thematic guidance if provided
   const thematicText = thematicGuidance ? `\n\nTHEMATIC GUIDANCE:\n${thematicGuidance}` : "";
+  const supportBaselineText = formatSupportProfilesForPrompt(supportProfiles);
 
   return `${ANTI_JARGON_RULES}
 
@@ -2684,6 +2818,9 @@ PLAYER ROLE & CONTEXT:
 
 POWER HOLDERS:
 ${holdersText}${challengerText}${compassText}${thematicText}
+
+SUPPORT BASELINES:
+${supportBaselineText}
 
 ⚠️ GROUNDING REQUIREMENT (CRITICAL):
 ${roleIntro ? `- ALL dilemmas must be deeply rooted in the specific historical/fictional context described above
@@ -2705,6 +2842,7 @@ YOUR RESPONSIBILITIES:
    - VARIETY: Show different aspects of the decision's impact (economic, social, political)
    - AVOID: Generating the same parameter multiple times
 6. Maintain narrative continuity across all ${totalDays} days
+7. Align supportShift reasoning with the baseline attitudes above; explicitly cite how each faction's stance agrees or clashes with the player's previous action.
 
 CONTINUITY & MEMORY:
 - You remember ALL previous dilemmas and player choices
@@ -2750,6 +2888,7 @@ OUTPUT FORMAT (JSON):
   "topic": "<Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture>",
   "scope": "<Local|National|International>",
   "supportShift": {  // Day 2+ only, based on previous choice
+    // WHY must cite alignment or friction with baseline stances above
     "people": {"delta": <-20 to +20>, "why": "<short reason>"},
     "mom": {"delta": <-20 to +20>, "why": "<short reason>"},
     "holders": {"delta": <-20 to +20>, "why": "<short reason>"}
@@ -2800,7 +2939,7 @@ function buildDay1UserPrompt(gameContext) {
 /**
  * Helper: Build turn user prompt (Day 2+)
  */
-function buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode = null, challengerSeat = null) {
+function buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode = null, challengerSeat = null, supportProfiles = null) {
   let prompt = `DAY ${day}\n\n`;
 
   prompt += `PREVIOUS CHOICE: "${playerChoice.title}"\n`;
@@ -2810,6 +2949,13 @@ function buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode = null
   if (compassUpdate) {
     // Summarize compass changes (just mention they were updated)
     prompt += `Player's compass values have been updated based on this choice.\n\n`;
+  }
+
+  if (supportProfiles) {
+    const reminder = buildSupportProfileReminder(supportProfiles);
+    if (reminder) {
+      prompt += `BASELINE REFERENCE:\n${reminder}\n\n`;
+    }
   }
 
   // CRISIS MODE: Support level consequences

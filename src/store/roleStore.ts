@@ -1,6 +1,7 @@
 // src/store/roleStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { RoleSupportProfiles } from "../data/supportProfiles";
 
 /* ---------- Types ---------- */
 export type PowerHolder = {
@@ -26,6 +27,7 @@ export type AnalysisResult = {
     percent: number;
     index: number | null;
   };
+  supportProfiles?: RoleSupportProfiles | null;
   e12?: { // NEW: Exception-12 analysis
     tierI: string[];
     tierII: string[];
@@ -67,9 +69,12 @@ type RoleState = {
   roleIntro: string | null;
   /** Year/era of the scenario (e.g., "-404", "1791", "2179") - for predefined roles only */
   roleYear: string | null;
+  /** Baseline support profiles for People + Challenger (optional) */
+  supportProfiles: RoleSupportProfiles | null;
 
   setRole: (r: string | null) => void;
   setAnalysis: (a: AnalysisResult | null) => void;
+  setSupportProfiles: (profiles: RoleSupportProfiles | null) => void;
 
   /** Replace the whole character object (e.g., from Name screen) */
   setCharacter: (c: Character | null) => void;
@@ -96,9 +101,13 @@ export const useRoleStore = create<RoleState>()(
       roleTitle: null,
       roleIntro: null,
       roleYear: null,
+      supportProfiles: null,
 
       setRole: (r) => set({ selectedRole: r }),
-      setAnalysis: (a) => set({ analysis: a }),
+      setAnalysis: (a) => set((state) => ({
+        analysis: a,
+        supportProfiles: a?.supportProfiles ?? state.supportProfiles ?? null
+      })),
 
       setCharacter: (c) => set({ character: c }),
 
@@ -121,6 +130,7 @@ export const useRoleStore = create<RoleState>()(
         roleIntro: intro,
         roleYear: year
       }),
+      setSupportProfiles: (profiles: RoleSupportProfiles | null) => set({ supportProfiles: profiles }),
 
       reset: () => set({
         selectedRole: null,
@@ -129,7 +139,8 @@ export const useRoleStore = create<RoleState>()(
         roleBackgroundImage: null,
         roleTitle: null,
         roleIntro: null,
-        roleYear: null
+        roleYear: null,
+        supportProfiles: null
       }),
     }),
     {

@@ -12,6 +12,7 @@
  * @property {number} createdAt - Unix timestamp
  * @property {number} lastUsedAt - Unix timestamp
  * @property {number} turnCount - Number of turns in this conversation
+ * @property {object} meta - Additional game metadata (challengerSeat, supportProfiles, etc.)
  */
 
 // In-memory store
