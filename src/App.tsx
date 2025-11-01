@@ -1,5 +1,6 @@
 // src/App.tsx
 import { useEffect } from "react";
+import { fetchAndStoreGameSettings } from "./lib/gameSettings";
 import MiniCompassDebugScreen from "./screens/MiniCompassDebugScreen";
 import { LanguageProvider, useLanguage } from "./i18n/LanguageContext";
 
@@ -82,6 +83,10 @@ export default function App() {
 
   // Initialize audio manager hook to sync settings with audio playback
   useAudioManager();
+
+  useEffect(() => {
+    fetchAndStoreGameSettings();
+  }, []);
 
   // Initialize logging service when consented
   useEffect(() => {
