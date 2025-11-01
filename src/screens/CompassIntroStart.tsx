@@ -10,6 +10,7 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import { useLogger } from "../hooks/useLogger";
 import { useLang } from "../i18n/lang";
 import { useTranslatedConst, createTranslatedConst } from "../i18n/useTranslatedConst";
+import { getPredefinedRole } from "../data/predefinedRoles";
 
 /** Small built-in placeholder (no asset file needed). */
 const DEFAULT_AVATAR_DATA_URL =
@@ -113,7 +114,19 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
     return DEFAULT_AVATAR_DATA_URL;
   }, [character?.avatarUrl, generateImages]);
 
-  const roleText = genderizeRole(trimEra(selectedRole || ""), character?.gender || "any");
+  // Get translated role text
+  const roleText = useMemo(() => {
+    if (!selectedRole) return "";
+    
+    const roleData = getPredefinedRole(selectedRole);
+    if (roleData) {
+      // For predefined roles, use the translated youAreKey
+      return lang(roleData.youAreKey);
+    }
+    
+    // For custom roles, use the old genderize logic
+    return genderizeRole(trimEra(selectedRole), character?.gender || "any");
+  }, [selectedRole, character?.gender, lang]);
 
   // Start narration preparation immediately on mount
   useEffect(() => {
@@ -130,7 +143,7 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
 
     console.log("[CompassIntroStart] ✅ Required data present, proceeding with narration");
 
-    const narrationText = `Welcome ${character.name}. It is the night before your first day as ${roleText}. A package arrives with no return address, only the words: Know Thyself. Inside, a mirror—black, breathless, waiting.`;
+    const narrationText = `${lang("COMPASS_INTRO_WELCOME")} ${character.name}. ${lang("COMPASS_INTRO_NIGHT_BEFORE")} ${roleText}. ${lang("COMPASS_INTRO_PACKAGE")} ${lang("COMPASS_INTRO_KNOW_THYSELF")}. ${lang("COMPASS_INTRO_MIRROR")}`;
 
     const prepareAndStartNarration = async () => {
       try {
@@ -216,13 +229,13 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
               transition={{ duration: 0.3 }}
               className="mt-5 text-center text-white/90 leading-relaxed"
             >
-              <p className="text-lg">Welcome {character?.name || "Player"},</p>
+              <p className="text-lg">{lang("COMPASS_INTRO_WELCOME")} {character?.name},</p>
               <p className="mt-3">
-                It is the night before your first day as{" "}
-                <span className="font-semibold">{roleText}</span>. A package arrives with no return address, only the words:{" "}
-                <span className="font-extrabold text-amber-300">Know Thyself</span>.
+                {lang("COMPASS_INTRO_NIGHT_BEFORE")}{" "}
+                <span className="font-semibold">{roleText}</span>. {lang("COMPASS_INTRO_PACKAGE")}{" "}
+                <span className="font-extrabold text-amber-300">{lang("COMPASS_INTRO_KNOW_THYSELF")}</span>.
               </p>
-              <p className="mt-3">Inside, a mirror—black, breathless, waiting.</p>
+              <p className="mt-3">{lang("COMPASS_INTRO_MIRROR")}</p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -236,12 +249,12 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
                 exit={{ opacity: 0, scale: 0.92, y: 8 }}
                 transition={{ type: "spring", stiffness: 300, damping: 22 }}
                 onClick={() => {
-                  logger.log('button_click_look_in_mirror', 'Look in the mirror', 'User clicked Look in the mirror button');
+                  logger.log('button_click_look_in_mirror', lang("COMPASS_INTRO_LOOK_IN_MIRROR"), 'User clicked Look in the mirror button');
                   push("/compass-mirror");
                 }}
                 className="rounded-2xl px-5 py-3 font-semibold text-lg shadow-lg bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] hover:scale-[1.02] active:scale-[0.98]"
               >
-                Look in the mirror
+                {lang("COMPASS_INTRO_LOOK_IN_MIRROR")}
               </motion.button>
             )}
           </AnimatePresence>

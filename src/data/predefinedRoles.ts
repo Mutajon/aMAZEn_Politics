@@ -4,8 +4,24 @@
 // This replaces the scattered data across multiple files
 
 import type { AnalysisResult } from "../store/roleStore";
-import type { RoleCharacters } from "./predefinedCharacters";
 import { ROLE_SUPPORT_PROFILES } from "./supportProfiles";
+
+/**
+ * Character data with i18n keys for name and prompt
+ */
+export interface CharacterKeys {
+  nameKey: string;
+  promptKey: string;
+}
+
+/**
+ * Role characters (male/female/any) with i18n keys
+ */
+export interface RoleCharacters {
+  male: CharacterKeys;
+  female: CharacterKeys;
+  any: CharacterKeys;
+}
 
 /**
  * Complete predefined role data structure
@@ -105,16 +121,16 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     },
     characters: {
       male: {
-        name: "Theramenes",
-        prompt: "A weathered Athenian citizen with salt-and-pepper beard, wearing a torn chiton, eyes filled with loss and determination, standing amid the ruins of democracy"
+        nameKey: "ATHENS_CHAR_MALE_NAME",
+        promptKey: "ATHENS_CHAR_MALE_PROMPT"
       },
       female: {
-        name: "Lysandra",
-        prompt: "An Athenian woman in simple peplos robes, dark hair covered with a veil, expression resolute yet sorrowful, representing those who survived Athens' fall"
+        nameKey: "ATHENS_CHAR_FEMALE_NAME",
+        promptKey: "ATHENS_CHAR_FEMALE_PROMPT"
       },
       any: {
-        name: "Nikias",
-        prompt: "A middle-aged Athenian with weary eyes, wearing travel-worn himation, holding a walking staff, embodying the spirit of a fallen democracy"
+        nameKey: "ATHENS_CHAR_ANY_NAME",
+        promptKey: "ATHENS_CHAR_ANY_PROMPT"
       }
     }
   },
@@ -196,16 +212,16 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     },
     characters: {
       male: {
-        name: "Apollonios",
-        prompt: "A Greek-Egyptian scholar in linen robes with papyrus scrolls, worried expression as smoke rises behind him, caught between warring powers and burning knowledge"
+        nameKey: "ALEXANDRIA_CHAR_MALE_NAME",
+        promptKey: "ALEXANDRIA_CHAR_MALE_PROMPT"
       },
       female: {
-        name: "Berenice",
-        prompt: "An educated Alexandrian woman in Greco-Egyptian dress with jewelry, intelligent eyes reflecting firelight, torn between loyalty and survival"
+        nameKey: "ALEXANDRIA_CHAR_FEMALE_NAME",
+        promptKey: "ALEXANDRIA_CHAR_FEMALE_PROMPT"
       },
       any: {
-        name: "Ptolemaios",
-        prompt: "A learned librarian in flowing robes with ink-stained fingers, desperate expression as the great Library burns, embodying the clash of knowledge and war"
+        nameKey: "ALEXANDRIA_CHAR_ANY_NAME",
+        promptKey: "ALEXANDRIA_CHAR_ANY_PROMPT"
       }
     }
   },
@@ -287,16 +303,16 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     },
     characters: {
       male: {
-        name: "Lorenzo",
-        prompt: "A Florentine council member in rich Renaissance attire with fur trim, conflicted expression, standing before the burning pyre of vanities with a rosary in hand"
+        nameKey: "FLORENCE_CHAR_MALE_NAME",
+        promptKey: "FLORENCE_CHAR_MALE_PROMPT"
       },
       female: {
-        name: "Caterina",
-        prompt: "A Renaissance Florentine woman in elegant dress with pearl necklace, eyes reflecting both faith and doubt, representing the city torn between art and piety"
+        nameKey: "FLORENCE_CHAR_FEMALE_NAME",
+        promptKey: "FLORENCE_CHAR_FEMALE_PROMPT"
       },
       any: {
-        name: "Alessandro",
-        prompt: "A thoughtful Florentine in merchant's robes with a ledger, watching Savonarola's followers with concern, embodying the tension between commerce and conviction"
+        nameKey: "FLORENCE_CHAR_ANY_NAME",
+        promptKey: "FLORENCE_CHAR_ANY_PROMPT"
       }
     }
   },
@@ -378,16 +394,16 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     },
     characters: {
       male: {
-        name: "Powhatan",
-        prompt: "A paramount chief in deerskin mantle with shell beads, feathered headdress, weathered face showing wisdom and caution, gazing toward distant wooden ships"
+        nameKey: "NORTH_AMERICA_CHAR_MALE_NAME",
+        promptKey: "NORTH_AMERICA_CHAR_MALE_PROMPT"
       },
       female: {
-        name: "Pocahontas",
-        prompt: "A young indigenous leader's daughter in decorated buckskin dress with intricate beadwork, curious yet wary expression, standing at the threshold of two worlds"
+        nameKey: "NORTH_AMERICA_CHAR_FEMALE_NAME",
+        promptKey: "NORTH_AMERICA_CHAR_FEMALE_PROMPT"
       },
       any: {
-        name: "Opchanacanough",
-        prompt: "A tribal elder in traditional dress with face paint and copper ornaments, eyes reflecting both the forest's ancient ways and the newcomers' strange ships"
+        nameKey: "NORTH_AMERICA_CHAR_ANY_NAME",
+        promptKey: "NORTH_AMERICA_CHAR_ANY_PROMPT"
       }
     }
   },
@@ -469,16 +485,16 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     },
     characters: {
       male: {
-        name: "Takeda Nobushige",
-        prompt: "A Japanese clan lord in samurai armor with mon crest, katana at his side, stern face showing the weight of choosing sides before Sekigahara"
+        nameKey: "JAPAN_CHAR_MALE_NAME",
+        promptKey: "JAPAN_CHAR_MALE_PROMPT"
       },
       female: {
-        name: "Hōjō Masako",
-        prompt: "A noble Japanese woman in formal kimono with elaborate hairstyle, intelligent eyes reflecting strategic thinking, wielding influence in a warrior's world"
+        nameKey: "JAPAN_CHAR_FEMALE_NAME",
+        promptKey: "JAPAN_CHAR_FEMALE_PROMPT"
       },
       any: {
-        name: "Shimazu Yoshihiro",
-        prompt: "A warlord in battle-worn armor with clan banner, weathered face showing years of war, standing at the crossroads of Japan's final great battle"
+        nameKey: "JAPAN_CHAR_ANY_NAME",
+        promptKey: "JAPAN_CHAR_ANY_PROMPT"
       }
     }
   },
@@ -560,16 +576,16 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     },
     characters: {
       male: {
-        name: "Jean-Baptiste",
-        prompt: "A mixed-race overseer in colonial clothes torn between two worlds, machete at his belt, eyes showing conflict between survival and justice on a burning island"
+        nameKey: "HAITI_CHAR_MALE_NAME",
+        promptKey: "HAITI_CHAR_MALE_PROMPT"
       },
       female: {
-        name: "Cécile",
-        prompt: "A Haitian woman of mixed heritage in practical dress, determined expression, caught between the plantation masters and the rebels' drums echoing through the night"
+        nameKey: "HAITI_CHAR_FEMALE_NAME",
+        promptKey: "HAITI_CHAR_FEMALE_PROMPT"
       },
       any: {
-        name: "Toussaint",
-        prompt: "A person of African and French descent in overseer's attire, standing amid sugar cane fields with flames on the horizon, embodying revolution's difficult choices"
+        nameKey: "HAITI_CHAR_ANY_NAME",
+        promptKey: "HAITI_CHAR_ANY_PROMPT"
       }
     }
   },
@@ -651,16 +667,16 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     },
     characters: {
       male: {
-        name: "Nikolai Alexandrovich",
-        prompt: "A Tsar in military uniform with medals and epaulettes, troubled expression, imperial bearing undermined by the weight of a crumbling empire and rising crowds"
+        nameKey: "RUSSIA_CHAR_MALE_NAME",
+        promptKey: "RUSSIA_CHAR_MALE_PROMPT"
       },
       female: {
-        name: "Anastasia Nikolaevna",
-        prompt: "A Russian noblewoman in elegant dress with fur stole, eyes reflecting both privilege and fear as the old world dissolves into revolution"
+        nameKey: "RUSSIA_CHAR_FEMALE_NAME",
+        promptKey: "RUSSIA_CHAR_FEMALE_PROMPT"
       },
       any: {
-        name: "Dmitri Kerensky",
-        prompt: "A Russian leader in formal suit with Duma pin, exhausted expression, caught between the Tsar's fading authority and the workers' rising councils"
+        nameKey: "RUSSIA_CHAR_ANY_NAME",
+        promptKey: "RUSSIA_CHAR_ANY_PROMPT"
       }
     }
   },
@@ -742,16 +758,16 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     },
     characters: {
       male: {
-        name: "Rajendra Singh",
-        prompt: "An Indian district officer in British colonial uniform, turban and serious expression, standing amid chaos as partition tears his town apart along invisible lines"
+        nameKey: "INDIA_CHAR_MALE_NAME",
+        promptKey: "INDIA_CHAR_MALE_PROMPT"
       },
       female: {
-        name: "Priya Sharma",
-        prompt: "An Indian administrator in sari with documents, determined face showing resolve to keep peace while flames of communal violence rise around her"
+        nameKey: "INDIA_CHAR_FEMALE_NAME",
+        promptKey: "INDIA_CHAR_FEMALE_PROMPT"
       },
       any: {
-        name: "Arjun Patel",
-        prompt: "A civil servant in khaki uniform with police insignia, weary eyes having seen too much violence, trying to hold together a fracturing community at midnight"
+        nameKey: "INDIA_CHAR_ANY_NAME",
+        promptKey: "INDIA_CHAR_ANY_PROMPT"
       }
     }
   },
@@ -833,16 +849,16 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     },
     characters: {
       male: {
-        name: "Pieter van Rensburg",
-        prompt: "A South African police commander in blue uniform with insignia, conflicted expression, standing between the old order's demands and the rising tide of change"
+        nameKey: "SOUTH_AFRICA_CHAR_MALE_NAME",
+        promptKey: "SOUTH_AFRICA_CHAR_MALE_PROMPT"
       },
       female: {
-        name: "Thandi Mkhize",
-        prompt: "A Black South African police official in uniform, determined face showing strength despite working within an unjust system nearing its end"
+        nameKey: "SOUTH_AFRICA_CHAR_FEMALE_NAME",
+        promptKey: "SOUTH_AFRICA_CHAR_FEMALE_PROMPT"
       },
       any: {
-        name: "Johan de Klerk",
-        prompt: "A senior commander in SAPS uniform with rank insignia, weathered face showing years of enforcing apartheid, now facing cameras and crowds demanding freedom"
+        nameKey: "SOUTH_AFRICA_CHAR_ANY_NAME",
+        promptKey: "SOUTH_AFRICA_CHAR_ANY_PROMPT"
       }
     }
   },
@@ -924,16 +940,16 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     },
     characters: {
       male: {
-        name: "Kenji Chen-Martinez",
-        prompt: "An elected Mars colony leader in utilitarian jumpsuit with Earth and Mars patches, confident yet burdened expression, standing in a habitat dome with red desert beyond"
+        nameKey: "MARS_CHAR_MALE_NAME",
+        promptKey: "MARS_CHAR_MALE_PROMPT"
       },
       female: {
-        name: "Amara Okonkwo-Singh",
-        prompt: "A Mars governor in practical colony uniform with communication devices, multicultural features, determined eyes reflecting both survival instinct and freedom's dream"
+        nameKey: "MARS_CHAR_FEMALE_NAME",
+        promptKey: "MARS_CHAR_FEMALE_PROMPT"
       },
       any: {
-        name: "Zara Al-Rahman",
-        prompt: "A future colony administrator in high-tech suit with holographic displays, diverse heritage visible in features, balancing Earth's control against Mars' independence"
+        nameKey: "MARS_CHAR_ANY_NAME",
+        promptKey: "MARS_CHAR_ANY_PROMPT"
       }
     }
   }

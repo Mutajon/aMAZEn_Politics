@@ -12,6 +12,8 @@
 // - src/store/dilemmaStore.ts: Stores selected goals and tracking state
 // - src/lib/scoring.ts: Calculates goal bonuses for final score
 
+import { lang } from "../i18n/lang";
+
 // ========================================================================
 // TYPES
 // ========================================================================
@@ -85,8 +87,10 @@ export interface SelectedGoal extends Goal {
 /**
  * All available goals in the game
  * Players select 2 from a random set of 3
+ * Now returns translated goals based on current language
  */
-export const GOAL_POOL: Goal[] = [
+export function getGoalPool(): Goal[] {
+  return [
   // ======================================================================
   // END-STATE GOALS (Evaluated on final day only)
   // ======================================================================
@@ -94,9 +98,9 @@ export const GOAL_POOL: Goal[] = [
   {
     id: 'balanced-leader',
     category: 'end-state-support',
-    title: 'Balanced Leader',
-    description: 'End the game with over 60% support from all three groups (public, {middleEntity}, and Mom)',
-    shortDescription: 'All support >60%',
+    title: lang('GOAL_BALANCED_LEADER_TITLE'),
+    description: lang('GOAL_BALANCED_LEADER_DESC'),
+    shortDescription: lang('GOAL_BALANCED_LEADER_SHORT'),
     evaluate: (state) => {
       if (!state.isGameComplete) return 'unmet';
       return (
@@ -113,9 +117,9 @@ export const GOAL_POOL: Goal[] = [
   {
     id: 'wealthy-leader',
     category: 'end-state-budget',
-    title: 'Wealthy Leader',
-    description: 'End the game with a budget above 500',
-    shortDescription: 'Budget >500',
+    title: lang('GOAL_WEALTHY_LEADER_TITLE'),
+    description: lang('GOAL_WEALTHY_LEADER_DESC'),
+    shortDescription: lang('GOAL_WEALTHY_LEADER_SHORT'),
     evaluate: (state) => {
       if (!state.isGameComplete) return 'unmet';
       return state.budget > 500 ? 'met' : 'unmet';
@@ -128,9 +132,9 @@ export const GOAL_POOL: Goal[] = [
   {
     id: 'popular-leader',
     category: 'end-state-support',
-    title: 'Popular Leader',
-    description: 'End the game with public support over 85%',
-    shortDescription: 'Public >85%',
+    title: lang('GOAL_POPULAR_LEADER_TITLE'),
+    description: lang('GOAL_POPULAR_LEADER_DESC'),
+    shortDescription: lang('GOAL_POPULAR_LEADER_SHORT'),
     evaluate: (state) => {
       if (!state.isGameComplete) return 'unmet';
       return state.supportPeople > 85 ? 'met' : 'unmet';
@@ -143,9 +147,9 @@ export const GOAL_POOL: Goal[] = [
   {
     id: 'loyal-inner-circle',
     category: 'end-state-support',
-    title: 'Lovely Child',
-    description: 'End the game with Mom support over 90%',
-    shortDescription: 'Mom >90%',
+    title: lang('GOAL_LOVELY_CHILD_TITLE'),
+    description: lang('GOAL_LOVELY_CHILD_DESC'),
+    shortDescription: lang('GOAL_LOVELY_CHILD_SHORT'),
     evaluate: (state) => {
       if (!state.isGameComplete) return 'unmet';
       return state.supportMom > 90 ? 'met' : 'unmet';
@@ -158,9 +162,9 @@ export const GOAL_POOL: Goal[] = [
   {
     id: 'consensus-builder',
     category: 'end-state-support',
-    title: 'Consensus Builder',
-    description: 'End with all three support levels within 15% of each other',
-    shortDescription: 'All support ±15%',
+    title: lang('GOAL_CONSENSUS_BUILDER_TITLE'),
+    description: lang('GOAL_CONSENSUS_BUILDER_DESC'),
+    shortDescription: lang('GOAL_CONSENSUS_BUILDER_SHORT'),
     evaluate: (state) => {
       if (!state.isGameComplete) return 'unmet';
       const max = Math.max(state.supportPeople, state.supportMiddle, state.supportMom);
@@ -179,9 +183,9 @@ export const GOAL_POOL: Goal[] = [
   {
     id: 'never-broke',
     category: 'continuous-budget',
-    title: 'Never Broke',
-    description: 'Never let your budget drop below 650 at any point during the game',
-    shortDescription: 'Budget never <650',
+    title: lang('GOAL_NEVER_BROKE_TITLE'),
+    description: lang('GOAL_NEVER_BROKE_DESC'),
+    shortDescription: lang('GOAL_NEVER_BROKE_SHORT'),
     evaluate: (state) => {
       if (state.minBudget < 650) return 'failed';
       if (state.isGameComplete && state.minBudget >= 650) return 'met';
@@ -195,9 +199,9 @@ export const GOAL_POOL: Goal[] = [
   {
     id: 'peoples-champion',
     category: 'continuous-support',
-    title: "People's Champion",
-    description: 'Never let people support drop below 50% at any point',
-    shortDescription: 'People never <50%',
+    title: lang('GOAL_PEOPLES_CHAMPION_TITLE'),
+    description: lang('GOAL_PEOPLES_CHAMPION_DESC'),
+    shortDescription: lang('GOAL_PEOPLES_CHAMPION_SHORT'),
     evaluate: (state) => {
       if (state.minSupportPeople < 50) return 'failed';
       if (state.isGameComplete && state.minSupportPeople >= 50) return 'met';
@@ -211,9 +215,9 @@ export const GOAL_POOL: Goal[] = [
   {
     id: 'power-broker',
     category: 'continuous-support',
-    title: 'Power Broker',
-    description: 'Never let {middleEntity} support drop below 40% at any point',
-    shortDescription: '{middleEntity} never <40%',
+    title: lang('GOAL_POWER_BROKER_TITLE'),
+    description: lang('GOAL_POWER_BROKER_DESC'),
+    shortDescription: lang('GOAL_POWER_BROKER_SHORT'),
     evaluate: (state) => {
       if (state.minSupportMiddle < 40) return 'failed';
       if (state.isGameComplete && state.minSupportMiddle >= 40) return 'met';
@@ -227,9 +231,9 @@ export const GOAL_POOL: Goal[] = [
   {
     id: 'loyal-allies',
     category: 'continuous-support',
-    title: 'Loyal Allies',
-    description: 'Never let Mom support drop below 40% at any point',
-    shortDescription: 'Mom never <40%',
+    title: lang('GOAL_LOYAL_ALLIES_TITLE'),
+    description: lang('GOAL_LOYAL_ALLIES_DESC'),
+    shortDescription: lang('GOAL_LOYAL_ALLIES_SHORT'),
     evaluate: (state) => {
       if (state.minSupportMom < 40) return 'failed';
       if (state.isGameComplete && state.minSupportMom >= 40) return 'met';
@@ -247,9 +251,9 @@ export const GOAL_POOL: Goal[] = [
   {
     id: 'pure-strategist',
     category: 'behavioral',
-    title: 'Pure Strategist',
-    description: 'Complete the game without using the "Suggest Your Own" option even once',
-    shortDescription: 'No custom actions',
+    title: lang('GOAL_PURE_STRATEGIST_TITLE'),
+    description: lang('GOAL_PURE_STRATEGIST_DESC'),
+    shortDescription: lang('GOAL_PURE_STRATEGIST_SHORT'),
     evaluate: (state) => {
       if (state.customActionCount > 0) return 'failed';
       if (state.isGameComplete && state.customActionCount === 0) return 'met';
@@ -263,9 +267,9 @@ export const GOAL_POOL: Goal[] = [
   {
     id: 'creative-maverick',
     category: 'behavioral',
-    title: 'Creative Maverick',
-    description: 'Complete the game using ONLY the "Suggest Your Own" option (every single day)',
-    shortDescription: 'Only custom actions',
+    title: lang('GOAL_CREATIVE_MAVERICK_TITLE'),
+    description: lang('GOAL_CREATIVE_MAVERICK_DESC'),
+    shortDescription: lang('GOAL_CREATIVE_MAVERICK_SHORT'),
     evaluate: (state) => {
       // Each day requires one action, so totalDays custom actions = all custom
       if (state.customActionCount < state.day - 1) return 'failed'; // Day 1 = 0 actions yet
@@ -277,6 +281,7 @@ export const GOAL_POOL: Goal[] = [
     color: 'yellow',
   },
 ];
+}
 
 // ========================================================================
 // UTILITY FUNCTIONS
@@ -289,7 +294,7 @@ export const GOAL_POOL: Goal[] = [
  */
 export function getRandomGoals(count: number = 3): Goal[] {
   // Shuffle pool using Fisher-Yates algorithm
-  const shuffled = [...GOAL_POOL];
+  const shuffled = [...getGoalPool()];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
@@ -304,7 +309,7 @@ export function getRandomGoals(count: number = 3): Goal[] {
  * @returns Goal or undefined if not found
  */
 export function getGoalById(id: string): Goal | undefined {
-  return GOAL_POOL.find(g => g.id === id);
+  return getGoalPool().find(g => g.id === id);
 }
 
 /**
@@ -313,5 +318,5 @@ export function getGoalById(id: string): Goal | undefined {
  * @returns Array of goals in that category
  */
 export function getGoalsByCategory(category: GoalCategory): Goal[] {
-  return GOAL_POOL.filter(g => g.category === category);
+  return getGoalPool().filter(g => g.category === category);
 }

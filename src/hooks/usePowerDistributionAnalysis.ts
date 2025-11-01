@@ -17,6 +17,9 @@ import type { FetchState, EnhancedPowerHolder } from "./usePowerDistributionStat
 import { ROLE_SUPPORT_PROFILES } from "../data/supportProfiles";
 import type { RoleSupportProfiles } from "../data/supportProfiles";
 import { useSettingsStore } from "../store/settingsStore";
+import { getPredefinedRole } from "../data/predefinedRoles";
+import { translatePowerDistribution } from "../data/powerDistributionTranslations";
+import { lang } from "../i18n/lang";
 
 // AI Analysis API call
 async function fetchAnalysis(role: string): Promise<AnalysisResult> {
@@ -231,11 +234,19 @@ export function usePowerDistributionAnalysis({
           analysisStore?.holders?.length ? (analysisStore as AnalysisResult) : await fetchAnalysis(role!);
         const predefinedProfiles = ROLE_SUPPORT_PROFILES[role!] || null;
 
+        // Translate power distribution for predefined roles BEFORE decoration
+        let baseHolders = base.holders ?? [];
+        const roleData = getPredefinedRole(role!);
+        if (roleData) {
+          const translated = translatePowerDistribution(roleData.id, base, lang);
+          baseHolders = translated.holders;
+        }
+
         const inferredIndex =
-          base.playerIndex != null ? base.playerIndex : inferPlayerIndex(role!, base.holders ?? []);
+          base.playerIndex != null ? base.playerIndex : inferPlayerIndex(role!, baseHolders);
 
         const { holders: decorated, playerHolderId } =
-          coerceAndDecorate(base.holders ?? [], inferredIndex, makeId, clampPct);
+          coerceAndDecorate(baseHolders, inferredIndex, makeId, clampPct);
 
         // Prefer what the API just returned (server enforces canonical names via ALLOWED_SYSTEMS).
         let name = (base.systemName || "").trim();
@@ -255,6 +266,14 @@ export function usePowerDistributionAnalysis({
           name = pick.name;
           desc = pick.description;
           flavor = pick.flavor;
+        }
+
+        // Apply translations to system info for predefined roles
+        if (roleData) {
+          const translated = translatePowerDistribution(roleData.id, base, lang);
+          name = translated.systemName;
+          desc = translated.systemDesc;
+          flavor = translated.flavor;
         }
 
         // Initialize the component state

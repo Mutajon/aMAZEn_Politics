@@ -99,7 +99,7 @@ function GoalCard({
         </div>
         <div>
           <h3 className="text-xl font-bold text-white">{goal.title}</h3>
-          <p className="text-sm text-white/60 mt-1">{goal.category.replace(/-/g, ' ')}</p>
+          <p className="text-sm text-white/60 mt-1">{lang(`GOAL_CATEGORY_${goal.category.toUpperCase().replace(/-/g, '_')}`)}</p>
         </div>
       </div>
 
@@ -272,7 +272,7 @@ export default function GoalsSelectionScreen({ push }: Props) {
             <div className="col-span-2">
               <div className="text-white/60 text-sm">{lang("INITIAL_SUPPORT_LEVELS")}</div>
               <div className="text-white font-bold">
-                Public: {supportPeople}% | {middleEntity}: {supportMiddle}% | Mom: {supportMom}%
+                {lang("PUBLIC")}: {supportPeople}% | {middleEntity}: {supportMiddle}% | {lang("MOM")}: {supportMom}%
               </div>
             </div>
           </div>

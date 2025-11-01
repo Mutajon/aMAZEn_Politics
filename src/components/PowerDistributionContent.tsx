@@ -15,6 +15,7 @@ import { IconFromKey, getRankColor } from "./PowerDistributionIcons";
 import type { EnhancedPowerHolder, FetchState } from "../hooks/usePowerDistributionState";
 import { useRoleStore } from "../store/roleStore";
 import { useLogger } from "../hooks/useLogger";
+import { useLang } from "../i18n/lang";
 
 interface PowerDistributionContentProps {
   // State
@@ -70,6 +71,7 @@ export default function PowerDistributionContent({
   onShowSystemModal,
   onHideSystemModal,
 }: PowerDistributionContentProps) {
+  const lang = useLang();
   const logger = useLogger();
   const character = useRoleStore((s) => s.character);
 
@@ -112,17 +114,17 @@ export default function PowerDistributionContent({
             {/* Header */}
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
               <h1 className="text-3xl font-extrabold text-center tracking-tight bg-gradient-to-r from-yellow-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
-                Top Power Holders In This Game
+                {lang("TOP_POWER_HOLDERS_IN_THIS_GAME")}
               </h1>
               {!isRealSetting && (
                 <p className="text-center text-white/75 mt-1">
-                  Not satisfied? Use sliders to adjust influence, or click names to edit.
+                  {lang("POWER_NOT_SATISFIED")}
                 </p>
               )}
 
               {/* Political System row */}
               <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-white/85">
-                <span className="font-semibold">Political system:</span>
+                <span className="font-semibold">{lang("POWER_POLITICAL_SYSTEM")}</span>
                 <button
                   onClick={() => {
                     logger.log('button_click_show_political_system', {
@@ -201,13 +203,13 @@ export default function PowerDistributionContent({
 
                             {isPlayer && (
                               <span className="text-amber-300 text-sm font-semibold whitespace-nowrap">
-                                (That's you!)
+                                {lang("POWER_THATS_YOU")}
                               </span>
                             )}
 
                             {isChallenger && (
                               <span className="text-rose-400 text-sm font-semibold whitespace-nowrap">
-                                (Major Challenger)
+                                {lang("POWER_MAJOR_CHALLENGER")}
                               </span>
                             )}
                           </div>
@@ -278,7 +280,7 @@ export default function PowerDistributionContent({
                 }}
                 className="rounded-2xl px-5 py-3 font-semibold bg-yellow-300 hover:bg-yellow-200 text-[#0b1335] shadow-lg hover:scale-[1.02] active:scale-[0.98]"
               >
-                Looks good →
+                {lang("LOOKS_GOOD")}
               </button>
             </div>
           </motion.div>
