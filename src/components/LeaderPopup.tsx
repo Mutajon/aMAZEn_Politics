@@ -7,6 +7,8 @@ import {
 } from "../data/highscores-default";
 import { POLITICAL_SYSTEMS } from "../data/politicalSystems";
 import { HelpCircle } from "lucide-react";
+import { useLang } from "../i18n/lang";
+import { translateDemocracyLevel, translatePoliticalSystem, translateCompassValue, translateLeaderDescription } from "../i18n/translateGameData";
 
 /** Parse "What: X; Whence: Y; How: Z; Whither: W" to parts */
 function parseValues(s: string) {
@@ -73,6 +75,7 @@ export default function LeaderPopup({
 }) {
   const show = !!entry;
   const [showSystemModal, setShowSystemModal] = useState(false);
+  const lang = useLang();
 
   const parsed = useMemo(() => parseValues(entry?.values || ""), [entry]);
 
@@ -166,7 +169,7 @@ export default function LeaderPopup({
             <div className="bg-[#0c1440] px-5 pt-5 pb-4 text-white/90">
               {/* System row */}
               <div className="mb-3 flex items-center gap-2">
-                <span className="text-[11px] uppercase tracking-wide text-white/70">Political system:</span>
+                <span className="text-[11px] uppercase tracking-wide text-white/70">{lang("POWER_POLITICAL_SYSTEM")}</span>
                 {entry.politicalSystem ? (
                   <button
                     type="button"
@@ -174,7 +177,7 @@ export default function LeaderPopup({
                     className="inline-flex items-center gap-1 rounded-lg px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10"
                     aria-label="Show system details"
                   >
-                    <span className="font-semibold">{entry.politicalSystem}</span>
+                    <span className="font-semibold">{translatePoliticalSystem(entry.politicalSystem, lang)}</span>
                     <HelpCircle className="w-4 h-4 text-amber-300" />
                   </button>
                 ) : (
@@ -182,22 +185,22 @@ export default function LeaderPopup({
                 )}
               </div>
 
-              <p className="leading-relaxed">{entry.about}</p>
+              <p className="leading-relaxed">{translateLeaderDescription(entry.name, entry.about, lang)}</p>
 
               {/* Ranking pills */}
               <div className="mt-5 flex flex-wrap gap-3">
-                <Badge label="Liberalism" value={entry.democracy} />
-                <Badge label="Autonomy" value={entry.autonomy} />
+                <Badge label={lang("LIBERALISM")} value={translateDemocracyLevel(entry.democracy, lang)} />
+                <Badge label={lang("AUTONOMY")} value={translateDemocracyLevel(entry.autonomy, lang)} />
               </div>
             </div>
 
             {/* Footer: Personal values (four 2-line colored pills) */}
             <div className="bg-gradient-to-t from-[#5f2e83] to-[#533076] px-5 py-5">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <ValuePill label="WHAT"    value={parsed.what}    color="indigo" />
-                <ValuePill label="WHENCE"  value={parsed.whence}  color="emerald" />
-                <ValuePill label="HOW"     value={parsed.how}     color="amber" />
-                <ValuePill label="WHITHER" value={parsed.whither} color="rose" />
+                <ValuePill label={lang("COMPASS_WHAT").toUpperCase() as any}    value={translateCompassValue(parsed.what, lang)}    color="indigo" />
+                <ValuePill label={lang("COMPASS_WHENCE").toUpperCase() as any}  value={translateCompassValue(parsed.whence, lang)}  color="emerald" />
+                <ValuePill label={lang("COMPASS_HOW").toUpperCase() as any}     value={translateCompassValue(parsed.how, lang)}     color="amber" />
+                <ValuePill label={lang("COMPASS_WHITHER").toUpperCase() as any} value={translateCompassValue(parsed.whither, lang)} color="rose" />
               </div>
             </div>
           </motion.div>
@@ -223,13 +226,13 @@ export default function LeaderPopup({
                 >
                   <div className="flex items-center justify-between">
                     <h2 className="text-2xl font-extrabold bg-gradient-to-r from-yellow-200 via-yellow-300 to-amber-400 bg-clip-text text-transparent">
-                      {systemMeta.name}
+                      {translatePoliticalSystem(systemMeta.name, lang)}
                     </h2>
                     <button
                       onClick={() => setShowSystemModal(false)}
                       className="rounded-xl px-2 py-1 bg-white/5 border border-white/10 text-white/80 hover:bg-white/10"
                     >
-                      Close
+                      {lang("CLOSE")}
                     </button>
                   </div>
                   <p className="mt-3 text-white/85">{systemMeta.description}</p>

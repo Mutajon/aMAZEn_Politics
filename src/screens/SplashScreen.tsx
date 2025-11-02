@@ -142,8 +142,8 @@ const setDataCollectionEnabled = useSettingsStore((s) => s.setDataCollectionEnab
       className="relative min-h-[100dvh] flex items-center justify-center px-5"
       style={bgStyleSplash}
     >
-      {/* Settings cog (top-right) - hidden when loading */}
-{!isLoading && (
+      {/* Settings cog (top-right) - visible only in debug mode and when not loading */}
+{!isLoading && debugMode && (
 <div className="absolute top-4 right-4 z-[40] pointer-events-auto">
   <button
     onClick={() => setShowSettings((v) => !v)}
@@ -158,8 +158,8 @@ const setDataCollectionEnabled = useSettingsStore((s) => s.setDataCollectionEnab
 </div>
 )}
 
-{/* Settings panel (fixed, above gear, outside its wrapper) */}
-{showSettings && (
+{/* Settings panel (fixed, above gear, outside its wrapper) - debug only */}
+{debugMode && showSettings && (
   <motion.div
     initial={{ opacity: 0, y: -6, scale: 0.98 }}
     animate={{ opacity: 1, y: 0, scale: 1 }}

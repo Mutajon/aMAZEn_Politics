@@ -124,7 +124,7 @@ export default function IntroScreen({ push }: { push: PushFn }) {
               }}
               className="rounded-full px-6 py-2 font-bold text-lg bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg"
             >
-              Yes!
+              {lang("YES!")}
             </motion.button>
           )}
         </div>

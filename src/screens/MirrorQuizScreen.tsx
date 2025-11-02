@@ -18,6 +18,8 @@ import MirrorBubbleTyping from "../components/MirrorBubbleTyping";
 import { COMPONENTS, PALETTE } from "../data/compass-data";
 import { useTranslatedConst, createTranslatedConst } from "../i18n/useTranslatedConst";
 import { useLogger } from "../hooks/useLogger";
+import { useLang } from "../i18n/lang";
+import { translateQuizQuestion, translateQuizAnswer } from "../i18n/translateGameData";
 
 
 /** placeholder avatar for images OFF */
@@ -46,6 +48,7 @@ const MIRROR_EPILOGUE = createTranslatedConst((lang) =>
 
 export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   const mirrorEpilogue = useTranslatedConst(MIRROR_EPILOGUE);
+  const lang = useLang();
 
   // compass values + reset
   const values = useCompassStore((s) => s.values);
@@ -286,7 +289,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
             {displayAvatar ? (
               <img src={displayAvatar} alt="Character avatar" className="w-full h-full object-cover" />
             ) : (
-              <div className="text-white/80 text-sm">Preparing avatar…</div>
+              <div className="text-white/80 text-sm">{lang("PREPARING_AVATAR")}</div>
             )}
           </motion.div>
         </div>
@@ -294,7 +297,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
         {/* Remaining counter — hidden once done */}
         {!done && (
           <div className="mt-3 text-center text-white/70 text-xs tracking-wide">
-            Mirror questions remaining: {Math.max(quiz.length - idx - 1, 0)}
+            {lang("MIRROR_QUESTIONS_REMAINING")} {Math.max(quiz.length - idx - 1, 0)}
           </div>
         )}
 
@@ -317,7 +320,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
                       className="text-[19px] font-semibold italic drop-shadow"
                       style={{ color: T.textColor, fontFamily: T.fontFamily }}
                     >
-                      {quiz[idx].q}
+                      {translateQuizQuestion(quiz[idx].id, quiz[idx].q, lang)}
                     </div>
 
                     {/* OPTIONS — mirror bubble style buttons */}
@@ -367,7 +370,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
                               }
                             }}
                           >
-                            {opt.a}
+                            {translateQuizAnswer(quiz[idx].id, i, opt.a, lang)}
                           </motion.button>
                         );
                       })}
@@ -384,7 +387,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
         {done && (
   <div className="mt-6 mx-auto max-w-xl">
     {/* ⬇️ while AI is working, show animated typing bubble */}
-    {!summary && <MirrorBubbleTyping text="Peering into your soul" />}
+    {!summary && <MirrorBubbleTyping text={lang("MIRROR_PEERING_INTO_SOUL")} />}
 
     {/* verdict bubble (types once) */}
     {summary && (
@@ -419,7 +422,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
           }}
           className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/90 text-[#0b1335] hover:bg-white"
         >
-          Go to sleep
+          {lang("BUTTON_GO_TO_SLEEP")}
         </button>
         <button
           onClick={() => {
@@ -430,7 +433,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
           }}
           className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/15 text-white hover:bg-white/25 border border-white/30"
         >
-          Examine mirror
+          {lang("BUTTON_EXAMINE_MIRROR")}
         </button>
       </div>
     )}

@@ -6,6 +6,7 @@ import LeaderPopup from "../components/LeaderPopup";
 import type { HighscoreEntry } from "../data/highscores-default";
 import { motion, type Variants } from "framer-motion";
 import { useLang } from "../i18n/lang";
+import { translateDemocracyLevel, translatePoliticalSystem } from "../i18n/translateGameData";
 
 // Parent controls stagger; children are the individual rows.
 // Parent controls stagger; children are the individual rows.
@@ -190,11 +191,11 @@ export default function HighscoreScreen() {
 
                   {/* System */}
                   <div className="text-white/90">
-                    <span className="px-2 py-1 rounded-md bg-white/10">{e.politicalSystem || "—"}</span>
+                    <span className="px-2 py-1 rounded-md bg-white/10">{translatePoliticalSystem(e.politicalSystem, lang) || "—"}</span>
                   </div>
 
-                  <div className="text-white/90">{e.democracy}</div>
-                  <div className="text-white/90">{e.autonomy}</div>
+                  <div className="text-white/90">{translateDemocracyLevel(e.democracy, lang)}</div>
+                  <div className="text-white/90">{translateDemocracyLevel(e.autonomy, lang)}</div>
 
                   {/* Score */}
                   <div className="text-right font-extrabold text-amber-300 tabular-nums">

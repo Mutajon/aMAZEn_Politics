@@ -33,29 +33,29 @@ const DEFAULT_AVATAR_DATA_URL =
 // Will be defined inside component to access lang function
 
 type Trio = {
-  male: { name: string; prompt: string };
-  female: { name: string; prompt: string };
-  any: { name: string; prompt: string };
+  male: { nameKey: string; promptKey: string };
+  female: { nameKey: string; promptKey: string };
+  any: { nameKey: string; promptKey: string };
 };
 
 // Generic placeholders for custom roles (no API call needed)
 // Will be defined inside component to access lang function
 
-// Translated constants
-const GENERIC_CHARACTERS = createTranslatedConst((lang) => ({
+// Generic characters for custom roles (using i18n keys)
+const GENERIC_CHARACTERS: Trio = {
   male: {
-    name: lang("GENERIC_MALE_NAME"),
-    prompt: lang("GENERIC_MALE_PROMPT")
+    nameKey: "GENERIC_MALE_NAME",
+    promptKey: "GENERIC_MALE_PROMPT"
   },
   female: {
-    name: lang("GENERIC_FEMALE_NAME"),
-    prompt: lang("GENERIC_FEMALE_PROMPT")
+    nameKey: "GENERIC_FEMALE_NAME",
+    promptKey: "GENERIC_FEMALE_PROMPT"
   },
   any: {
-    name: lang("GENERIC_ANY_NAME"),
-    prompt: lang("GENERIC_ANY_PROMPT")
+    nameKey: "GENERIC_ANY_NAME",
+    promptKey: "GENERIC_ANY_PROMPT"
   }
-}));
+};
 
 const LOADING_QUOTES = createTranslatedConst((lang) => [
   lang("LOADING_QUOTE_1"),
@@ -140,7 +140,6 @@ export default function NameScreen({ push }: { push: PushFn }) {
   const lang = useLang();
 
   // Use translated constants
-  const genericCharacters = useTranslatedConst(GENERIC_CHARACTERS);
   const loadingQuotes = useTranslatedConst(LOADING_QUOTES);
   const overlayTitle = useTranslatedConst(OVERLAY_TITLE);
 
@@ -194,17 +193,17 @@ export default function NameScreen({ push }: { push: PushFn }) {
         };
         setTrio(data);
         const pick = data[gender] || data.any;
-        setName(pick?.name || "");
-        setPhysical(extractPhysical(pick?.prompt || ""));
+        setName(lang(pick?.nameKey || ""));
+        setPhysical(extractPhysical(lang(pick?.promptKey || "")));
         setBgObject((prev) => prev || suggestBackgroundObject(selectedRole));
       } else {
         console.log("[NameScreen] Using generic placeholders for custom role:", selectedRole);
         // Use generic placeholders for custom roles (no API call)
-        const data: Trio = genericCharacters;
+        const data: Trio = GENERIC_CHARACTERS;
         setTrio(data);
         const pick = data[gender] || data.any;
-        setName(pick?.name || "");
-        setPhysical(extractPhysical(pick?.prompt || ""));
+        setName(lang(pick?.nameKey || ""));
+        setPhysical(extractPhysical(lang(pick?.promptKey || "")));
         setBgObject((prev) => prev || suggestBackgroundObject(selectedRole));
       }
     } catch (e: any) {
@@ -226,8 +225,8 @@ export default function NameScreen({ push }: { push: PushFn }) {
   useEffect(() => {
     if (!trio) return;
     const pick = trio[gender] || trio.any;
-    setName(pick?.name || "");
-    setPhysical(extractPhysical(pick?.prompt || ""));
+    setName(lang(pick?.nameKey || ""));
+    setPhysical(extractPhysical(lang(pick?.promptKey || "")));
     setBgObject((prev) => prev || suggestBackgroundObject(selectedRole || ""));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gender, trio]);
@@ -438,7 +437,17 @@ export default function NameScreen({ push }: { push: PushFn }) {
               >
                 <h2 className="text-2xl font-bold text-white mb-2">{name}</h2>
                 <p className="text-white/70 text-sm">
-                  {genderizeRole(selectedRole || "", gender)}
+                  {(() => {
+                    // Check for predefined role first
+                    if (selectedRole) {
+                      const roleData = getPredefinedRole(selectedRole);
+                      if (roleData) {
+                        return `${lang(roleData.titleKey)} (${roleData.year})`;
+                      }
+                    }
+                    // For custom roles, use genderizeRole
+                    return genderizeRole(selectedRole || "", gender);
+                  })()}
                 </p>
               </motion.div>
 
