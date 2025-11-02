@@ -10,7 +10,6 @@ const DESC_CLASS  = "text-[13px] leading-snug text-white/85";
 const CARD_PAD    = "px-3 py-3"; // overall padding
 const CARD_TONE   = "border-slate-700/50 bg-black/60 backdrop-blur-sm ring-1 ring-amber-400/40 rounded-2xl shadow-sm";
 
-import React from "react";
 import { motion } from "framer-motion";
 
 export type DilemmaProps = {

@@ -14,6 +14,7 @@ export function useEventNarration() {
 
   const preparedDilemmaRef = useRef<PreparedTTSHandle>(null);
   const dilemmaPlayedRef = useRef(false);
+  const skipNarrationLogRef = useRef(false);
   const [canShowDilemma, setCanShowDilemma] = useState(false);
 
   // Prepare narration whenever the dilemma changes
@@ -39,10 +40,14 @@ export function useEventNarration() {
 
         // Skip TTS preparation if narration disabled
         if (!narrationEnabled) {
-          console.log("[EventNarration] Skipping TTS preparation (narration disabled)");
+          if (!skipNarrationLogRef.current) {
+            console.log("[EventNarration] Skipping TTS preparation (narration disabled)");
+            skipNarrationLogRef.current = true;
+          }
           setCanShowDilemma(true);
           return;
         }
+        skipNarrationLogRef.current = false;
 
         const p = await narrator.prepare(speech, { voiceName: "alloy", format: "mp3" });
         if (cancelled) {

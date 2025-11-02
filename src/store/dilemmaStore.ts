@@ -1,7 +1,7 @@
 // src/store/dilemmaStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Dilemma, DilemmaRequest, DilemmaAction, DilemmaHistoryEntry, SubjectStreak, DilemmaScope, ScopeStreak, LightDilemmaRequest, LightDilemmaResponse } from "../lib/dilemma";
+import type { Dilemma, DilemmaAction, DilemmaHistoryEntry, SubjectStreak, DilemmaScope, ScopeStreak, LightDilemmaRequest, LightDilemmaResponse } from "../lib/dilemma";
 import type { ScoreBreakdown } from "../lib/scoring";
 import type { Goal, SelectedGoal } from "../data/goals";
 import { evaluateAllGoals } from "../lib/goalEvaluation";

@@ -31,6 +31,8 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const setRoleBackgroundImage = useRoleStore(s => s.setRoleBackgroundImage);
   const setRoleContext = useRoleStore(s => s.setRoleContext);
   const setSupportProfiles = useRoleStore(s => s.setSupportProfiles);
+  const setRoleScope = useRoleStore(s => s.setRoleScope);
+  const setStoryThemes = useRoleStore(s => s.setStoryThemes);
   const debugMode = useSettingsStore(s => s.debugMode);
 
   // Generate roles array dynamically from centralized database
@@ -136,6 +138,8 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
       // Clear role context (custom roles have no intro/year data)
       setRoleContext(null, null, null);
       setSupportProfiles(null);
+      setRoleScope(null);
+      setStoryThemes(null);
 
       push("/name");
       closeSuggest();
@@ -162,10 +166,19 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
       setAnalysis(roleData.powerDistribution);
       setRoleBackgroundImage(getRoleImagePaths(roleData.imageId).full);
       setSupportProfiles(roleData.powerDistribution.supportProfiles ?? null);
+      setRoleScope(roleData.roleScope);
+      setStoryThemes(roleData.storyThemes);
       if (debugMode && roleData.powerDistribution.supportProfiles) {
         console.log("[RoleSelection][Debug] Support baselines for predefined role:", {
           role: role.key,
           profiles: roleData.powerDistribution.supportProfiles,
+        });
+      }
+      if (debugMode) {
+        console.log("[RoleSelection][Debug] Scope & themes:", {
+          role: role.key,
+          roleScope: roleData.roleScope,
+          storyThemes: roleData.storyThemes,
         });
       }
     }

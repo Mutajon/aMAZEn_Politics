@@ -28,11 +28,11 @@ export default function AudioControls() {
   // Handle music toggle
   const handleMusicToggle = () => {
     const newMusicState = !musicEnabled;
-    logger.log('button_click_music_toggle', {
-      previousState: musicEnabled,
-      newState: newMusicState,
-      action: newMusicState ? 'unmute' : 'mute'
-    }, `User ${newMusicState ? 'unmuted' : 'muted'} music`);
+    logger.log(
+      'button_click_music_toggle',
+      newMusicState ? 'unmute' : 'mute',
+      `User ${newMusicState ? 'unmuted' : 'muted'} music`
+    );
 
     toggleMusicEnabled();
   };
@@ -41,11 +41,11 @@ export default function AudioControls() {
   const handleSfxToggle = () => {
     const newSfxState = !sfxEnabled;
 
-    logger.log('button_click_sfx_toggle', {
-      previousState: sfxEnabled,
-      newState: newSfxState,
-      action: newSfxState ? 'unmute' : 'mute'
-    }, `User ${newSfxState ? 'unmuted' : 'muted'} sound effects`);
+    logger.log(
+      'button_click_sfx_toggle',
+      newSfxState ? 'unmute' : 'mute',
+      `User ${newSfxState ? 'unmuted' : 'muted'} sound effects`
+    );
 
     toggleSfxEnabled();
 

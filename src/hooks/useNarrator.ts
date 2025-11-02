@@ -6,7 +6,7 @@
 // - prime() should be called from a user gesture (Splash "Start!") to unlock mobile audio.
 // - All requests go to /api/tts on your server; the API key never touches the client.
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { useSettingsStore } from "../store/settingsStore";
 
 type SpeakOptions = {
@@ -135,7 +135,7 @@ export function useNarrator() {
           audio.removeEventListener("error", onErr);
           resolve();
         };
-        const onErr = (e: any) => {
+        const onErr = () => {
           audio.removeEventListener("canplaythrough", onReady);
           audio.removeEventListener("error", onErr);
           reject(new Error("Audio element error"));

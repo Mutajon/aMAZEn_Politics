@@ -39,7 +39,7 @@ export async function generateMirrorSummary(
   }
 
   // Local playful fallback: keep to 1–2 short sentences
-  return localSummary({ whatTop, whenceTop, overall });
+  return localSummary({ whatTop, whenceTop });
 }
 
 /* ---------------- helpers ---------------- */
@@ -84,7 +84,7 @@ function soften(label: string) {
     .replace(/\bResponsibility\/Duty\b/i, "showing up when it counts");
 }
 
-function localSummary({ whatTop, whenceTop, overall }: { whatTop: TopItem[]; whenceTop: TopItem[]; overall: TopItem[] }) {
+function localSummary({ whatTop, whenceTop }: { whatTop: TopItem[]; whenceTop: TopItem[] }) {
   const w = whatTop[0]?.label ? soften(whatTop[0].label) : null;
   const j = whenceTop[0]?.label ? soften(whenceTop[0].label) : null;
 

@@ -2,7 +2,7 @@
 // Enhanced loading overlay for day progression with multi-phase states.
 // Shows rotating hourglass, days remaining bar, and analysis progress.
 
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { Hourglass } from "lucide-react";
 import { motion } from "framer-motion";
 import { bgStyleWithRoleImage } from "../../lib/ui";
@@ -13,7 +13,6 @@ type Props = {
   showDayProgression?: boolean; // when true, shows day progression UI
   currentDay?: number;
   totalDays?: number;
-  isAnimatingCounter?: boolean;
   analysisComplete?: {
     support: boolean;
     compass: boolean;
@@ -29,7 +28,6 @@ export default function EventLoadingOverlay({
   showDayProgression = false,
   currentDay = 1,
   totalDays = 30,
-  isAnimatingCounter = false,
   analysisComplete
 }: Props) {
   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);

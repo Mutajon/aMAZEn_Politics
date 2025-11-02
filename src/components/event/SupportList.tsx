@@ -3,7 +3,7 @@
 // - Icon badge: per-entity colored background; icon lines (strokes) are white.
 // - Minimal knobs live at the top (sizes + colors).
 
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Users, Landmark, Heart, ArrowUp, ArrowDown } from "lucide-react";
 
@@ -21,8 +21,6 @@ const ICON_BADGE_RING = "ring-1 ring-white/15 shadow-sm";
 
 // Icon stroke color (white lines)
 const ICON_STROKE_CLASS = "text-white";      // lucide uses currentColor for strokes
-const ARROW_UP_COLOR_CLASS = "text-emerald-300";
-const ARROW_DOWN_COLOR_CLASS = "text-rose-300";
 
 // Per-entity badge background colors
 // Change these to whatever palette you like.

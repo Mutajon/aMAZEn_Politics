@@ -11,13 +11,12 @@
 // Dependencies: dilemmaStore, roleStore, compassStore
 
 import { useState, useCallback, useRef } from "react";
-import { useDilemmaStore, buildLightSnapshot } from "../store/dilemmaStore";
-import type { GoalStatusChange } from "../store/dilemmaStore";
+import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { COMPONENTS, type PropKey } from "../data/compass-data";
-import type { Dilemma, DilemmaAction, LightDilemmaResponse } from "../lib/dilemma";
+import type { Dilemma } from "../lib/dilemma";
 import type { TickerItem } from "../components/event/NewsTicker";
 import { audioManager } from "../lib/audioManager";
 
@@ -96,37 +95,6 @@ export type CollectedData = Phase1Data & Phase2Data & Phase3Data & {
  * Example: [8.5, 2.1, 7.2, 1.5, 6.1, 0.5, 3.2, 1.0, 0.8, 0.3]
  *       → [8.5, 0, 7.2, 0, 6.1, 0, 0, 0, 0, 0]
  */
-function getTop3CompassValues(arr: number[] | undefined): number[] {
-  if (!Array.isArray(arr) || arr.length === 0) return [];
-
-  // Create array of [value, originalIndex] pairs
-  const indexed = arr.map((v, i) => ({ v: Number(v) || 0, i }));
-
-  // Sort by value descending, take top 3
-  const top3 = indexed.sort((a, b) => b.v - a.v).slice(0, 3);
-
-  // Build sparse result array - only top 3 values at original indices
-  const result = new Array(arr.length).fill(0);
-  top3.forEach(({ v, i }) => { result[i] = v; });
-
-  return result;
-}
-
-/**
- * Build optimized compass payload with top 3 values per dimension
- * Reduces token usage by ~300 tokens (40 values → 12 values)
- */
-function buildOptimizedCompassPayload(compassValues: any): any {
-  if (!compassValues) return { what: [], whence: [], how: [], whither: [] };
-
-  return {
-    what: getTop3CompassValues(compassValues?.what),
-    whence: getTop3CompassValues(compassValues?.whence),
-    how: getTop3CompassValues(compassValues?.how),
-    whither: getTop3CompassValues(compassValues?.whither)
-  };
-}
-
 /**
  * Get top K compass values with names and strengths (not indices)
  * Returns value names for natural language mirror recommendations
@@ -150,31 +118,6 @@ function topKWithNames(arr: number[] | undefined, prop: PropKey, k = 3): Array<{
  * Get top overall values across all compass dimensions
  * NO threshold filtering - just sort and take top K
  */
-function topOverallWithNames(compassValues: any, k = 3): Array<{ name: string; strength: number; dimension: PropKey }> {
-  const allValues: Array<{ v: number; name: string; dimension: PropKey }> = [];
-
-  (["what", "whence", "how", "whither"] as PropKey[]).forEach((prop) => {
-    const arr = Array.isArray(compassValues?.[prop]) ? compassValues[prop] : [];
-    arr.forEach((v: number, i: number) => {
-      allValues.push({
-        v: Number(v) || 0,
-        name: COMPONENTS[prop]?.[i]?.short || `${prop} #${i + 1}`,
-        dimension: prop,
-      });
-    });
-  });
-
-  return allValues
-    // NO threshold filter - just sort by value
-    .sort((a, b) => b.v - a.v)
-    .slice(0, k)
-    .map(x => ({
-      name: x.name,
-      strength: Math.round(x.v * 10) / 10,
-      dimension: x.dimension
-    }));
-}
-
 /**
  * UNIFIED GAME TURN API - Fetches ALL data in one call using hosted state
  *
@@ -196,6 +139,7 @@ async function fetchGameTurn(): Promise<{
   const {
     gameId,
     day,
+    totalDays,
     lastChoice,
     supportPeople,
     supportMiddle,
@@ -242,6 +186,8 @@ async function fetchGameTurn(): Promise<{
       powerHolders: roleState.analysis?.holders || [],
       challengerSeat: roleState.analysis?.challengerSeat || null,  // NEW: Primary institutional opponent
       supportProfiles: roleState.supportProfiles || roleState.analysis?.supportProfiles || null,
+      roleScope: roleState.roleScope || roleState.analysis?.roleScope || null,
+      storyThemes: roleState.storyThemes || roleState.analysis?.storyThemes || null,
       playerCompass: {
         what: topWhatValues.join(', '),
         whence: topKWithNames(compassValues?.whence, 'whence', 2).map(v => v.name).join(', '),
@@ -249,7 +195,8 @@ async function fetchGameTurn(): Promise<{
         whither: topKWithNames(compassValues?.whither, 'whither', 2).map(v => v.name).join(', ')
       },
       topWhatValues,
-      totalDays: 7,
+      totalDays,
+      daysLeft: totalDays - day + 1,
       thematicGuidance: dilemmasSubjectEnabled && dilemmasSubject
         ? `Focus on: ${dilemmasSubject}`
         : null
@@ -291,6 +238,9 @@ async function fetchGameTurn(): Promise<{
     }
   }
 
+  payload.totalDays = totalDays;
+  payload.daysLeft = totalDays - day + 1;
+
   console.log(`[fetchGameTurn] Calling /api/game-turn for Day ${day}, gameId=${currentGameId}`);
 
   const response = await fetch("/api/game-turn", {
@@ -312,13 +262,41 @@ async function fetchGameTurn(): Promise<{
   }
 
   // Allow empty actions array ONLY when isGameEnd is true
-  if (!data.isGameEnd && data.actions.length !== 3) {
-    throw new Error("Invalid game turn response: expected 3 actions for normal dilemma");
+  if (!Array.isArray(data.actions)) {
+    data.actions = [];
   }
 
-  // Game end must have empty actions
-  if (data.isGameEnd && data.actions.length !== 0) {
-    throw new Error("Invalid game turn response: game end must have empty actions array");
+  if (!data.isGameEnd) {
+    if (data.actions.length > 3) {
+      console.warn("[fetchGameTurn] ⚠️ Received more than 3 actions. Truncating to 3.");
+      data.actions = data.actions.slice(0, 3);
+    } else if (data.actions.length < 3) {
+      console.warn("[fetchGameTurn] ⚠️ Received fewer than 3 actions. Padding with fallback choices.");
+      const fallbackSource = data.actions[0] || { title: "Fallback Option", summary: "A reasonable alternative.", cost: 0, iconHint: "speech" };
+      while (data.actions.length < 3) {
+        const idx = data.actions.length;
+        data.actions.push({
+          id: ["a", "b", "c"][idx] || `opt${idx}`,
+          title: `${fallbackSource.title} (${idx + 1})`,
+          summary: fallbackSource.summary,
+          cost: Number.isFinite(fallbackSource.cost) ? fallbackSource.cost : 0,
+          iconHint: fallbackSource.iconHint || "speech"
+        });
+      }
+    }
+  } else {
+    if (data.actions.length !== 0) {
+      console.warn("[fetchGameTurn] ⚠️ Game-end response returned actions. Clearing array.");
+      data.actions = [];
+    }
+  }
+
+  // Failsafe: if the server failed to flag game end but daysLeft reached zero, enforce aftermath locally
+  const daysLeft = totalDays - day + 1;
+  if (!data.isGameEnd && (!Array.isArray(data.actions) || data.actions.length !== 3) && daysLeft <= 0) {
+    console.warn("[fetchGameTurn] ⚠️ Server returned unexpected action count on final day — forcing aftermath mode.");
+    data.isGameEnd = true;
+    data.actions = [];
   }
 
   // Extract dilemma

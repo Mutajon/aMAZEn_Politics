@@ -159,7 +159,7 @@ class LoggingService {
    */
   log(
     action: string,
-    value: string | number | boolean,
+    value: string | number | boolean | Record<string, unknown>,
     comments?: string,
     metadata?: { screen?: string; day?: number; role?: string }
   ): void {
@@ -179,7 +179,7 @@ class LoggingService {
    */
   logSystem(
     action: string,
-    value: string | number | boolean,
+    value: string | number | boolean | Record<string, unknown>,
     comments?: string,
     metadata?: { screen?: string; day?: number; role?: string }
   ): void {
@@ -193,7 +193,7 @@ class LoggingService {
   private _logInternal(
     source: 'player' | 'system',
     action: string,
-    value: string | number | boolean,
+    value: string | number | boolean | Record<string, unknown>,
     comments?: string,
     metadata?: { screen?: string; day?: number; role?: string }
   ): void {
@@ -206,6 +206,11 @@ class LoggingService {
     }
 
     // Create log entry with flat structure (all fields at top level)
+    const entryValue =
+      typeof value === 'object' && value !== null
+        ? JSON.stringify(value)
+        : value;
+
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       userId,
@@ -213,7 +218,7 @@ class LoggingService {
       treatment,
       source,
       action,
-      value,                          // Simple value (not an object)
+      value: entryValue as LogEntry['value'],                          // Simple value (stringified if object)
       currentScreen: metadata?.screen,
       day: metadata?.day,
       role: metadata?.role,
@@ -336,16 +341,6 @@ class LoggingService {
   }
 
   /**
-   * Stop auto-flush timer
-   */
-  private stopAutoFlush(): void {
-    if (this.flushTimer) {
-      clearInterval(this.flushTimer);
-      this.flushTimer = null;
-    }
-  }
-
-  /**
    * Get current queue (for debugging)
    */
   getQueue(): LogEntry[] {
@@ -378,7 +373,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
     // Use sendBeacon for reliable delivery on page unload
     const { dataCollectionEnabled } = useSettingsStore.getState();
-    const { sessionId, userId, gameVersion, treatment } = useLoggingStore.getState();
+    const { sessionId } = useLoggingStore.getState();
 
     if (dataCollectionEnabled && loggingService.getQueue().length > 0) {
       const queue = loggingService.getQueue();

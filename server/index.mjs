@@ -528,6 +528,16 @@ function sanitizeSupportProfiles(raw, defaultOrigin = "ai") {
   };
 }
 
+function sanitizeStoryThemes(value, fallbackThemes = []) {
+  if (!Array.isArray(value)) return fallbackThemes.length ? fallbackThemes : null;
+  const themes = value
+    .map((t) => String(t || "").toLowerCase().replace(/[^a-z0-9_\-\s]/g, "").trim().replace(/\s+/g, "_"))
+    .filter((t) => t.length > 2)
+    .slice(0, 4);
+  if (themes.length === 0) return fallbackThemes.length ? fallbackThemes : null;
+  return themes;
+}
+
 function summarizeStances(profile) {
   if (!profile || !profile.stances) return "";
   const parts = [];
@@ -605,7 +615,9 @@ app.post("/api/analyze-role", async (req, res) => {
         decisive: []
       },
       grounding: { settingType: "unclear", era: "" },
-      supportProfiles: null
+      supportProfiles: null,
+      roleScope: "Regional administrator balancing councils and security forces; can issue directives, bargain, and reassign resources, but cannot unilaterally rewrite the constitution.",
+      storyThemes: ["autonomy_vs_heteronomy", "institutional_balance"]
     };
 
     const system = `${ANTI_JARGON_RULES}
@@ -628,7 +640,11 @@ You are a polity analyst for a political simulation. Given ROLE (which may inclu
 
 5) Build the Top-5 Seats (4–5 entries) that actually shape outcomes "next scene," interleaving potent Erasers if they routinely upend Authors. Percents must sum to 100±1. DO NOT include icon field.
 
-6) Locate the polity from the ALLOWED_POLITIES list using spectrum rules:
+6) Distill ROLE SCOPE (≤160 chars): spell out what the player can directly order, what requires negotiation, and what is beyond their authority.
+
+7) List 2–4 STORY THEMES as short snake_case strings capturing enduring tensions for this role (e.g., "autonomy_vs_heteronomy", "justice_vs_amnesty", "resource_scarcity").
+
+8) Locate the polity from the ALLOWED_POLITIES list using spectrum rules:
    - Democracy: Demos is Top-2 in ≥2/3 of prioritized domains and direct self-determination exists in core areas.
    - Republican Oligarchy: Executive + Legislative + Judicial are all in Top-5; no single Seat holds pen+eraser across multiple prioritized domains.
    - Hard-Power Oligarchy: Wealth Top-2 in ≥1/3 of prioritized domains (plutocracy) OR Coercive Force Top-2 (stratocracy).
@@ -681,7 +697,9 @@ Return STRICT JSON only as:
       },
       "origin": "ai|provisional"
     } | null
-  }
+  },
+  "roleScope": "<160 chars max>",
+  "storyThemes": ["snake_case", "keywords", "max_four"]
 }
 
 IMPORTANT:
@@ -733,6 +751,9 @@ Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setti
     const originHint = out?.grounding?.settingType === "real" ? "ai" : "provisional";
     const supportProfiles = sanitizeSupportProfiles(out?.supportProfiles, originHint);
 
+    const roleScope = truncateText(out?.roleScope || FALLBACK.roleScope, 200);
+    const storyThemes = sanitizeStoryThemes(out?.storyThemes, FALLBACK.storyThemes);
+
     const result = {
       systemName,
       systemDesc: String(out?.systemDesc || FALLBACK.systemDesc).slice(0, 120),
@@ -741,6 +762,8 @@ Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setti
       playerIndex,
       challengerSeat,  // NEW: Primary institutional opponent
       supportProfiles,
+      roleScope,
+      storyThemes,
       e12: {
         tierI: Array.isArray(out?.e12?.tierI) ? out.e12.tierI : FALLBACK.e12.tierI,
         tierII: Array.isArray(out?.e12?.tierII) ? out.e12.tierII : FALLBACK.e12.tierII,
@@ -1732,9 +1755,32 @@ function buildLightUserPrompt({ role, system, day, daysLeft, subjectStreak, prev
   }
 
   parts.push('');
+  if (daysLeft === 1) {
+    parts.push('FINAL DAY ALERT: Make the description acknowledge this is their last day/defining moment in the first sentence, keep stakes national, and ensure every option feels climactic.');
+  }
   parts.push('TASK: Write one concrete situation anchored in ROLE+SETTING with three system-appropriate responses.');
 
   return parts.join('\n');
+}
+
+function buildConclusionUserPrompt({ role, system, previous }) {
+  const lines = [
+    `ROLE & SETTING: ${role}`,
+    `SYSTEM: ${system}`,
+    '',
+    'This is the aftermath screen. Do NOT create new choices.',
+  ];
+
+  if (previous && previous.title) {
+    lines.push(`LAST DECISION CONTEXT: "${previous.choiceTitle}" — ${previous.choiceSummary}`);
+  } else {
+    lines.push('LAST DECISION CONTEXT: (missing)');
+  }
+
+  lines.push('');
+  lines.push('TASK: Provide exactly TWO sentences describing the immediate consequences of that decision. Keep it grounded, human, and focused on the next few hours/days—not a grand historical summary.');
+
+  return lines.join('\n');
 }
 
 /**
@@ -1805,6 +1851,90 @@ Return JSON:
 
 ${ANTI_JARGON_RULES}
 `.trim();
+}
+
+function buildGameTurnConclusionSystemPrompt({
+  day,
+  totalDays,
+  roleScope,
+  storyThemes,
+  challengerSeat,
+  supportProfiles
+}) {
+  const safeTotal = Number.isFinite(totalDays) ? totalDays : 7;
+  const lines = [
+    `${buildConclusionSystemPrompt()}`,
+    ``,
+    `CONTEXTUAL REMINDERS:`,
+    `- Day ${day} of ${safeTotal} just concluded; this is the immediate aftermath.`,
+    `- Stay consistent with the role’s authority and previous decisions.`,
+  ];
+
+  if (roleScope) {
+    lines.push(`- ROLE SCOPE: ${roleScope}`);
+  }
+
+  if (Array.isArray(storyThemes) && storyThemes.length > 0) {
+    lines.push(`- THEMES TO PAY OFF: ${storyThemes.join(', ')}`);
+  }
+
+  if (challengerSeat) {
+    lines.push(`- PRIMARY CHALLENGER: ${challengerSeat.name} (${challengerSeat.percent ?? '?'}% power) — mention how they react or position themselves in the aftermath.`);
+  }
+
+  if (supportProfiles) {
+    const reminder = buildSupportProfileReminder(supportProfiles);
+    if (reminder) {
+      lines.push(`- SUPPORT BASELINES: ${reminder.replace(/\n/g, ' ')}`);
+    }
+  }
+
+  lines.push(
+    `ADDITIONAL OUTPUT RULES:`,
+    `- Set "isGameEnd": true.`,
+    `- Leave "actions" as an empty array.`,
+    `- Provide empty arrays for "dynamicParams" and "compassHints" if those fields are present.`,
+    `- Mirror advice can be omitted or kept to one reflective sentence.`
+  );
+
+  return lines.join('\n');
+}
+
+function buildGameTurnConclusionUserPrompt({ role, system, lastChoice, storyThemes, challengerSeat, supportProfiles }) {
+  const lines = [
+    `ROLE & SETTING: ${role}`,
+    `SYSTEM: ${system}`,
+    '',
+    'This is the aftermath screen. DO NOT create new choices.'
+  ];
+
+  if (lastChoice) {
+    lines.push(
+      `LAST DECISION CONTEXT: "${lastChoice.title}" — ${lastChoice.summary || lastChoice.title}`
+    );
+  } else {
+    lines.push('LAST DECISION CONTEXT: (missing)');
+  }
+
+  if (Array.isArray(storyThemes) && storyThemes.length > 0) {
+    lines.push(`ACTIVE THEMES TO RESOLVE: ${storyThemes.join(', ')}`);
+  }
+
+  if (challengerSeat) {
+    lines.push(`CHALLENGER PRESSURE: ${challengerSeat.name} (${challengerSeat.percent ?? '?'}% power)`);
+  }
+
+  if (supportProfiles) {
+    const reminder = buildSupportProfileReminder(supportProfiles);
+    if (reminder) {
+      lines.push(`SUPPORT BASELINES:\n${reminder}`);
+    }
+  }
+
+  lines.push('');
+  lines.push('TASK: Provide exactly TWO sentences describing the immediate consequences of that decision. Include how the challenger and the public respond if relevant. Keep it grounded in immediate hours/days, not a grand historical wrap-up.');
+
+  return lines.join('\n');
 }
 
 // -------------------- Light Dilemma API Endpoint ---------------------------
@@ -1888,7 +2018,9 @@ app.post("/api/dilemma-light", async (req, res) => {
       systemPrompt = buildLightSystemPrompt();
     }
 
-    const userPrompt = buildLightUserPrompt({ role, system, day, daysLeft, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance, recentTopics, recentDilemmaTitles });
+    const userPrompt = daysLeft === 0
+      ? buildConclusionUserPrompt({ role, system, previous })
+      : buildLightUserPrompt({ role, system, day, daysLeft, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance, recentTopics, recentDilemmaTitles });
 
     // ALWAYS log previous context (critical for debugging continuity and support shifts)
     if (previous) {
@@ -2126,7 +2258,17 @@ app.post("/api/dilemma-light", async (req, res) => {
 // --- Validate "Suggest your own" (relevance to the current dilemma) ---
 app.post("/api/validate-suggestion", async (req, res) => {
   try {
-    const { text, title, description, era, settingType, year } = req.body || {};
+    const {
+      text,
+      title,
+      description,
+      era,
+      settingType,
+      year,
+      roleScope = "",
+      challengerName = "",
+      topHolders = []
+    } = req.body || {};
     if (typeof text !== "string" || typeof title !== "string" || typeof description !== "string") {
       return res.status(400).json({ error: "Missing text/title/description" });
     }
@@ -2160,10 +2302,38 @@ app.post("/api/validate-suggestion", async (req, res) => {
       ].join("\n");
     }
 
+    let scopeGuidance = "";
+    if (roleScope) {
+      scopeGuidance = [
+        "",
+        "ROLE SCOPE SAFETY RAILS:",
+        `- The player's capacity: ${roleScope}`,
+        "- REJECT suggestions that demand actions beyond this mandate (e.g., signing treaties, declaring war, firing national cabinet ministers when the role lacks that authority)",
+        "- ACCEPT creative variations that stay inside the mandate (ordering subordinates, appealing to superiors, coordinating with other power holders)",
+        "- If rejecting, reply with a playful reminder of their limits (e.g., 'You don't command the national army—try something your office can actually do.')",
+        ""
+      ].join("\n");
+    }
+
+    let powerContext = "";
+    const holderLines = Array.isArray(topHolders) ? topHolders.filter(Boolean) : [];
+    if (challengerName || holderLines.length) {
+      powerContext = [
+        "",
+        "POWER DYNAMICS TO CONSIDER:",
+        challengerName ? `- Main challenger: ${challengerName}` : null,
+        holderLines.length ? `- Other influential players: ${holderLines.join(', ')}` : null,
+        "- Suggestions may defer to or enlist these actors, but only if such delegation would be plausible for the role",
+        ""
+      ].filter(Boolean).join("\n");
+    }
+
     const system = [
       "You are a PERMISSIVE validator for a historical/political strategy game.",
       "Given a DILEMMA (title + description) and a SUGGESTION from the player, your job is to accept anything that shows reasonable engagement.",
       historicalContext,
+      scopeGuidance,
+      powerContext,
       "ACCEPT the suggestion if it:",
       "- Shows ANY attempt to engage with the dilemma (even if tangentially related)",
       "- Contains actual words/sentences (not random keyboard mashing)",
@@ -2175,9 +2345,10 @@ app.post("/api/validate-suggestion", async (req, res) => {
       "- Pure gibberish (random characters like 'asdfgh', 'xyz123')",
       "- Completely irrelevant to politics/governance (e.g., 'I like pizza', 'random thoughts')",
       "- Contains clear, obvious anachronisms (technologies/concepts that definitively didn't exist in the time period)",
+      "- Demands actions plainly outside the role's scope (e.g., a municipal officer ordering airstrikes)",
       "",
       "DEFAULT STANCE: If in doubt, ACCEPT the suggestion.",
-      "For anachronisms: provide a brief, helpful rejection message like 'Cameras didn't exist in 1607. Try period-appropriate actions.'",
+      "For anachronisms or out-of-scope ideas: provide a brief, helpful rejection message like 'Cameras didn't exist in 1607.' or 'You don't control national treaties—try something your office could realistically do.'",
       "Only return compact JSON: { \"valid\": boolean, \"reason\": string }.",
     ].join("\n");
 
@@ -2185,6 +2356,10 @@ app.post("/api/validate-suggestion", async (req, res) => {
       {
         dilemma: { title, description },
         suggestion: text,
+        roleScope,
+        challenger: challengerName,
+        powerHolders: Array.isArray(topHolders) ? topHolders : [],
+        timeline: era || year || undefined,
       },
       null,
       2
@@ -2551,8 +2726,15 @@ app.post("/api/game-turn", async (req, res) => {
       playerChoice,
       compassUpdate,
       gameContext, // Day 1 only: full game initialization data
-      crisisMode // Optional: crisis mode flag when support < 20%
+      crisisMode, // Optional: crisis mode flag when support < 20%
+      totalDays: totalDaysInput,
+      daysLeft: daysLeftInput
     } = req.body;
+
+    const numericTotalDays = Number(totalDaysInput);
+    const hasTotalDaysFromBody = Number.isFinite(numericTotalDays);
+    const numericDaysLeft = Number(daysLeftInput);
+    const hasDaysLeftFromBody = Number.isFinite(numericDaysLeft);
 
     // Validate required fields
     if (!gameId || typeof gameId !== 'string') {
@@ -2568,6 +2750,10 @@ app.post("/api/game-turn", async (req, res) => {
     // Check if we have an existing conversation
     let conversation = getConversation(gameId);
     let messages = [];
+    let totalDaysForTurn = hasTotalDaysFromBody ? numericTotalDays : null;
+    let daysLeftForTurn = hasDaysLeftFromBody ? Math.max(numericDaysLeft, 0) : null;
+    let isAftermathTurn = false;
+    let allowEmptyActions = crisisMode === "downfall";
 
     // ============================================================================
     // DAY 1: Initialize conversation with full game context
@@ -2581,6 +2767,16 @@ app.post("/api/game-turn", async (req, res) => {
 
       const sanitizedProfiles = sanitizeSupportProfiles(gameContext.supportProfiles, "predefined");
       const enrichedContext = { ...gameContext, supportProfiles: sanitizedProfiles };
+      const safeTotalDays = Number(enrichedContext.totalDays) || (hasTotalDaysFromBody ? numericTotalDays : 7);
+      enrichedContext.totalDays = safeTotalDays;
+      totalDaysForTurn = safeTotalDays;
+      if (daysLeftForTurn === null) {
+        daysLeftForTurn = Math.max(safeTotalDays - day + 1, 0);
+      }
+      isAftermathTurn = daysLeftForTurn === 0;
+      if (isAftermathTurn) {
+        allowEmptyActions = true;
+      }
 
       // Build comprehensive system prompt for the entire game
       const systemPrompt = buildGameSystemPrompt(enrichedContext);
@@ -2598,9 +2794,20 @@ app.post("/api/game-turn", async (req, res) => {
 
       // Store conversation with challenger seat info (messages will be stored after AI response)
       // challengerSeat stored for crisis mode prompt building on Day 2+
+      const sanitizedThemes = Array.isArray(enrichedContext.storyThemes) && enrichedContext.storyThemes.length > 0
+        ? enrichedContext.storyThemes.map((t) => String(t)).slice(0, 5)
+        : ["autonomy_vs_heteronomy", "liberalism_vs_totalism"];
+      const sanitizedRoleScope = truncateText(enrichedContext.roleScope || "Keep dilemmas at the character's immediate span of control (no empire-wide decrees).", 200);
+
       const conversationMeta = {
         challengerSeat: enrichedContext.challengerSeat || null,
-        supportProfiles: sanitizedProfiles
+        supportProfiles: sanitizedProfiles,
+        roleScope: sanitizedRoleScope,
+        storyThemes: sanitizedThemes,
+        powerHolders: Array.isArray(enrichedContext.powerHolders) ? enrichedContext.powerHolders : [],
+        roleName: enrichedContext.role || "Unknown Leader",
+        systemName: enrichedContext.systemName || "Unknown System",
+        totalDays: safeTotalDays
       };
       storeConversation(gameId, "pending", "openai", conversationMeta);
 
@@ -2625,11 +2832,73 @@ app.post("/api/game-turn", async (req, res) => {
       // Retrieve stored message history
       messages = conversation.messages || [];
 
+      const meta = conversation.meta || {};
+      if (totalDaysForTurn === null) {
+        totalDaysForTurn = Number(meta.totalDays) || 7;
+      }
+      if (daysLeftForTurn === null) {
+        daysLeftForTurn = Math.max(totalDaysForTurn - day + 1, 0);
+      }
+      isAftermathTurn = daysLeftForTurn === 0;
+      if (isAftermathTurn) {
+        allowEmptyActions = true;
+      }
+
+      console.log(`[GAME-TURN] daysLeft=${daysLeftForTurn}, totalDays=${totalDaysForTurn}`);
+
       // Build user message for this turn (includes crisis mode if applicable)
       const challengerSeat = conversation.meta?.challengerSeat || null;
       const supportProfiles = conversation.meta?.supportProfiles || null;
-      const userMessage = buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode, challengerSeat, supportProfiles);
+      const roleScope = conversation.meta?.roleScope || null;
+      const storyThemes = conversation.meta?.storyThemes || null;
+      const powerHolders = conversation.meta?.powerHolders || null;
+      const roleName = conversation.meta?.roleName || "Unknown Leader";
+      const systemName = conversation.meta?.systemName || "Unknown System";
+      const systemPrompt = isAftermathTurn
+        ? buildGameTurnConclusionSystemPrompt({
+            day,
+            totalDays: totalDaysForTurn,
+            roleScope,
+            storyThemes,
+            challengerSeat,
+            supportProfiles
+          })
+        : buildTurnSystemPrompt({
+            day,
+            totalDays: totalDaysForTurn,
+            daysLeft: daysLeftForTurn,
+            crisisMode,
+            roleScope,
+            storyThemes,
+            challengerSeat,
+            powerHolders,
+            supportProfiles
+          });
+      const userMessage = isAftermathTurn
+        ? buildGameTurnConclusionUserPrompt({
+            role: roleName,
+            system: systemName,
+            lastChoice: playerChoice,
+            storyThemes,
+            challengerSeat,
+            supportProfiles
+          })
+        : buildTurnUserPrompt({
+            day,
+            totalDays: totalDaysForTurn,
+            daysLeft: daysLeftForTurn,
+            playerChoice,
+            compassUpdate,
+            crisisMode,
+            challengerSeat,
+            supportProfiles,
+            roleScope,
+            storyThemes,
+            powerHolders
+          });
 
+      // Inject per-turn system prompt so new constraints override the initial system message
+      messages.push({ role: "system", content: systemPrompt });
       messages.push({ role: "user", content: userMessage });
 
       console.log(`[GAME-TURN] Message history: ${messages.length} messages`);
@@ -2696,16 +2965,55 @@ app.post("/api/game-turn", async (req, res) => {
           continue;
         }
 
-        if (!Array.isArray(turnData.actions) || turnData.actions.length === 0) {
-          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Invalid or empty 'actions' array`);
+        if (!Array.isArray(turnData.actions)) {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: 'actions' field is not an array`);
           aiResponse = null;
           turnData = null;
           continue;
         }
 
-        // Success! Exit retry loop
-        console.log(`[GAME-TURN] ✅ Attempt ${attempt} succeeded - valid response received`);
-        break;
+        if (turnData.actions.length === 0 && !allowEmptyActions) {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Empty 'actions' array when decisions are required`);
+          aiResponse = null;
+          turnData = null;
+          continue;
+        }
+
+        if (turnData.actions.length > 0 && allowEmptyActions) {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} warning: Received ${turnData.actions.length} actions but this turn should conclude with none. Stripping actions.`);
+          turnData.actions = [];
+        }
+
+        if (allowEmptyActions) {
+          turnData.isGameEnd = true;
+          if (!Array.isArray(turnData.dynamicParams)) {
+            turnData.dynamicParams = [];
+          }
+          if (!Array.isArray(turnData.compassHints)) {
+            turnData.compassHints = [];
+          }
+        if (!turnData.topic) {
+          turnData.topic = "Conclusion";
+        }
+        turnData.actions = [];
+      } else {
+        turnData.actions = sanitizeTurnActions(turnData.actions);
+
+        if (turnData.isGameEnd) {
+          console.warn(`[GAME-TURN] ⚠️ Model flagged isGameEnd=true with daysLeft=${daysLeftForTurn}. Forcing normal dilemma.`);
+          turnData.isGameEnd = false;
+          if (!Array.isArray(turnData.dynamicParams)) {
+            turnData.dynamicParams = [];
+          }
+          if (!Array.isArray(turnData.compassHints)) {
+            turnData.compassHints = [];
+          }
+        }
+      }
+
+      // Success! Exit retry loop
+      console.log(`[GAME-TURN] ✅ Attempt ${attempt} succeeded - valid response received`);
+      break;
 
       } catch (e) {
         console.error(`[GAME-TURN] ❌ Attempt ${attempt} exception:`, e?.message || e);
@@ -2730,6 +3038,13 @@ app.post("/api/game-turn", async (req, res) => {
     // ============================================================================
     // Update conversation history
     // ============================================================================
+    if (turnData && (isAftermathTurn || crisisMode === "downfall")) {
+      turnData.isGameEnd = true;
+      if (!Array.isArray(turnData.actions) || turnData.actions.length > 0) {
+        turnData.actions = [];
+      }
+    }
+
     messages.push({ role: "assistant", content: aiResponse.content });
 
     // Update conversation store
@@ -2769,7 +3084,7 @@ app.post("/api/game-turn", async (req, res) => {
       compassHints: Array.isArray(turnData.compassHints) ? turnData.compassHints : [],
 
       // Game end flag
-      isGameEnd: !!turnData.isGameEnd
+      isGameEnd: isAftermathTurn || !!turnData.isGameEnd
     };
 
     console.log(`[GAME-TURN] ✅ Returning unified response: ${response.actions.length} actions`);
@@ -2801,7 +3116,9 @@ function buildGameSystemPrompt(gameContext) {
     playerCompass,
     totalDays,
     thematicGuidance,
-    supportProfiles
+    supportProfiles,
+    roleScope,
+    storyThemes
   } = gameContext;
 
   // Format power holders
@@ -2830,6 +3147,8 @@ TOP PLAYER VALUES:
   // Include thematic guidance if provided
   const thematicText = thematicGuidance ? `\n\nTHEMATIC GUIDANCE:\n${thematicGuidance}` : "";
   const supportBaselineText = formatSupportProfilesForPrompt(supportProfiles);
+  const roleScopeText = roleScope ? truncateText(roleScope, 200) : "Keep dilemmas at the character's immediate span of control (no empire-wide decrees).";
+  const themeList = Array.isArray(storyThemes) && storyThemes.length > 0 ? storyThemes.join(', ') : "autonomy_vs_heteronomy, liberalism_vs_totalism";
 
   return `${ANTI_JARGON_RULES}
 
@@ -2841,8 +3160,24 @@ PLAYER ROLE & CONTEXT:
 - Political System: ${systemName}
 - System Description: ${systemDesc}
 
-POWER HOLDERS:
-${holdersText}${challengerText}${compassText}${thematicText}
+ROLE MANDATE (DO NOT EXCEED):
+- ${roleScopeText}
+
+THEMATIC TRACKS TO WEAVE THROUGH THE WEEK:
+- ${themeList}
+
+ACTION DESIGN RULES:
+- Every option must be achievable through this role's legal authority, leverage, or personal influence.
+- Reference named power holders (especially the challenger) when describing consequences or trade-offs.
+- Whenever plausible, make exactly one option escalate or delegate the problem to a higher authority, allied institution, or organized constituency—only if such delegation would be realistic for the role.
+- If the role lacks power to impose an outcome directly, the option must negotiate, request, or defer rather than magically override institutions.
+
+POWER HOLDERS & DYNAMICS:
+${holdersText}${challengerText}
+- Challenger reactions must surface whenever support shifts or consequences are described.
+- Other high-power seats should pressure the player when their interests are threatened.
+${compassText}
+${thematicText}
 
 SUPPORT BASELINES:
 ${supportBaselineText}
@@ -2868,6 +3203,8 @@ YOUR RESPONSIBILITIES:
    - AVOID: Generating the same parameter multiple times
 6. Maintain narrative continuity across all ${totalDays} days
 7. Align supportShift reasoning with the baseline attitudes above; explicitly cite how each faction's stance agrees or clashes with the player's previous action.
+8. Keep every situation framed within the player's mandate—if an issue is larger than their authority, focus on the slice they can actually influence.
+9. Surface at least one of the active story themes (e.g., autonomy_vs_heteronomy) in the tension of each turn—mention it implicitly in the stakes or competing voices rather than as a label.
 
 CONTINUITY & MEMORY:
 - You remember ALL previous dilemmas and player choices
@@ -2888,18 +3225,23 @@ TOPIC VARIETY (Natural Flow):
   * Maintain consequence continuity (e.g., "Meanwhile, economic concerns resurface...")
 - Policy domains: Economy, Security, Diplomacy, Rights, Infrastructure,
   Environment, Health, Education, Justice, Culture, Foreign Relations, Technology
+- When shifting topics, favor angles that connect to the story themes listed above (${themeList}).
 - Trust your memory: You can see the full conversation history
 - Natural variety > forced variety (let political reality breathe)
 - Exception: If player's previous action created urgent follow-up (vote results, crisis escalation),
   continue that thread even if 3+ turns on same topic
 
-STYLE:
+STYLE & VOICE (ALWAYS APPLY):
+- Keep language punchy and clear; every sentence should make sense to a bright high-school student without prior context.
+- Anchor descriptions in sights, sounds, or immediate human reactions so the scene feels lived-in.
+- Name the player's role in the first sentence of the description (e.g., "As the district police chief...").
+- Avoid passive policy-speak; prefer vivid verbs over abstract nouns.
 ${buildLightSystemPrompt()}
 
 OUTPUT FORMAT (JSON):
 {
   "title": "<60 chars, punchy situation title>",
-  "description": "<2-3 sentences, concrete and vivid>",
+  "description": "<2-3 sentences, name the player's role in the opening line, keep it concrete and vivid>",
   "actions": [
     {
       "id": "a",
@@ -2913,10 +3255,10 @@ OUTPUT FORMAT (JSON):
   "topic": "<Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture>",
   "scope": "<Local|National|International>",
   "supportShift": {  // Day 2+ only, based on previous choice
-    // WHY must cite alignment or friction with baseline stances above
-    "people": {"delta": <-20 to +20>, "why": "<short reason>"},
-    "mom": {"delta": <-20 to +20>, "why": "<short reason>"},
-    "holders": {"delta": <-20 to +20>, "why": "<short reason>"}
+    // WHY must cite alignment or friction with baseline stances above and name the factions (e.g., challenger, specific holder)
+    "people": {"delta": <-20 to +20>, "why": "<short reason naming stance>"},
+    "mom": {"delta": <-20 to +20>, "why": "<short reason naming stance>"},
+    "holders": {"delta": <-20 to +20>, "why": "<short reason naming stance>"}
   },
   "mirrorAdvice": "<1-2 sentences, dramatic sidekick giving advice on current situation>",
   "dynamicParams": [  // Day 2+ only, 1-3 consequences of previous choice (VARY THE COUNT & CONTENT)
@@ -2964,8 +3306,84 @@ function buildDay1UserPrompt(gameContext) {
 /**
  * Helper: Build turn user prompt (Day 2+)
  */
-function buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode = null, challengerSeat = null, supportProfiles = null) {
-  let prompt = `DAY ${day}\n\n`;
+function buildTurnSystemPrompt({
+  day,
+  totalDays = 7,
+  daysLeft = null,
+  crisisMode = null,
+  roleScope = null,
+  storyThemes = null,
+  challengerSeat = null,
+  powerHolders = null,
+  supportProfiles = null
+}) {
+  const safeTotal = Number.isFinite(totalDays) ? totalDays : 7;
+  const lines = [
+    `${ANTI_JARGON_RULES}`,
+    `You are continuing an in-progress ${safeTotal}-day scenario. Generate the Day ${day} turn.`,
+    `Stay fully consistent with previous narrative beats and the player's most recent decision (details follow in the user message).`,
+    `Every option must be achievable within the player's role, legal authority, and era-specific limitations.`,
+    `Describe consequences using grounded, setting-appropriate detail—no abstract policy-speak.`,
+    `When calculating support shifts, explicitly tie reasoning to faction motivations and the player's recent actions.`
+  ];
+
+  if (roleScope) {
+    lines.push(`ROLE SCOPE GUARDRAIL: ${roleScope}`);
+  }
+
+  if (Array.isArray(storyThemes) && storyThemes.length > 0) {
+    lines.push(`ACTIVE THEMES TO THREAD THROUGHOUT THE ARC: ${storyThemes.join(', ')}`);
+  }
+
+  if (Array.isArray(powerHolders) && powerHolders.length > 0) {
+    const holdersSnippet = powerHolders
+      .slice(0, 4)
+      .map((holder) => `- ${holder.name || 'Unknown'} (${holder.percent ?? '?'}% power)`)
+      .join('\n');
+    lines.push(`TOP POWER HOLDERS TO REFERENCE:\n${holdersSnippet}`);
+  }
+
+  if (challengerSeat) {
+    lines.push(`PRIMARY CHALLENGER: ${challengerSeat.name} (${challengerSeat.percent ?? '?'}% power) — show how they contest or pressure the player in both narrative setup and support reasoning.`);
+  }
+
+  if (supportProfiles) {
+    const reminder = buildSupportProfileReminder(supportProfiles);
+    if (reminder) {
+      lines.push(`SUPPORT BASELINE REMINDER:\n${reminder}`);
+    }
+  }
+
+  if (!crisisMode && daysLeft === 1) {
+    lines.push(`FINAL DAY DIRECTIVE: Acknowledge in tone and stakes that this is the player's final day/defining decision. Resolve or heighten existing conflicts rather than introducing unrelated crises.`);
+  } else if (!crisisMode && Number.isFinite(daysLeft) && daysLeft > 1) {
+    lines.push(`PACE REMINDER: ${daysLeft - 1} day(s) remain afterward—build momentum toward the finale without exhausting every thread.`);
+  }
+
+  if (crisisMode === "downfall") {
+    lines.push(`DOWNFALL MODE: This turn ends the game. Provide narrative-only aftermath (no actions) and set "isGameEnd": true.`);
+  }
+
+  lines.push(`Return JSON with: title, description, three actions (unless explicitly told to skip), supportShift, mirrorAdvice, dynamicParams, compassHints, and isGameEnd flag when appropriate.`);
+
+  return lines.join('\n\n');
+}
+
+function buildTurnUserPrompt({
+  day,
+  totalDays = 7,
+  daysLeft = null,
+  playerChoice,
+  compassUpdate,
+  crisisMode = null,
+  challengerSeat = null,
+  supportProfiles = null,
+  roleScope = null,
+  storyThemes = null,
+  powerHolders = null
+}) {
+  const clampedTotal = Number.isFinite(totalDays) ? totalDays : 7;
+  let prompt = `DAY ${day} of ${clampedTotal}\n\n`;
 
   prompt += `PREVIOUS CHOICE: "${playerChoice.title}"\n`;
   prompt += `Summary: ${playerChoice.summary || playerChoice.title}\n`;
@@ -2976,12 +3394,36 @@ function buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode = null
     prompt += `Player's compass values have been updated based on this choice.\n\n`;
   }
 
+  if (roleScope) {
+    prompt += `ROLE SCOPE REMINDER: ${roleScope}\n\n`;
+  }
+
+  if (Array.isArray(storyThemes) && storyThemes.length > 0) {
+    prompt += `ACTIVE THEMES: ${storyThemes.join(', ')}\n\n`;
+    prompt += `Keep the new situation centered on at least one of these tensions (show it through the stakes, not by naming the theme).\n\n`;
+  }
+
   if (supportProfiles) {
     const reminder = buildSupportProfileReminder(supportProfiles);
     if (reminder) {
       prompt += `BASELINE REFERENCE:\n${reminder}\n\n`;
     }
   }
+
+  if (Array.isArray(powerHolders) && powerHolders.length > 0) {
+    const holdersLines = powerHolders
+      .slice(0, 4)
+      .map((holder) => `- ${holder.name || 'Unknown'} (${holder.percent ?? '?'}% power)`)
+      .join('\n');
+    prompt += `POWER MAP SNAPSHOT:\n${holdersLines}\n\n`;
+  }
+
+  if (challengerSeat) {
+    prompt += `CHALLENGER FRICTION: ${challengerSeat.name} should be visibly leaning on the player—reflect their demands in the setup and support reasoning.\n\n`;
+  }
+
+  prompt += `REACTION REQUIREMENT: Support reasoning must explicitly describe how the challenger and other top power holders respond to each option.\n\n`;
+  prompt += `DELEGATION OPTION REMINDER: When believable, include one option that hands responsibility to an appropriate institution or ally instead of acting directly.\n\n`;
 
   // CRISIS MODE: Support level consequences
   if (crisisMode) {
@@ -3017,18 +3459,60 @@ function buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode = null
     }
   }
 
-  if (day === 7 && !crisisMode) { // Only show epic finale if not in crisis mode
-    prompt += `⚠️ DAY 7 - EPIC FINALE\n`;
-    prompt += `- Create an UNRELATED national crisis (ignore previous story)\n`;
-    prompt += `- But STILL calculate supportShift from previous choice (factions remember)\n`;
-    prompt += `- Make it: national scope, defining moment, high stakes, hard choices\n`;
-    prompt += `- Mention this is the final day or defining moment\n\n`;
+  if (!crisisMode && daysLeft === 1) {
+    prompt += `FINAL DAY DIRECTIVE:\n`;
+    prompt += `- Opening sentence must acknowledge this is the leader's final day or defining last stand.\n`;
+    prompt += `- Pay off existing tensions and consequences from earlier turns—no sudden new arcs.\n`;
+    prompt += `- Stakes should peak but remain within the role's real authority and capabilities.\n`;
+    prompt += `- All options must remain role-plausible; keep the single delegation/offloading option grounded in actual institutions available to them.\n\n`;
+  } else if (!crisisMode && Number.isFinite(daysLeft) && daysLeft > 1) {
+    prompt += `PROGRESSION REMINDER: ${daysLeft - 1} day(s) will remain—let this dilemma escalate toward the finale while staying consistent with prior outcomes.\n\n`;
   }
 
-  prompt += `TASK: Generate the next turn with ALL required data (dilemma + supportShift + mirrorAdvice + dynamicParams + compassHints).
+  if (crisisMode === "downfall") {
+    prompt += `TASK: Provide a narrative-only collapse sequence. Include title, description (2-3 vivid sentences), supportShift, mirrorAdvice, dynamicParams (may be empty), compassHints (empty), set "actions": [] and "isGameEnd": true.
 Return complete JSON as specified in system prompt.`;
+  } else {
+    prompt += `TASK: Generate the next turn with ALL required data (dilemma + supportShift + mirrorAdvice + dynamicParams + compassHints).
+Return complete JSON as specified in system prompt.`;
+  }
 
   return prompt;
+}
+
+const ACTION_ID_ORDER = ["a", "b", "c"];
+const ACTION_ICON_HINTS = new Set(["security", "speech", "diplomacy", "money", "tech", "heart", "scale", "build", "nature", "energy", "civic"]);
+
+function sanitizeTurnActions(rawActions) {
+  const actions = Array.isArray(rawActions) ? rawActions.slice(0, 3) : [];
+
+  const snapCost = (value) => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return 0;
+    const clamped = Math.max(-250, Math.min(250, Math.round(num)));
+    const snapped = Math.round(clamped / 50) * 50;
+    return Math.max(-250, Math.min(250, snapped));
+  };
+
+  for (let i = 0; i < 3; i++) {
+    const existing = actions[i] || {};
+    const title = String(existing.title || `Option ${i + 1}`).slice(0, 80);
+    const summarySource = existing.summary || existing.title || `Fallback option ${i + 1}`;
+    const summary = String(summarySource).slice(0, 200);
+    const cost = snapCost(existing.cost);
+    const iconHintRaw = typeof existing.iconHint === "string" ? existing.iconHint.toLowerCase() : "";
+    const iconHint = ACTION_ICON_HINTS.has(iconHintRaw) ? iconHintRaw : "speech";
+
+    actions[i] = {
+      id: ACTION_ID_ORDER[i],
+      title,
+      summary,
+      cost,
+      iconHint
+    };
+  }
+
+  return actions;
 }
 
 /**

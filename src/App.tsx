@@ -145,7 +145,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: any
       {route === "/compass-quiz" && <MirrorQuizScreen push={push} />}
 
       {route === "/name" && <NameScreen push={push} />}
-      {route === "/compass-vis" && <CompassVisScreen push={push} />}
+      {route === "/compass-vis" && <CompassVisScreen />}
       {route === "/mirror" && <MirrorScreen push={push} />}
       {route === "/debug-mini" && <MiniCompassDebugScreen push={push} />}
       {route === "/background-intro" && <BackgroundIntroScreen push={push} />}

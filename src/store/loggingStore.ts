@@ -53,7 +53,7 @@ function generateUUID(): string {
 
 export const useLoggingStore = create<LoggingState>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       // --- User identification ---
       userId: null,  // Will be generated on first use
       setUserId: (id) => set({ userId: id }),

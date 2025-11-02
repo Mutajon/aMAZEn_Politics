@@ -8,6 +8,7 @@
 // Automatically includes metadata (screen, day, role) from application state
 
 import { useCallback, useMemo } from 'react';
+import type { MouseEvent } from 'react';
 import { useSettingsStore } from '../store/settingsStore';
 import { useDilemmaStore } from '../store/dilemmaStore';
 import { useRoleStore } from '../store/roleStore';
@@ -36,7 +37,7 @@ export function useLogger() {
    * @param comments - Optional human-readable description
    */
   const log = useCallback(
-    (action: string, value: string | number | boolean, comments?: string) => {
+    (action: string, value: string | number | boolean | Record<string, unknown>, comments?: string) => {
       if (!enabled) {
         return;
       }
@@ -62,7 +63,7 @@ export function useLogger() {
    * @param comments - Optional human-readable description
    */
   const logSystem = useCallback(
-    (action: string, value: string | number | boolean, comments?: string) => {
+    (action: string, value: string | number | boolean | Record<string, unknown>, comments?: string) => {
       if (!enabled) {
         return;
       }
@@ -95,14 +96,14 @@ export function useLogger() {
  */
 export function useLoggedClick(
   action: string,
-  value: any = {},
+  value: string | number | boolean | Record<string, unknown> = {},
   comments?: string,
   onClick?: () => void
 ) {
   const logger = useLogger();
 
   return useCallback(
-    (e?: React.MouseEvent) => {
+    (_e?: MouseEvent) => {
       logger.log(action, value, comments);
       if (onClick) {
         onClick();

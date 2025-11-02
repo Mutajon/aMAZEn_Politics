@@ -262,6 +262,8 @@ export function usePowerDistributionAnalysis({
 
         const supportProfiles: RoleSupportProfiles | null =
           base.supportProfiles ?? predefinedProfiles ?? null;
+        const roleScope = base.roleScope ?? null;
+        const storyThemes = base.storyThemes ?? null;
 
         if (supportProfiles && useSettingsStore.getState().debugMode) {
           console.log("[PowerDistribution][Debug] Support baselines:", {
@@ -269,6 +271,13 @@ export function usePowerDistributionAnalysis({
             origin: supportProfiles.people?.origin ?? supportProfiles.challenger?.origin ?? "unknown",
             people: supportProfiles.people,
             challenger: supportProfiles.challenger,
+          });
+        }
+        if (useSettingsStore.getState().debugMode) {
+          console.log("[PowerDistribution][Debug] Scope & themes:", {
+            role,
+            roleScope,
+            storyThemes,
           });
         }
 
@@ -284,10 +293,15 @@ export function usePowerDistributionAnalysis({
           holders: decorated.map(({ _id, ...rest }) => rest),
           playerIndex: finalPlayerIndex,
           supportProfiles,
+          roleScope,
+          storyThemes,
         };
 
         setAnalysis(analysisResult);
-        useRoleStore.getState().setSupportProfiles(supportProfiles);
+        const store = useRoleStore.getState();
+        store.setSupportProfiles(supportProfiles);
+        store.setRoleScope(roleScope ?? null);
+        store.setStoryThemes(storyThemes ?? null);
 
         setState("done");
       } catch (e: any) {

@@ -1,5 +1,4 @@
 // src/screens/MiniCompassDebugScreen.tsx
-import { useMemo } from "react";
 import type { PushFn } from "../lib/router";
 import { bgStyle } from "../lib/ui";
 import MiniCompass from "../components/MiniCompass";

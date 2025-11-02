@@ -4,7 +4,17 @@
 // This replaces the scattered data across multiple files
 
 import type { AnalysisResult } from "../store/roleStore";
-import type { RoleCharacters } from "./predefinedCharacters";
+
+export interface RoleCharacter {
+  name: string;
+  prompt: string;
+}
+
+export interface RoleCharacters {
+  male: RoleCharacter;
+  female: RoleCharacter;
+  any: RoleCharacter;
+}
 import { ROLE_SUPPORT_PROFILES } from "./supportProfiles";
 
 /**
@@ -19,6 +29,8 @@ export interface PredefinedRoleData {
   youAreKey: string;                   // i18n key for role description
   year: string;                        // Year badge display
   imageId: string;                     // Image identifier for banner/full images
+  roleScope: string;                   // In-world authority / what this role can actually do
+  storyThemes: string[];               // Core thematic axes or domains to explore
   powerDistribution: AnalysisResult;   // Complete E-12 political system analysis
   characters: RoleCharacters;          // Character name options (male/female/any)
 }
@@ -37,6 +49,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "ATHENS_YOU_ARE",
     year: "-404",
     imageId: "greece",
+    roleScope: "Acts as a respected citizen on the oligarch-controlled civic council, influencing local decrees and relief efforts but never commanding the Spartan garrison.",
+    storyThemes: ["autonomy_vs_heteronomy", "liberalism_vs_totalism", "reconciliation"],
     powerDistribution: {
       systemName: "Hard-Power Oligarchy — Stratocracy",
       systemDesc: "Military-backed oligarchy: Spartan garrison with local rulers set rules; courts muted, citizens sidelined.",
@@ -101,7 +115,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
         settingType: "real",
         era: "404–403 BCE Athens"
       },
-      supportProfiles: ROLE_SUPPORT_PROFILES["Athens — The Day Democracy Died (-404)"] ?? null
+      supportProfiles: ROLE_SUPPORT_PROFILES["Athens — The Day Democracy Died (-404)"] ?? null,
+      roleScope: "Acts as a respected citizen on the oligarch-controlled civic council, influencing local decrees and relief efforts but never commanding the Spartan garrison.",
+      storyThemes: ["autonomy_vs_heteronomy", "liberalism_vs_totalism", "reconciliation"]
     },
     characters: {
       male: {
@@ -128,6 +144,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "ALEXANDRIA_YOU_ARE",
     year: "-48",
     imageId: "alexandria",
+    roleScope: "Serves as a city scholar-advisor mediating between palace factions and Roman commanders; can sway civic policy, archives, and urban defenses but not direct legions.",
+    storyThemes: ["cultural_survival", "foreign_domination", "knowledge_vs_power"],
     powerDistribution: {
       systemName: "Autocratizing (Military)",
       systemDesc: "Under siege, the foreign general and local army overrule the court; force sets terms, others adapt.",
@@ -192,7 +210,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
         settingType: "real",
         era: "48–47 BCE Alexandria"
       },
-      supportProfiles: ROLE_SUPPORT_PROFILES["Alexandria — Fire over the Nile (-48)"] ?? null
+      supportProfiles: ROLE_SUPPORT_PROFILES["Alexandria — Fire over the Nile (-48)"] ?? null,
+      roleScope: "Serves as a city scholar-advisor mediating between palace factions and Roman commanders; can sway civic policy, archives, and urban defenses but not direct legions.",
+      storyThemes: ["cultural_survival", "foreign_domination", "knowledge_vs_power"]
     },
     characters: {
       male: {
@@ -219,6 +239,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "FLORENCE_YOU_ARE",
     year: "1494",
     imageId: "florence",
+    roleScope: "Sits on Florence's Great Council, balancing guild and patrician interests; can propose civic edicts, policing orders, and cultural protections but cannot command Papal or French armies.",
+    storyThemes: ["faith_vs_freedom", "economic_stability", "civic_identity"],
     powerDistribution: {
       systemName: "Mental-Might Oligarchy — Theocracy",
       systemDesc: "Wide-vote republic led by a strong preacher; laws and diplomacy follow sermons and public piety.",
@@ -283,7 +305,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
         settingType: "real",
         era: "Florence 1494–1498 (Savonarola era)"
       },
-      supportProfiles: ROLE_SUPPORT_PROFILES["Florence — The Fire and the Faith (1494)"] ?? null
+      supportProfiles: ROLE_SUPPORT_PROFILES["Florence — The Fire and the Faith (1494)"] ?? null,
+      roleScope: "Sits on Florence's Great Council, balancing guild and patrician interests; can propose civic edicts, policing orders, and cultural protections but cannot command Papal or French armies.",
+      storyThemes: ["faith_vs_freedom", "economic_stability", "civic_identity"]
     },
     characters: {
       male: {
@@ -310,6 +334,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "NORTH_AMERICA_YOU_ARE",
     year: "1607",
     imageId: "northAmerica",
+    roleScope: "Leads a tribal council overseeing diplomacy, land stewardship, and trade terms; can mobilize scouts and negotiate boundaries but does not unilaterally declare war without consensus.",
+    storyThemes: ["territorial_autonomy", "cultural_preservation", "exchange_vs_exploitation"],
     powerDistribution: {
       systemName: "Personalist Monarchy / Autocracy",
       systemDesc: "Single paramount chief directs war, trade, and justice; councils advise, but his word usually decides.",
@@ -374,7 +400,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
         settingType: "real",
         era: "Tidewater Virginia, 1607–1609"
       },
-      supportProfiles: ROLE_SUPPORT_PROFILES["North America — The First Encounter (1607)"] ?? null
+      supportProfiles: ROLE_SUPPORT_PROFILES["North America — The First Encounter (1607)"] ?? null,
+      roleScope: "Leads a tribal council overseeing diplomacy, land stewardship, and trade terms; can mobilize scouts and negotiate boundaries but does not unilaterally declare war without consensus.",
+      storyThemes: ["territorial_autonomy", "cultural_preservation", "exchange_vs_exploitation"]
     },
     characters: {
       male: {
@@ -401,6 +429,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "JAPAN_YOU_ARE",
     year: "1600",
     imageId: "japan",
+    roleScope: "Heads a mid-level samurai clan caught between warring coalitions; can commit retainers, negotiate allegiances, and manage village protections but cannot dictate national strategy.",
+    storyThemes: ["loyalty_vs_survival", "clan_honor", "centralization"],
     powerDistribution: {
       systemName: "Hard-Power Oligarchy — Stratocracy",
       systemDesc: "Warlord coalitions rule by force; law follows the armies, not councils.",
@@ -465,7 +495,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
         settingType: "real",
         era: "Japan, 1600 (late Sengoku)"
       },
-      supportProfiles: ROLE_SUPPORT_PROFILES["Japan — The Land at War's End (1600)"] ?? null
+      supportProfiles: ROLE_SUPPORT_PROFILES["Japan — The Land at War's End (1600)"] ?? null,
+      roleScope: "Heads a mid-level samurai clan caught between warring coalitions; can commit retainers, negotiate allegiances, and manage village protections but cannot dictate national strategy.",
+      storyThemes: ["loyalty_vs_survival", "clan_honor", "centralization"]
     },
     characters: {
       male: {
@@ -492,6 +524,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "HAITI_YOU_ARE",
     year: "1791",
     imageId: "haiti",
+    roleScope: "Acts as a plantation overseer-turned-liaison among rebel factions; can influence local militia deployments, justice for captives, and resource distribution but cannot dictate colony-wide treaties.",
+    storyThemes: ["emancipation", "justice_vs_vengeance", "unity_vs_fragmentation"],
     powerDistribution: {
       systemName: "Hard-Power Oligarchy — Stratocracy",
       systemDesc: "Warring armed factions decide outcomes; civil authority is weak.",
@@ -556,7 +590,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
         settingType: "real",
         era: "Saint-Domingue, 1791"
       },
-      supportProfiles: ROLE_SUPPORT_PROFILES["Haiti — The Island in Revolt (1791)"] ?? null
+      supportProfiles: ROLE_SUPPORT_PROFILES["Haiti — The Island in Revolt (1791)"] ?? null,
+      roleScope: "Acts as a plantation overseer-turned-liaison among rebel factions; can influence local militia deployments, justice for captives, and resource distribution but cannot dictate colony-wide treaties.",
+      storyThemes: ["emancipation", "justice_vs_vengeance", "unity_vs_fragmentation"]
     },
     characters: {
       male: {
@@ -583,6 +619,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "RUSSIA_YOU_ARE",
     year: "1917",
     imageId: "russia",
+    roleScope: "Embattled Tsar managing imperial decrees, military appointments, and court negotiations; can reshuffle ministers, issue manifestos, or seek truces but cannot personally command every garrison simultaneously.",
+    storyThemes: ["autocracy_vs_revolution", "bread_land_peace", "loyalty_crisis"],
     powerDistribution: {
       systemName: "Personalist Monarchy / Autocracy",
       systemDesc: "Tsar rules personally; army compliance and urban revolt now decide what sticks.",
@@ -647,7 +685,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
         settingType: "real",
         era: "Russia, Feb–Mar 1917"
       },
-      supportProfiles: ROLE_SUPPORT_PROFILES["Russia — The Throne Crumbles (1917)"] ?? null
+      supportProfiles: ROLE_SUPPORT_PROFILES["Russia — The Throne Crumbles (1917)"] ?? null,
+      roleScope: "Embattled Tsar managing imperial decrees, military appointments, and court negotiations; can reshuffle ministers, issue manifestos, or seek truces but cannot personally command every garrison simultaneously.",
+      storyThemes: ["autocracy_vs_revolution", "bread_land_peace", "loyalty_crisis"]
     },
     characters: {
       male: {
@@ -674,6 +714,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "INDIA_YOU_ARE",
     year: "1947",
     imageId: "india",
+    roleScope: "District officer coordinating police, relief, and political liaisons along the partition line; manages curfews, convoys, and investigations but cannot redraw national borders.",
+    storyThemes: ["communal_trust", "order_vs_liberty", "refugee_protection"],
     powerDistribution: {
       systemName: "Hard-Power Oligarchy — Stratocracy",
       systemDesc: "Armed forces and communal leaders shape rules; administrators improvise to contain violence amid state breakdown.",
@@ -738,7 +780,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
         settingType: "real",
         era: "India Partition, 1947"
       },
-      supportProfiles: ROLE_SUPPORT_PROFILES["India — The Midnight of Freedom (1947)"] ?? null
+      supportProfiles: ROLE_SUPPORT_PROFILES["India — The Midnight of Freedom (1947)"] ?? null,
+      roleScope: "District officer coordinating police, relief, and political liaisons along the partition line; manages curfews, convoys, and investigations but cannot redraw national borders.",
+      storyThemes: ["communal_trust", "order_vs_liberty", "refugee_protection"]
     },
     characters: {
       male: {
@@ -765,6 +809,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "SOUTH_AFRICA_YOU_ARE",
     year: "1990",
     imageId: "southAfrica",
+    roleScope: "Senior police commander overseeing citywide operations during the transition; can set deployment protocols, liaise with reform negotiators, and manage crowd-control policy but cannot pass national laws.",
+    storyThemes: ["justice_vs_amnesty", "public_safety", "institutional_trust"],
     powerDistribution: {
       systemName: "Autocratizing (Executive)",
       systemDesc: "Late-apartheid South Africa: executive-led minority rule with strong security forces and rising mass opposition.",
@@ -829,7 +875,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
         settingType: "real",
         era: "South Africa, 1990 transition"
       },
-      supportProfiles: ROLE_SUPPORT_PROFILES["South Africa — The End of Apartheid (1990)"] ?? null
+      supportProfiles: ROLE_SUPPORT_PROFILES["South Africa — The End of Apartheid (1990)"] ?? null,
+      roleScope: "Senior police commander overseeing citywide operations during the transition; can set deployment protocols, liaise with reform negotiators, and manage crowd-control policy but cannot pass national laws.",
+      storyThemes: ["justice_vs_amnesty", "public_safety", "institutional_trust"]
     },
     characters: {
       male: {
@@ -856,6 +904,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "MARS_YOU_ARE",
     year: "2179",
     imageId: "mars",
+    roleScope: "Elected Mars colony governor balancing survival systems and autonomy petitions; can adjust habitat policy, rationing, and negotiations with Earth but cannot conjure unlimited supplies.",
+    storyThemes: ["autonomy_vs_dependency", "survival_ethics", "science_vs_populism"],
     powerDistribution: {
       systemName: "Mental-Might Oligarchy — Technocracy",
       systemDesc: "Engineers and safety rules steer decisions; an elected governor balances Earth supply leverage and local freedoms.",
@@ -920,7 +970,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
         settingType: "fictional",
         era: "late 22nd century"
       },
-      supportProfiles: ROLE_SUPPORT_PROFILES["Mars Colony — The Red Frontier (2179)"] ?? null
+      supportProfiles: ROLE_SUPPORT_PROFILES["Mars Colony — The Red Frontier (2179)"] ?? null,
+      roleScope: "Elected Mars colony governor balancing survival systems and autonomy petitions; can adjust habitat policy, rationing, and negotiations with Earth but cannot conjure unlimited supplies.",
+      storyThemes: ["autonomy_vs_dependency", "survival_ethics", "science_vs_populism"]
     },
     characters: {
       male: {

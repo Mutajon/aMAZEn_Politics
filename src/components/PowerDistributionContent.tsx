@@ -8,7 +8,6 @@
  * Uses: PowerDistributionIcons.tsx, framer-motion for animations
  */
 
-import { default as React } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { HelpCircle, Cog } from "lucide-react";
 import { IconFromKey, getRankColor } from "./PowerDistributionIcons";
@@ -27,14 +26,6 @@ interface PowerDistributionContentProps {
   systemDesc: string;
   systemFlavor: string;
   showSystemModal: boolean;
-  e12Data?: {
-    tierI: string[];
-    tierII: string[];
-    tierIII: string[];
-    stopA: boolean;
-    stopB: boolean;
-    decisive: string[];
-  };
   groundingData?: {
     settingType: "real" | "fictional" | "unclear";
     era: string;
@@ -60,7 +51,6 @@ export default function PowerDistributionContent({
   systemDesc,
   systemFlavor,
   showSystemModal,
-  e12Data,
   groundingData,
   onRetry,
   onChangePercent,

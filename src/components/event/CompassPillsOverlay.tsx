@@ -1,5 +1,5 @@
 // src/components/event/CompassPillsOverlay.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { CompassEffectPing } from "../MiniCompass";
 import { COMPONENTS, PALETTE } from "../../data/compass-data";

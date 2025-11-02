@@ -60,11 +60,13 @@ export async function cleanAndAdvanceDay(
   const { setLastChoice } = useDilemmaStore.getState();
 
   // Convert ActionCard back to DilemmaAction format for storage
+  const actionCost = selectedAction.cost ?? 0;
+
   const dilemmaAction = {
     id: selectedAction.id as 'a' | 'b' | 'c',
     title: selectedAction.title,
     summary: selectedAction.summary,
-    cost: selectedAction.cost
+    cost: actionCost
   };
 
   setLastChoice(dilemmaAction);
@@ -78,10 +80,10 @@ export async function cleanAndAdvanceDay(
 
   if (showBudget) {
     const { budget, setBudget } = useDilemmaStore.getState();
-    const newBudget = budget + selectedAction.cost;
+    const newBudget = budget + actionCost;
     setBudget(newBudget);
 
-    const costDisplay = selectedAction.cost >= 0 ? `+${selectedAction.cost}` : `${selectedAction.cost}`;
+    const costDisplay = actionCost >= 0 ? `+${actionCost}` : `${actionCost}`;
     console.log(`[Cleaner] Budget updated: ${budget} → ${newBudget} (${costDisplay})`);
   } else {
     console.log('[Cleaner] Budget system disabled - skipping budget update');

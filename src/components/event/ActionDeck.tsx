@@ -74,7 +74,6 @@ export default function ActionDeck({
     closeSuggestModal,
     startConfirmationFlow,
     startSuggestConfirmationFlow,
-    resetState,
   } = state;
 
   // Coin flight system - use parent's trigger if provided, otherwise use local

@@ -8,7 +8,6 @@
  * Uses: framer-motion for animations, lucide-react for icons
  */
 
-import React from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { Coins, CheckCircle2 } from "lucide-react";
 import type { ActionCard } from "../../hooks/useActionDeckState";
@@ -18,7 +17,6 @@ import { useLogger } from "../../hooks/useLogger";
 // Visual constants
 const ENTER_STAGGER = 0.12;
 const ENTER_DURATION = 0.36;
-const ENTER_Y = 24;
 
 const CARD_TITLE_CLASS = "text-[14px] font-semibold text-white";
 const CARD_DESC_CLASS = "text-[12.5px] leading-snug text-white/95";
