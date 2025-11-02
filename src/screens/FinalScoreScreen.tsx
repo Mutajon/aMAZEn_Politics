@@ -50,6 +50,7 @@ import { useLogger } from "../hooks/useLogger";
 import { loggingService } from "../lib/loggingService";
 import type { PushFn } from "../lib/router";
 import { useLang } from "../i18n/lang";
+import { translateDemocracyLevel } from "../i18n/translateGameData";
 
 type Props = {
   push: PushFn;
@@ -624,7 +625,7 @@ export default function FinalScoreScreen({ push }: Props) {
                         <span>
                           {lang("FINAL_SCORE_LIBERALISM_LABEL")}{" "}
                           <span className="font-semibold">
-                            {formatRating(breakdown.ideology.liberalism.rating)}
+                            {translateDemocracyLevel(formatRating(breakdown.ideology.liberalism.rating) as any, lang)}
                           </span>
                         </span>
                       }
@@ -635,7 +636,7 @@ export default function FinalScoreScreen({ push }: Props) {
                         <span>
                           {lang("FINAL_SCORE_AUTONOMY_LABEL")}{" "}
                           <span className="font-semibold">
-                            {formatRating(breakdown.ideology.autonomy.rating)}
+                            {translateDemocracyLevel(formatRating(breakdown.ideology.autonomy.rating) as any, lang)}
                           </span>
                         </span>
                       }

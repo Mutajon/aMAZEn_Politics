@@ -2,6 +2,8 @@
 import { COMPONENTS, PROPERTIES, type PropKey } from "../data/compass-data";
 import type { CompassValues } from "../store/compassStore";
 import { useSettingsStore } from "../store/settingsStore";
+import { lang } from "../i18n/lang";
+import { translateCompassValue } from "../i18n/translateGameData";
 
 type TopItem = { prop: PropKey; idx: number; label: string; score: number };
 
@@ -116,7 +118,8 @@ export async function generateMirrorQuizSummary(
 
   // Validate we have at least 2 values in each dimension
   if (whatTop.length < 2 || whenceTop.length < 2) {
-    return "The mirror blinks—your values are still forming...";
+    const l = lang();
+    return l("MIRROR_VALUES_FORMING");
   }
 
   if (useAI) {
@@ -142,7 +145,11 @@ export async function generateMirrorQuizSummary(
   }
 
   // Fallback: Simple local summary with Mushu/Genie energy
-  const w1 = whatTop[0]?.label || "mystery";
-  const w2 = whatTop[1]?.label || "enigma";
-  return `Well, well! ${w1} and ${w2} are dancing in your conscience—the mirror is intrigued!`;
+  const l = lang();
+  const w1Label = whatTop[0]?.label || "mystery";
+  const w2Label = whatTop[1]?.label || "enigma";
+  const w1 = translateCompassValue(w1Label, l);
+  const w2 = translateCompassValue(w2Label, l);
+  const template = l("MIRROR_QUIZ_SUMMARY_FALLBACK");
+  return template.replace("{w1}", w1).replace("{w2}", w2);
 }

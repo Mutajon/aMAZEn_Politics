@@ -12,6 +12,7 @@
 import { motion } from "framer-motion";
 import { forwardRef, useEffect } from "react";
 import type { DecisionAnalysis } from "../../lib/aftermath";
+import { useLang } from "../../i18n/lang";
 
 type Props = {
   decisions: DecisionAnalysis[];
@@ -40,8 +41,22 @@ function getRatingColor(level: string): string {
   }
 }
 
-/** Format rating text */
-function formatRating(level: string): string {
+/** Format rating text with translation support */
+function formatRating(level: string, lang: (key: string) => string): string {
+  const keyMap: Record<string, string> = {
+    "very-high": "DEMOCRACY_LEVEL_VERY_HIGH",
+    "high": "DEMOCRACY_LEVEL_HIGH",
+    "medium": "DEMOCRACY_LEVEL_MEDIUM",
+    "low": "DEMOCRACY_LEVEL_LOW",
+    "very-low": "DEMOCRACY_LEVEL_VERY_LOW",
+  };
+  
+  const key = keyMap[level];
+  if (key) {
+    return lang(key);
+  }
+  
+  // Fallback to capitalization
   return level
     .split("-")
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
@@ -50,6 +65,8 @@ function formatRating(level: string): string {
 
 const DecisionBreakdownSection = forwardRef<HTMLDivElement, Props>(
   ({ decisions, ratings, currentDecisionIndex, showFinalRatings, skipAnimation, onComplete }, ref) => {
+    const lang = useLang();
+    
     // Call onComplete when animation finishes after a decision or ratings appear
     useEffect(() => {
       if (skipAnimation) {
@@ -141,7 +158,7 @@ const DecisionBreakdownSection = forwardRef<HTMLDivElement, Props>(
                 color: getRatingColor(ratings.liberalism)
               }}
             >
-              Liberalism: {formatRating(ratings.liberalism)}
+              {lang("LIBERALISM")}: {formatRating(ratings.liberalism, lang)}
             </div>
 
             {/* Autonomy Pill */}
@@ -154,7 +171,7 @@ const DecisionBreakdownSection = forwardRef<HTMLDivElement, Props>(
                 color: getRatingColor(ratings.autonomy)
               }}
             >
-              Autonomy: {formatRating(ratings.autonomy)}
+              {lang("AUTONOMY")}: {formatRating(ratings.autonomy, lang)}
             </div>
           </AnimationWrapper>
         )}
