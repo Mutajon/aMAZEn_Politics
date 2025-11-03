@@ -436,59 +436,10 @@ async function fetchGameTurn(): Promise<{
     updateSubjectStreak(data.topic);
   }
 
-  // Extract compass pills (Day 2+ only)
-  const rawPillCount = Array.isArray(data.compassHints) ? data.compassHints.length : 0;
-  const compassPills: CompassPill[] = Array.isArray(data.compassHints)
-    ? data.compassHints
-        .map((hint: any) => {
-          const prop = hint.prop;
-          const idx = Number(hint.idx);
-          const polarity = String(hint.polarity || "").toLowerCase();
-          const strength = String(hint.strength || "").toLowerCase();
+  // Compass pills fetched asynchronously elsewhere
+  const compassPills: CompassPill[] | null = null;
 
-          // Validate prop
-          if (!["what", "whence", "how", "whither"].includes(prop)) {
-            console.warn(`[useEventDataCollector] Invalid compass pill: prop="${prop}" not recognized`);
-            return null;
-          }
-
-          // Validate idx range
-          if (!Number.isFinite(idx) || idx < 0 || idx > 9) {
-            console.warn(`[useEventDataCollector] Invalid compass pill: idx=${idx} out of range (0-9) for prop="${prop}"`);
-            return null;
-          }
-
-          // Validate value name exists
-          const valueName = COMPONENTS[prop as PropKey]?.[idx]?.short;
-          if (!valueName) {
-            console.warn(`[useEventDataCollector] Invalid compass pill: No value found at prop="${prop}", idx=${idx}`);
-            return null;
-          }
-
-          // Calculate delta
-          let delta = 0;
-          if (polarity === "positive") {
-            delta = strength === "strong" ? 2 : 1;
-          } else if (polarity === "negative") {
-            delta = strength === "strong" ? -2 : -1;
-          }
-
-          if (delta === 0) {
-            console.warn(`[useEventDataCollector] Invalid compass pill: delta=0 for prop="${prop}", idx=${idx} (polarity="${polarity}")`);
-            return null;
-          }
-
-          return { prop: prop as any, idx, delta };
-        })
-        .filter(Boolean) as CompassPill[]
-    : [];
-
-  // Log pill validation summary
-  if (rawPillCount > 0 && compassPills.length !== rawPillCount) {
-    console.warn(`[useEventDataCollector] ⚠️ Filtered ${rawPillCount - compassPills.length}/${rawPillCount} invalid compass pills`);
-  }
-
-  // Extract dynamic parameters (Day 2+ only)
+// Extract dynamic parameters (Day 2+ only)
   const dynamicParams: DynamicParam[] = Array.isArray(data.dynamicParams)
     ? data.dynamicParams
     : [];
@@ -496,7 +447,7 @@ async function fetchGameTurn(): Promise<{
   // Extract mirror advice
   const mirrorText = String(data.mirrorAdvice || "The mirror squints, light pooling in the glass...");
 
-  console.log(`[fetchGameTurn] ✅ Unified response received: ${data.actions.length} actions, ${compassPills.length} pills, ${dynamicParams.length} params`);
+  console.log(`[fetchGameTurn] ✅ Unified response received: ${data.actions.length} actions, 0 pills (pills fetched separately), ${dynamicParams.length} params`);
 
   return {
     dilemma,
@@ -521,6 +472,60 @@ function getTop2WhatValues(): string[] {
     .sort((a, b) => b.v - a.v)
     .slice(0, 2)
     .map(x => x.name);
+}
+
+function transformCompassHints(rawHints: any): CompassPill[] {
+  if (!Array.isArray(rawHints)) return [];
+  const validProps = new Set<CompassPill['prop']>(["what", "whence", "how", "whither"]);
+  const pills: CompassPill[] = [];
+
+  for (const hint of rawHints) {
+    const prop = String(hint?.prop || "").toLowerCase() as CompassPill['prop'];
+    if (!validProps.has(prop)) continue;
+
+    const idx = Number(hint?.idx);
+    if (!Number.isFinite(idx) || idx < 0 || idx > 9) continue;
+
+    const polarity = String(hint?.polarity || "").toLowerCase();
+    const strength = String(hint?.strength || "").toLowerCase();
+
+    let delta = 0;
+    if (polarity === "positive") {
+      delta = strength === "strong" ? 2 : 1;
+    } else if (polarity === "negative") {
+      delta = strength === "strong" ? -2 : -1;
+    }
+
+    if (delta === 0) continue;
+
+    pills.push({ prop, idx, delta });
+  }
+
+  return pills;
+}
+
+async function fetchCompassHintsForAction(
+  gameId: string,
+  action: { title: string; summary: string }
+): Promise<CompassPill[]> {
+  try {
+    const response = await fetch("/api/compass-hints", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ gameId, action })
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Compass hints API failed (${response.status}): ${text}`);
+    }
+
+    const data = await response.json();
+    return transformCompassHints(data?.compassHints);
+  } catch (error) {
+    console.error("[fetchGameTurn] ⚠️ Compass hints request failed:", error);
+    return [];
+  }
 }
 
 // ============================================================================
@@ -721,7 +726,7 @@ export function useEventDataCollector() {
     setIsCollecting(true);
     setCollectionError(null);
 
-    const { day } = useDilemmaStore.getState();
+    const { day, lastChoice, gameId: currentGameId } = useDilemmaStore.getState();
 
     try {
       // ========================================================================
@@ -732,7 +737,7 @@ export function useEventDataCollector() {
       const turnData = await fetchGameTurn();
 
       // Extract all data from unified response
-      const { dilemma, supportEffects, compassPills, dynamicParams, mirrorText } = turnData;
+      const { dilemma, supportEffects, dynamicParams, mirrorText } = turnData;
 
       console.log(`[Collector] ✅ Unified data received for Day ${day}`);
 
@@ -757,8 +762,28 @@ export function useEventDataCollector() {
         onReadyCallbackRef.current();
       }
 
-      // Set Phase 2 data (compass pills + dynamic params)
-      setPhase2Data({ compassPills, dynamicParams });
+      // Set Phase 2 data (dynamic params immediately, pills fetched separately)
+      setPhase2Data({ compassPills: null, dynamicParams });
+
+      if (day > 1 && lastChoice && currentGameId) {
+        fetchCompassHintsForAction(currentGameId, {
+          title: lastChoice.title,
+          summary: lastChoice.summary || lastChoice.title
+        })
+          .then((pills) => {
+            setPhase2Data(prev => ({
+              compassPills: pills.length > 0 ? pills : null,
+              dynamicParams: prev?.dynamicParams ?? dynamicParams
+            }));
+          })
+          .catch((err) => {
+            console.error('[Collector] ⚠️ Compass hint fetch failed:', err);
+            setPhase2Data(prev => ({
+              compassPills: prev?.compassPills ?? null,
+              dynamicParams: prev?.dynamicParams ?? dynamicParams
+            }));
+          });
+      }
 
       // Set Phase 3 data (mirror advice)
       setPhase3Data({ mirrorText });
