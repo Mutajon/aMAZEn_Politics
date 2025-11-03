@@ -26,33 +26,33 @@ interface IDCollectionModalProps {
  * Returns error key for i18n, or null if valid
  */
 function validateID(id: string): string | null {
-  // Trim whitespace
   const trimmed = id.trim();
 
-  // Check length
   if (trimmed.length === 0) {
-    return null; // Empty is not an error, just not submittable
+    return null;
   }
 
-  if (trimmed.length < 9) {
-    return "ID_VALIDATION_LENGTH";
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(trimmed)) {
+    return "ID_VALIDATION_EMAIL";
   }
 
-  if (trimmed.length > 9) {
-    return "ID_VALIDATION_LENGTH";
+  if (!trimmed.toLowerCase().endsWith("@tau.ac.il")) {
+    return "ID_VALIDATION_DOMAIN";
   }
 
-  // Check all numeric
-  if (!/^\d{9}$/.test(trimmed)) {
-    return "ID_VALIDATION_NUMERIC";
+  const localPart = trimmed.split("@")[0];
+  const sanitizedLocal = localPart.replace(/[^a-z0-9]/gi, "");
+
+  if (sanitizedLocal.length < 3) {
+    return "ID_VALIDATION_LOCAL_LENGTH";
   }
 
-  // Check not all same digit (e.g., 111111111, 222222222)
-  if (/^(\d)\1{8}$/.test(trimmed)) {
-    return "ID_VALIDATION_PATTERN";
+  const uniqueChars = new Set(sanitizedLocal.toLowerCase());
+  if (uniqueChars.size < 3) {
+    return "ID_VALIDATION_LOCAL_VARIETY";
   }
 
-  // Valid!
   return null;
 }
 
@@ -79,9 +79,10 @@ export default function IDCollectionModal({
   }, [idInput]);
 
   const handleSubmit = () => {
-    const error = validateID(idInput);
-    if (error === null && idInput.trim().length === 9) {
-      onSubmit(idInput.trim());
+    const trimmed = idInput.trim();
+    const error = validateID(trimmed);
+    if (error === null && trimmed.length > 0) {
+      onSubmit(trimmed);
     }
   };
 
@@ -91,7 +92,8 @@ export default function IDCollectionModal({
     }
   };
 
-  const isValid = validationError === null && idInput.trim().length === 9;
+  const trimmedInput = idInput.trim();
+  const isValid = validationError === null && trimmedInput.length > 0;
 
   return (
     <AnimatePresence>
@@ -144,15 +146,15 @@ export default function IDCollectionModal({
               <input
                 ref={inputRef}
                 id="id-input"
-                type="text"
-                inputMode="numeric"
-                maxLength={9}
+                type="email"
+                inputMode="email"
+                autoComplete="email"
                 value={idInput}
                 onChange={(e) => setIdInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder={lang("ID_COLLECTION_PLACEHOLDER")}
                 className={[
-                  "w-full px-4 py-3 rounded-xl text-center text-xl font-mono tracking-wider",
+                  "w-full px-4 py-3 rounded-xl text-base",
                   "bg-white/10 border-2 text-white placeholder-white/30",
                   "focus:outline-none focus:ring-2 focus:ring-purple-400/50",
                   "transition-colors",
@@ -165,11 +167,6 @@ export default function IDCollectionModal({
                 aria-invalid={validationError !== null}
                 aria-describedby={validationError ? "id-error" : undefined}
               />
-
-              {/* Character Count */}
-              <div className="text-center text-xs text-white/40">
-                {idInput.length}/9 {idInput.length === 1 ? "digit" : "digits"}
-              </div>
 
               {/* Validation Error Message */}
               {validationError && (
@@ -199,12 +196,13 @@ export default function IDCollectionModal({
               </button>
             </div>
 
-            {/* Privacy Notice */}
-            <div className="mt-6 p-3 rounded-lg bg-white/5 border border-white/10">
-              <p className="text-xs text-white/50 text-center">
-                🔒 Your ID will be stored securely and used only for research
-                purposes. All data is anonymized and confidential.
+            <div className="mt-6 space-y-3 text-xs leading-relaxed">
+              <p className="text-white/55">
+                {lang("ID_COLLECTION_CONSENT")}
               </p>
+              <div className="border border-amber-400/40 bg-amber-900/15 text-amber-100 rounded-lg px-3 py-2">
+                {lang("ID_COLLECTION_WARNING")}
+              </div>
             </div>
           </motion.div>
         </motion.div>

@@ -21,11 +21,12 @@ import CollectorLoadingOverlay from "../components/event/CollectorLoadingOverlay
 import DilemmaLoadError from "../components/event/DilemmaLoadError";
 import ResourceBar from "../components/event/ResourceBar";
 import SupportList from "../components/event/SupportList";
-import { NewsTicker, buildDynamicParamsTickerItems } from "../components/event/NewsTicker";
+import { DynamicParameters, buildDynamicParamsItems } from "../components/event/DynamicParameters";
 import DilemmaCard from "../components/event/DilemmaCard";
 import MirrorCard from "../components/event/MirrorCard";
 import CompassPillsOverlay from "../components/event/CompassPillsOverlay";
 import ActionDeck, { type ActionCard } from "../components/event/ActionDeck";
+import CrisisWarningBanner, { type CrisisInfo } from "../components/event/CrisisWarningBanner";
 import { actionsToDeckCards } from "../components/event/actionVisuals";
 import { useCoinFlights, CoinFlightOverlay } from "../components/event/CoinFlightSystem";
 import { AnimatePresence } from "framer-motion";
@@ -43,13 +44,46 @@ export default function EventScreen3({ push }: Props) {
   const lang = useLang();
 
   // Global state (read only - single source of truth)
-  const { day, totalDays, budget } = useDilemmaStore();
-  const { character, roleBackgroundImage } = useRoleStore();
+  const { day, totalDays, budget, supportPeople, supportMiddle, supportMom, crisisMode: storedCrisisMode } = useDilemmaStore();
+  const { character, roleBackgroundImage, analysis } = useRoleStore();
   const showBudget = useSettingsStore((s) => s.showBudget);
   const debugMode = useSettingsStore((s) => s.debugMode);
 
   // Create role-based background style
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
+
+  // Build crisis information for warning banner
+  const crises = useMemo((): CrisisInfo[] => {
+    const CRISIS_THRESHOLD = 20;
+    const crisisArray: CrisisInfo[] = [];
+
+    if (supportPeople < CRISIS_THRESHOLD) {
+      crisisArray.push({
+        entity: "The People",
+        currentSupport: supportPeople,
+        type: "people"
+      });
+    }
+
+    if (supportMiddle < CRISIS_THRESHOLD) {
+      const challengerName = analysis?.challengerSeat?.name || "Power Holders";
+      crisisArray.push({
+        entity: challengerName,
+        currentSupport: supportMiddle,
+        type: "challenger"
+      });
+    }
+
+    if (supportMom < CRISIS_THRESHOLD) {
+      crisisArray.push({
+        entity: "Personal Anchor",
+        currentSupport: supportMom,
+        type: "caring"
+      });
+    }
+
+    return crisisArray;
+  }, [supportPeople, supportMiddle, supportMom, analysis]);
 
   // Data collection (progressive 3-phase loading)
   const {
@@ -233,6 +267,19 @@ export default function EventScreen3({ push }: Props) {
       setShowCompassPills(shouldShow);
     }
   }, [phase, day, compassPings.length, showCompassPills]);
+
+  // ========================================================================
+  // EFFECT 5: Redirect to downfall screen when terminal crisis occurs
+  // ========================================================================
+  useEffect(() => {
+    // Check if game ended with downfall crisis (all 3 tracks < 20%)
+    const isGameEnd = collectedData?.dilemma?.isGameEnd;
+
+    if (isGameEnd && storedCrisisMode === "downfall" && phase === 'interacting') {
+      console.log('[EventScreen3] 🚨 DOWNFALL DETECTED - Redirecting to downfall screen');
+      push('/downfall');
+    }
+  }, [collectedData, storedCrisisMode, phase, push]);
 
   // ========================================================================
   // ACTION HANDLERS
@@ -427,9 +474,9 @@ export default function EventScreen3({ push }: Props) {
       ? actionsToDeckCards(collectedData.dilemma.actions)
       : [];
 
-    // Build ticker items from dynamic parameters
+    // Build parameter items from dynamic parameters
     const isFirstDay = day === 1;
-    const tickerItems = buildDynamicParamsTickerItems(
+    const parameterItems = buildDynamicParamsItems(
       collectedData?.dynamicParams || null,
       isFirstDay
     );
@@ -463,9 +510,17 @@ export default function EventScreen3({ push }: Props) {
             <SupportList items={supportItems} />
           )}
 
-          {/* Step 3+: NewsTicker - Shows placeholder "News items incoming..." until dynamicParams ready */}
-          {presentationStep >= 3 && (
-            <NewsTicker items={tickerItems} />
+          {/* Step 3+: DynamicParameters - Shows 1-3 narrative impacts with emoji (Day 2+ only) */}
+          {presentationStep >= 3 && day >= 2 && (
+            <DynamicParameters items={parameterItems} />
+          )}
+
+          {/* Crisis Warning Banner (only during presenting/interacting phases, if any crises exist) */}
+          {(phase === 'presenting' || phase === 'interacting') && crises.length > 0 && presentationStep >= 4 && (
+            <CrisisWarningBanner
+              crises={crises}
+              autoDismiss={true}
+            />
           )}
 
           {/* Step 4+: DilemmaCard OR Aftermath (game ending) */}

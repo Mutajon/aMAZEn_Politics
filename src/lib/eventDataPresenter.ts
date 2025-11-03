@@ -129,9 +129,9 @@ export async function presentEventData(
     console.warn(`[Presenter] ⚠️ Day ${day}: Missing support effects (expected for Day 2+)`);
   }
 
-  // ========== STEP 3: NewsTicker (shows immediately with placeholder) ==========
+  // ========== STEP 3: DynamicParameters (shows immediately with placeholder) ==========
   setPresentationStep(3);
-  await delay(0); // No delay - NewsTicker just needs to mount
+  await delay(0); // No delay - DynamicParameters just needs to mount
 
   // ========== STEP 4: DilemmaCard ==========
   setPresentationStep(4);

@@ -94,6 +94,15 @@ type DilemmaState = {
   minSupportMiddle: number;
   minSupportMom: number;
 
+  // Crisis state tracking (NEW)
+  crisisMode: "people" | "challenger" | "caring" | "downfall" | null;
+  crisisEntity: string | null; // Name of the entity in crisis
+  previousSupportValues: {
+    people: number;
+    middle: number;
+    mom: number;
+  } | null;
+
   loadNext: () => Promise<void>;
   nextDay: () => void;
   setTotalDays: (n: number) => void;
@@ -143,6 +152,11 @@ type DilemmaState = {
   // Hosted state conversation methods
   initializeGame: () => void;      // Generate gameId and prepare for new game
   endConversation: () => void;     // Cleanup after game ends
+
+  // Crisis detection methods (NEW)
+  detectAndSetCrisis: () => void;  // Detect crisis after support updates
+  clearCrisis: () => void;          // Clear crisis state after handling
+  savePreviousSupport: () => void;  // Store support values before updates
 };
 
 // Type for goal status changes (used for audio/visual feedback)
@@ -222,6 +236,11 @@ export const useDilemmaStore = create<DilemmaState>()(
   minSupportPeople: 50,
   minSupportMiddle: 50,
   minSupportMom: 50,
+
+  // Crisis state tracking (NEW)
+  crisisMode: null,
+  crisisEntity: null,
+  previousSupportValues: null,
 
   async loadNext() {
     // If something is already loading, bail early
@@ -346,6 +365,9 @@ export const useDilemmaStore = create<DilemmaState>()(
       minSupportPeople: 50,
       minSupportMiddle: 50,
       minSupportMom: 50,
+      crisisMode: null,
+      crisisEntity: null,
+      previousSupportValues: null,
     });
   },
 
@@ -670,6 +692,78 @@ export const useDilemmaStore = create<DilemmaState>()(
     set({
       gameId: null,
       conversationActive: false
+    });
+  },
+
+  // ========================================================================
+  // CRISIS DETECTION METHODS
+  // ========================================================================
+
+  savePreviousSupport() {
+    const { supportPeople, supportMiddle, supportMom } = get();
+
+    dlog("savePreviousSupport ->", {
+      people: supportPeople,
+      middle: supportMiddle,
+      mom: supportMom
+    });
+
+    set({
+      previousSupportValues: {
+        people: supportPeople,
+        middle: supportMiddle,
+        mom: supportMom
+      }
+    });
+  },
+
+  detectAndSetCrisis() {
+    const { supportPeople, supportMiddle, supportMom } = get();
+    const CRISIS_THRESHOLD = 20;
+
+    // Check if any track is below threshold
+    const peopleInCrisis = supportPeople < CRISIS_THRESHOLD;
+    const challengerInCrisis = supportMiddle < CRISIS_THRESHOLD;
+    const caringInCrisis = supportMom < CRISIS_THRESHOLD;
+
+    // Determine crisis mode (priority: downfall > people > challenger > caring)
+    let crisisMode: typeof get extends () => infer S ? S extends { crisisMode: infer C } ? C : never : never = null;
+    let crisisEntity: string | null = null;
+
+    if (peopleInCrisis && challengerInCrisis && caringInCrisis) {
+      crisisMode = "downfall";
+      crisisEntity = "ALL";
+      dlog(`detectAndSetCrisis -> DOWNFALL: All three tracks below ${CRISIS_THRESHOLD}%`);
+    } else if (peopleInCrisis) {
+      crisisMode = "people";
+      crisisEntity = "The People";
+      dlog(`detectAndSetCrisis -> PEOPLE CRISIS: ${supportPeople}%`);
+    } else if (challengerInCrisis) {
+      crisisMode = "challenger";
+
+      // Get challenger name from roleStore if available
+      const roleState = useRoleStore.getState();
+      crisisEntity = roleState.analysis?.challengerSeat?.name || "Institutional Opposition";
+      dlog(`detectAndSetCrisis -> CHALLENGER CRISIS: ${supportMiddle}% (${crisisEntity})`);
+    } else if (caringInCrisis) {
+      crisisMode = "caring";
+      crisisEntity = "Personal Anchor";
+      dlog(`detectAndSetCrisis -> CARING CRISIS: ${supportMom}%`);
+    } else {
+      dlog("detectAndSetCrisis -> No crisis detected");
+    }
+
+    set({ crisisMode, crisisEntity });
+
+    return crisisMode;
+  },
+
+  clearCrisis() {
+    dlog("clearCrisis -> Clearing crisis state");
+    set({
+      crisisMode: null,
+      crisisEntity: null,
+      previousSupportValues: null
     });
   },
     }),

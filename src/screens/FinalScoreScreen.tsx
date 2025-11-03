@@ -26,7 +26,7 @@ import {
   Rocket,
   Trophy,
 } from "lucide-react";
-import { bgStyle } from "../lib/ui";
+import { bgStyleWithRoleImage } from "../lib/ui";
 import { useScoreCalculation } from "../hooks/useScoreCalculation";
 import {
   formatRating,
@@ -121,6 +121,7 @@ export default function FinalScoreScreen({ push }: Props) {
   // Store access
   const character = useRoleStore((s) => s.character);
   const analysis = useRoleStore((s) => s.analysis);
+  const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
   const addHighscoreEntry = useHighscoreStore((s) => s.addEntry);
   const top3ByDimension = useMirrorTop3();
   const selectedGoals = useDilemmaStore((s) => s.selectedGoals);
@@ -128,6 +129,10 @@ export default function FinalScoreScreen({ push }: Props) {
   const showBudget = useSettingsStore((s) => s.showBudget);
   const { playSfx } = useAudioManager();
   const logger = useLogger();
+  const roleBgStyle = useMemo(
+    () => bgStyleWithRoleImage(roleBackgroundImage),
+    [roleBackgroundImage]
+  );
 
   // Score persistence (prevents recalculation on revisit)
   const saveFinalScore = useDilemmaStore((s) => s.saveFinalScore);
@@ -497,7 +502,7 @@ export default function FinalScoreScreen({ push }: Props) {
   };
 
   return (
-    <div className="min-h-screen px-5 py-8" style={bgStyle}>
+    <div className="min-h-screen px-5 py-8" style={roleBgStyle}>
       <div className="w-full max-w-3xl mx-auto space-y-6">
         {/* Back button (conditional) */}
         {canGoBack && (

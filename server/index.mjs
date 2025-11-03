@@ -1532,7 +1532,7 @@ Examples of the cynical advisor voice:
 ❌ "Facilitate a consultative process engaging all stakeholders." (bureaucratic)
 ❌ "Respect individual autonomy by declining to intervene." (formal/boring)
 
-IMPORTANT: No numbers, no meta language, no bureaucratese. Sound like a sharp political advisor, not a policy memo.
+IMPORTANT: No numbers in action summaries or descriptions (save specific numbers for dynamic parameters only). No meta language, no bureaucratese. Sound like a sharp political advisor, not a policy memo.
 
 - Cost from {0, ±50, ±100, ±150, ±200, ±250} — typically negative unless it clearly earns income.
 
@@ -2727,8 +2727,10 @@ app.post("/api/game-turn", async (req, res) => {
       compassUpdate,
       gameContext, // Day 1 only: full game initialization data
       crisisMode, // Optional: crisis mode flag when support < 20%
+      crisisContext, // Optional: rich context about the crisis (NEW)
       totalDays: totalDaysInput,
-      daysLeft: daysLeftInput
+      daysLeft: daysLeftInput,
+      debugMode // Optional: enable verbose logging (from settingsStore.debugEnabled)
     } = req.body;
 
     const numericTotalDays = Number(totalDaysInput);
@@ -2792,6 +2794,19 @@ app.post("/api/game-turn", async (req, res) => {
       console.log(`[GAME-TURN] System prompt: ${systemPrompt.length} chars`);
       console.log(`[GAME-TURN] User prompt: ${userMessage.length} chars`);
 
+      // Debug mode: Show full prompts
+      if (debugMode) {
+        console.log("\n" + "=".repeat(80));
+        console.log("🐛 [DEBUG] Day 1 System Prompt:");
+        console.log("=".repeat(80));
+        console.log(systemPrompt);
+        console.log("\n" + "=".repeat(80));
+        console.log("🐛 [DEBUG] Day 1 User Message:");
+        console.log("=".repeat(80));
+        console.log(userMessage);
+        console.log("=".repeat(80) + "\n");
+      }
+
       // Store conversation with challenger seat info (messages will be stored after AI response)
       // challengerSeat stored for crisis mode prompt building on Day 2+
       const sanitizedThemes = Array.isArray(enrichedContext.storyThemes) && enrichedContext.storyThemes.length > 0
@@ -2807,7 +2822,8 @@ app.post("/api/game-turn", async (req, res) => {
         powerHolders: Array.isArray(enrichedContext.powerHolders) ? enrichedContext.powerHolders : [],
         roleName: enrichedContext.role || "Unknown Leader",
         systemName: enrichedContext.systemName || "Unknown System",
-        totalDays: safeTotalDays
+        totalDays: safeTotalDays,
+        compassTableProvided: false
       };
       storeConversation(gameId, "pending", "openai", conversationMeta);
 
@@ -2833,6 +2849,7 @@ app.post("/api/game-turn", async (req, res) => {
       messages = conversation.messages || [];
 
       const meta = conversation.meta || {};
+      const compassTableProvided = meta?.compassTableProvided === true;
       if (totalDaysForTurn === null) {
         totalDaysForTurn = Number(meta.totalDays) || 7;
       }
@@ -2889,7 +2906,9 @@ app.post("/api/game-turn", async (req, res) => {
             daysLeft: daysLeftForTurn,
             playerChoice,
             compassUpdate,
+            compassTableProvided,
             crisisMode,
+            crisisContext, // NEW: Rich crisis context from frontend
             challengerSeat,
             supportProfiles,
             roleScope,
@@ -2905,6 +2924,23 @@ app.post("/api/game-turn", async (req, res) => {
       console.log(`[GAME-TURN] Turn prompt: ${userMessage.length} chars`);
       if (crisisMode) {
         console.log(`[GAME-TURN] ⚠️ CRISIS MODE: ${crisisMode}`);
+        if (crisisContext) {
+          console.log(`[GAME-TURN] 📋 Crisis entity: ${crisisContext.entity}`);
+          console.log(`[GAME-TURN] 📉 Support: ${crisisContext.previousSupport || '?'}% → ${crisisContext.currentSupport || '?'}%`);
+        }
+      }
+
+      // Debug mode: Show full prompts for Day 2+
+      if (debugMode) {
+        console.log("\n" + "=".repeat(80));
+        console.log(`🐛 [DEBUG] Day ${day} Turn System Prompt:`);
+        console.log("=".repeat(80));
+        console.log(systemPrompt);
+        console.log("\n" + "=".repeat(80));
+        console.log(`🐛 [DEBUG] Day ${day} User Message:`);
+        console.log("=".repeat(80));
+        console.log(userMessage);
+        console.log("=".repeat(80) + "\n");
       }
     }
 
@@ -2928,6 +2964,15 @@ app.post("/api/game-turn", async (req, res) => {
         }
 
         console.log(`[GAME-TURN] ✅ AI responded: ${aiResponse.content.length} chars`);
+
+        // Debug mode: Show raw AI response
+        if (debugMode) {
+          console.log("\n" + "=".repeat(80));
+          console.log("🐛 [DEBUG] Raw AI Response:");
+          console.log("=".repeat(80));
+          console.log(aiResponse.content);
+          console.log("=".repeat(80) + "\n");
+        }
 
         // Check finish_reason for truncation
         if (aiResponse.finishReason && aiResponse.finishReason !== 'stop') {
@@ -3013,6 +3058,26 @@ app.post("/api/game-turn", async (req, res) => {
 
       // Success! Exit retry loop
       console.log(`[GAME-TURN] ✅ Attempt ${attempt} succeeded - valid response received`);
+
+      // Debug mode: Show parsed turn data with compass hints detail
+      if (debugMode && turnData) {
+        console.log("\n" + "=".repeat(80));
+        console.log("🐛 [DEBUG] Parsed Turn Data:");
+        console.log("=".repeat(80));
+        console.log(JSON.stringify(turnData, null, 2));
+
+        // Detailed compass hints logging
+        if (Array.isArray(turnData.compassHints) && turnData.compassHints.length > 0) {
+          console.log("\n🐛 [DEBUG] Compass Hints Detail:");
+          turnData.compassHints.forEach((hint, i) => {
+            console.log(`  ${i + 1}. prop="${hint.prop}", idx=${hint.idx}, polarity="${hint.polarity}", strength="${hint.strength}"`);
+          });
+        } else if (day > 1) {
+          console.log("\n🐛 [DEBUG] ⚠️ No compass hints returned (Day 2+ should have them)");
+        }
+        console.log("=".repeat(80) + "\n");
+      }
+
       break;
 
       } catch (e) {
@@ -3049,14 +3114,26 @@ app.post("/api/game-turn", async (req, res) => {
 
     // Update conversation store
     conversation = getConversation(gameId);
+    const updateMetaWithTurn = (meta) => {
+      if (!meta) return;
+      meta.lastDilemma = {
+        title: String(turnData.title || "").slice(0, 120),
+        description: String(turnData.description || "")
+      };
+      meta.compassTableProvided = true;
+    };
+
     if (conversation) {
       conversation.messages = messages;
+      updateMetaWithTurn(conversation.meta);
       touchConversation(gameId);
     } else {
       // First turn - store new conversation with messages
       storeConversation(gameId, JSON.stringify({messages}), "openai");
       const newConv = getConversation(gameId);
       newConv.messages = messages;
+      updateMetaWithTurn(newConv.meta);
+      touchConversation(gameId);
     }
 
     console.log(`[GAME-TURN] Conversation updated: ${messages.length} messages total`);
@@ -3099,6 +3176,62 @@ app.post("/api/game-turn", async (req, res) => {
     });
   }
 });
+
+const COMPASS_DEFINITION_BLOCK = `COMPASS VALUES QUICK REFERENCE
+
+WHAT (ultimate goals) – prop "what"
+ 0 Truth/Trust – facts out front, honest reporting
+ 1 Liberty/Agency – widen personal freedom or choice
+ 2 Equality/Equity – close unfair gaps, share burdens
+ 3 Care/Solidarity – protect the vulnerable, mutual aid
+ 4 Create/Courage – innovation, bold risks and vision
+ 5 Wellbeing – daily quality of life, health, morale
+ 6 Security/Safety – law, order, protection from harm
+ 7 Freedom/Responsibility – autonomy paired with accountability
+ 8 Honor/Sacrifice – principled stands that cost something
+ 9 Sacred/Awe – respect for the transcendent or revered
+
+WHENCE (justifications) – prop "whence"
+ 0 Evidence – data, audits, investigative proof
+ 1 Public Reason – arguments others find legitimate
+ 2 Personal – gut, conscience, first-hand duty
+ 3 Tradition – custom, elders, inherited norms
+ 4 Revelation – divine mandate, spiritual insight
+ 5 Nature – natural purpose, how things are meant to work
+ 6 Pragmatism – results-first, “does it work?”
+ 7 Aesthesis – aesthetic fit, harmony, the vibe check
+ 8 Fidelity – loyalty to allies, promises kept
+ 9 Law (Office) – procedures, rules, chain of authority
+
+HOW (means) – prop "how"
+ 0 Law/Std. – statutes, courts, regulations
+ 1 Deliberation – debate, negotiation, public forums
+ 2 Mobilize – protests, grassroots pressure, crowd power
+ 3 Markets – incentives, pricing, competition
+ 4 Mutual Aid – peer-to-peer help, community support
+ 5 Ritual – ceremony, symbolism, shared rites
+ 6 Enforce – policing, disciplined force, coercion
+ 7 Design/UX – nudges, defaults, experience design
+ 8 Civic Culture – media, education, storytelling
+ 9 Philanthropy – private resources funding causes
+
+WHITHER (recipients) – prop "whither"
+ 0 Self – personal benefit, self-preservation
+ 1 Family – households, kin, inner circle
+ 2 Friends – allies, loyal network
+ 3 In-Group – our faction, tribe, community
+ 4 Nation – citizens, flag, state apparatus
+ 5 Civiliz. – wider culture, region, bloc
+ 6 Humanity – everyone, universal scope
+ 7 Earth – planet, ecosystems, non-humans
+ 8 Cosmos – sentient life beyond Earth
+ 9 God – higher power, religious authority
+
+COMPASS HINT TASK
+- Read the player's most recent action and decide which values it clearly advances (positive) or undermines (negative).
+- Return 3‑4 compassHints referencing prop + idx from the table above.
+- Strength "strong" = direct embodiment or blatant violation; "weak" = secondary or modest effect.
+- Stay focused on THIS action; ignore earlier turns.`;
 
 /**
  * Helper: Build comprehensive system prompt for entire game
@@ -3195,12 +3328,35 @@ YOUR RESPONSIBILITIES:
 3. Provide mirror advice (1-2 sentences, dramatic sidekick personality - think Mushu/Genie)
 4. Identify compass effects from previous choice (Day 2+ only)
 5. Generate 1-3 dynamic parameters showing measurable consequences (Day 2+ only)
-   - Each parameter = ultra-concise outcome (4-6 words max)
-   - Examples: "GDP growth +2.3%", "800K jobs lost", "Approval rating 68%"
-   - Include relevant icon (TrendingUp/Down, Users, DollarSign, Shield, Heart, etc.)
+
+   🔢 NUMERICAL REQUIREMENT (MANDATORY - NEVER SKIP):
+   - EVERY parameter MUST contain a specific number, count, percentage, or measurable value
+   - NEVER use qualitative/abstract language without numbers
+   - Format: emoji + NUMBER + outcome (3-5 words TOTAL)
+
+   ✅ GOOD EXAMPLES (copy this pattern - all have numbers):
+   - "🔥 +47 buildings burned"
+   - "👥 3,000 protesters arrested"
+   - "📊 GDP +2.3%"
+   - "⚔️ 12,400 troops deployed"
+   - "💼 800K jobs lost"
+   - "🏥 15% hospitals overcapacity"
+   - "🎨 1,723 artworks rescued"
+
+   ❌ BAD EXAMPLES (NEVER generate these - no numbers):
+   - "trust declines" (abstract, no number)
+   - "protests gather" (vague, no number)
+   - "tightening demands" (qualitative, no number)
+   - "mood shifts" (abstract, no number)
+   - "tensions rise" (vague, no number)
+
+   REQUIREMENTS:
+   - Base on player's LAST ACTION and story context
+   - Choose contextually-appropriate emoji (vary each turn, avoid repeating)
    - Set tone: "up" (positive), "down" (negative), or "neutral"
-   - VARIETY: Show different aspects of the decision's impact (economic, social, political)
-   - AVOID: Generating the same parameter multiple times
+   - Rotate impact types: economic → social → political → cultural → military
+   - Can show escalating metrics across turns if relevant
+   - DO NOT include: support levels (shown separately), budget (shown separately)
 6. Maintain narrative continuity across all ${totalDays} days
 7. Align supportShift reasoning with the baseline attitudes above; explicitly cite how each faction's stance agrees or clashes with the player's previous action.
 8. Keep every situation framed within the player's mandate—if an issue is larger than their authority, focus on the slice they can actually influence.
@@ -3238,6 +3394,8 @@ STYLE & VOICE (ALWAYS APPLY):
 - Avoid passive policy-speak; prefer vivid verbs over abstract nouns.
 ${buildLightSystemPrompt()}
 
+${COMPASS_DEFINITION_BLOCK}
+
 OUTPUT FORMAT (JSON):
 {
   "title": "<60 chars, punchy situation title>",
@@ -3261,12 +3419,13 @@ OUTPUT FORMAT (JSON):
     "holders": {"delta": <-20 to +20>, "why": "<short reason naming stance>"}
   },
   "mirrorAdvice": "<1-2 sentences, dramatic sidekick giving advice on current situation>",
-  "dynamicParams": [  // Day 2+ only, 1-3 consequences of previous choice (VARY THE COUNT & CONTENT)
-    {"id": "param1", "icon": "TrendingUp", "text": "GDP growth +2.3%", "tone": "up"},
-    {"id": "param2", "icon": "Users", "text": "800K new jobs created", "tone": "up"},
-    {"id": "param3", "icon": "DollarSign", "text": "National debt +$12B", "tone": "down"}
-    // Generate 1-3 params showing DIFFERENT aspects of the decision's impact
-    // Use varied icons: TrendingUp/Down, Users, DollarSign, Shield, Heart, Zap, Building2, etc.
+  "dynamicParams": [  // Day 2+ only, 1-3 narrative consequences based on player's LAST ACTION
+    {"id": "param1", "icon": "🔥", "text": "+47 buildings burned", "tone": "down"}
+    // 🔢 MANDATORY: Every text field MUST contain a specific number/count/percentage!
+    // ✅ GOOD: "+47 buildings burned" | "GDP +2.3%" | "3,000 arrested" | "800K jobs lost"
+    // ❌ BAD: "trust declines" | "protests gather" | "tensions rise" (NO numbers!)
+    // Format: emoji + NUMBER + outcome (3-5 words total)
+    // Vary emoji each turn, base on player's last action
   ],
   "compassHints": [  // Day 2+ only, how previous choice affected compass
     {"prop": "what|whence|how|whither", "idx": <0-9>, "polarity": "positive|negative", "strength": "weak|strong"}
@@ -3375,7 +3534,9 @@ function buildTurnUserPrompt({
   daysLeft = null,
   playerChoice,
   compassUpdate,
+  compassTableProvided = true,
   crisisMode = null,
+  crisisContext = null, // NEW: Rich crisis context from frontend
   challengerSeat = null,
   supportProfiles = null,
   roleScope = null,
@@ -3390,8 +3551,12 @@ function buildTurnUserPrompt({
   prompt += `Cost: ${playerChoice.cost}\n\n`;
 
   if (compassUpdate) {
-    // Summarize compass changes (just mention they were updated)
-    prompt += `Player's compass values have been updated based on this choice.\n\n`;
+    prompt += `${COMPASS_DEFINITION_BLOCK}\n\n`;
+    prompt += `COMPASS INSTRUCTIONS: Map the player's most recent action to the values above.\n`;
+    prompt += `- Analyze THIS action only; ignore earlier decisions.\n`;
+    prompt += `- Return exactly three (3) or four (4) compassHints using prop + idx from the table.\n`;
+    prompt += `- Set polarity to "positive" when the action advances the value, "negative" when it harms it.\n`;
+    prompt += `- Choose strength "strong" for direct, central effects; use "weak" for secondary consequences.\n\n`;
   }
 
   if (roleScope) {
@@ -3426,7 +3591,85 @@ function buildTurnUserPrompt({
   prompt += `DELEGATION OPTION REMINDER: When believable, include one option that hands responsibility to an appropriate institution or ally instead of acting directly.\n\n`;
 
   // CRISIS MODE: Support level consequences
-  if (crisisMode) {
+  if (crisisMode && crisisContext) {
+    prompt += `🚨 CRISIS MODE: "${crisisMode}"\n`;
+    prompt += `⚠️ CRITICAL: Support level(s) dropped below 20% threshold!\n\n`;
+
+    // Use rich crisis context from frontend
+    if (crisisMode === "downfall") {
+      prompt += `**DOWNFALL CRISIS** (ALL three support tracks < 20%):\n`;
+      prompt += `- This is a TERMINAL CRISIS - the player's rule is collapsing\n`;
+      if (crisisContext.allSupport) {
+        prompt += `- People: ${crisisContext.allSupport.people.previous}% → ${crisisContext.allSupport.people.current}%\n`;
+        prompt += `- Power holders: ${crisisContext.allSupport.middle.previous}% → ${crisisContext.allSupport.middle.current}%\n`;
+        prompt += `- Personal anchor: ${crisisContext.allSupport.mom.previous}% → ${crisisContext.allSupport.mom.current}%\n`;
+      }
+      prompt += `- Generate a dramatic final scenario showing the consequences of total loss of support\n`;
+      prompt += `- The "dilemma" should be narrative-only (no actions) describing their downfall\n`;
+      prompt += `- In ${crisisContext.systemName}, total collapse manifests as: [generate system-specific consequence]\n`;
+      prompt += `- Set "isGameEnd": true in response\n`;
+      prompt += `- This is the END OF THE GAME - no Day ${day + 1}\n\n`;
+    } else if (crisisMode === "people") {
+      prompt += `**PEOPLE CRISIS** (${crisisContext.entity} support < 20%):\n`;
+      prompt += `- Support collapsed: ${crisisContext.previousSupport}% → ${crisisContext.currentSupport}%\n`;
+      if (crisisContext.triggeringAction) {
+        prompt += `- TRIGGER: Player chose "${crisisContext.triggeringAction.title}" - ${crisisContext.triggeringAction.summary}\n`;
+      }
+      if (crisisContext.entityProfile) {
+        prompt += `- WHO THEY ARE: ${crisisContext.entityProfile}\n`;
+      }
+      if (crisisContext.entityStances) {
+        prompt += `- THEIR GRIEVANCES:\n`;
+        for (const [issue, stance] of Object.entries(crisisContext.entityStances)) {
+          prompt += `  • ${issue}: ${stance}\n`;
+        }
+      }
+      prompt += `- In ${crisisContext.systemName} (${crisisContext.era}), public uprising manifests as: [generate concrete, system-specific consequence]\n`;
+      prompt += `- EXAMPLES: Mass protests filling the streets, general strike crippling the economy, violent riots targeting symbols of power\n`;
+      prompt += `- Generate a CONCRETE dilemma showing specific people taking specific actions\n`;
+      prompt += `- High stakes: How does the player respond to this specific uprising?\n\n`;
+    } else if (crisisMode === "challenger") {
+      const challengerName = crisisContext.challengerName || challengerSeat?.name || "the institutional opposition";
+      prompt += `**CHALLENGER CRISIS** (${challengerName} support < 20%):\n`;
+      prompt += `- Support collapsed: ${crisisContext.previousSupport}% → ${crisisContext.currentSupport}%\n`;
+      if (crisisContext.triggeringAction) {
+        prompt += `- TRIGGER: Player chose "${crisisContext.triggeringAction.title}" - ${crisisContext.triggeringAction.summary}\n`;
+      }
+      if (crisisContext.entityProfile) {
+        prompt += `- WHO THEY ARE: ${crisisContext.entityProfile}\n`;
+      }
+      if (crisisContext.entityStances) {
+        prompt += `- THEIR GRIEVANCES:\n`;
+        for (const [issue, stance] of Object.entries(crisisContext.entityStances)) {
+          prompt += `  • ${issue}: ${stance}\n`;
+        }
+      }
+      prompt += `- In ${crisisContext.systemName} (${crisisContext.era}), institutional retaliation manifests as: [generate concrete, system-specific consequence]\n`;
+      prompt += `- EXAMPLES: Coup attempt by military faction, parliament passing vote of no confidence, rival faction seizing key positions\n`;
+      prompt += `- Generate a CONCRETE dilemma showing ${challengerName} taking specific retaliatory action\n`;
+      prompt += `- High stakes: How does the player deal with this specific threat?\n\n`;
+    } else if (crisisMode === "caring") {
+      prompt += `**PERSONAL CRISIS** (${crisisContext.entity} support < 20%):\n`;
+      prompt += `- Support collapsed: ${crisisContext.previousSupport}% → ${crisisContext.currentSupport}%\n`;
+      if (crisisContext.triggeringAction) {
+        prompt += `- TRIGGER: Player chose "${crisisContext.triggeringAction.title}" - ${crisisContext.triggeringAction.summary}\n`;
+      }
+      if (crisisContext.entityProfile) {
+        prompt += `- WHO THEY ARE: ${crisisContext.entityProfile}\n`;
+      }
+      if (crisisContext.entityStances) {
+        prompt += `- WHAT THEY CARE ABOUT:\n`;
+        for (const [issue, stance] of Object.entries(crisisContext.entityStances)) {
+          prompt += `  • ${issue}: ${stance}\n`;
+        }
+      }
+      prompt += `- In ${crisisContext.systemName} (${crisisContext.era}), personal anchor crisis manifests as: [generate concrete, system-specific consequence]\n`;
+      prompt += `- EXAMPLES: Confidant threatens to leave, advisor publicly resigns, family member cuts contact\n`;
+      prompt += `- Generate a CONCRETE dilemma showing this person taking specific action\n`;
+      prompt += `- High stakes: Can the player maintain their humanity and this relationship?\n\n`;
+    }
+  } else if (crisisMode && !crisisContext) {
+    // Fallback to old generic prompts if no rich context provided
     prompt += `🚨 CRISIS MODE: "${crisisMode}"\n`;
     prompt += `⚠️ CRITICAL: Support level(s) dropped below 20% threshold!\n\n`;
 
@@ -3475,7 +3718,160 @@ Return complete JSON as specified in system prompt.`;
   } else {
     prompt += `TASK: Generate the next turn with ALL required data (dilemma + supportShift + mirrorAdvice + dynamicParams + compassHints).
 Return complete JSON as specified in system prompt.`;
-  }
+}
+
+function buildCompassDefinitionBlock() {
+  return `COMPASS VALUE DEFINITIONS (For compassHints generation):
+
+The player's political compass has 4 dimensions with 10 values each (40 total).
+When generating compassHints (Day 2+ only), use these exact idx values:
+
+WHAT (Ultimate goals) - prop: "what"
+  0: Truth/Trust - Believing facts, relying on honest sources
+     → Strengthened by: fact-based decisions, transparency, exposing lies
+     → Weakened by: deception, propaganda, covering up information
+  1: Liberty/Agency - Freedom to choose your own path
+     → Strengthened by: expanding freedoms, removing restrictions, empowering choice
+     → Weakened by: censorship, mandates, limiting personal autonomy
+  2: Equality/Equity - Fair chances and redress where needed
+     → Strengthened by: redistributive policies, anti-discrimination, leveling playing field
+     → Weakened by: favoring elites, widening inequality, discriminatory policies
+  3: Care/Solidarity - Looking after one another, no one left behind
+     → Strengthened by: welfare programs, community support, mutual aid
+     → Weakened by: cutting social services, individualism, abandoning vulnerable
+  4: Create/Courage - Bold making, risk-taking, innovation
+     → Strengthened by: supporting entrepreneurs, funding R&D, celebrating creativity
+     → Weakened by: stifling innovation, risk-averse policies, punishing failure
+  5: Wellbeing - Health, happiness, daily quality of life
+     → Strengthened by: healthcare access, work-life balance, improving living standards
+     → Weakened by: environmental harm, stress, declining health outcomes
+  6: Security/Safety - Protection from harm and chaos
+     → Strengthened by: law enforcement, defense spending, crime prevention
+     → Weakened by: violence, disorder, weakened security apparatus
+  7: Freedom/Responsibility - Power to choose & own consequences
+     → Strengthened by: responsible freedom, balanced rights/duties, civic participation
+     → Weakened by: avoiding accountability, paternalism, ceding responsibility
+  8: Honor/Sacrifice - Doing what's right even when it's hard
+     → Strengthened by: personal sacrifice, integrity, duty
+     → Weakened by: cowardice, betraying oaths, avoiding tough choices
+  9: Sacred/Awe - Reverence for higher ideals or the transcendent
+     → Strengthened by: honoring sacred spaces, rituals, spiritual experiences
+     → Weakened by: desecration, cynicism, reducing everything to material gain
+
+WHENCE (Justification) - prop: "whence"
+  0: Evidence - What the facts say
+     → Strengthened by: data, investigations, transparency, audits
+     → Weakened by: ignoring evidence, misinformation, secrecy
+  1: Public Reason - Reasons others could accept
+     → Strengthened by: debate, consensus, pluralism
+     → Weakened by: imposing sectarian logic, ignoring broader legitimacy
+  2: Personal - Gut, conscience, personal experience
+     → Strengthened by: personal conviction, duty, intuition
+     → Weakened by: betraying conscience, outsourcing moral judgment
+  3: Tradition - What the community/ancestors passed down
+     → Strengthened by: honoring customs, elders, heritage
+     → Weakened by: iconoclasm, rejecting traditions, erasing history
+  4: Revelation - Divine insight, spiritual truth
+     → Strengthened by: faith-based rationale, prophecy, scripture
+     → Weakened by: secularism, heresy, denying spiritual authority
+  5: Nature - Purpose, design, telos of a thing
+     → Strengthened by: aligning with natural order, moral "ought"
+     → Weakened by: artificiality, violating essence, technocracy
+  6: Pragmatism - If it works, it works
+     → Strengthened by: results, practical outcomes, utilitarian gains
+     → Weakened by: ideology over outcomes, inefficiency
+  7: Aesthesis - Beauty, harmony, vibe
+     → Strengthened by: elegance, fitting style, meaningful symbolism
+     → Weakened by: ugliness, discord, tastelessness
+  8: Fidelity - Loyalty to friends, groups, promises
+     → Strengthened by: tribal loyalty, keeping promises, standing by allies
+     → Weakened by: betrayal, breaking bonds, abandoning your people
+  9: Law (Office) - Because the rules are the rules
+     → Strengthened by: following procedures, respecting authority, legal compliance
+     → Weakened by: breaking laws, challenging authority, procedural violations
+
+HOW (Means to goals) - prop: "how"
+  0: Law/Std. - Using rulebook, regulations, courts, standards
+     → Strengthened by: new regulations, judicial action, standardization
+     → Weakened by: deregulation, bypassing legal process, ignoring rules
+  1: Deliberation - Talking it out till compromise or exhaustion
+     → Strengthened by: parliamentary debate, public forums, negotiation
+     → Weakened by: unilateral action, shutting down dialogue, forcing decisions
+  2: Mobilize - Getting people marching, organizing, making a scene
+     → Strengthened by: rallies, protests, grassroots organizing, public pressure
+     → Weakened by: suppressing dissent, banning assembly, demobilizing movements
+  3: Markets - Letting free market work via prices and incentives
+     → Strengthened by: privatization, market competition, price signals
+     → Weakened by: price controls, nationalization, market restrictions
+  4: Mutual Aid - Direct help, neighbors supporting neighbors
+     → Strengthened by: community organizing, peer support, voluntary cooperation
+     → Weakened by: institutionalizing support, top-down programs, breaking communities
+  5: Ritual - Power of ceremony, traditions, public holidays
+     → Strengthened by: state ceremonies, symbolic acts, ritualized practices
+     → Weakened by: abandoning ceremonies, profaning rituals, casual informality
+  6: Design/UX - Nudging behavior through design and defaults
+     → Strengthened by: behavioral economics, choice architecture, usability
+     → Weakened by: forcing choices, ignoring user experience, poor design
+  7: Enforce - Keeping peace with legal/ethical force
+     → Strengthened by: policing, military action, coercive compliance
+     → Weakened by: lawlessness, refusing to enforce, allowing violations
+  8: Civic Culture - Schools, media, stories shaping worldview
+     → Strengthened by: education reform, media campaigns, cultural narratives
+     → Weakened by: censorship, propaganda, cultural degradation
+  9: Philanthropy - Putting money/resources where your mouth is
+     → Strengthened by: charitable giving, endowments, private funding
+     → Weakened by: hoarding wealth, cutting donations, miserly behavior
+
+WHITHER (Recipients of goals) - prop: "whither"
+  0: Self - Looking out for number one
+     → Strengthened by: self-interest, personal gain, individualistic choices
+     → Weakened by: self-sacrifice, putting others first, altruism
+  1: Family - For nearest and dearest
+     → Strengthened by: family benefits, nepotism, protecting kin
+     → Weakened by: harming family, ignoring relatives, universal treatment
+  2: Friends - The family you choose, your ride-or-dies
+     → Strengthened by: cronyism, favoring allies, protecting friends
+     → Weakened by: betraying friends, treating everyone equally
+  3: In-Group - Your team, tribe, people (us vs them)
+     → Strengthened by: tribalism, in-group favoritism, protecting "our people"
+     → Weakened by: out-group favoritism, universalism, breaking tribal bonds
+  4: Nation - For flag and country, all passport-holders
+     → Strengthened by: nationalism, patriotic policies, putting country first
+     → Weakened by: internationalism, cosmopolitan values, ignoring national interest
+  5: Civiliz. - Broader cultural family (city to continent)
+     → Strengthened by: civilizational solidarity, cultural alliances, regional cooperation
+     → Weakened by: narrow nationalism, isolationism, cultural conflict
+  6: Humanity - For all people on the planet
+     → Strengthened by: universal human rights, humanitarian aid, global justice
+     → Weakened by: particularism, prioritizing some humans over others
+  7: Earth - For planet and all creatures
+     → Strengthened by: environmentalism, animal welfare, ecological protection
+     → Weakened by: environmental destruction, anthropocentrism, exploitation
+  8: Cosmos - For all sentient life wherever it may be
+     → Strengthened by: space exploration, universal ethics, cosmic consciousness
+     → Weakened by: Earth-chauvinism, narrow scope of moral concern
+  9: God - For higher power, ultimate authority
+     → Strengthened by: theocratic decisions, serving divine will, religious devotion
+     → Weakened by: secularism, defying religious authority, blasphemy
+
+COMPASS HINTS GUIDANCE:
+- Generate 2-4 compassHints per turn (Day 2+ only)
+- Focus on the most significant compass shifts from the player's previous action
+- Strength criteria:
+  * "weak" = indirect or minor effect on the value (delta ±1)
+  * "strong" = direct embodiment or violation of the value (delta ±2)
+- Examples:
+  * Player enforces curfew → {"prop": "what", "idx": 6, "polarity": "positive", "strength": "weak"}
+    (Weakly strengthens Security/Safety)
+  * Player releases political prisoners → {"prop": "what", "idx": 1, "polarity": "positive", "strength": "strong"}
+    (Strongly strengthens Liberty/Agency)
+  * Player censors critical media → {"prop": "what", "idx": 0, "polarity": "negative", "strength": "strong"}
+    (Strongly weakens Truth/Trust)
+  * Player increases welfare spending → {"prop": "what", "idx": 3, "polarity": "positive", "strength": "weak"}
+    (Weakly strengthens Care/Solidarity)
+- Quality over quantity: Better to have 2 highly relevant pills than 4 mediocre ones
+- Avoid generating the same compassHint repeatedly`;
+}
 
   return prompt;
 }

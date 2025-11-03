@@ -1,4 +1,7 @@
-import type { TickerItem } from "../components/event/NewsTicker";
+import type { ParameterItem } from "../components/event/DynamicParameters";
+
+// Legacy type alias for backward compatibility
+export type TickerItem = ParameterItem;
 
 export type NewsTickerRequest = {
   day: number;

@@ -478,7 +478,7 @@ const setDataCollectionEnabled = useSettingsStore((s) => s.setDataCollectionEnab
     onClick={async () => {
       const { dataCollectionEnabled } = useSettingsStore.getState();
 
-      if (dataCollectionEnabled) {
+      if (dataCollectionEnabled && !debugMode) {
         // Show ID collection modal
         setIsCollectingID(true);
         setShowIDModal(true);

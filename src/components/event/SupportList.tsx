@@ -152,21 +152,40 @@ function SupportCard({
   const showDelta = typeof delta === "number" && delta !== 0;
   const showTrend = trend === "up" || trend === "down";
   const showNote = !!note;
- // 25% threshold rule (reversible)
- const isLow = pctDisplay < 25;
+  // Crisis threshold (< 20%)
+  const CRISIS_THRESHOLD = 20;
+  const isCrisis = pctDisplay < CRISIS_THRESHOLD;
+  const isLow = pctDisplay < 25; // Warning threshold (yellow !)
+
   // Colored badge bg + white strokes
   const badgeBg = ICON_BADGE_BG[id] ?? "bg-white/20";
 
   return (
     <motion.div
-      className="rounded-xl bg-white/3 border border-white/5 text-white px-3 py-2.5"
+      className={[
+        "rounded-xl px-3 py-2.5 text-white",
+        isCrisis
+          ? "bg-red-500/15 border-2 border-red-500/60" // Crisis: red background + thicker red border
+          : "bg-white/3 border border-white/5" // Normal: subtle background + border
+      ].join(" ")}
       initial={{ opacity: 0, x: -30 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{
-        duration: 0.5,
-        delay: index * 0.2, // Stagger: 0s, 0.2s, 0.4s
-        ease: [0.25, 0.46, 0.45, 0.94] // easeOutQuart
-      }}
+      animate={
+        isCrisis
+          ? { opacity: [0.7, 1, 0.7], x: 0 } // Crisis: pulsing opacity + position
+          : { opacity: 1, x: 0 } // Normal: fade in once
+      }
+      transition={
+        isCrisis
+          ? {
+              opacity: { duration: 2, repeat: Infinity, ease: "easeInOut" }, // Continuous pulse
+              x: { duration: 0.5, delay: index * 0.2, ease: [0.25, 0.46, 0.45, 0.94] } // Initial slide-in
+            }
+          : {
+              duration: 0.5,
+              delay: index * 0.2, // Stagger: 0s, 0.2s, 0.4s
+              ease: [0.25, 0.46, 0.45, 0.94] // easeOutQuart
+            }
+      }
     >
       <div className="flex items-start">
         {/* Left icon badge — colored background + white lines */}
@@ -184,17 +203,22 @@ function SupportCard({
             {/* mood emoji (left of percent), tween-pop when bucket changes */}
             <MoodEmojiTween percent={pctDisplay} variant={moodVariant} />
 
-           {/* percent pill (animated) – size controlled by PERCENT_FONT_CLASS */}
-<span
-  className={[
-    PERCENT_FONT_CLASS,
-    "leading-none px-2 py-1 rounded-full bg-white/10 border border-white/15",
-    isLow ? "text-rose-300" : "text-white", // 25% rule
-  ].join(" ")}
->
-  {pctDisplay}%
-</span>
-{isLow && <span className="ml-1 text-yellow-300">!</span>}
+            {/* percent pill (animated) – size controlled by PERCENT_FONT_CLASS */}
+            <span
+              className={[
+                PERCENT_FONT_CLASS,
+                "leading-none px-2 py-1 rounded-full border font-semibold",
+                isCrisis
+                  ? "bg-red-500/25 border-red-400/60 text-red-200" // Crisis: bright red styling
+                  : isLow
+                  ? "bg-white/10 border-white/15 text-rose-300" // Warning: subtle red text
+                  : "bg-white/10 border-white/15 text-white", // Normal: white
+              ].join(" ")}
+            >
+              {pctDisplay}%
+            </span>
+            {isCrisis && <span className="ml-1 text-red-300 font-bold">⚠️</span>}
+            {!isCrisis && isLow && <span className="ml-1 text-yellow-300">!</span>}
 
 
             {/* delta pill (tween-pop, persists) – size controlled by DELTA_FONT_CLASS */}

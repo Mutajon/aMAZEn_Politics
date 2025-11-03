@@ -26,6 +26,7 @@ import AchievementsScreen from "./screens/AchievementsScreen";
 import MirrorScreen from "./screens/MirrorScreen";
 import AftermathScreen from "./screens/AftermathScreen";
 import FinalScoreScreen from "./screens/FinalScoreScreen";
+import DownfallScreen from "./screens/DownfallScreen";
 import AudioControls from "./components/AudioControls";
 import { useAudioManager } from "./hooks/useAudioManager";
 import { useSettingsStore } from "./store/settingsStore";
@@ -159,6 +160,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: any
         return <GoalsSelectionScreen push={push} />;
       })()}
       {route === "/event" && <EventScreen3 push={push} />}
+      {route === "/downfall" && <DownfallScreen push={push} />}
       {route.startsWith("/highscores") && <HighscoreScreen />}
       {route === "/achievements" && <AchievementsScreen />}
       {route === "/aftermath" && <AftermathScreen push={push} />}

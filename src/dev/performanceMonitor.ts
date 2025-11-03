@@ -33,7 +33,7 @@ export type EventScreenTiming = {
     step0?: number;        // ResourceBar
     step1?: number;        // SupportList
     step2?: number;        // Support Changes (Day 2+)
-    step3?: number;        // NewsTicker
+    step3?: number;        // DynamicParameters
     step4?: number;        // PlayerStatusStrip
     step5?: number;        // DilemmaCard
     step5A?: number;       // Compass Pills (Day 2+)

@@ -142,11 +142,23 @@ PORT=3001  # Auto-set by Render, override if needed
 - Policy domains: Economy, Security, Diplomacy, Rights, Infrastructure, Environment, Health, Education, Justice, Culture, Foreign Relations, Technology
 
 **Dynamic Parameters Generation:**
-- AI generates 1-3 unique measurable consequences per turn (Day 2+ only)
-- Each parameter: 4-6 words max, specific outcome with icon and tone
-- Examples: "GDP growth +2.3%", "800K jobs lost", "Approval rating 68%"
-- Variety enforced: Economic, social, political aspects shown
-- Bug fix (2025-01-27): Prompt now shows 1-3 diverse examples to prevent duplication
+- AI generates 1-3 narrative-driven measurable consequences per turn (Day 2+ only)
+- **Day 1:** Component is hidden (no parameters shown)
+- **Day 2+:** Shows 1-3 parameters based on previous action
+- Each parameter: 3-5 words total (including numbers) with single emoji character
+- **Emoji Selection:** AI freely chooses contextually-appropriate emoji (no preset list)
+  * Instructed to select different icons each turn
+  * Reviews previous turns to avoid repetition
+- **Phrasing Rules:**
+  * Crisp format: numbers + concrete nouns or past-tense verbs
+  * Examples: "GDP +2.3%", "47 buildings burned", "2.4M vaccinated"
+  * Anti-patterns: NO "reported", "announced", "discontented", "members", gerunds
+  * Focus on concrete, engaging outcomes (not boring admin details)
+- **Variety Enforcement:** AI rotates impact types (economic → social → political → cultural)
+- Can show escalating/evolving metrics across turns if relevant to ongoing story
+- Explicitly excludes support level changes (handled separately in SupportList UI)
+- **Display:** Static horizontal row with 1.5s fade-in animation, uniform light gray text
+- Component: `DynamicParameters.tsx` (refactored 2025-11-03)
 
 ### AI Endpoints
 
@@ -748,7 +760,7 @@ Benefits: Better React optimizations (memoization, selective re-renders), improv
 - Compass values: Top 3 per dimension only (not all 40)
 - Dilemma history: Last 2 days only (not full 7 days)
 - Mirror payload: Minimal context (top 2 values + current dilemma)
-- NewsTicker: Disabled by default (~800 tokens saved)
+- Satirical NewsTicker endpoint: Disabled by default (~800 tokens saved)
 
 ### Remaining Optimization Opportunities
 
