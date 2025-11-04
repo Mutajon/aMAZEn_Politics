@@ -19,6 +19,7 @@ import { COMPONENTS, type PropKey } from "../data/compass-data";
 import type { Dilemma } from "../lib/dilemma";
 import type { TickerItem } from "../components/event/NewsTicker";
 import { audioManager } from "../lib/audioManager";
+import { calculateLiveScoreBreakdown } from "../lib/scoring";
 
 // ============================================================================
 // TYPES
@@ -43,11 +44,18 @@ export type DynamicParam = {
   tone: "up" | "down" | "neutral";
 };
 
+export type CorruptionShift = {
+  delta: number;       // Change from previous turn
+  reason: string;      // AI's explanation
+  newLevel: number;    // Updated 0-100 level
+};
+
 // PHASE 1: Critical data - must load before showing anything
 export type Phase1Data = {
   dilemma: Dilemma;
   supportEffects: SupportEffect[] | null; // Included in dilemma response on Day 2+
   newsItems: TickerItem[]; // Empty array (disabled)
+  corruptionShift: CorruptionShift | null; // Included in dilemma response on Day 2+
 };
 
 // PHASE 2: Secondary data - loads in background while user reads
@@ -118,6 +126,18 @@ function topKWithNames(arr: number[] | undefined, prop: PropKey, k = 3): Array<{
  * Get top overall values across all compass dimensions
  * NO threshold filtering - just sort and take top K
  */
+async function waitForNarrativeMemory(timeoutMs = 4000, pollIntervalMs = 75) {
+  const deadline = Date.now() + timeoutMs;
+
+  let memory = useDilemmaStore.getState().narrativeMemory;
+  while (!memory && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+    memory = useDilemmaStore.getState().narrativeMemory;
+  }
+
+  return memory;
+}
+
 /**
  * UNIFIED GAME TURN API - Fetches ALL data in one call using hosted state
  *
@@ -132,6 +152,8 @@ function topKWithNames(arr: number[] | undefined, prop: PropKey, k = 3): Array<{
 async function fetchGameTurn(): Promise<{
   dilemma: Dilemma;
   supportEffects: SupportEffect[] | null;
+  newsItems: TickerItem[];
+  corruptionShift: CorruptionShift | null;
   compassPills: CompassPill[] | null;
   dynamicParams: DynamicParam[] | null;
   mirrorText: string;
@@ -175,6 +197,17 @@ async function fetchGameTurn(): Promise<{
     const roleState = useRoleStore.getState();
     const topWhatValues = getTop2WhatValues();
     const { dilemmasSubjectEnabled, dilemmasSubject } = useSettingsStore.getState();
+    let narrativeMemory = useDilemmaStore.getState().narrativeMemory;
+
+    if (!narrativeMemory) {
+      console.log("[fetchGameTurn] Narrative memory missing at Day 1 fetch. Waiting briefly...");
+      narrativeMemory = await waitForNarrativeMemory();
+      if (!narrativeMemory) {
+        console.warn("[fetchGameTurn] Narrative memory still unavailable. Proceeding without seeded thread guidance.");
+      } else {
+        console.log("[fetchGameTurn] Narrative memory acquired before Day 1 generation.");
+      }
+    }
 
     payload.gameContext = {
       role: roleState.selectedRole || "Unicorn King",
@@ -199,7 +232,8 @@ async function fetchGameTurn(): Promise<{
       daysLeft: totalDays - day + 1,
       thematicGuidance: dilemmasSubjectEnabled && dilemmasSubject
         ? `Focus on: ${dilemmasSubject}`
-        : null
+        : null,
+      narrativeMemory: narrativeMemory || null  // Dynamic Story Spine: Include if available
     };
   }
 
@@ -250,7 +284,7 @@ async function fetchGameTurn(): Promise<{
             p.name.toLowerCase().includes(challengerSeat?.name.toLowerCase() || "")
           )
         : null;
-      payload.crisisContext.entityProfile = challengerProfile?.summary || challengerSeat?.note || "Institutional opposition";
+      payload.crisisContext.entityProfile = challengerProfile?.summary || "Institutional opposition";
       payload.crisisContext.entityStances = challengerProfile?.stances || null;
       payload.crisisContext.currentSupport = supportMiddle;
       payload.crisisContext.previousSupport = previousSupportValues?.middle || supportMiddle;
@@ -291,7 +325,7 @@ async function fetchGameTurn(): Promise<{
   payload.daysLeft = totalDays - day + 1;
 
   // Pass debug mode setting to server for verbose logging
-  const debugMode = useSettingsStore.getState().debugEnabled;
+  const debugMode = useSettingsStore.getState().debugMode;
   payload.debugMode = debugMode;
 
   console.log(`[fetchGameTurn] Calling /api/game-turn for Day ${day}, gameId=${currentGameId}`);
@@ -431,6 +465,73 @@ async function fetchGameTurn(): Promise<{
     ];
   }
 
+  // Extract corruption shift (Day 2+ only, mirrors support pattern)
+  let corruptionShift: CorruptionShift | null = null;
+
+  if (data.corruptionShift && day > 1) {
+    const { savePreviousCorruption, setCorruptionLevel, corruptionHistory } =
+      useDilemmaStore.getState();
+
+    // STEP 0: Save previous value (for animation)
+    savePreviousCorruption();
+
+    // STEP 1: Apply new corruption level
+    const newLevel = Math.max(0, Math.min(100, Number(data.corruptionShift.newLevel) || 50));
+    setCorruptionLevel(newLevel);
+
+    // STEP 2: Store history entry
+    useDilemmaStore.setState({
+      corruptionHistory: [
+        ...corruptionHistory,
+        {
+          day,
+          score: Math.round(newLevel / 10), // Approximate reverse-calc
+          reason: data.corruptionShift.reason,
+          level: newLevel
+        }
+      ].slice(-3)  // Keep last 3
+    });
+
+    // STEP 3: Prepare for UI display
+    corruptionShift = {
+      delta: Number(data.corruptionShift.delta) || 0,
+      reason: String(data.corruptionShift.reason || '').slice(0, 150),
+      newLevel
+    };
+
+    // COMPREHENSIVE DEBUG LOGGING
+    console.log('[fetchGameTurn] 🔸 Corruption shift received:');
+    console.log(`   Delta: ${corruptionShift.delta >= 0 ? '+' : ''}${corruptionShift.delta.toFixed(2)}`);
+    console.log(`   New Level: ${corruptionShift.newLevel.toFixed(2)}`);
+    console.log(`   Reason: ${corruptionShift.reason}`);
+
+    if (debugMode) {
+      console.log(`   🐛 [DEBUG] Previous: ${useDilemmaStore.getState().previousCorruptionValue}`);
+      console.log(`   🐛 [DEBUG] Current: ${useDilemmaStore.getState().corruptionLevel}`);
+      console.log(`   🐛 [DEBUG] History: ${JSON.stringify(useDilemmaStore.getState().corruptionHistory)}`);
+    }
+  }
+
+  // Update live score once all resource values have been applied.
+  {
+    const {
+      supportPeople: latestPeople,
+      supportMiddle: latestMiddle,
+      supportMom: latestMom,
+      corruptionLevel: latestCorruption,
+      setScore,
+    } = useDilemmaStore.getState();
+
+    const breakdown = calculateLiveScoreBreakdown({
+      supportPeople: latestPeople,
+      supportMiddle: latestMiddle,
+      supportMom: latestMom,
+      corruptionLevel: latestCorruption,
+    });
+
+    setScore(breakdown.final);
+  }
+
   // Update subject streak
   if (data.topic) {
     updateSubjectStreak(data.topic);
@@ -452,6 +553,8 @@ async function fetchGameTurn(): Promise<{
   return {
     dilemma,
     supportEffects,
+    newsItems: [], // Empty array (disabled)
+    corruptionShift,
     compassPills,
     dynamicParams,
     mirrorText
@@ -486,19 +589,11 @@ function transformCompassHints(rawHints: any): CompassPill[] {
     const idx = Number(hint?.idx);
     if (!Number.isFinite(idx) || idx < 0 || idx > 9) continue;
 
-    const polarity = String(hint?.polarity || "").toLowerCase();
-    const strength = String(hint?.strength || "").toLowerCase();
+    // Accept numerical polarity directly from API
+    const polarity = Number(hint?.polarity);
+    if (![-2, -1, 1, 2].includes(polarity)) continue;
 
-    let delta = 0;
-    if (polarity === "positive") {
-      delta = strength === "strong" ? 2 : 1;
-    } else if (polarity === "negative") {
-      delta = strength === "strong" ? -2 : -1;
-    }
-
-    if (delta === 0) continue;
-
-    pills.push({ prop, idx, delta });
+    pills.push({ prop, idx, delta: polarity });
   }
 
   return pills;
@@ -737,7 +832,13 @@ export function useEventDataCollector() {
       const turnData = await fetchGameTurn();
 
       // Extract all data from unified response
-      const { dilemma, supportEffects, dynamicParams, mirrorText } = turnData;
+      const {
+        dilemma,
+        supportEffects,
+        dynamicParams,
+        mirrorText,
+        corruptionShift,
+      } = turnData;
 
       console.log(`[Collector] ✅ Unified data received for Day ${day}`);
 
@@ -745,7 +846,8 @@ export function useEventDataCollector() {
       const p1: Phase1Data = {
         dilemma,
         supportEffects,
-        newsItems: [] // Disabled
+        newsItems: [], // Disabled
+        corruptionShift: corruptionShift ?? null,
       };
 
       // Set Phase 1 data immediately - triggers UI render!
@@ -829,7 +931,8 @@ export function useEventDataCollector() {
     setPhase1Data({
       dilemma: data.dilemma,
       supportEffects: data.supportEffects,
-      newsItems: data.newsItems || []
+      newsItems: data.newsItems || [],
+      corruptionShift: data.corruptionShift || null
     });
 
     setPhase2Data({

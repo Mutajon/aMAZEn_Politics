@@ -41,6 +41,20 @@ type DilemmaState = {
   // Hosted state conversation tracking
   gameId: string | null;           // Unique ID for this playthrough (persists conversation)
   conversationActive: boolean;     // True when using hosted state API
+  narrativeMemory: {               // Dynamic Story Spine: Narrative scaffold for 7-day arc
+    threads: string[];
+    climaxCandidates: string[];
+    thematicEmphasis: {
+      coreConflict: string;
+      emotionalTone: string;
+      stakes: string;
+    };
+    threadDevelopment: Array<{
+      day: number;
+      thread: number | null;
+      summary: string;
+    }>;
+  } | null;
 
   current: Dilemma | null;
   history: Dilemma[];
@@ -103,6 +117,16 @@ type DilemmaState = {
     mom: number;
   } | null;
 
+  // Corruption tracking (mirrors crisis pattern)
+  corruptionLevel: number;                    // Current 0-100
+  previousCorruptionValue: number | null;     // For animation
+  corruptionHistory: Array<{
+    day: number;
+    score: number;      // AI's 0-10 judgment
+    reason: string;
+    level: number;      // Resulting 0-100 level
+  }>;
+
   loadNext: () => Promise<void>;
   nextDay: () => void;
   setTotalDays: (n: number) => void;
@@ -152,11 +176,17 @@ type DilemmaState = {
   // Hosted state conversation methods
   initializeGame: () => void;      // Generate gameId and prepare for new game
   endConversation: () => void;     // Cleanup after game ends
+  setNarrativeMemory: (memory: DilemmaState['narrativeMemory']) => void; // Store narrative scaffold
 
   // Crisis detection methods (NEW)
-  detectAndSetCrisis: () => void;  // Detect crisis after support updates
+  detectAndSetCrisis: () => "downfall" | "people" | "challenger" | "caring" | null;  // Detect crisis after support updates, returns crisis mode
   clearCrisis: () => void;          // Clear crisis state after handling
   savePreviousSupport: () => void;  // Store support values before updates
+
+  // Corruption tracking methods (mirrors support pattern)
+  setCorruptionLevel: (n: number) => void;
+  savePreviousCorruption: () => void;
+  clearCorruptionHistory: () => void;
 };
 
 // Type for goal status changes (used for audio/visual feedback)
@@ -176,6 +206,7 @@ export const useDilemmaStore = create<DilemmaState>()(
   // Hosted state conversation
   gameId: null,
   conversationActive: false,
+  narrativeMemory: null, // Will be populated during BackgroundIntroScreen
 
   current: null,
   history: [],
@@ -241,6 +272,11 @@ export const useDilemmaStore = create<DilemmaState>()(
   crisisMode: null,
   crisisEntity: null,
   previousSupportValues: null,
+
+  // Corruption tracking
+  corruptionLevel: 50,
+  previousCorruptionValue: null,
+  corruptionHistory: [],
 
   async loadNext() {
     // If something is already loading, bail early
@@ -368,6 +404,9 @@ export const useDilemmaStore = create<DilemmaState>()(
       crisisMode: null,
       crisisEntity: null,
       previousSupportValues: null,
+      corruptionLevel: 50,
+      previousCorruptionValue: null,
+      corruptionHistory: [],
     });
   },
 
@@ -695,6 +734,11 @@ export const useDilemmaStore = create<DilemmaState>()(
     });
   },
 
+  setNarrativeMemory(memory) {
+    dlog("setNarrativeMemory ->", memory);
+    set({ narrativeMemory: memory });
+  },
+
   // ========================================================================
   // CRISIS DETECTION METHODS
   // ========================================================================
@@ -765,6 +809,24 @@ export const useDilemmaStore = create<DilemmaState>()(
       crisisEntity: null,
       previousSupportValues: null
     });
+  },
+
+  // Corruption tracking methods (mirror support pattern)
+  setCorruptionLevel(n) {
+    const clamped = Math.max(0, Math.min(100, Number(n) || 50));
+    dlog("setCorruptionLevel:", clamped);
+    set({ corruptionLevel: clamped });
+  },
+
+  savePreviousCorruption() {
+    const { corruptionLevel } = get();
+    dlog("savePreviousCorruption:", corruptionLevel);
+    set({ previousCorruptionValue: corruptionLevel });
+  },
+
+  clearCorruptionHistory() {
+    dlog("clearCorruptionHistory");
+    set({ corruptionHistory: [] });
   },
     }),
     {

@@ -1,37 +1,25 @@
 // src/screens/FinalScoreScreen.tsx
-// Final score screen showing comprehensive score breakdown with animations
-//
-// Features:
-// - Cumulative progress bar (0 → final score)
-// - Category cards (Support, Budget, Ideology, Goals, Bonus, Difficulty)
-// - Animated counters revealing score sequentially
-// - Automatic highscore submission after animation
-// - Hall of Fame rank check (Top 20)
-// - Navigation to Play Again or Visit Hall of Fame
-//
-// Connected to:
-// - src/hooks/useScoreCalculation.ts: Calculates score breakdown
-// - src/lib/scoring.ts: Score formulas, types, and highscore helpers
-// - src/store/highscoreStore.ts: Automatic submission
-// - src/screens/AftermathScreen.tsx: Navigates here after epilogue
-// - src/screens/HighscoreScreen.tsx: Navigates here to view Hall of Fame
+// Simplified final score screen aligned with the live scoring schema.
+// Shows four animated components (People, Power Holders, Personal Anchor, Corruption)
+// followed by the total score, hall-of-fame handling, and end-of-run actions.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Users,
-  DollarSign,
-  Gauge,
-  Target,
-  Rocket,
+  Building2,
+  Heart,
+  ShieldCheck,
   Trophy,
+  RotateCcw,
+  ArrowRight,
 } from "lucide-react";
 import { bgStyleWithRoleImage } from "../lib/ui";
 import { useScoreCalculation } from "../hooks/useScoreCalculation";
 import {
-  formatRating,
   buildHighscoreEntry,
   type AftermathRating,
+  type ScoreBreakdown,
 } from "../lib/scoring";
 import {
   loadAftermathScreenSnapshot,
@@ -43,111 +31,146 @@ import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
 import { useHighscoreStore } from "../store/highscoreStore";
-import { useSettingsStore } from "../store/settingsStore";
+import { useRoleProgressStore } from "../store/roleProgressStore";
 import { useMirrorTop3 } from "../hooks/useMirrorTop3";
 import { useAudioManager } from "../hooks/useAudioManager";
 import { useLogger } from "../hooks/useLogger";
 import { loggingService } from "../lib/loggingService";
 import type { PushFn } from "../lib/router";
 import { useLang } from "../i18n/lang";
-import { translateDemocracyLevel } from "../i18n/translateGameData";
 
 type Props = {
   push: PushFn;
 };
 
-/**
- * Helper: Ease-out cubic for smooth counter animation
- */
+type CategoryKey = "people" | "middle" | "mom" | "corruption";
+
+type CategoryRenderInfo = {
+  key: CategoryKey;
+  label: string;
+  detail: string;
+  points: number;
+  maxPoints: number;
+  icon: React.ReactNode;
+};
+
 function easeNumber(from: number, to: number, t: number): number {
   const u = 1 - Math.pow(1 - t, 3);
   return from + (to - from) * u;
 }
 
-/**
- * Component: Dotted leader row (table of contents style)
- */
-function TocRow({
-  left,
-  right,
-}: {
-  left: React.ReactNode;
-  right: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-baseline gap-2 text-sm">
-      <span className="shrink-0 text-white/70">{left}</span>
-      <span className="flex-1 border-b border-dotted border-white/20" />
-      <span className="shrink-0 tabular-nums font-semibold text-white/90">
-        {right}
-      </span>
-    </div>
-  );
-}
-
-type CategoryPiece = {
-  key: string;
-  label: string;
-  value: number;
-  icon: React.ReactNode;
-  tint: string; // Tailwind background color
-};
-
-/**
- * Map difficulty IDs to display names (matches DifficultyScreen titles)
- */
-const difficultyDisplayMap = (lang: (key: string) => string): Record<string, string> => ({
-  "baby-boss": lang("FINAL_SCORE_DIFFICULTY_BABY_BOSS"),
-  "freshman": lang("FINAL_SCORE_DIFFICULTY_FRESHMAN"),
-  "tactician": lang("FINAL_SCORE_DIFFICULTY_TACTICIAN"),
-  "old-fox": lang("FINAL_SCORE_DIFFICULTY_OLD_FOX"),
+const formatNumber = new Intl.NumberFormat(undefined, {
+  maximumFractionDigits: 0,
 });
 
 export default function FinalScoreScreen({ push }: Props) {
   const lang = useLang();
-  
-  // Load aftermath ratings from snapshot (saved by AftermathScreen)
-  const [ratings, setRatings] = useState<{
-    liberalism: AftermathRating;
-    autonomy: AftermathRating;
-  } | null>(null);
+  const liveBreakdown = useScoreCalculation();
 
-  // Submission state (persistent to prevent duplicates on revisit)
+  const finalScoreCalculated = useDilemmaStore((s) => s.finalScoreCalculated);
+  const savedBreakdown = useDilemmaStore((s) => s.finalScoreBreakdown);
   const finalScoreSubmitted = useDilemmaStore((s) => s.finalScoreSubmitted);
   const markScoreSubmitted = useDilemmaStore((s) => s.markScoreSubmitted);
-  const [playerRank, setPlayerRank] = useState<number | null>(null);
-  const [isHallOfFame, setIsHallOfFame] = useState(false);
+  const saveFinalScore = useDilemmaStore((s) => s.saveFinalScore);
+  const clearFinalScore = useDilemmaStore((s) => s.clearFinalScore);
 
-  // Store access
   const character = useRoleStore((s) => s.character);
   const analysis = useRoleStore((s) => s.analysis);
   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
-  const addHighscoreEntry = useHighscoreStore((s) => s.addEntry);
-  const top3ByDimension = useMirrorTop3();
-  const selectedGoals = useDilemmaStore((s) => s.selectedGoals);
-  const enableModifiers = useSettingsStore((s) => s.enableModifiers);
-  const showBudget = useSettingsStore((s) => s.showBudget);
-  const { playSfx } = useAudioManager();
-  const logger = useLogger();
+  const selectedRoleKey = useRoleStore((s) => s.selectedRole);
   const roleBgStyle = useMemo(
     () => bgStyleWithRoleImage(roleBackgroundImage),
     [roleBackgroundImage]
   );
 
-  // Score persistence (prevents recalculation on revisit)
-  const saveFinalScore = useDilemmaStore((s) => s.saveFinalScore);
-  const finalScoreCalculated = useDilemmaStore((s) => s.finalScoreCalculated);
-  const savedBreakdown = useDilemmaStore((s) => s.finalScoreBreakdown);
+  const top3ByDimension = useMirrorTop3();
+  const addHighscoreEntry = useHighscoreStore((s) => s.addEntry);
+  const roleProgress = useRoleProgressStore((s) =>
+    selectedRoleKey ? s.goals[selectedRoleKey] ?? null : null
+  );
+  const setRoleGoalStatus = useRoleProgressStore((s) => s.setRoleGoalStatus);
+  const setRoleBestScore = useRoleProgressStore((s) => s.setRoleBestScore);
+  const { playSfx } = useAudioManager();
+  const logger = useLogger();
+  const breakdown: ScoreBreakdown =
+    finalScoreCalculated && savedBreakdown ? savedBreakdown : liveBreakdown;
 
-  // Check if we can navigate back to Aftermath
+  const midLabel =
+    analysis?.challengerSeat?.name || lang("FINAL_SCORE_POWER_HOLDERS_SUPPORT");
+
+  const sequence: CategoryRenderInfo[] = useMemo(
+    () => [
+      {
+        key: "people",
+        label: lang("FINAL_SCORE_PUBLIC_SUPPORT"),
+        detail: `${breakdown.support.people.percent}%`,
+        points: breakdown.support.people.points,
+        maxPoints: breakdown.support.people.maxPoints,
+        icon: <Users className="h-6 w-6" />,
+      },
+      {
+        key: "middle",
+        label: midLabel,
+        detail: `${breakdown.support.middle.percent}%`,
+        points: breakdown.support.middle.points,
+        maxPoints: breakdown.support.middle.maxPoints,
+        icon: <Building2 className="h-6 w-6" />,
+      },
+      {
+        key: "mom",
+        label: lang("FINAL_SCORE_MOM_SUPPORT"),
+        detail: `${breakdown.support.mom.percent}%`,
+        points: breakdown.support.mom.points,
+        maxPoints: breakdown.support.mom.maxPoints,
+        icon: <Heart className="h-6 w-6" />,
+      },
+      {
+        key: "corruption",
+        label: lang("FINAL_SCORE_CORRUPTION"),
+        detail: `${breakdown.corruption.normalizedLevel.toFixed(1)}/10`,
+        points: breakdown.corruption.points,
+        maxPoints: breakdown.corruption.maxPoints,
+        icon: <ShieldCheck className="h-6 w-6" />,
+      },
+    ],
+    [
+      breakdown.support.people.points,
+      breakdown.support.people.percent,
+      breakdown.support.middle.points,
+      breakdown.support.middle.percent,
+      breakdown.support.mom.points,
+      breakdown.support.mom.percent,
+      breakdown.corruption.points,
+      breakdown.corruption.normalizedLevel,
+      breakdown.corruption.maxPoints,
+      lang,
+      midLabel,
+    ]
+  );
+
+  const [displayValues, setDisplayValues] = useState<number[]>(
+    () => new Array(sequence.length + 1).fill(0)
+  );
+  const displayValuesRef = useRef(displayValues);
+  const [step, setStep] = useState(0);
+  const [running, setRunning] = useState(true);
+  const rafRef = useRef<number | null>(null);
+  const startTimeRef = useRef(0);
+
+  const [ratings, setRatings] = useState<{
+    liberalism: AftermathRating;
+    autonomy: AftermathRating;
+  } | null>(null);
+
+  const [playerRank, setPlayerRank] = useState<number | null>(null);
+  const [isHallOfFame, setIsHallOfFame] = useState(false);
+
   const canGoBack = hasAftermathScreenSnapshot();
 
-  // Auto-scroll to top on mount (user may have scrolled Aftermath before coming here)
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, []);
 
-  // Load aftermath ratings
   useEffect(() => {
     const snapshot = loadAftermathScreenSnapshot();
     if (snapshot?.data?.ratings) {
@@ -161,218 +184,101 @@ export default function FinalScoreScreen({ push }: Props) {
     }
   }, []);
 
-  // Calculate score breakdown (or use saved if available)
-  const freshBreakdown = useScoreCalculation({
-    liberalismRating: ratings?.liberalism,
-    autonomyRating: ratings?.autonomy,
-  });
-
-  // Use saved breakdown if score already calculated, otherwise use fresh
-  const breakdown = savedBreakdown && finalScoreCalculated ? savedBreakdown : freshBreakdown;
-
-  // Build category sequence for animation (4-5 categories depending on enableModifiers, final score bar added separately)
-  const sequence: CategoryPiece[] = useMemo(
-    () => {
-      const allCategories: CategoryPiece[] = [
-        {
-          key: "support",
-          label: lang("FINAL_SCORE_SUPPORT"),
-          value: breakdown.support.total,
-          icon: <Users className="h-5 w-5" />,
-          tint: "bg-blue-500/10",
-        },
-        {
-          key: "budget",
-          label: lang("FINAL_SCORE_BUDGET"),
-          value: breakdown.budget.points,
-          icon: <DollarSign className="h-5 w-5" />,
-          tint: "bg-emerald-500/10",
-        },
-        {
-          key: "ideology",
-          label: lang("FINAL_SCORE_IDEOLOGY"),
-          value: breakdown.ideology.total,
-          icon: <Gauge className="h-5 w-5" />,
-          tint: "bg-purple-500/10",
-        },
-        {
-          key: "goals",
-          label: lang("FINAL_SCORE_GOALS"),
-          value: breakdown.goals.total,
-          icon: <Target className="h-5 w-5" />,
-          tint: "bg-orange-500/10",
-        },
-        {
-          key: "difficulty",
-          label: lang("FINAL_SCORE_DIFFICULTY"),
-          value: breakdown.difficulty.points,
-          icon: <Rocket className="h-5 w-5" />,
-          tint: "bg-yellow-500/10",
-        },
-      ];
-
-      // Filter out categories based on settings
-      let filtered = allCategories;
-      // Filter budget if disabled
-      if (!showBudget) {
-        filtered = filtered.filter(c => c.key !== 'budget');
-      }
-      // Filter goals & difficulty if modifiers disabled
-      if (!enableModifiers) {
-        filtered = filtered.filter(c => c.key !== 'goals' && c.key !== 'difficulty');
-      }
-      return filtered;
-    },
-    [breakdown, enableModifiers, showBudget]
-  );
-
-  // Animation state (3-5 categories + 1 final score = 4-6 total steps, depending on enableModifiers)
-  const [step, setStep] = useState(0);
-  const [running, setRunning] = useState(true);
-  const [displayValues, setDisplayValues] = useState<number[]>(() =>
-    [...sequence.map(() => 0), 0] // N categories + final score
-  );
-  const [finalScoreDisplay, setFinalScoreDisplay] = useState(0);
-  const rafRef = useRef<number | null>(null);
-  const startTimeRef = useRef<number>(0);
-
-  // Refs for auto-scrolling category cards
-  const categoryRefs = useRef<(HTMLLIElement | null)[]>([]);
-  const finalScoreRef = useRef<HTMLDivElement | null>(null);
-
-  // Restore animation state if score already calculated (runs once on mount)
   useEffect(() => {
-    if (finalScoreCalculated && savedBreakdown && ratings) {
-      console.log("[FinalScoreScreen] Score already calculated - skipping animation");
-      // Jump to completed state immediately with saved values (sequence.length categories + final score)
-      // Build array matching current sequence (filtered by enableModifiers)
-      const categoryValues = sequence.map(piece => {
-        switch (piece.key) {
-          case 'support': return savedBreakdown.support.total;
-          case 'budget': return savedBreakdown.budget.points;
-          case 'ideology': return savedBreakdown.ideology.total;
-          case 'goals': return savedBreakdown.goals.total;
-          case 'difficulty': return savedBreakdown.difficulty.points;
-          default: return 0;
-        }
-      });
-      const finalSequence = [...categoryValues, savedBreakdown.final];
-      setDisplayValues(finalSequence);
-      setFinalScoreDisplay(savedBreakdown.final);
-      setStep(sequence.length + 1); // sequence.length categories + 1 final score
+    if (finalScoreCalculated && savedBreakdown) {
+      const values = sequence.map((item) => item.points);
+      setDisplayValues([...values, savedBreakdown.final]);
+      setStep(sequence.length + 1);
       setRunning(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
-
-  // Reset animation when breakdown changes (only if not restored)
-  useEffect(() => {
-    if (!finalScoreCalculated) {
+    } else {
+      setDisplayValues(new Array(sequence.length + 1).fill(0));
       setStep(0);
       setRunning(true);
-      setDisplayValues([...sequence.map(() => 0), 0]); // 5 categories + final score
-      setFinalScoreDisplay(0);
     }
-  }, [sequence, finalScoreCalculated]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sequence.length, finalScoreCalculated]);
 
-  // Calculate rank on mount if already submitted (for revisits after navigation)
   useEffect(() => {
-    if (finalScoreSubmitted && savedBreakdown && character && ratings && playerRank === null) {
-      console.log("[FinalScoreScreen] Already submitted - calculating rank on revisit");
-      const freshEntries = useHighscoreStore.getState().entries;
-      const rank = findPlayerRank(character.name, savedBreakdown.final, freshEntries);
-      console.log("[FinalScoreScreen] Recalculated rank on revisit:", rank);
-      setPlayerRank(rank);
-      setIsHallOfFame(rank > 0 && rank <= 20);
-    }
-  }, [finalScoreSubmitted, savedBreakdown, character, ratings, playerRank]);
+    displayValuesRef.current = displayValues;
+  }, [displayValues]);
 
-  // Auto-scroll to active category card
   useEffect(() => {
-    if (step >= 0 && step < sequence.length) {
-      // Steps 0-(N-1): category cards
-      const element = categoryRefs.current[step];
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    } else if (step === sequence.length) {
-      // Step N: final score bar
-      if (finalScoreRef.current) {
-        finalScoreRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    }
-  }, [step, sequence.length]);
+    if (!running || step > sequence.length) return;
 
-  // Animate current step
-  useEffect(() => {
-    if (!running || step > sequence.length) return; // N+1 steps total (0-N)
+    const isFinalStep = step === sequence.length;
+    const duration = isFinalStep ? 1200 : 900;
+    const target = isFinalStep ? breakdown.final : sequence[step].points;
+    const from =
+      displayValuesRef.current[isFinalStep ? sequence.length : step] ?? 0;
 
-    // Step N is the final score bar animation
-    if (step === sequence.length) {
-      // Play drumroll sound effect
-      playSfx('drumroll');
-
-      const duration = 1200;
-      const from = 0;
-      const to = breakdown.final;
-
-      const tick = (t: number) => {
-        if (startTimeRef.current === 0) startTimeRef.current = t;
-        const elapsed = t - startTimeRef.current;
-        const progress = Math.min(1, elapsed / duration);
-        const val = Math.round(easeNumber(from, to, progress));
-
-        setFinalScoreDisplay(val);
-        setDisplayValues((prev) => prev.map((v, i) => (i === sequence.length ? val : v)));
-
-        if (progress < 1) {
-          rafRef.current = requestAnimationFrame(tick);
-        } else {
-          startTimeRef.current = 0;
-          setRunning(false); // Animation complete
-          setTimeout(() => setStep((s) => s + 1), 200);
-        }
-      };
-
-      rafRef.current = requestAnimationFrame(tick);
-      return () => {
-        if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      };
+    if (isFinalStep) {
+      playSfx("drumroll");
     }
 
-    // Steps 0-4: category animations
-    const duration = 800;
-    const from = 0;
-    const to = sequence[step].value;
-
-    const tick = (t: number) => {
-      if (startTimeRef.current === 0) startTimeRef.current = t;
-      const elapsed = t - startTimeRef.current;
+    const tick = (timestamp: number) => {
+      if (startTimeRef.current === 0) startTimeRef.current = timestamp;
+      const elapsed = timestamp - startTimeRef.current;
       const progress = Math.min(1, elapsed / duration);
-      const val = Math.round(easeNumber(from, to, progress));
+      const value = Math.round(easeNumber(from, target, progress));
 
-      setDisplayValues((prev) => prev.map((v, i) => (i === step ? val : v)));
+      setDisplayValues((prev) => {
+        const next = [...prev];
+        next[isFinalStep ? sequence.length : step] = value;
+        return next;
+      });
 
       if (progress < 1) {
         rafRef.current = requestAnimationFrame(tick);
       } else {
         startTimeRef.current = 0;
-        setTimeout(() => setStep((s) => s + 1), 200);
+        requestAnimationFrame(() => setStep((prev) => prev + 1));
       }
     };
 
     rafRef.current = requestAnimationFrame(tick);
+
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [running, step, sequence, breakdown.final, playSfx]);
 
-  // On animation complete: submit to highscores (only once, tracked in persisted store)
+  useEffect(() => {
+    if (step === sequence.length + 1) {
+      setRunning(false);
+    }
+  }, [step, sequence.length]);
+
+  useEffect(() => {
+    if (step === sequence.length + 1 && !finalScoreCalculated) {
+      saveFinalScore(breakdown);
+    }
+  }, [step, sequence.length, finalScoreCalculated, saveFinalScore, breakdown]);
+
+  useEffect(() => {
+    if (step !== sequence.length + 1 || !selectedRoleKey || !roleProgress) {
+      return;
+    }
+
+    if (
+      breakdown.final >= roleProgress.goal &&
+      roleProgress.status !== "completed"
+    ) {
+      setRoleGoalStatus(selectedRoleKey, "completed");
+    }
+
+    setRoleBestScore(selectedRoleKey, breakdown.final);
+  }, [
+    step,
+    sequence.length,
+    selectedRoleKey,
+    roleProgress,
+    breakdown.final,
+    setRoleGoalStatus,
+    setRoleBestScore,
+  ]);
+
   useEffect(() => {
     if (step === sequence.length + 1 && !finalScoreSubmitted && ratings) {
-      console.log("[FinalScoreScreen] Animation complete - submitting to highscores");
-
-      // Submit to highscores (AUTOMATIC FOR ALL PLAYERS)
       const entry = buildHighscoreEntry(
         breakdown,
         character,
@@ -381,33 +287,24 @@ export default function FinalScoreScreen({ push }: Props) {
         top3ByDimension
       );
 
-      console.log("[FinalScoreScreen] Submitting highscore entry:", entry);
       addHighscoreEntry(entry);
-
-      // Mark as submitted in persistent store (prevents duplicates on revisit)
       markScoreSubmitted();
 
-      // Get FRESH entries from store after adding (hook value is stale)
       const freshEntries = useHighscoreStore.getState().entries;
       const rank = findPlayerRank(entry.name, breakdown.final, freshEntries);
-      console.log("[FinalScoreScreen] Player rank:", rank);
-      setPlayerRank(rank);
+      setPlayerRank(rank > 0 ? rank : null);
       setIsHallOfFame(rank > 0 && rank <= 20);
 
-      // End logging session (game complete)
       loggingService.endSession();
-      logger.log('game_completed', {
-        finalScore: breakdown.final,
-        rank: rank,
-        isHallOfFame: rank > 0 && rank <= 20,
-        scoreBreakdown: {
-          support: breakdown.support.total,
-          budget: breakdown.budget.points,
-          ideology: breakdown.ideology.total,
-          goals: breakdown.goals.total,
-          difficulty: breakdown.difficulty.points
-        }
-      }, `Game completed - Final score: ${breakdown.final}, Rank: ${rank}`);
+      logger.log(
+        "final_score_complete",
+        {
+          finalScore: breakdown.final,
+          rank,
+          isHallOfFame: rank > 0 && rank <= 20,
+        },
+        `Game completed - Final score: ${breakdown.final}, Rank: ${rank}`
+      );
     }
   }, [
     step,
@@ -423,394 +320,285 @@ export default function FinalScoreScreen({ push }: Props) {
     logger,
   ]);
 
-  // Save score to store after animation completes (prevents recalculation on revisit)
   useEffect(() => {
-    if (step === sequence.length + 1 && !finalScoreCalculated && breakdown && ratings) {
-      console.log("[FinalScoreScreen] Saving score to store (final score:", breakdown.final, ")");
-      saveFinalScore(breakdown);
+    if (finalScoreSubmitted && breakdown && character && playerRank === null) {
+      const entries = useHighscoreStore.getState().entries;
+      const rank = findPlayerRank(character.name, breakdown.final, entries);
+      setPlayerRank(rank > 0 ? rank : null);
+      setIsHallOfFame(rank > 0 && rank <= 20);
     }
-  }, [step, sequence.length, finalScoreCalculated, breakdown, ratings, saveFinalScore]);
+  }, [finalScoreSubmitted, breakdown, character, playerRank]);
 
-  // Helper: Find player rank in sorted highscores (takes entries as param to avoid stale closure)
-  function findPlayerRank(
-    playerName: string,
-    playerScore: number,
-    entries: ReturnType<typeof useHighscoreStore.getState>["entries"]
-  ): number {
-    // Highscores are already sorted by score (descending) by the store
-    const playerIndex = entries.findIndex(
-      (e) => e.name === playerName && e.score === playerScore
-    );
-    return playerIndex >= 0 ? playerIndex + 1 : -1; // 1-indexed
-  }
+  const scoreSummary = useMemo(
+    () => ({
+      total: breakdown.final,
+      maxTotal: breakdown.maxFinal,
+      components: sequence.map((item) => ({
+        key: item.key,
+        label: item.label,
+        detail: item.detail,
+        points: item.points,
+        maxPoints: item.maxPoints,
+      })),
+    }),
+    [breakdown.final, breakdown.maxFinal, sequence]
+  );
 
-  // User controls
-  const restart = () => {
-    console.log("[FinalScoreScreen] Restarting animation");
+  const handleReplayAnimation = () => {
+    clearFinalScore();
+    setDisplayValues(new Array(sequence.length + 1).fill(0));
     setStep(0);
     setRunning(true);
-    setDisplayValues([...sequence.map(() => 0), 0]); // 5 categories + final score
-    setFinalScoreDisplay(0);
     startTimeRef.current = 0;
-    // Clear saved score so animation can replay fully
-    if (finalScoreCalculated) {
-      useDilemmaStore.getState().clearFinalScore();
-    }
   };
 
-  // Skip function (not currently used in UI, but available for future)
-  // const skip = () => {
-  //   setRunning(false);
-  //   setDisplayValues(sequence.map((p) => p.value));
-  //   setStep(sequence.length);
-  // };
-
-  // Navigation handlers
   const handleBackToAftermath = () => {
-    logger.log('button_click_back_to_aftermath', {}, 'User clicked back to Aftermath');
-    // Navigate back to Aftermath (will restore from snapshot, no reload)
+    logger.log(
+      "button_click_back_to_aftermath",
+      {},
+      "User clicked back to Aftermath"
+    );
     push("/aftermath");
   };
 
   const handlePlayAgain = () => {
-    logger.log('button_click_play_again', {
-      previousScore: breakdown.final,
-      previousRank: playerRank
-    }, 'User clicked Play Again');
-
-    // Reset all stores for new game
+    logger.log(
+      "button_click_play_again",
+      {
+        previousScore: breakdown.final,
+        previousRank: playerRank,
+      },
+      "User clicked Play Again"
+    );
     useDilemmaStore.getState().reset();
     useRoleStore.getState().reset();
     useCompassStore.getState().reset();
-
-    // Clear all snapshots from sessionStorage
     clearAllSnapshots();
-
-    // Navigate to role selection (start new game)
     push("/role");
   };
 
   const handleVisitHallOfFame = () => {
-    logger.log('button_click_visit_hall_of_fame', {
-      playerScore: breakdown.final,
-      playerRank: playerRank
-    }, 'User clicked Visit Hall of Fame');
-
-    // Navigate to highscores with player name for highlighting
+    logger.log(
+      "button_click_visit_hall_of_fame",
+      {
+        playerScore: breakdown.final,
+        playerRank,
+      },
+      "User clicked Visit Hall of Fame"
+    );
     const playerName = character?.name || lang("FINAL_SCORE_UNKNOWN_LEADER");
     push(`/highscores?highlight=${encodeURIComponent(playerName)}`);
   };
 
+  const finalScoreDisplay = displayValues[sequence.length];
+
   return (
     <div className="min-h-screen px-5 py-8" style={roleBgStyle}>
       <div className="w-full max-w-3xl mx-auto space-y-6">
-        {/* Back button (conditional) */}
         {canGoBack && (
-          <div className="mb-4">
-            <button
-              onClick={handleBackToAftermath}
-              className="rounded-xl px-4 py-2 bg-white/10 hover:bg-white/20 text-white/90 transition-colors"
-            >
-              ← {lang("FINAL_SCORE_BACK_TO_AFTERMATH")}
-            </button>
-          </div>
+          <button
+            onClick={handleBackToAftermath}
+            className="rounded-xl px-4 py-2 bg-white/10 hover:bg-white/20 text-white/90 transition-colors"
+          >
+            ← {lang("FINAL_SCORE_BACK_TO_AFTERMATH")}
+          </button>
         )}
 
-        {/* Title */}
-        <h1 className="text-4xl font-extrabold text-center bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent mb-8">
-          {lang("FINAL_SCORE_TITLE")}
-        </h1>
+        <div className="text-center space-y-2">
+          <h1 className="text-4xl font-extrabold text-white">
+            {lang("FINAL_SCORE_TITLE")}
+          </h1>
+          <p className="text-white/70 text-sm">
+            {lang("FINAL_SCORE")} • {formatNumber.format(finalScoreDisplay)} /{" "}
+            {formatNumber.format(scoreSummary.maxTotal)}
+          </p>
+        </div>
 
-        {/* Category Cards */}
         <ul className="space-y-4">
-          {sequence.map((piece, idx) => (
-            <li
-              key={piece.key}
-              ref={(el) => {
-                categoryRefs.current[idx] = el;
-              }}
-            >
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: idx <= step ? 1 : 0.4, y: 0 }}
-                transition={{ duration: 0.25 }}
-                className={`rounded-xl border border-white/10 p-5 ${piece.tint} backdrop-blur-sm`}
-              >
-                {/* Category Header */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-full bg-white/10 p-2.5 text-white">
-                      {piece.icon}
-                    </div>
-                    <div className="font-semibold text-lg text-white">
-                      {piece.label}
-                    </div>
-                  </div>
-                  <div
-                    className={`text-2xl tabular-nums font-bold ${
-                      piece.key === "final" ? "text-amber-400" : "text-white"
-                    }`}
-                  >
-                    {piece.key === "final"
-                      ? displayValues[idx]
-                      : displayValues[idx] >= 0
-                      ? `+${displayValues[idx]}`
-                      : displayValues[idx]}
-                  </div>
-                </div>
-
-                {/* Category Breakdown */}
-                {piece.key === "support" && (
-                  <div className="space-y-2">
-                    <TocRow
-                      left={
-                        <span>
-                          {lang("FINAL_SCORE_PUBLIC_SUPPORT")}{" "}
-                          <span className="font-semibold">
-                            {breakdown.support.people > 0
-                              ? Math.round((breakdown.support.people / 600) * 100)
-                              : 0}
-                            %
-                          </span>
-                        </span>
-                      }
-                      right={<span>{breakdown.support.people}</span>}
-                    />
-                    <TocRow
-                      left={
-                        <span>
-                          {lang("FINAL_SCORE_POWER_HOLDERS_SUPPORT")}{" "}
-                          <span className="font-semibold">
-                            {breakdown.support.middle > 0
-                              ? Math.round((breakdown.support.middle / 600) * 100)
-                              : 0}
-                            %
-                          </span>
-                        </span>
-                      }
-                      right={<span>{breakdown.support.middle}</span>}
-                    />
-                    <TocRow
-                      left={
-                        <span>
-                          {lang("FINAL_SCORE_MOM_SUPPORT")}{" "}
-                          <span className="font-semibold">
-                            {breakdown.support.mom > 0
-                              ? Math.round((breakdown.support.mom / 600) * 100)
-                              : 0}
-                            %
-                          </span>
-                        </span>
-                      }
-                      right={<span>{breakdown.support.mom}</span>}
-                    />
-                  </div>
-                )}
-
-                {piece.key === "budget" && (
-                  <div className="space-y-2">
-                    <TocRow
-                      left={
-                        <span>
-                          {lang("FINAL_SCORE_BUDGET_LABEL")}{" "}
-                          <span className="font-semibold">
-                            {breakdown.budget.budgetAmount}
-                          </span>
-                        </span>
-                      }
-                      right={<span>{breakdown.budget.points}</span>}
-                    />
-                  </div>
-                )}
-
-                {piece.key === "ideology" && (
-                  <div className="space-y-2">
-                    <TocRow
-                      left={
-                        <span>
-                          {lang("FINAL_SCORE_LIBERALISM_LABEL")}{" "}
-                          <span className="font-semibold">
-                            {translateDemocracyLevel(formatRating(breakdown.ideology.liberalism.rating) as any, lang)}
-                          </span>
-                        </span>
-                      }
-                      right={<span>{breakdown.ideology.liberalism.points}</span>}
-                    />
-                    <TocRow
-                      left={
-                        <span>
-                          {lang("FINAL_SCORE_AUTONOMY_LABEL")}{" "}
-                          <span className="font-semibold">
-                            {translateDemocracyLevel(formatRating(breakdown.ideology.autonomy.rating) as any, lang)}
-                          </span>
-                        </span>
-                      }
-                      right={<span>{breakdown.ideology.autonomy.points}</span>}
-                    />
-                  </div>
-                )}
-
-                {piece.key === "goals" && (
-                  <div className="space-y-2">
-                    {selectedGoals.length > 0 ? (
-                      <>
-                        {/* Summary line: Only show if at least one goal completed */}
-                        {breakdown.goals.completed > 0 && (
-                          <TocRow
-                            left={
-                              <span>
-                                {lang("FINAL_SCORE_GOALS_COMPLETED")}{" "}
-                                <span className="font-semibold">
-                                  {breakdown.goals.completed} / 2
-                                </span>
-                              </span>
-                            }
-                            right={<span>{breakdown.goals.bonusPoints}</span>}
-                          />
-                        )}
-
-                        {/* Goal list: ALWAYS show with status icons */}
-                        {selectedGoals.map(goal => (
-                          <div key={goal.id} className="text-xs text-white/60 flex items-center gap-2 ml-4">
-                            <span>{goal.status === 'met' ? '✅' : goal.status === 'failed' ? '❌' : '⏳'}</span>
-                            <span className={goal.status === 'met' ? 'text-green-400' : goal.status === 'failed' ? 'text-red-400' : ''}>{goal.title}</span>
-                            {goal.status === 'met' && <span className="text-green-400">+{goal.scoreBonusOnCompletion}</span>}
-                          </div>
-                        ))}
-                      </>
-                    ) : (
-                      <div className="text-sm text-white/60 italic">
-                        {lang("FINAL_SCORE_NO_GOALS_SELECTED")}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {piece.key === "difficulty" && breakdown.difficulty.level && (
-                  <div className="space-y-2">
-                    <TocRow
-                      left={
-                        <span>
-                          {lang("FINAL_SCORE_LEVEL_LABEL")}{" "}
-                          <span className="font-semibold">
-                            {difficultyDisplayMap(lang)[breakdown.difficulty.level] || breakdown.difficulty.level}
-                          </span>
-                        </span>
-                      }
-                      right={
-                        <span
-                          className={
-                            breakdown.difficulty.points >= 0
-                              ? "text-green-400"
-                              : "text-red-400"
-                          }
-                        >
-                          {breakdown.difficulty.points >= 0
-                            ? `+${breakdown.difficulty.points}`
-                            : breakdown.difficulty.points}
-                        </span>
-                      }
-                    />
-                  </div>
-                )}
-              </motion.div>
+          {sequence.map((item, idx) => (
+            <li key={item.key}>
+              <CategoryCard
+                icon={item.icon}
+                label={item.label}
+                detail={item.detail}
+                points={displayValues[idx]}
+                target={item.points}
+                maxPoints={item.maxPoints}
+                active={running && step === idx}
+              />
             </li>
           ))}
         </ul>
 
-        {/* Final Score Bar (appears after all categories complete) */}
-        {step >= sequence.length && (
-          <motion.div
-            ref={finalScoreRef}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="bg-amber-500/10 backdrop-blur-sm border border-amber-400/30 rounded-xl p-6"
-          >
-            {/* Header with Trophy Icon */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className="rounded-full bg-amber-500/20 p-2.5 text-amber-400">
-                <Trophy className="h-6 w-6" />
+        <motion.div
+          layout
+          className="rounded-2xl border border-yellow-400/40 bg-yellow-500/15 backdrop-blur-sm p-5 text-yellow-100 shadow-lg"
+        >
+          <div className="flex items-center gap-3">
+            <Trophy className="h-8 w-8 text-yellow-300" />
+            <div>
+              <div className="text-xs uppercase tracking-wide text-yellow-200/70">
+                {lang("FINAL_SCORE")}
               </div>
-              <div className="font-bold text-2xl text-amber-400">
-                Final Score
+              <div className="text-3xl font-extrabold tabular-nums">
+                {formatNumber.format(finalScoreDisplay)}
               </div>
             </div>
+          </div>
+          <div className="mt-3 text-sm text-yellow-100/80">
+            {formatNumber.format(finalScoreDisplay)} /{" "}
+            {formatNumber.format(scoreSummary.maxTotal)}
+          </div>
+        </motion.div>
 
-            {/* Animated Progress Bar */}
-            <div className="relative h-12 w-full overflow-hidden rounded-xl bg-white/5 border border-white/10">
-              <motion.div
-                className="absolute left-0 top-0 h-full bg-gradient-to-r from-amber-400 to-amber-600"
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.round((Math.max(0, Math.min(3600, finalScoreDisplay)) / 3600) * 100)}%` }}
-                transition={{ type: "tween", duration: 0.3 }}
-              />
-              <div className="relative z-10 flex h-full items-center justify-center text-2xl font-bold tabular-nums text-white">
-                {finalScoreDisplay}
-              </div>
-            </div>
-
-            {/* Hall of Fame Status Message (appears below bar after animation) */}
-            {playerRank !== null && step === sequence.length + 1 && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5, duration: 0.4 }}
-                className="mt-4 text-center"
-              >
-                {isHallOfFame ? (
-                  <motion.div
-                    className="text-lg font-semibold text-amber-300"
-                    animate={{
-                      opacity: [1, 0.6, 1],
-                      scale: [1, 1.02, 1],
-                    }}
-                    transition={{
-                      duration: 1.5,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                  >
-                    🎉 {lang("FINAL_SCORE_HALL_OF_FAME_MESSAGE").replace("{rank}", playerRank.toString())}
-                  </motion.div>
-                ) : (
-                  <div className="text-lg text-white/70">
-                    {lang("FINAL_SCORE_NOT_HALL_OF_FAME_MESSAGE")}
-                  </div>
-                )}
-              </motion.div>
-            )}
-          </motion.div>
+        {playerRank && (
+          <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/15 p-4 text-emerald-100 shadow">
+            {isHallOfFame
+              ? lang("FINAL_SCORE_HALL_OF_FAME_MESSAGE").replace(
+                  "{rank}",
+                  String(playerRank)
+                )
+              : lang("FINAL_SCORE_NOT_HALL_OF_FAME_MESSAGE")}
+          </div>
         )}
 
-        {/* Navigation Buttons */}
-        <div className="space-y-3 pt-4">
-          <div className="flex gap-3">
-            <button
-              onClick={handlePlayAgain}
-              className="flex-1 px-6 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-amber-500/50"
-            >
-              ↻ {lang("FINAL_SCORE_PLAY_AGAIN")}
-            </button>
-            <button
-              onClick={handleVisitHallOfFame}
-              className="flex-1 px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold rounded-xl transition-all"
-            >
-              🏆 {lang("FINAL_SCORE_VISIT_HALL_OF_FAME")}
-            </button>
-          </div>
+        <ScoreDetailsPanel summary={scoreSummary} />
 
-          {/* Small replay link */}
-          <div className="text-center">
-            <button
-              onClick={restart}
-              className="text-sm text-white/60 hover:text-white/90 underline"
-            >
-              {lang("FINAL_SCORE_REPLAY_ANIMATION")}
-            </button>
-          </div>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={handleReplayAnimation}
+            className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-white/80 hover:bg-white/20 transition"
+            disabled={running}
+          >
+            <RotateCcw className="h-4 w-4" />
+            {lang("FINAL_SCORE_REPLAY_ANIMATION")}
+          </button>
+          <button
+            onClick={handlePlayAgain}
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-400 px-4 py-2 font-semibold text-white shadow-lg hover:from-amber-400 hover:to-orange-300 transition"
+          >
+            <ArrowRight className="h-4 w-4" />
+            {lang("FINAL_SCORE_PLAY_AGAIN")}
+          </button>
+          <button
+            onClick={handleVisitHallOfFame}
+            className="inline-flex items-center gap-2 rounded-xl border border-white/25 px-4 py-2 text-white/80 hover:bg-white/15 transition"
+          >
+            {lang("FINAL_SCORE_VISIT_HALL_OF_FAME")}
+          </button>
         </div>
       </div>
     </div>
   );
+}
+
+function CategoryCard({
+  icon,
+  label,
+  detail,
+  points,
+  target,
+  maxPoints,
+  active,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  detail: string;
+  points: number;
+  target: number;
+  maxPoints: number;
+  active: boolean;
+}) {
+  const progress = Math.min(1, target === 0 ? 0 : points / maxPoints);
+  return (
+    <motion.div
+      layout
+      className={[
+        "rounded-2xl border border-white/10 bg-white/10 backdrop-blur-sm p-4 shadow",
+        active ? "ring-2 ring-white/30" : "",
+      ].join(" ")}
+    >
+      <div className="flex items-center gap-3">
+        <div className="rounded-xl bg-white/15 p-3 text-white">{icon}</div>
+        <div className="flex-1">
+          <div className="text-base font-semibold text-white">{label}</div>
+          <div className="text-xs text-white/60">{detail}</div>
+        </div>
+        <div className="text-right">
+          <div className="text-xl font-bold tabular-nums text-white">
+            {formatNumber.format(points)}
+          </div>
+          <div className="text-xs text-white/50">
+            / {formatNumber.format(maxPoints)}
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 h-2 w-full rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-amber-300 via-amber-200 to-yellow-200 transition-all"
+          style={{ width: `${Math.max(4, progress * 100)}%` }}
+        />
+      </div>
+    </motion.div>
+  );
+}
+
+function ScoreDetailsPanel({
+  summary,
+}: {
+  summary: {
+    total: number;
+    maxTotal: number;
+    components: Array<{
+      key: CategoryKey;
+      label: string;
+      detail: string;
+      points: number;
+      maxPoints: number;
+    }>;
+  };
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-5 backdrop-blur-sm text-white shadow-lg">
+      <div className="text-sm uppercase tracking-wide text-white/50 mb-3">
+        Score breakdown
+      </div>
+      <ul className="space-y-2 text-sm">
+        {summary.components.map((item) => (
+          <li key={item.key} className="flex items-center justify-between gap-3">
+            <div>
+              <div className="font-semibold text-white">{item.label}</div>
+              <div className="text-xs text-white/60">{item.detail}</div>
+            </div>
+            <div className="text-right">
+              <div className="tabular-nums font-semibold text-white">
+                {formatNumber.format(item.points)} pts
+              </div>
+              <div className="text-xs text-white/50">
+                / {formatNumber.format(item.maxPoints)}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-4 flex items-center justify-between text-sm text-white/70 border-t border-white/10 pt-3">
+        <span>Total</span>
+        <span className="tabular-nums font-semibold text-white">
+          {formatNumber.format(summary.total)} /{" "}
+          {formatNumber.format(summary.maxTotal)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function findPlayerRank(
+  playerName: string,
+  playerScore: number,
+  entries: ReturnType<typeof useHighscoreStore.getState>["entries"]
+): number {
+  const playerIndex = entries.findIndex(
+    (entry) => entry.name === playerName && entry.score === playerScore
+  );
+  return playerIndex >= 0 ? playerIndex + 1 : -1;
 }

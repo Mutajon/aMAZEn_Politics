@@ -8,8 +8,9 @@ import { validateRoleStrict, AIConnectionError } from "../lib/validation";
 import { useRoleStore } from "../store/roleStore";
 import { useLogger } from "../hooks/useLogger";
 import { useLang } from "../i18n/lang";
-import { PREDEFINED_ROLES_ARRAY, getRoleImagePaths } from "../data/predefinedRoles";
+import { PREDEFINED_ROLES_ARRAY, getRoleImagePaths, type RoleGoalStatus } from "../data/predefinedRoles";
 import { useSettingsStore } from "../store/settingsStore";
+import { useRoleProgressStore } from "../store/roleProgressStore";
 
 type RoleItem = {
   key: string; // Unique key for the role (matches predefinedPowerDistributions keys)
@@ -21,6 +22,9 @@ type RoleItem = {
   bannerImage?: string; // Banner image path (small, shown when collapsed)
   fullImage?: string; // Full image path (large, shown when expanded)
   suggest?: boolean; // Flag for "Suggest your own" button
+  scoreGoal: number;
+  goalStatus: RoleGoalStatus;
+  highScore: number;
 };
 
 export default function RoleSelectionScreen({ push }: { push: PushFn }) {
@@ -34,6 +38,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const setRoleScope = useRoleStore(s => s.setRoleScope);
   const setStoryThemes = useRoleStore(s => s.setStoryThemes);
   const debugMode = useSettingsStore(s => s.debugMode);
+  const roleGoals = useRoleProgressStore((s) => s.goals);
 
   // Generate roles array dynamically from centralized database
   const roles: RoleItem[] = PREDEFINED_ROLES_ARRAY.map((roleData) => {
@@ -47,6 +52,9 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
       youAre: lang(roleData.youAreKey),    // Translated at runtime
       bannerImage: images.banner,
       fullImage: images.full,
+      scoreGoal: roleData.scoreGoal,
+      goalStatus: roleGoals[roleData.legacyKey]?.status ?? roleData.defaultGoalStatus,
+      highScore: roleGoals[roleData.legacyKey]?.bestScore ?? roleData.defaultHighScore,
     };
   });
 
@@ -207,8 +215,30 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
         </h2>
 
         <motion.div variants={container} initial="hidden" animate="show" className="mt-6 space-y-3">
-          {roles.map((role) => (
-            <motion.div key={role.key} variants={itemVariants} data-role-card>
+          {roles.map((role) => {
+            const statusCompleted = role.goalStatus === "completed";
+            const statusLabel = lang(statusCompleted ? "ROLE_GOAL_COMPLETED" : "ROLE_GOAL_UNCOMPLETED");
+            const statusClasses = statusCompleted
+              ? "bg-gradient-to-r from-emerald-400/40 via-emerald-500/40 to-emerald-400/40 text-emerald-100 border border-emerald-300/40 shadow-[0_0_8px_rgba(16,185,129,0.25)]"
+              : "bg-slate-800/60 text-slate-300 border border-slate-600/60";
+            const goalColorClass = (() => {
+              switch (role.scoreGoal) {
+                case 1200:
+                  return "text-white";
+                case 1500:
+                  return "text-yellow-200";
+                case 1800:
+                  return "text-orange-200";
+                case 2000:
+                  return "text-rose-200";
+                default:
+                  return "text-white";
+              }
+            })();
+            const highScoreDisplay = role.highScore > 0 ? role.highScore.toLocaleString() : "-";
+
+            return (
+              <motion.div key={role.key} variants={itemVariants} data-role-card>
               {/* Golden frame wrapper that contains both title and expanded content */}
               <div className={`rounded-2xl overflow-hidden shadow-xl transition-all duration-300 ${
                 expandedRole === role.key
@@ -247,7 +277,19 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                     </AnimatePresence>
                   )}
 
-                  <span className="text-sm text-amber-300 font-light tracking-wider drop-shadow-md">{role.year}</span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-[10px] uppercase tracking-wider text-amber-300/80">{lang("ROLE_YEAR_LABEL")}</span>
+                    <span className="text-sm text-amber-300 font-light tracking-wider drop-shadow-md">{role.year}</span>
+                    <span
+                      className={[
+                        "text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full",
+                        "font-medium transition-colors duration-200",
+                        statusClasses,
+                      ].join(" ")}
+                    >
+                      {statusLabel}
+                    </span>
+                  </div>
                 </button>
 
                 {/* Expandable content with black semi-transparent background */}
@@ -278,6 +320,18 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                                     <span className="font-semibold text-amber-300">You are:</span>{" "}
                                     <span className="text-white/90">{role.youAre}</span>
                                   </p>
+                                </div>
+
+                                <div className="flex flex-col items-center gap-1 text-xs text-center">
+                                  <span className="uppercase tracking-wide font-semibold text-purple-300">
+                                    {lang("ROLE_GOAL_TARGET_LABEL")}
+                                  </span>
+                                  <span className={["font-semibold text-lg", goalColorClass, "drop-shadow-sm"].join(" ")}>
+                                    {role.scoreGoal.toLocaleString()}
+                                  </span>
+                                  <span className="text-[11px] text-white/60 font-medium">
+                                    {lang("ROLE_CURRENT_HIGH_SCORE_LABEL")}: {highScoreDisplay}
+                                  </span>
                                 </div>
                               </div>
 
@@ -315,8 +369,9 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                   )}
                 </AnimatePresence>
               </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
 
           {/* Suggest your own button */}
           <motion.div variants={itemVariants}>

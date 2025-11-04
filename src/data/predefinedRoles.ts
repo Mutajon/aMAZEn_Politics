@@ -6,6 +6,8 @@
 import type { AnalysisResult } from "../store/roleStore";
 import { ROLE_SUPPORT_PROFILES } from "./supportProfiles";
 
+export type RoleGoalStatus = "uncompleted" | "completed";
+
 /**
  * Character data with i18n keys for name and prompt
  */
@@ -39,6 +41,9 @@ export interface PredefinedRoleData {
   storyThemes: string[];               // Core thematic axes or domains to explore
   powerDistribution: AnalysisResult;   // Complete E-12 political system analysis
   characters: RoleCharacters;          // Character name options (male/female/any)
+  scoreGoal: number;                   // Target score to mark role as completed
+  defaultGoalStatus: RoleGoalStatus;   // Initial completion status
+  defaultHighScore: number;            // Baseline high score (persisted separately)
 }
 
 /**
@@ -57,6 +62,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "greece",
     roleScope: "Acts as a respected citizen on the oligarch-controlled civic council, influencing local decrees and relief efforts but never commanding the Spartan garrison.",
     storyThemes: ["autonomy_vs_heteronomy", "liberalism_vs_totalism", "reconciliation"],
+    scoreGoal: 1200,
+    defaultGoalStatus: "uncompleted",
+    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Hard-Power Oligarchy — Stratocracy",
       systemDesc: "Military-backed oligarchy: Spartan garrison with local rulers set rules; courts muted, citizens sidelined.",
@@ -152,6 +160,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "alexandria",
     roleScope: "Serves as a city scholar-advisor mediating between palace factions and Roman commanders; can sway civic policy, archives, and urban defenses but not direct legions.",
     storyThemes: ["cultural_survival", "foreign_domination", "knowledge_vs_power"],
+    scoreGoal: 1200,
+    defaultGoalStatus: "uncompleted",
+    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Autocratizing (Military)",
       systemDesc: "Under siege, the foreign general and local army overrule the court; force sets terms, others adapt.",
@@ -247,6 +258,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "florence",
     roleScope: "Sits on Florence's Great Council, balancing guild and patrician interests; can propose civic edicts, policing orders, and cultural protections but cannot command Papal or French armies.",
     storyThemes: ["faith_vs_freedom", "economic_stability", "civic_identity"],
+    scoreGoal: 1200,
+    defaultGoalStatus: "uncompleted",
+    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Mental-Might Oligarchy — Theocracy",
       systemDesc: "Wide-vote republic led by a strong preacher; laws and diplomacy follow sermons and public piety.",
@@ -342,6 +356,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "northAmerica",
     roleScope: "Leads a tribal council overseeing diplomacy, land stewardship, and trade terms; can mobilize scouts and negotiate boundaries but does not unilaterally declare war without consensus.",
     storyThemes: ["territorial_autonomy", "cultural_preservation", "exchange_vs_exploitation"],
+    scoreGoal: 1500,
+    defaultGoalStatus: "uncompleted",
+    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Personalist Monarchy / Autocracy",
       systemDesc: "Single paramount chief directs war, trade, and justice; councils advise, but his word usually decides.",
@@ -437,6 +454,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "japan",
     roleScope: "Heads a mid-level samurai clan caught between warring coalitions; can commit retainers, negotiate allegiances, and manage village protections but cannot dictate national strategy.",
     storyThemes: ["loyalty_vs_survival", "clan_honor", "centralization"],
+    scoreGoal: 1500,
+    defaultGoalStatus: "uncompleted",
+    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Hard-Power Oligarchy — Stratocracy",
       systemDesc: "Warlord coalitions rule by force; law follows the armies, not councils.",
@@ -532,6 +552,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "haiti",
     roleScope: "Acts as a plantation overseer-turned-liaison among rebel factions; can influence local militia deployments, justice for captives, and resource distribution but cannot dictate colony-wide treaties.",
     storyThemes: ["emancipation", "justice_vs_vengeance", "unity_vs_fragmentation"],
+    scoreGoal: 1500,
+    defaultGoalStatus: "uncompleted",
+    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Hard-Power Oligarchy — Stratocracy",
       systemDesc: "Warring armed factions decide outcomes; civil authority is weak.",
@@ -627,6 +650,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "russia",
     roleScope: "Embattled Tsar managing imperial decrees, military appointments, and court negotiations; can reshuffle ministers, issue manifestos, or seek truces but cannot personally command every garrison simultaneously.",
     storyThemes: ["autocracy_vs_revolution", "bread_land_peace", "loyalty_crisis"],
+    scoreGoal: 1800,
+    defaultGoalStatus: "uncompleted",
+    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Personalist Monarchy / Autocracy",
       systemDesc: "Tsar rules personally; army compliance and urban revolt now decide what sticks.",
@@ -722,6 +748,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "india",
     roleScope: "District officer coordinating police, relief, and political liaisons along the partition line; manages curfews, convoys, and investigations but cannot redraw national borders.",
     storyThemes: ["communal_trust", "order_vs_liberty", "refugee_protection"],
+    scoreGoal: 1800,
+    defaultGoalStatus: "uncompleted",
+    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Hard-Power Oligarchy — Stratocracy",
       systemDesc: "Armed forces and communal leaders shape rules; administrators improvise to contain violence amid state breakdown.",
@@ -817,6 +846,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "southAfrica",
     roleScope: "Senior police commander overseeing citywide operations during the transition; can set deployment protocols, liaise with reform negotiators, and manage crowd-control policy but cannot pass national laws.",
     storyThemes: ["justice_vs_amnesty", "public_safety", "institutional_trust"],
+    scoreGoal: 1800,
+    defaultGoalStatus: "uncompleted",
+    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Autocratizing (Executive)",
       systemDesc: "Late-apartheid South Africa: executive-led minority rule with strong security forces and rising mass opposition.",
@@ -912,6 +944,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "mars",
     roleScope: "Elected Mars colony governor balancing survival systems and autonomy petitions; can adjust habitat policy, rationing, and negotiations with Earth but cannot conjure unlimited supplies.",
     storyThemes: ["autonomy_vs_dependency", "survival_ethics", "science_vs_populism"],
+    scoreGoal: 2000,
+    defaultGoalStatus: "uncompleted",
+    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Mental-Might Oligarchy — Technocracy",
       systemDesc: "Engineers and safety rules steer decisions; an elected governor balances Earth supply leverage and local freedoms.",

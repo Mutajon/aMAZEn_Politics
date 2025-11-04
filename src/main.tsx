@@ -79,6 +79,30 @@ const useStrict = import.meta.env.MODE !== "development";
   }
 };
 
+// Corruption tracking toggle commands
+(window as any).enableCorruption = () => {
+  useSettingsStore.getState().setCorruptionTrackingEnabled(true);
+  console.log('✅ Corruption tracking enabled immediately (no refresh needed).');
+  console.log('🔸 Features: Corruption pills appear on Day 2+, AI judges power misuse');
+  console.log('💡 Corruption level tracked internally (0-100 scale)');
+};
+
+(window as any).disableCorruption = () => {
+  useSettingsStore.getState().setCorruptionTrackingEnabled(false);
+  console.log('❌ Corruption tracking disabled immediately (no refresh needed).');
+};
+
+(window as any).toggleCorruption = () => {
+  const current = useSettingsStore.getState().corruptionTrackingEnabled;
+  useSettingsStore.getState().setCorruptionTrackingEnabled(!current);
+  if (!current) {
+    console.log('✅ Corruption tracking enabled immediately (no refresh needed).');
+    console.log('🔸 Features: Corruption pills appear on Day 2+, AI judges power misuse');
+  } else {
+    console.log('❌ Corruption tracking disabled immediately (no refresh needed).');
+  }
+};
+
 // Log available commands
 console.log("🎮 Available console commands:");
 console.log("  switchToClaude()          - Use Anthropic Claude (configured in .env)");
@@ -89,6 +113,9 @@ console.log("  toggleDebug()             - Toggle debug mode on/off");
 console.log("  skipPreviousContext()     - Skip Day 2+ context (diagnose AI failures)");
 console.log("  includePreviousContext()  - Include Day 2+ context (normal behavior)");
 console.log("  togglePreviousContext()   - Toggle previous context on/off");
+console.log("  enableCorruption()        - Enable corruption tracking (AI judges power misuse)");
+console.log("  disableCorruption()       - Disable corruption tracking");
+console.log("  toggleCorruption()        - Toggle corruption tracking on/off");
 // ----------------------------------------------------------------
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

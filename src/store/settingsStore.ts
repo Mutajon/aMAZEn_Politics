@@ -70,6 +70,11 @@ type SettingsState = {
   dataCollectionEnabled: boolean;
   setDataCollectionEnabled: (v: boolean) => void;
   toggleDataCollectionEnabled: () => void;
+
+  // --- NEW: Corruption tracking (default OFF) ---
+  corruptionTrackingEnabled: boolean;
+  setCorruptionTrackingEnabled: (v: boolean) => void;
+  toggleCorruptionTrackingEnabled: () => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -143,10 +148,15 @@ export const useSettingsStore = create<SettingsState>()(
       dataCollectionEnabled: false,
       setDataCollectionEnabled: (v) => set({ dataCollectionEnabled: v }),
       toggleDataCollectionEnabled: () => set({ dataCollectionEnabled: !get().dataCollectionEnabled }),
+
+      // NEW: Corruption tracking (default OFF)
+      corruptionTrackingEnabled: false,
+      setCorruptionTrackingEnabled: (v) => set({ corruptionTrackingEnabled: v }),
+      toggleCorruptionTrackingEnabled: () => set({ corruptionTrackingEnabled: !get().corruptionTrackingEnabled }),
     }),
     {
       // Bump key so no stale objects hide the new fields
-      name: "settings-v13",
+      name: "settings-v14",
       partialize: (s) => ({
         generateImages: s.generateImages,
         narrationEnabled: s.narrationEnabled,
@@ -164,6 +174,7 @@ export const useSettingsStore = create<SettingsState>()(
         sfxVolume: s.sfxVolume,
         skipPreviousContext: s.skipPreviousContext,
         dataCollectionEnabled: s.dataCollectionEnabled,
+        corruptionTrackingEnabled: s.corruptionTrackingEnabled,
       }),
     }
   )
