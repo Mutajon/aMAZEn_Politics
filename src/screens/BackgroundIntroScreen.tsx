@@ -17,6 +17,7 @@ import { COMPONENTS } from "../data/compass-data";
  * Phases:
  *  - "preparingDefault" : fetch & buffer TTS for the default line
  *  - "idle"             : default text visible; Wake up available
+ *  - "waitingForSeed"   : waiting for narrative seeding to complete
  *  - "loading"          : calling OpenAI for paragraph
  *  - "preparingIntro"   : buffering TTS for generated paragraph
  *  - "ready" / "error"  : show paragraph + Begin
@@ -24,7 +25,7 @@ import { COMPONENTS } from "../data/compass-data";
  * We start audio exactly on the fade-in animation by using onAnimationStart.
  */
 
-type Phase = "preparingDefault" | "idle" | "loading" | "preparingIntro" | "ready" | "error";
+type Phase = "preparingDefault" | "idle" | "waitingForSeed" | "loading" | "preparingIntro" | "ready" | "error";
 
 export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
   const lang = useLang();
@@ -214,7 +215,7 @@ useEffect(() => {
         if (!compassStore.values || !compassStore.values[dimension]) return [];
         const entries = Object.entries(compassStore.values[dimension])
           .map(([idx, value]) => ({
-            componentName: COMPONENTS[dimension][parseInt(idx, 10)].name,
+            componentName: COMPONENTS[dimension][parseInt(idx, 10)].short,
             value,
             dimension
           }))
@@ -281,8 +282,8 @@ useEffect(() => {
   };
 }, [defaultNarrationComplete]);
 
-  // 2) Wake up → fade out, then load paragraph
-  const onWake = async () => {
+  // 2) Wake up → immediately transition to waitingForSeed phase
+  const onWake = () => {
     // Log player clicking "Wake up" button
     logger.log('button_click_wake_up', 'Wake up', 'User clicked Wake up button');
 
@@ -294,23 +295,36 @@ useEffect(() => {
       prefetchAbortRef.current = null;
     }
 
-    if (seedPromiseRef.current) {
-      console.log("[BackgroundIntro] Wake pressed while narrative seed in flight — waiting to finish...");
-      try {
-        await seedPromiseRef.current;
-        console.log("[BackgroundIntro] Narrative seed resolved during wake transition.");
-      } catch (e: any) {
-        console.warn("[BackgroundIntro] Narrative seed wait during wake hit error:", e?.message || e);
-      }
-    }
-
-    if (bgReadyRef.current && preparedIntroRef.current && para.trim()) {
-      setPhase("ready");
-    } else {
-      setPhase("loading");
-    }
+    // Immediately show loading state - the useEffect will handle the wait
+    setPhase("waitingForSeed");
   };
-  
+
+  // 2.5) When in waitingForSeed phase, wait for narrative seeding to complete
+  useEffect(() => {
+    if (phase !== "waitingForSeed") return;
+
+    (async () => {
+      // Wait for narrative seeding if still in flight
+      if (seedPromiseRef.current) {
+        console.log("[BackgroundIntro] Waiting for narrative seed to complete...");
+        try {
+          await seedPromiseRef.current;
+          console.log("[BackgroundIntro] Narrative seed resolved.");
+        } catch (e: any) {
+          console.warn("[BackgroundIntro] Narrative seed wait hit error:", e?.message || e);
+        }
+      }
+
+      // After seed completes, transition to appropriate phase
+      if (bgReadyRef.current && preparedIntroRef.current && para.trim()) {
+        console.log("[BackgroundIntro] Intro paragraph ready from prefetch");
+        setPhase("ready");
+      } else {
+        console.log("[BackgroundIntro] Need to fetch intro paragraph");
+        setPhase("loading");
+      }
+    })();
+  }, [phase, para]);
 
   // 3) When loading, call the server for the paragraph
   useEffect(() => {
@@ -486,7 +500,31 @@ useEffect(() => {
           )}
         </AnimatePresence>
 
-        {/* Stage B: loading indicator ---------------------------------------------- */}
+        {/* Stage B: waiting for narrative seeding ---------------------------------- */}
+        <AnimatePresence mode="wait">
+          {phase === "waitingForSeed" && (
+            <motion.div
+              key="waitingForSeed"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25 }}
+              className="mt-4"
+            >
+              <h2 className="text-lg font-medium text-white/80">
+                Weaving the narrative…
+              </h2>
+              <div className="mt-4 flex items-center gap-3 text-white/70">
+                <div className="h-5 w-5 rounded-full border-2 border-white/30 border-t-white animate-spin" aria-hidden />
+                <span>
+                  Preparing your story arc…
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Stage C: loading indicator ---------------------------------------------- */}
         <AnimatePresence mode="wait">
           {(phase === "loading" || phase === "preparingIntro") && (
             <motion.div
@@ -512,7 +550,7 @@ useEffect(() => {
           )}
         </AnimatePresence>
 
-        {/* Stage C: result (or error) --------------------------------------------- */}
+        {/* Stage D: result (or error) --------------------------------------------- */}
         {(phase === "ready" || phase === "error") && (
           <motion.div
             key="result"

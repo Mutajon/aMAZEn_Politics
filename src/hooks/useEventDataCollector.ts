@@ -493,8 +493,12 @@ async function fetchGameTurn(): Promise<{
     });
 
     // STEP 3: Prepare for UI display
+    // Recalculate delta from store values (don't trust API value)
+    const previousValue = useDilemmaStore.getState().previousCorruptionValue || 0;
+    const calculatedDelta = newLevel - previousValue;
+
     corruptionShift = {
-      delta: Number(data.corruptionShift.delta) || 0,
+      delta: calculatedDelta,
       reason: String(data.corruptionShift.reason || '').slice(0, 150),
       newLevel
     };

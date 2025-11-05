@@ -1,8 +1,8 @@
 // src/components/event/ResourceBar.tsx
-// Restored visuals + animated budget counter + anchor for coin flights + player avatar + goals display
+// Restored visuals + animated budget counter + anchor for coin flights + goals display
 
-import React, { useMemo, useState } from "react";
-import { Hourglass, Coins, Trophy, User } from "lucide-react";
+import React, { useState } from "react";
+import { Hourglass, Coins, Trophy } from "lucide-react";
 import GoalsCompact from "./GoalsCompact";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useLang } from "../../i18n/lang";
@@ -24,7 +24,6 @@ type Props = {
   daysLeft: number;
   budget: number;
   showBudget?: boolean; // defaults to true
-  avatarSrc?: string | null;
   score: number;
   scoreGoal?: number | null;
   goalStatus?: RoleGoalStatus;
@@ -35,7 +34,6 @@ export default function ResourceBar({
   daysLeft,
   budget,
   showBudget = true,
-  avatarSrc,
   score,
   scoreGoal = null,
   goalStatus = "uncompleted",
@@ -109,17 +107,6 @@ export default function ResourceBar({
     };
   }, [score]);
 
-  // --- Avatar URL normalization (from PlayerStatusStrip) ---
-  const [imgError, setImgError] = useState(false);
-
-  const resolvedSrc = useMemo(() => {
-    const src = (avatarSrc || "").trim();
-    if (!src) return "";
-    if (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("data:")) return src;
-    if (src.startsWith("/")) return src;
-    return `/${src}`;
-  }, [avatarSrc]);
-
   const normalizedGoal = typeof scoreGoal === "number" && Number.isFinite(scoreGoal) ? scoreGoal : null;
   const statusValueText = lang(goalStatus === "completed" ? "ROLE_GOAL_COMPLETED" : "ROLE_GOAL_UNCOMPLETED");
   const statusLabelText = lang("ROLE_GOAL_STATUS_LABEL");
@@ -170,30 +157,6 @@ export default function ResourceBar({
 
       {/* Goals Section (only if modifiers enabled) */}
       {enableModifiers && <GoalsCompact />}
-
-      {/* Avatar */}
-      <div
-        className="shrink-0 rounded-xl overflow-hidden ring-1 ring-white/15 bg-white/5"
-        style={{ width: 100, height: 100, minWidth: 100 }}
-        aria-label="Player portrait"
-        title={resolvedSrc || undefined}
-      >
-        {resolvedSrc && !imgError ? (
-          <img
-            src={resolvedSrc}
-            alt="Player"
-            className="w-full h-full object-cover"
-            width={100}
-            height={100}
-            loading="lazy"
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <User className="w-8 h-8 text-white/80" strokeWidth={2.2} />
-          </div>
-        )}
-      </div>
     </div>
   );
 }
@@ -309,10 +272,6 @@ function ScorePill({
     : goalMet
       ? "text-emerald-300"
       : "text-rose-300";
-  const scoreDisplay = goal === null
-    ? formatPoints(score)
-    : `${formatPoints(score)} — ${formatPoints(goal)}`;
-
   return (
     <div
       className="relative z-[70]"
@@ -323,16 +282,25 @@ function ScorePill({
         icon={<Trophy className="w-4 h-4" />}
         label="Score"
         value={
-          <span className={[
-            "tabular-nums font-semibold",
-            scoreColorClass,
-          ].join(" ")}>
-            {scoreDisplay}
-          </span>
+          <div className="flex items-baseline justify-end gap-1">
+            <span
+              className={[
+                "tabular-nums font-semibold text-xl leading-none", // bigger number
+                scoreColorClass,
+              ].join(" ")}
+            >
+              {formatPoints(score)}
+            </span>
+            {goal !== null && (
+              <span className="tabular-nums text-sm text-white/60 leading-none">
+                / {formatPoints(goal)}
+              </span>
+            )}
+          </div>
         }
         iconBgClass="bg-violet-500/25"
         iconTextClass="text-violet-200"
-        width={140}
+        width={180}
         bgClass="bg-[rgba(76,29,149,0.25)] border border-violet-400/40"
         onClick={(event) => {
           event.stopPropagation();

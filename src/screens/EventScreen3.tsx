@@ -23,7 +23,7 @@ import ResourceBar, { type ResourceBarScoreDetails } from "../components/event/R
 import SupportList from "../components/event/SupportList";
 import { DynamicParameters, buildDynamicParamsItems } from "../components/event/DynamicParameters";
 import DilemmaCard from "../components/event/DilemmaCard";
-import MirrorCard from "../components/event/MirrorCard";
+import MirrorWithAvatar from "../components/event/MirrorWithAvatar";
 import CompassPillsOverlay from "../components/event/CompassPillsOverlay";
 import CorruptionPill from "../components/event/CorruptionPill";
 import ActionDeck, { type ActionCard } from "../components/event/ActionDeck";
@@ -583,13 +583,12 @@ export default function EventScreen3({ push }: Props) {
         )}
 
         <div className="max-w-3xl mx-auto space-y-3">
-          {/* Step 0+: ResourceBar (always visible) with avatar */}
+          {/* Step 0+: ResourceBar (always visible) */}
           {presentationStep >= 0 && (
             <ResourceBar
               budget={budget}
               daysLeft={daysLeft}
               showBudget={showBudget}
-              avatarSrc={character?.avatarUrl || null}
               scoreGoal={roleProgress?.goal ?? null}
               goalStatus={roleProgress?.status ?? "uncompleted"}
               score={score}
@@ -646,11 +645,12 @@ export default function EventScreen3({ push }: Props) {
             </>
           )}
 
-          {/* Step 5+: MirrorCard with Compass Pills Overlay (skip if game end) */}
+          {/* Step 5+: MirrorWithAvatar with Compass Pills Overlay (skip if game end) */}
           {!isGameEnd && presentationStep >= 5 && collectedData && (
             <div className="relative">
-              <MirrorCard
+              <MirrorWithAvatar
                 text={collectedData.mirrorText}
+                avatarSrc={character?.avatarUrl || null}
                 // onExploreClick temporarily removed - navigation bugs prevent safe return to EventScreen
               />
               {/* Compass Pills Overlay - appears at Step 4A (Day 2+) */}

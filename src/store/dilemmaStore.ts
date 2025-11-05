@@ -273,8 +273,8 @@ export const useDilemmaStore = create<DilemmaState>()(
   crisisEntity: null,
   previousSupportValues: null,
 
-  // Corruption tracking
-  corruptionLevel: 50,
+  // Corruption tracking (start clean, increases only with corrupt actions)
+  corruptionLevel: 0,
   previousCorruptionValue: null,
   corruptionHistory: [],
 

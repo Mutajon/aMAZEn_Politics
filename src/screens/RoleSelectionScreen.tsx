@@ -34,6 +34,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const setAnalysis = useRoleStore(s => s.setAnalysis);
   const setRoleBackgroundImage = useRoleStore(s => s.setRoleBackgroundImage);
   const setRoleContext = useRoleStore(s => s.setRoleContext);
+  const setRoleDescription = useRoleStore(s => s.setRoleDescription);
   const setSupportProfiles = useRoleStore(s => s.setSupportProfiles);
   const setRoleScope = useRoleStore(s => s.setRoleScope);
   const setStoryThemes = useRoleStore(s => s.setStoryThemes);
@@ -145,6 +146,10 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
 
       // Clear role context (custom roles have no intro/year data)
       setRoleContext(null, null, null);
+
+      // Set role description to the custom role text
+      setRoleDescription(input.trim());
+
       setSupportProfiles(null);
       setRoleScope(null);
       setStoryThemes(null);
@@ -194,6 +199,9 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
     // Save rich role context for AI (title, intro, year) - predefined roles only
     setRoleContext(role.title, role.intro, role.year);
 
+    // Save role description for player card display (e.g., "Governor in Florence")
+    setRoleDescription(role.youAre);
+
     push("/name");
   };
 
@@ -223,13 +231,15 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
               : "bg-slate-800/60 text-slate-300 border border-slate-600/60";
             const goalColorClass = (() => {
               switch (role.scoreGoal) {
-                case 1200:
+                case 1000:
                   return "text-white";
-                case 1500:
+                case 1100:
                   return "text-yellow-200";
-                case 1800:
+                case 1200:
                   return "text-orange-200";
-                case 2000:
+                case 1300:
+                  return "text-orange-300";
+                case 1400:
                   return "text-rose-200";
                 default:
                   return "text-white";

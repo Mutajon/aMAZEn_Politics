@@ -13,6 +13,10 @@ import {
   deleteConversation,
   startCleanupTask
 } from "./conversationStore.mjs";
+import {
+  detectKeywordHints,
+  formatKeywordHintsForPrompt
+} from "./compassKeywordDetector.mjs";
 
 const app = express();
 app.use(bodyParser.json());
@@ -3361,8 +3365,8 @@ app.post("/api/game-turn", async (req, res) => {
         playerCompassTopValues: initialTopValues || null,
         // Compass Definitions: Store once for reuse in compass hints (token optimization)
         compassDefinitions: COMPASS_DEFINITION_BLOCK,
-        // Corruption tracking: Neutral start, evolves based on player choices
-        corruptionLevel: 50,        // 0-100 scale (0=selfless, 100=kleptocratic)
+        // Corruption tracking: Start clean (0=no corruption), increases only with corrupt actions
+        corruptionLevel: 0,         // 0-100 scale (0=no corruption, 100=kleptocratic)
         corruptionHistory: []       // Track last 3 judgments for AI context
       };
       storeConversation(gameId, "pending", "openai", conversationMeta);
@@ -3636,16 +3640,7 @@ app.post("/api/game-turn", async (req, res) => {
               .filter(Boolean)
           : [];
 
-        if (day > 1 && !allowEmptyActions && sanitizedDynamicParams.length === 0) {
-          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: dynamicParams missing or invalid for Day ${day}`);
-          if (debugMode) {
-            console.warn("[GAME-TURN] 🐛 [DEBUG] Raw dynamicParams payload:", JSON.stringify(rawDynamicParams, null, 2));
-          }
-          aiResponse = null;
-          turnData = null;
-          continue;
-        }
-
+        // Allow 0-3 dynamic parameters (0 is valid)
         turnData.dynamicParams = sanitizedDynamicParams;
 
         if (allowEmptyActions) {
@@ -3891,6 +3886,21 @@ app.post("/api/compass-hints", async (req, res) => {
       return res.status(400).json({ error: "Missing action title" });
     }
 
+    // ========================================================================
+    // PHASE 1: KEYWORD DETECTION (pre-processing)
+    // ========================================================================
+    const keywordHints = detectKeywordHints(actionTitle, actionSummary);
+    const keywordPromptBlock = formatKeywordHintsForPrompt(keywordHints);
+
+    console.log(`[CompassHints] 🔍 Keyword detection results:`);
+    if (keywordHints.length > 0) {
+      keywordHints.forEach(hint => {
+        console.log(`  → ${hint.prop}:${hint.idx} (${hint.polarity >= 0 ? '+' : ''}${hint.polarity}) - confidence: ${hint.confidence.toFixed(2)} - keywords: [${hint.matchedKeywords.join(', ')}]`);
+      });
+    } else {
+      console.log(`  → No keywords detected, will use full AI analysis`);
+    }
+
     // TOKEN OPTIMIZATION: Retrieve stored compass definitions from conversation
     const conversation = getConversation(gameId);
     const hasStoredDefinitions = !!conversation?.meta?.compassDefinitions;
@@ -3912,13 +3922,17 @@ KEY RULES:
 - Enforce = coercion/force/military, NOT voluntary persuasion
 - Design/UX = voluntary nudges/defaults, NOT laws/mandates/enforcement
 - Pick 2-6 values that most clearly fit the action
+- PRIORITY: If keyword hints are provided, validate them FIRST using the stored compass definitions
+- Only adjust keyword hint polarity/strength if context clearly contradicts
+- Add 0-4 additional values beyond keyword hints if contextually relevant
 
 TASK INSTRUCTIONS:
 1. Read the player's action carefully in the context of the dilemma setting.
-2. Identify 2 to 6 values that are most clearly supported or undermined.
-3. For each value, assign polarity: 2 (strongly supports), 1 (somewhat supports), -1 (somewhat opposes), -2 (strongly opposes). Use plain integers—no leading plus sign.
-4. Use literal, direct matches—avoid creative stretching
-5. Return JSON only—no prose, no inline comments, no explanations.`;
+2. If keyword hints are provided: START by validating each hint using literal keyword matching from the stored compass definitions. Only adjust polarity if context clearly contradicts (e.g., "reduce security" vs "increase security").
+3. After validating keyword hints, identify 0-4 additional values that are clearly supported or undermined but not captured by keywords.
+4. For each value, assign polarity: 2 (strongly supports), 1 (somewhat supports), -1 (somewhat opposes), -2 (strongly opposes). Use plain integers—no leading plus sign.
+5. Use literal, direct matches—avoid creative stretching
+6. Return JSON only—no prose, no inline comments, no explanations.`;
     } else {
       // FALLBACK: Use full definitions (backward compatibility for expired/missing conversations)
       console.warn(`[CompassHints] ⚠️ No stored definitions for gameId=${gameId}, using fallback`);
@@ -3927,8 +3941,8 @@ ${COMPASS_DEFINITION_BLOCK}
 
 TASK INSTRUCTIONS:
 1. Read the player's action carefully in the context of the dilemma setting.
-2. Consider the 40 value definitions above with their support/oppose cues.
-3. Identify 2 to 6 values that are most clearly supported or undermined by this action.
+2. If keyword hints are provided: START by validating each hint using literal keyword matching from the support/oppose cues above. Only adjust polarity if context clearly contradicts (e.g., "reduce security" vs "increase security").
+3. After validating keyword hints (if any), consider the 40 value definitions above with their support/oppose cues and identify 0-4 additional values that are clearly supported or undermined but not captured by keywords.
 4. For each value, determine the polarity using this numerical scale (plain integers only, no leading plus sign):
    • 2 = strongly supports (action directly advances this value)
    • 1 = somewhat supports (action modestly advances this value)
@@ -3960,6 +3974,8 @@ RESPONSE FORMAT:
     const userPrompt = `GAME ID: ${gameId}
 PLAYER ACTION TITLE: ${actionTitle}
 PLAYER ACTION SUMMARY: ${actionSummary || "(no summary provided)"}
+
+${keywordPromptBlock}
 
 Return JSON in this shape:
 {
@@ -3999,10 +4015,51 @@ Return JSON in this shape:
       });
     }
 
-    if (sanitized.length === 0) {
-      console.warn("[CompassHints] ⚠️ No valid hints generated for", actionTitle);
+    // ========================================================================
+    // PHASE 2: AI VALIDATION & ADDITIONAL ANALYSIS (post-processing)
+    // ========================================================================
+    console.log(`[CompassHints] 🤖 AI returned ${sanitized.length} hint(s):`);
+    if (sanitized.length > 0) {
+      sanitized.forEach(hint => {
+        console.log(`  → ${hint.prop}:${hint.idx} (${hint.polarity >= 0 ? '+' : ''}${hint.polarity})`);
+      });
+
+      // Compare with keyword hints
+      if (keywordHints.length > 0) {
+        console.log(`[CompassHints] 📊 Comparison: Keywords vs AI`);
+
+        // Check which keyword hints were preserved
+        const keywordSet = new Set(keywordHints.map(h => `${h.prop}:${h.idx}`));
+        const aiSet = new Set(sanitized.map(h => `${h.prop}:${h.idx}`));
+
+        const preserved = keywordHints.filter(kh => aiSet.has(`${kh.prop}:${kh.idx}`));
+        const modified = keywordHints.filter(kh => {
+          const key = `${kh.prop}:${kh.idx}`;
+          const aiHint = sanitized.find(ah => `${ah.prop}:${ah.idx}` === key);
+          return aiHint && aiHint.polarity !== kh.polarity;
+        });
+        const dropped = keywordHints.filter(kh => !aiSet.has(`${kh.prop}:${kh.idx}`));
+        const added = sanitized.filter(ah => !keywordSet.has(`${ah.prop}:${ah.idx}`));
+
+        if (preserved.length > 0) {
+          console.log(`  ✅ Preserved ${preserved.length} keyword hint(s)`);
+        }
+        if (modified.length > 0) {
+          console.log(`  🔄 Modified ${modified.length} keyword hint(s):`);
+          modified.forEach(kh => {
+            const aiHint = sanitized.find(ah => `${ah.prop}:${ah.idx}` === `${kh.prop}:${kh.idx}`);
+            console.log(`     ${kh.prop}:${kh.idx} - Keyword: ${kh.polarity >= 0 ? '+' : ''}${kh.polarity} → AI: ${aiHint.polarity >= 0 ? '+' : ''}${aiHint.polarity}`);
+          });
+        }
+        if (dropped.length > 0) {
+          console.log(`  ❌ Dropped ${dropped.length} keyword hint(s): ${dropped.map(h => `${h.prop}:${h.idx}`).join(', ')}`);
+        }
+        if (added.length > 0) {
+          console.log(`  ➕ Added ${added.length} new value(s): ${added.map(h => `${h.prop}:${h.idx} (${h.polarity >= 0 ? '+' : ''}${h.polarity})`).join(', ')}`);
+        }
+      }
     } else {
-      console.log(`[CompassHints] ✅ Generated ${sanitized.length} hint(s) for ${actionTitle}`);
+      console.warn("[CompassHints] ⚠️ No valid hints generated for", actionTitle);
     }
 
     return res.json({ compassHints: sanitized.slice(0, 6) });
@@ -4606,51 +4663,52 @@ YOUR RESPONSIBILITIES:
    already took (provided in the user message), NOT the new options you're generating.
    The player hasn't seen the new options yet - they're future possibilities.
 3. Provide mirror advice (one sentence, 20–25 words, dry wit) that highlights how the player's strongest value(s) collide with or reinforce the dilemma's options—provoke reflection, never dictate a choice.
-4. Generate 1-3 dynamic parameters showing measurable consequences (Day 2+ only)
+4. Generate 1-3 dynamic parameters showing numerical consequences of player's last action (Day 2+ only)
 
    🔢 NUMERICAL REQUIREMENT (MANDATORY - NEVER SKIP):
-   - EVERY parameter MUST contain a specific number, count, percentage, or measurable value
+   - EVERY parameter MUST contain a specific measurable value with a positive or negative number (avoid percentages)
    - NEVER use qualitative/abstract language without numbers
    - Format: emoji + NUMBER + outcome (3-5 words TOTAL)
 
    ✅ GOOD EXAMPLES (copy this pattern - all have numbers):
    - "🔥 +47 buildings burned"
    - "👥 3,000 protesters arrested"
-   - "📊 GDP +2.3%"
    - "⚔️ 12,400 troops deployed"
    - "💼 800K jobs lost"
-   - "🏥 15% hospitals overcapacity"
    - "🎨 1,723 artworks rescued"
 
    ❌ BAD EXAMPLES (NEVER generate these - no numbers):
+   - "+42% support"
    - "trust declines" (abstract, no number)
    - "protests gather" (vague, no number)
    - "tightening demands" (qualitative, no number)
    - "mood shifts" (abstract, no number)
    - "tensions rise" (vague, no number)
+   - "-10% trust"
+
 
    REQUIREMENTS:
-   - Base on player's LAST ACTION and story context
+   - Base strictly on player's LAST ACTION and story context
+   - parameters must embody the numerical consequences of the player's last action
    - Choose contextually-appropriate emoji (vary each turn, avoid repeating)
-   - Set tone: "up" (positive), "down" (negative), or "neutral"
-   - Rotate impact types: economic → social → political → cultural → military
    - Can show escalating metrics across turns if relevant
-   - DO NOT include: support levels (shown separately), budget (shown separately)
+
 5. Evaluate corruption of previous action (Day 2+ only)
 
    CORRUPTION DEFINITION:
    "Misuse of entrusted power for personal, factional, or unjust ends, betraying the legitimate
    trust, laws, or norms of the polity."
 
-   BASELINE PRINCIPLE — BE STRICT:
-   - MOST legitimate governance actions score 0-2, even if imperfect or controversial
-   - Corruption requires CLEAR EVIDENCE of misuse for personal/factional gain OR serious institutional betrayal
-   - Democratic processes (votes, consultations, transparency) are NOT corruption regardless of timing
-   - Policy disagreements, imperfect leadership, or risk-averse decisions are NOT corruption
-   - When in doubt between normal governance and corruption, score 0-2
-   - Reserve scores 5+ for cases with CLEAR evidence of self-enrichment, nepotism, bribery, or abuse of power
+   BASELINE PRINCIPLE — DEFAULT TO ZERO:
+   - Start evaluation at score 0 for every action
+   - ADD points ONLY when corruption elements are explicitly stated in the action text
+   - Most governance actions score 0-2 even if controversial, imperfect, or favor certain groups
+   - NO evidence of personal gain/nepotism/bribery in action text = maximum score 1
+   - When ANY uncertainty exists, score 0
+   - Reserve 5+ ONLY for explicit self-enrichment, nepotism, bribery, or violent coercion
+   - Democratic processes (votes, consultations) ALWAYS score 0 regardless of timing
 
-   WHAT IS NOT CORRUPTION (score 0-2):
+   WHAT IS NOT CORRUPTION (score 0-1):
    - Calling referendums, votes, or public consultations
    - Collaborative decision-making or delays for stakeholder input
    - Emergency actions with legitimate public safety justification
@@ -4658,6 +4716,15 @@ YOUR RESPONSIBILITIES:
    - Following institutional channels even if slow
    - Risk-averse governance or "indecision" without evidence of hiding wrongdoing
    - Prioritizing one legitimate value over another (e.g., security vs. liberty)
+   - Political allegiance or support for movements
+   - Building coalitions or support bases through legitimate means
+
+   EVIDENCE REQUIREMENT — NO SPECULATION:
+   - Base score ONLY on explicit actions stated in the player's choice text
+   - FORBIDDEN LANGUAGE: "risks", "might", "could", "suggests", "may lead to", "potential", "appears"
+   - Hypothetical future impacts are NOT corruption
+   - If action text doesn't explicitly show self-enrichment/nepotism/bribery, score 0-1 maximum
+   - Example: "Display allegiance to Savonarola" = political support, NOT corruption (score 0)
 
    JUDGMENT RUBRIC (0-10 scale):
    - Intent (0-4): Was there EVIDENCE of self-serving/factional motive vs. public good?
@@ -4673,24 +4740,27 @@ YOUR RESPONSIBILITIES:
      * 1: Some groups benefit more but no institutional harm
      * 0: Strengthened accountability, transparency, or equal treatment
 
-   SCORING RANGES WITH EXAMPLES:
-   - 0-1: Normal governance, transparency, following procedures, anti-corruption reforms
-     * Creating independent audit office = 0
-     * Implementing transparent bidding = 1
+   SCORING RANGES — MOST ACTIONS SCORE 0-2:
+   - 0: Democratic processes, transparency reforms, anti-corruption actions, emergency justified actions
      * Facilitating fair referendum = 0
-   - 2-3: Minor procedural shortcuts or small favoritism, but no personal gain
-     * Awarding contract to friend's company after open bidding = 2
-     * Fast-tracking ally's permit application = 3
-   - 4-5: Factional favoritism with institutional impact, avoiding accountability
-     * Stacking courts with loyalists to block investigations = 5
-     * Diverting public funds to supporter regions = 4
-   - 6-7: Clear nepotism, minor bribery, coercion for factional advantage
-     * Appointing brother to key ministry = 7
-     * Accepting bribes for mid-level contracts = 6
-   - 8-10: Major bribery, kleptocracy, violent coercion for personal gain
-     * Accepting bribes for major contracts = 9
-     * Embezzling treasury funds = 10
-     * Using security forces to seize private assets = 8
+     * Creating independent audit = 0
+     * Political allegiance to movement = 0
+     * Emergency rationing with justification = 0
+   - 1: Normal governance even if imperfect, following institutional channels
+     * Implementing oversight = 1
+     * Collaborative planning = 1
+     * Transparent bidding process = 1
+   - 2: Minor favoritism with transparent process (friend's company wins AFTER public bidding)
+   - 3: Clear procedural shortcuts favoring allies (fast-tracking ally's permit without review)
+   - 4: Directing public funds to supporter regions without justification
+   - 5: Stacking courts with loyalists to block investigations
+   - 6: Accepting small bribes for contracts
+   - 7: Appointing brother/family to ministry
+   - 8: Using security forces to seize private assets
+   - 9: Accepting major bribes for contracts
+   - 10: Embezzling treasury for personal wealth
+
+   CRITICAL: Score 0-1 unless the action text EXPLICITLY shows corruption.
 
    CONTEXT ADJUSTMENT:
    - Consider era norms (patronage may be expected in some historical systems, adjust DOWN by 1-2 points)
@@ -4701,6 +4771,18 @@ YOUR RESPONSIBILITIES:
    - "score": 0-10 (numeric rating for THIS action)
    - "reason": 1 sentence (15-25 words) explaining the judgment
    - BE STRICT: Most actions should score 0-2 unless there is clear evidence of corruption
+
+   FORBIDDEN REASONING — NEVER SCORE HIGHER FOR:
+   - Speculative future: "might/could/may lead to corruption", "risks exploitation"
+   - Risk assessment: "potential for abuse", "suggests favoritism", "appears corrupt"
+   - Political strategy: "helps the movement", "builds support base", "strengthens faction"
+   - Leadership style: "avoiding responsibility", "indecision", "hesitation to lead"
+   - Value trade-offs: choosing security over liberty, or vice versa
+   - Democratic delays: consultations, referendums, collaborative planning
+   - Emergency actions: unilateral decisions with public safety justification
+
+   IF the action text does NOT explicitly describe taking money, appointing family, accepting bribes,
+   or using force for personal gain, score 0-1 maximum.
 
 6. Maintain narrative continuity across all ${totalDays} days
 7. Align supportShift reasoning with the baseline attitudes above; explicitly cite how each faction's stance agrees or clashes with the player's previous action (the one they already took, NOT the new options you're presenting).

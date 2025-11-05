@@ -62,7 +62,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "greece",
     roleScope: "Acts as a respected citizen on the oligarch-controlled civic council, influencing local decrees and relief efforts but never commanding the Spartan garrison.",
     storyThemes: ["autonomy_vs_heteronomy", "liberalism_vs_totalism", "reconciliation"],
-    scoreGoal: 1200,
+    scoreGoal: 1000,
     defaultGoalStatus: "uncompleted",
     defaultHighScore: 0,
     powerDistribution: {
@@ -160,7 +160,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "alexandria",
     roleScope: "Serves as a city scholar-advisor mediating between palace factions and Roman commanders; can sway civic policy, archives, and urban defenses but not direct legions.",
     storyThemes: ["cultural_survival", "foreign_domination", "knowledge_vs_power"],
-    scoreGoal: 1200,
+    scoreGoal: 1000,
     defaultGoalStatus: "uncompleted",
     defaultHighScore: 0,
     powerDistribution: {
@@ -258,7 +258,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "florence",
     roleScope: "Sits on Florence's Great Council, balancing guild and patrician interests; can propose civic edicts, policing orders, and cultural protections but cannot command Papal or French armies.",
     storyThemes: ["faith_vs_freedom", "economic_stability", "civic_identity"],
-    scoreGoal: 1200,
+    scoreGoal: 1100,
     defaultGoalStatus: "uncompleted",
     defaultHighScore: 0,
     powerDistribution: {
@@ -356,7 +356,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "northAmerica",
     roleScope: "Leads a tribal council overseeing diplomacy, land stewardship, and trade terms; can mobilize scouts and negotiate boundaries but does not unilaterally declare war without consensus.",
     storyThemes: ["territorial_autonomy", "cultural_preservation", "exchange_vs_exploitation"],
-    scoreGoal: 1500,
+    scoreGoal: 1100,
     defaultGoalStatus: "uncompleted",
     defaultHighScore: 0,
     powerDistribution: {
@@ -454,7 +454,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "japan",
     roleScope: "Heads a mid-level samurai clan caught between warring coalitions; can commit retainers, negotiate allegiances, and manage village protections but cannot dictate national strategy.",
     storyThemes: ["loyalty_vs_survival", "clan_honor", "centralization"],
-    scoreGoal: 1500,
+    scoreGoal: 1200,
     defaultGoalStatus: "uncompleted",
     defaultHighScore: 0,
     powerDistribution: {
@@ -552,7 +552,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "haiti",
     roleScope: "Acts as a plantation overseer-turned-liaison among rebel factions; can influence local militia deployments, justice for captives, and resource distribution but cannot dictate colony-wide treaties.",
     storyThemes: ["emancipation", "justice_vs_vengeance", "unity_vs_fragmentation"],
-    scoreGoal: 1500,
+    scoreGoal: 1200,
     defaultGoalStatus: "uncompleted",
     defaultHighScore: 0,
     powerDistribution: {
@@ -650,7 +650,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "russia",
     roleScope: "Embattled Tsar managing imperial decrees, military appointments, and court negotiations; can reshuffle ministers, issue manifestos, or seek truces but cannot personally command every garrison simultaneously.",
     storyThemes: ["autocracy_vs_revolution", "bread_land_peace", "loyalty_crisis"],
-    scoreGoal: 1800,
+    scoreGoal: 1300,
     defaultGoalStatus: "uncompleted",
     defaultHighScore: 0,
     powerDistribution: {
@@ -748,7 +748,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "india",
     roleScope: "District officer coordinating police, relief, and political liaisons along the partition line; manages curfews, convoys, and investigations but cannot redraw national borders.",
     storyThemes: ["communal_trust", "order_vs_liberty", "refugee_protection"],
-    scoreGoal: 1800,
+    scoreGoal: 1300,
     defaultGoalStatus: "uncompleted",
     defaultHighScore: 0,
     powerDistribution: {
@@ -846,7 +846,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "southAfrica",
     roleScope: "Senior police commander overseeing citywide operations during the transition; can set deployment protocols, liaise with reform negotiators, and manage crowd-control policy but cannot pass national laws.",
     storyThemes: ["justice_vs_amnesty", "public_safety", "institutional_trust"],
-    scoreGoal: 1800,
+    scoreGoal: 1400,
     defaultGoalStatus: "uncompleted",
     defaultHighScore: 0,
     powerDistribution: {
@@ -944,7 +944,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     imageId: "mars",
     roleScope: "Elected Mars colony governor balancing survival systems and autonomy petitions; can adjust habitat policy, rationing, and negotiations with Earth but cannot conjure unlimited supplies.",
     storyThemes: ["autonomy_vs_dependency", "survival_ethics", "science_vs_populism"],
-    scoreGoal: 2000,
+    scoreGoal: 1400,
     defaultGoalStatus: "uncompleted",
     defaultHighScore: 0,
     powerDistribution: {

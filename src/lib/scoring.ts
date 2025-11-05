@@ -5,9 +5,9 @@
 // - Three support tracks (People, Power Holders, Personal Anchor)
 //   • Each track: 0‒100% → 0‒500 pts (linear)
 //   • Combined support maximum: 1500 pts
-// - Corruption level: 0‒10 → 0‒500 pts (linear)
+// - Corruption level: 0‒10 → 0‒500 pts penalty (linear, deducted from total)
 //   • Incoming corruption level may be 0‒10 or 0‒100 (legacy); values >10 are scaled down.
-// - Total maximum: 2000 pts
+// - Total maximum: 1500 pts (all support, zero corruption)
 //
 // Exports helpers used by:
 // - Event screen resource bar (live score display)
@@ -26,7 +26,7 @@ export const SUPPORT_TOTAL_MAX_POINTS =
   SUPPORT_TRACK_MAX_POINTS * SUPPORT_TRACK_COUNT; // 1500
 
 export const CORRUPTION_MAX_POINTS = 500;
-export const MAX_FINAL_SCORE = SUPPORT_TOTAL_MAX_POINTS + CORRUPTION_MAX_POINTS; // 2000
+export const MAX_FINAL_SCORE = SUPPORT_TOTAL_MAX_POINTS; // 1500
 
 // ===========================================================================
 // TYPES
@@ -47,8 +47,8 @@ export type SupportTrackBreakdown = {
 export type CorruptionBreakdown = {
   rawLevel: number; // Raw value from store/API (0-10 or 0-100 legacy)
   normalizedLevel: number; // Coerced 0-10 scale
-  points: number; // 0-500 points (higher level = higher points per spec)
-  maxPoints: number; // 500
+  points: number; // 0 to -500 points (higher corruption = larger penalty)
+  maxPoints: number; // 500 (penalty magnitude)
 };
 
 /**
@@ -100,12 +100,12 @@ export function normalizeCorruptionLevel(rawLevel: number): number {
 }
 
 /**
- * Convert corruption level (0-10) to points (0-500).
- * Spec states linear mapping 0 → 0 pts, 10 → 500 pts.
+ * Convert corruption level (0-10) to penalty points (0 to -500).
+ * Spec: 0 → 0 pts deducted, 10 → -500 pts.
  */
 function corruptionLevelToPoints(normalizedLevel: number): number {
   const clamped = clamp(normalizedLevel, 0, 10);
-  return Math.round((clamped / 10) * CORRUPTION_MAX_POINTS);
+  return -Math.round((clamped / 10) * CORRUPTION_MAX_POINTS);
 }
 
 // ===========================================================================
@@ -150,7 +150,7 @@ export function calculateLiveScoreBreakdown({
   const corruption = buildCorruptionBreakdown(corruptionLevel);
 
   const supportTotal = people.points + middle.points + mom.points;
-  const final = supportTotal + corruption.points;
+  const final = Math.max(0, supportTotal + corruption.points);
 
   return {
     support: {

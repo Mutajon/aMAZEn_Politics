@@ -454,6 +454,8 @@
   "ROLE_GOAL_STATUS_LABEL": "Status",
   "ROLE_CURRENT_HIGH_SCORE_LABEL": "Current High Score",
   "ROLE_YEAR_LABEL": "Year",
+  "FINAL_SCORE_HIGH_SCORE": "High Score",
+  "FINAL_SCORE_NEW_HIGH_SCORE": "New High Score!",
   "FINAL_SCORE_BUDGET_LABEL": "Budget:",
   "FINAL_SCORE_LIBERALISM_LABEL": "Liberalism:",
   "FINAL_SCORE_AUTONOMY_LABEL": "Autonomy:",

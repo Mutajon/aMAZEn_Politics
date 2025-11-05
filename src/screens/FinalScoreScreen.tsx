@@ -90,6 +90,7 @@ export default function FinalScoreScreen({ push }: Props) {
   );
   const setRoleGoalStatus = useRoleProgressStore((s) => s.setRoleGoalStatus);
   const setRoleBestScore = useRoleProgressStore((s) => s.setRoleBestScore);
+  const previousBestScoreRef = useRef<number | null>(roleProgress?.bestScore ?? null);
   const { playSfx } = useAudioManager();
   const logger = useLogger();
   const breakdown: ScoreBreakdown =
@@ -201,6 +202,12 @@ export default function FinalScoreScreen({ push }: Props) {
   useEffect(() => {
     displayValuesRef.current = displayValues;
   }, [displayValues]);
+
+  useEffect(() => {
+    if (previousBestScoreRef.current === null && roleProgress) {
+      previousBestScoreRef.current = roleProgress.bestScore;
+    }
+  }, [roleProgress]);
 
   useEffect(() => {
     if (!running || step > sequence.length) return;
@@ -329,21 +336,6 @@ export default function FinalScoreScreen({ push }: Props) {
     }
   }, [finalScoreSubmitted, breakdown, character, playerRank]);
 
-  const scoreSummary = useMemo(
-    () => ({
-      total: breakdown.final,
-      maxTotal: breakdown.maxFinal,
-      components: sequence.map((item) => ({
-        key: item.key,
-        label: item.label,
-        detail: item.detail,
-        points: item.points,
-        maxPoints: item.maxPoints,
-      })),
-    }),
-    [breakdown.final, breakdown.maxFinal, sequence]
-  );
-
   const handleReplayAnimation = () => {
     clearFinalScore();
     setDisplayValues(new Array(sequence.length + 1).fill(0));
@@ -391,6 +383,14 @@ export default function FinalScoreScreen({ push }: Props) {
   };
 
   const finalScoreDisplay = displayValues[sequence.length];
+  const previousHighScore = previousBestScoreRef.current ?? 0;
+  const newHighScoreAchieved =
+    step === sequence.length + 1 &&
+    previousBestScoreRef.current !== null &&
+    breakdown.final > previousBestScoreRef.current;
+  const displayedHighScore = newHighScoreAchieved
+    ? Math.max(breakdown.final, roleProgress?.bestScore ?? breakdown.final)
+    : Math.max(roleProgress?.bestScore ?? 0, previousHighScore);
 
   return (
     <div className="min-h-screen px-5 py-8" style={roleBgStyle}>
@@ -408,10 +408,6 @@ export default function FinalScoreScreen({ push }: Props) {
           <h1 className="text-4xl font-extrabold text-white">
             {lang("FINAL_SCORE_TITLE")}
           </h1>
-          <p className="text-white/70 text-sm">
-            {lang("FINAL_SCORE")} • {formatNumber.format(finalScoreDisplay)} /{" "}
-            {formatNumber.format(scoreSummary.maxTotal)}
-          </p>
         </div>
 
         <ul className="space-y-4">
@@ -434,20 +430,29 @@ export default function FinalScoreScreen({ push }: Props) {
           layout
           className="rounded-2xl border border-yellow-400/40 bg-yellow-500/15 backdrop-blur-sm p-5 text-yellow-100 shadow-lg"
         >
-          <div className="flex items-center gap-3">
-            <Trophy className="h-8 w-8 text-yellow-300" />
-            <div>
-              <div className="text-xs uppercase tracking-wide text-yellow-200/70">
-                {lang("FINAL_SCORE")}
-              </div>
-              <div className="text-3xl font-extrabold tabular-nums">
-                {formatNumber.format(finalScoreDisplay)}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Trophy className="h-8 w-8 text-yellow-300" />
+              <div>
+                <div className="text-xs uppercase tracking-wide text-yellow-200/70">
+                  {lang("FINAL_SCORE")}
+                </div>
+                <div className="text-3xl font-extrabold tabular-nums">
+                  {formatNumber.format(finalScoreDisplay)}
+                </div>
+                <div className="text-xs text-yellow-100/70">
+                  / {formatNumber.format(breakdown.maxFinal)}
+                </div>
               </div>
             </div>
-          </div>
-          <div className="mt-3 text-sm text-yellow-100/80">
-            {formatNumber.format(finalScoreDisplay)} /{" "}
-            {formatNumber.format(scoreSummary.maxTotal)}
+            {selectedRoleKey && roleProgress ? (
+              <HighScoreSummary
+                label={lang("FINAL_SCORE_HIGH_SCORE")}
+                newLabel={lang("FINAL_SCORE_NEW_HIGH_SCORE")}
+                value={displayedHighScore}
+                isNew={newHighScoreAchieved}
+              />
+            ) : null}
           </div>
         </motion.div>
 
@@ -461,9 +466,6 @@ export default function FinalScoreScreen({ push }: Props) {
               : lang("FINAL_SCORE_NOT_HALL_OF_FAME_MESSAGE")}
           </div>
         )}
-
-        <ScoreDetailsPanel summary={scoreSummary} />
-
         <div className="flex flex-wrap gap-3">
           <button
             onClick={handleReplayAnimation}
@@ -509,7 +511,14 @@ function CategoryCard({
   maxPoints: number;
   active: boolean;
 }) {
-  const progress = Math.min(1, target === 0 ? 0 : points / maxPoints);
+  const progress = (() => {
+    if (maxPoints <= 0) return 0;
+    if (target < 0 || points < 0) {
+      return Math.min(1, Math.abs(points) / maxPoints);
+    }
+    return Math.min(1, points / maxPoints);
+  })();
+  const maxPointsDisplay = target < 0 ? -maxPoints : maxPoints;
   return (
     <motion.div
       layout
@@ -529,7 +538,7 @@ function CategoryCard({
             {formatNumber.format(points)}
           </div>
           <div className="text-xs text-white/50">
-            / {formatNumber.format(maxPoints)}
+            / {formatNumber.format(maxPointsDisplay)}
           </div>
         </div>
       </div>
@@ -543,51 +552,26 @@ function CategoryCard({
   );
 }
 
-function ScoreDetailsPanel({
-  summary,
+function HighScoreSummary({
+  label,
+  newLabel,
+  value,
+  isNew,
 }: {
-  summary: {
-    total: number;
-    maxTotal: number;
-    components: Array<{
-      key: CategoryKey;
-      label: string;
-      detail: string;
-      points: number;
-      maxPoints: number;
-    }>;
-  };
+  label: string;
+  newLabel: string;
+  value: number;
+  isNew: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-5 backdrop-blur-sm text-white shadow-lg">
-      <div className="text-sm uppercase tracking-wide text-white/50 mb-3">
-        Score breakdown
+    <div className="text-right">
+      <div className="text-xs uppercase tracking-wide text-yellow-200/70">{label}</div>
+      <div className="text-2xl font-bold tabular-nums text-yellow-50">
+        {value > 0 ? formatNumber.format(value) : "—"}
       </div>
-      <ul className="space-y-2 text-sm">
-        {summary.components.map((item) => (
-          <li key={item.key} className="flex items-center justify-between gap-3">
-            <div>
-              <div className="font-semibold text-white">{item.label}</div>
-              <div className="text-xs text-white/60">{item.detail}</div>
-            </div>
-            <div className="text-right">
-              <div className="tabular-nums font-semibold text-white">
-                {formatNumber.format(item.points)} pts
-              </div>
-              <div className="text-xs text-white/50">
-                / {formatNumber.format(item.maxPoints)}
-              </div>
-            </div>
-          </li>
-        ))}
-      </ul>
-      <div className="mt-4 flex items-center justify-between text-sm text-white/70 border-t border-white/10 pt-3">
-        <span>Total</span>
-        <span className="tabular-nums font-semibold text-white">
-          {formatNumber.format(summary.total)} /{" "}
-          {formatNumber.format(summary.maxTotal)}
-        </span>
-      </div>
+      {isNew && (
+        <div className="text-[11px] font-semibold text-emerald-200">{newLabel}</div>
+      )}
     </div>
   );
 }
