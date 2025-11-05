@@ -6,15 +6,18 @@
 // - Update budget immediately
 // - Trigger coin flight animation
 // - Wait for animation to complete
+// - Fetch and apply compass deltas IMMEDIATELY (Day 2+)
 // - Clear coin flights
 // - Advance to next day
 //
 // Used by: EventScreen3 (handleConfirm)
-// Dependencies: dilemmaStore
+// Dependencies: dilemmaStore, compassStore
 
 import { useDilemmaStore } from "../store/dilemmaStore";
+import { useCompassStore } from "../store/compassStore";
 import { useSettingsStore } from "../store/settingsStore";
 import type { ActionCard } from "../components/event/ActionDeck";
+import { fetchCompassHintsForAction } from "../hooks/useEventDataCollector";
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -107,6 +110,58 @@ export async function cleanAndAdvanceDay(
   // We just need to wait for it to complete (1200ms standard duration)
   console.log('[Cleaner] Waiting for coin animation to complete (1200ms)...');
   await delay(1200);
+
+  // ========================================================================
+  // STEP 3.5: Fetch and apply compass deltas IMMEDIATELY (Day 2+ only)
+  // This ensures compass values are updated BEFORE day advances
+  // ========================================================================
+  const { day, gameId } = useDilemmaStore.getState();
+
+  if (day > 1 && gameId) {
+    console.log('[Cleaner] Fetching compass deltas for current action...');
+
+    try {
+      // Fetch compass pills for the action just taken
+      const pills = await fetchCompassHintsForAction(gameId, {
+        title: selectedAction.title,
+        summary: selectedAction.summary || selectedAction.title
+      });
+
+      if (pills.length > 0) {
+        console.log(`[Cleaner] Applying ${pills.length} compass deltas immediately`);
+
+        // Apply deltas to compass store RIGHT NOW (while still on Day N)
+        const compassStore = useCompassStore.getState();
+        const effects = pills.map(pill => ({
+          prop: pill.prop,
+          idx: pill.idx,
+          delta: pill.delta
+        }));
+
+        const appliedEffects = compassStore.applyEffects(effects);
+
+        // Log each applied delta
+        appliedEffects.forEach(eff => {
+          console.log(`[Cleaner] Applied compass delta: ${eff.prop}[${eff.idx}] (${eff.delta >= 0 ? '+' : ''}${eff.delta})`);
+        });
+
+        // Store pills in dilemmaStore for visual display (EventScreen3 will show overlay)
+        useDilemmaStore.setState({ pendingCompassPills: pills });
+
+        console.log('[Cleaner] Compass deltas applied successfully, pills stored for display');
+      } else {
+        console.log('[Cleaner] No compass changes detected for this action');
+        useDilemmaStore.setState({ pendingCompassPills: null });
+      }
+    } catch (error) {
+      console.error('[Cleaner] ⚠️ Failed to fetch/apply compass deltas:', error);
+      // Non-critical error - game continues without compass feedback
+      useDilemmaStore.setState({ pendingCompassPills: null });
+    }
+  } else {
+    // Day 1 or no gameId - skip compass pills
+    useDilemmaStore.setState({ pendingCompassPills: null });
+  }
 
   // ========================================================================
   // STEP 4: Clear coin flights

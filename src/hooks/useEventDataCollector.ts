@@ -603,7 +603,7 @@ function transformCompassHints(rawHints: any): CompassPill[] {
   return pills;
 }
 
-async function fetchCompassHintsForAction(
+export async function fetchCompassHintsForAction(
   gameId: string,
   action: { title: string; summary: string }
 ): Promise<CompassPill[]> {
@@ -825,7 +825,7 @@ export function useEventDataCollector() {
     setIsCollecting(true);
     setCollectionError(null);
 
-    const { day, lastChoice, gameId: currentGameId } = useDilemmaStore.getState();
+    const { day } = useDilemmaStore.getState();
 
     try {
       // ========================================================================
@@ -868,28 +868,12 @@ export function useEventDataCollector() {
         onReadyCallbackRef.current();
       }
 
-      // Set Phase 2 data (dynamic params immediately, pills fetched separately)
+      // Set Phase 2 data (dynamic params only)
+      // NOTE: Compass pills are NO LONGER fetched here!
+      // They're now fetched and applied in eventDataCleaner.ts (Step 3.5)
+      // IMMEDIATELY after action confirmation, BEFORE day advancement.
+      // This fixes the one-day delay where compass values weren't updated until the next day.
       setPhase2Data({ compassPills: null, dynamicParams });
-
-      if (day > 1 && lastChoice && currentGameId) {
-        fetchCompassHintsForAction(currentGameId, {
-          title: lastChoice.title,
-          summary: lastChoice.summary || lastChoice.title
-        })
-          .then((pills) => {
-            setPhase2Data(prev => ({
-              compassPills: pills.length > 0 ? pills : null,
-              dynamicParams: prev?.dynamicParams ?? dynamicParams
-            }));
-          })
-          .catch((err) => {
-            console.error('[Collector] ⚠️ Compass hint fetch failed:', err);
-            setPhase2Data(prev => ({
-              compassPills: prev?.compassPills ?? null,
-              dynamicParams: prev?.dynamicParams ?? dynamicParams
-            }));
-          });
-      }
 
       // Set Phase 3 data (mirror advice)
       setPhase3Data({ mirrorText });

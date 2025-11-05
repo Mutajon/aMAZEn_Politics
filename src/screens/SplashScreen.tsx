@@ -71,22 +71,25 @@ export default function SplashScreen({
   const showBudget = useSettingsStore((s) => s.showBudget);
   const setShowBudget = useSettingsStore((s) => s.setShowBudget);
   // Debug mode
-const debugMode = useSettingsStore((s) => s.debugMode);
-const setDebugMode = useSettingsStore((s) => s.setDebugMode);
+  const debugMode = useSettingsStore((s) => s.debugMode);
+  const setDebugMode = useSettingsStore((s) => s.setDebugMode);
 
-// Dilemmas subject
-const dilemmasSubjectEnabled = useSettingsStore((s) => s.dilemmasSubjectEnabled);
-const setDilemmasSubjectEnabled = useSettingsStore((s) => s.setDilemmasSubjectEnabled);
-const dilemmasSubject = useSettingsStore((s) => s.dilemmasSubject);
-const setDilemmasSubject = useSettingsStore((s) => s.setDilemmasSubject);
+  // Dilemmas subject
+  const dilemmasSubjectEnabled = useSettingsStore((s) => s.dilemmasSubjectEnabled);
+  const setDilemmasSubjectEnabled = useSettingsStore((s) => s.setDilemmasSubjectEnabled);
+  const dilemmasSubject = useSettingsStore((s) => s.dilemmasSubject);
+  const setDilemmasSubject = useSettingsStore((s) => s.setDilemmasSubject);
 
-// Enable modifiers
-const enableModifiers = useSettingsStore((s) => s.enableModifiers);
-const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
+  // Enable modifiers
+  const enableModifiers = useSettingsStore((s) => s.enableModifiers);
+  const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
 
-// Data collection
-const dataCollectionEnabled = useSettingsStore((s) => s.dataCollectionEnabled);
-const setDataCollectionEnabled = useSettingsStore((s) => s.setDataCollectionEnabled);
+  const experimentMode = useSettingsStore((s) => s.experimentMode);
+  const setExperimentMode = useSettingsStore((s) => s.setExperimentMode);
+
+  // Data collection
+  const dataCollectionEnabled = useSettingsStore((s) => s.dataCollectionEnabled);
+  const setDataCollectionEnabled = useSettingsStore((s) => s.setDataCollectionEnabled);
 
   // -------------------------------------------------------------------------
 
@@ -389,6 +392,32 @@ const setDataCollectionEnabled = useSettingsStore((s) => s.setDataCollectionEnab
       className={[
         "block w-5 h-5 rounded-full bg-white transition-transform",
         getToggleTransform(dataCollectionEnabled),
+      ].join(" ")}
+    />
+  </button>
+</div>
+
+{/* Experiment mode ------------------------------------------------------------- */}
+<div className="mt-3 flex items-center justify-between gap-3">
+  <div>
+    <div className="text-sm font-medium">{lang("EXPERIMENT_MODE")}</div>
+    <div className="text-xs text-white/60">
+      {lang("EXPERIMENT_MODE_DESC")}
+    </div>
+  </div>
+  <button
+    onClick={() => setExperimentMode(!experimentMode)}
+    role="switch"
+    aria-checked={experimentMode}
+    className={[
+      "w-12 h-7 rounded-full p-1 transition-colors",
+      experimentMode ? "bg-emerald-500/70" : "bg-white/20",
+    ].join(" ")}
+  >
+    <span
+      className={[
+        "block w-5 h-5 rounded-full bg-white transition-transform",
+        getToggleTransform(experimentMode),
       ].join(" ")}
     />
   </button>

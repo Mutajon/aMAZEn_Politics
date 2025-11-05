@@ -31,7 +31,10 @@ const defaultGoals = (): Record<string, RoleGoal> =>
     return acc;
   }, {});
 
-function mergeWithDefaults(existing: Record<string, RoleGoal> | undefined) {
+function mergeWithDefaults(
+  existing: Record<string, RoleGoal> | undefined,
+  overwriteGoals = false
+) {
   const base = defaultGoals();
   if (!existing) return base;
 
@@ -39,7 +42,7 @@ function mergeWithDefaults(existing: Record<string, RoleGoal> | undefined) {
     const stored = existing[key];
     if (stored) {
       base[key] = {
-        goal: value.goal,
+        goal: overwriteGoals ? value.goal : stored.goal ?? value.goal,
         status: stored.status,
         bestScore: Math.max(value.bestScore, stored.bestScore || 0),
       };
@@ -80,15 +83,16 @@ export const useRoleProgressStore = create<RoleProgressState>()(
       resetRoleGoals: () => set({ goals: mergeWithDefaults(undefined) }),
     }),
     {
-      name: "role-progress-v1",
+      name: "role-progress-v2",
       partialize: (state) => ({
         goals: state.goals,
       }),
-      version: 1,
-      migrate: (persistedState) => {
+      version: 2,
+      migrate: (persistedState, version) => {
         const stored = (persistedState as RoleProgressState | undefined)?.goals;
+        const overwriteGoals = version === undefined || version < 2;
         return {
-          goals: mergeWithDefaults(stored),
+          goals: mergeWithDefaults(stored, overwriteGoals),
         };
       },
     }

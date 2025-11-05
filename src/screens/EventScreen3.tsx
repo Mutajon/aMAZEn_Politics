@@ -135,10 +135,15 @@ export default function EventScreen3({ push }: Props) {
   // Snapshot restoration flag (prevents collection when restored)
   const [restoredFromSnapshot, setRestoredFromSnapshot] = useState(false);
 
-  // Convert collected compassPills to CompassEffectPing format with unique IDs
+  // Read pending compass pills from dilemmaStore (set by cleaner after action confirmation)
+  // NOTE: Pills are now applied in eventDataCleaner.ts BEFORE day advances,
+  // not during next day's presentation. This fixes the one-day delay issue.
+  const pendingCompassPills = useDilemmaStore((s) => s.pendingCompassPills);
+
+  // Convert pending pills to CompassEffectPing format with unique IDs
   const compassPings: CompassEffectPing[] = useMemo(() => {
-    if (!collectedData?.compassPills) return [];
-    const pills = collectedData.compassPills.map((pill, i) => ({
+    if (!pendingCompassPills) return [];
+    const pills = pendingCompassPills.map((pill, i) => ({
       id: `${Date.now()}-${i}`,
       prop: pill.prop,
       idx: pill.idx,
@@ -148,7 +153,7 @@ export default function EventScreen3({ push }: Props) {
       console.log(`[EventScreen3] 💊 CompassPings populated: ${pills.length} pills`, pills);
     }
     return pills;
-  }, [collectedData?.compassPills]);
+  }, [pendingCompassPills]);
 
   // Extract corruption pill data (Day 2+ only, feature flag gated)
   const corruptionTrackingEnabled = useSettingsStore((s) => s.corruptionTrackingEnabled);

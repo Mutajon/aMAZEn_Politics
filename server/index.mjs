@@ -3480,7 +3480,7 @@ app.post("/api/game-turn", async (req, res) => {
             narrativeMemory: conversation.meta?.narrativeMemory || null,  // Dynamic Story Spine
             playerCompass: conversation.meta?.playerCompass || null,  // Player compass values
             playerCompassTopValues: conversation.meta?.playerCompassTopValues || null,
-            corruptionLevel: conversation.meta?.corruptionLevel ?? 50,  // Corruption tracking
+            corruptionLevel: conversation.meta?.corruptionLevel ?? 0,  // Corruption tracking (start clean)
             corruptionHistory: conversation.meta?.corruptionHistory || []
           });
 
@@ -3679,10 +3679,10 @@ app.post("/api/game-turn", async (req, res) => {
             if (conversation?.meta) {
               const prevLevel = conversation.meta.corruptionHistory?.length > 1
                 ? conversation.meta.corruptionHistory[conversation.meta.corruptionHistory.length - 2].level
-                : 50;
+                : 0;
               console.log(`  Previous Level: ${prevLevel.toFixed(2)}`);
               console.log(`  New Level: ${conversation.meta.corruptionLevel?.toFixed(2) || '?'}`);
-              const delta = (conversation.meta.corruptionLevel || 50) - prevLevel;
+              const delta = (conversation.meta.corruptionLevel || 0) - prevLevel;
               console.log(`  Delta: ${delta >= 0 ? '+' : ''}${delta.toFixed(2)}`);
             }
             console.log("-".repeat(80));
@@ -3770,7 +3770,7 @@ app.post("/api/game-turn", async (req, res) => {
       // Corruption judgment update (Day 2+)
       if (turnData.corruptionJudgment && typeof turnData.corruptionJudgment.score === 'number') {
         const rawScore = Math.max(0, Math.min(10, turnData.corruptionJudgment.score));
-        const prevCorruption = typeof meta.corruptionLevel === 'number' ? meta.corruptionLevel : 50;
+        const prevCorruption = typeof meta.corruptionLevel === 'number' ? meta.corruptionLevel : 0;
 
         // Smooth blending: 70% previous + 30% new (scaled to 0-100)
         // Raw score 0-10 → multiply by 10 → 0-100 range
@@ -4087,7 +4087,7 @@ function buildTurnUserPrompt({
   narrativeMemory = null,  // Dynamic Story Spine
   playerCompass = null,  // Player compass values for optional integration
   playerCompassTopValues = null,
-  corruptionLevel = 50,  // Corruption tracking (0-100)
+  corruptionLevel = 0,   // Corruption tracking (0-100, start clean)
   corruptionHistory = []
 }) {
   const clampedTotal = Number.isFinite(totalDays) ? totalDays : 7;

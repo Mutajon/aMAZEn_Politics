@@ -3,15 +3,17 @@
 //
 // Handles:
 // - Progressive revelation (one component at a time)
-// - Day 1 vs Day 2+ differences (support/compass analysis)
+// - Day 1 vs Day 2+ differences (support analysis)
 // - Applying state updates at correct moments
 // - Timing and animation coordination
 //
+// NOTE: Compass deltas are NO LONGER applied here - they're applied in eventDataCleaner.ts
+// immediately after action confirmation, before day advancement.
+//
 // Used by: EventScreen3
-// Dependencies: dilemmaStore, compassStore, useRoleStore
+// Dependencies: dilemmaStore, useRoleStore
 
 import { useDilemmaStore } from "../store/dilemmaStore";
-import { useCompassStore } from "../store/compassStore";
 import { useRoleStore } from "../store/roleStore";
 import type { CollectedData } from "../hooks/useEventDataCollector";
 
@@ -58,31 +60,16 @@ function applySupportDeltas(supportEffects: CollectedData['supportEffects']): vo
 }
 
 /**
- * Apply compass deltas to the compassStore
- * This is where compass values actually change in the global state
+ * REMOVED: applyCompassDeltas() function
+ *
+ * Compass deltas are now applied in eventDataCleaner.ts (Step 3.5)
+ * IMMEDIATELY after action confirmation, BEFORE day advancement.
+ *
+ * This ensures compass values are updated when pills appear visually,
+ * not one day later during the next day's presentation.
+ *
+ * See: src/lib/eventDataCleaner.ts - Step 3.5
  */
-function applyCompassDeltas(compassPills: CollectedData['compassPills']): void {
-  if (!compassPills || compassPills.length === 0) return;
-
-  const store = useCompassStore.getState();
-
-  // Convert compassPills to Effect[] format expected by applyEffects
-  const effects = compassPills.map(pill => ({
-    prop: pill.prop,
-    idx: pill.idx,
-    delta: pill.delta
-  }));
-
-  console.log(`[Presenter] Applying ${effects.length} compass deltas`);
-
-  // Use the store's built-in applyEffects method (handles clamping 0-10)
-  const appliedEffects = store.applyEffects(effects);
-
-  // Log each applied delta
-  appliedEffects.forEach(eff => {
-    console.log(`[Presenter] Applied compass delta: ${eff.prop}[${eff.idx}] (${eff.delta >= 0 ? '+' : ''}${eff.delta})`);
-  });
-}
 
 // ============================================================================
 // MAIN PRESENTER FUNCTION
@@ -144,13 +131,15 @@ export async function presentEventData(
 
   await delay(1200); // Let user start reading dilemma
 
-  // ========== STEP 4A: Compass Pills (Day 2+ only) ==========
-  // Pills are handled by EventScreen3's visibility logic (data-based, not step-based)
-  // Apply compass deltas to store when available
-  if (!isFirstDay && collectedData.compassPills && collectedData.compassPills.length > 0) {
-    applyCompassDeltas(collectedData.compassPills);
-    await delay(2500); // Wait for pills to appear and auto-collapse
-  }
+  // ========== STEP 4A: Compass Pills ==========
+  // REMOVED - Compass deltas are now applied in eventDataCleaner.ts (Step 3.5)
+  // immediately after action confirmation, BEFORE day advancement.
+  //
+  // Pills are still displayed by EventScreen3 from dilemmaStore.pendingCompassPills,
+  // but the compass values are already updated by the time pills appear.
+  //
+  // This fixes the one-day delay issue where compass values weren't updated
+  // until the NEXT day's presentation started.
 
   // ========== STEP 5: MirrorCard ==========
   setPresentationStep(5);

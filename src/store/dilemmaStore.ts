@@ -4,6 +4,7 @@ import { persist } from "zustand/middleware";
 import type { Dilemma, DilemmaAction, DilemmaHistoryEntry, SubjectStreak, DilemmaScope, ScopeStreak, LightDilemmaRequest, LightDilemmaResponse } from "../lib/dilemma";
 import type { ScoreBreakdown } from "../lib/scoring";
 import type { Goal, SelectedGoal } from "../data/goals";
+import type { CompassPill } from "../hooks/useEventDataCollector";
 import { evaluateAllGoals } from "../lib/goalEvaluation";
 import { useSettingsStore } from "./settingsStore";
 import { useRoleStore } from "./roleStore";
@@ -126,6 +127,9 @@ type DilemmaState = {
     reason: string;
     level: number;      // Resulting 0-100 level
   }>;
+
+  // Pending compass pills (applied in cleaner phase, displayed in EventScreen)
+  pendingCompassPills: CompassPill[] | null;
 
   loadNext: () => Promise<void>;
   nextDay: () => void;
@@ -277,6 +281,7 @@ export const useDilemmaStore = create<DilemmaState>()(
   corruptionLevel: 0,
   previousCorruptionValue: null,
   corruptionHistory: [],
+  pendingCompassPills: null,
 
   async loadNext() {
     // If something is already loading, bail early
@@ -404,9 +409,10 @@ export const useDilemmaStore = create<DilemmaState>()(
       crisisMode: null,
       crisisEntity: null,
       previousSupportValues: null,
-      corruptionLevel: 50,
+      corruptionLevel: 0,
       previousCorruptionValue: null,
       corruptionHistory: [],
+      pendingCompassPills: null,
     });
   },
 

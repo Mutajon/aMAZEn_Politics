@@ -71,6 +71,15 @@ type SettingsState = {
   setDataCollectionEnabled: (v: boolean) => void;
   toggleDataCollectionEnabled: () => void;
 
+  // --- NEW: Treatment assignment (for research variants) ---
+  treatment: string;
+  setTreatment: (v: string) => void;
+
+  // --- NEW: Experiment mode gate ---
+  experimentMode: boolean;
+  setExperimentMode: (v: boolean) => void;
+  toggleExperimentMode: () => void;
+
   // --- NEW: Corruption tracking (default OFF) ---
   corruptionTrackingEnabled: boolean;
   setCorruptionTrackingEnabled: (v: boolean) => void;
@@ -149,6 +158,15 @@ export const useSettingsStore = create<SettingsState>()(
       setDataCollectionEnabled: (v) => set({ dataCollectionEnabled: v }),
       toggleDataCollectionEnabled: () => set({ dataCollectionEnabled: !get().dataCollectionEnabled }),
 
+      // NEW: Treatment assignment (default "control")
+      treatment: "control",
+      setTreatment: (v) => set({ treatment: v }),
+
+      // NEW: Experiment mode gate (default OFF)
+      experimentMode: false,
+      setExperimentMode: (v) => set({ experimentMode: v }),
+      toggleExperimentMode: () => set({ experimentMode: !get().experimentMode }),
+
       // NEW: Corruption tracking (default OFF)
       corruptionTrackingEnabled: false,
       setCorruptionTrackingEnabled: (v) => set({ corruptionTrackingEnabled: v }),
@@ -174,6 +192,8 @@ export const useSettingsStore = create<SettingsState>()(
         sfxVolume: s.sfxVolume,
         skipPreviousContext: s.skipPreviousContext,
         dataCollectionEnabled: s.dataCollectionEnabled,
+        treatment: s.treatment,
+        experimentMode: s.experimentMode,
         corruptionTrackingEnabled: s.corruptionTrackingEnabled,
       }),
     }
