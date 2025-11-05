@@ -8,9 +8,12 @@ import { validateRoleStrict, AIConnectionError } from "../lib/validation";
 import { useRoleStore } from "../store/roleStore";
 import { useLogger } from "../hooks/useLogger";
 import { useLang } from "../i18n/lang";
-import { PREDEFINED_ROLES_ARRAY, getRoleImagePaths, type RoleGoalStatus } from "../data/predefinedRoles";
+import { PREDEFINED_ROLES_ARRAY, getRoleImagePaths, type RoleGoalStatus, EXPERIMENT_PREDEFINED_ROLE_KEYS } from "../data/predefinedRoles";
 import { useSettingsStore } from "../store/settingsStore";
 import { useRoleProgressStore } from "../store/roleProgressStore";
+import { useLoggingStore } from "../store/loggingStore";
+
+const EXPERIMENT_ROLE_KEY_SET = new Set(EXPERIMENT_PREDEFINED_ROLE_KEYS);
 
 type RoleItem = {
   key: string; // Unique key for the role (matches predefinedPowerDistributions keys)
@@ -39,7 +42,10 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const setRoleScope = useRoleStore(s => s.setRoleScope);
   const setStoryThemes = useRoleStore(s => s.setStoryThemes);
   const debugMode = useSettingsStore(s => s.debugMode);
+  const experimentMode = useSettingsStore(s => s.experimentMode);
   const roleGoals = useRoleProgressStore((s) => s.goals);
+  const experimentProgress = useLoggingStore((s) => s.experimentProgress);
+  const setExperimentActiveRole = useLoggingStore((s) => s.setExperimentActiveRole);
 
   // Generate roles array dynamically from centralized database
   const roles: RoleItem[] = PREDEFINED_ROLES_ARRAY.map((roleData) => {
@@ -58,6 +64,39 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
       highScore: roleGoals[roleData.legacyKey]?.bestScore ?? roleData.defaultHighScore,
     };
   });
+
+  const experimentCompletedRoles = experimentProgress.completedRoles;
+  const experimentCompletedCount = EXPERIMENT_PREDEFINED_ROLE_KEYS.reduce(
+    (count, key) => count + (experimentCompletedRoles?.[key] ? 1 : 0),
+    0
+  );
+  const experimentAllCompleted =
+    experimentCompletedCount >= EXPERIMENT_PREDEFINED_ROLE_KEYS.length;
+
+  const experimentVisibleRoles = experimentMode
+    ? roles.filter((role) => EXPERIMENT_ROLE_KEY_SET.has(role.key))
+    : roles;
+
+  const isExperimentRoleUnlocked = (roleKey: string) => {
+    if (!experimentMode) {
+      return true;
+    }
+    if (!EXPERIMENT_ROLE_KEY_SET.has(roleKey)) {
+      return false;
+    }
+    if (experimentAllCompleted) {
+      return false;
+    }
+    if (experimentCompletedRoles?.[roleKey]) {
+      return false;
+    }
+    const roleIndex = EXPERIMENT_PREDEFINED_ROLE_KEYS.indexOf(roleKey);
+    if (roleIndex === -1) {
+      return false;
+    }
+
+    return roleIndex === experimentCompletedCount;
+  };
 
   const [expandedRole, setExpandedRole] = useState<string | null>(null);
   const [showSuggestModal, setShowSuggestModal] = useState(false);
@@ -79,6 +118,12 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (experimentMode && expandedRole && !EXPERIMENT_ROLE_KEY_SET.has(expandedRole)) {
+      setExpandedRole(null);
+    }
+  }, [experimentMode, expandedRole]);
 
   const openSuggest = () => {
     setInput("");
@@ -131,6 +176,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
 
       setChecking(false);
       setRole(input.trim());
+      setExperimentActiveRole(null);
 
       // Clear stale political system data when entering custom role
       setAnalysis({
@@ -169,9 +215,19 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   }
 
   const handleRoleConfirm = (role: RoleItem) => {
+    if (experimentMode && !isExperimentRoleUnlocked(role.key)) {
+      logger.log(
+        'role_locked_attempt',
+        role.key,
+        'User attempted to confirm a locked role while experiment mode is active'
+      );
+      return;
+    }
+
     logger.log('role_confirm', role.key, `User confirmed predefined role: ${role.key}`);
 
     setRole(role.key);
+    setExperimentActiveRole(experimentMode ? role.key : null);
 
     // Prime analysis from centralized predefined roles database
     const roleData = PREDEFINED_ROLES_ARRAY.find(r => r.legacyKey === role.key);
@@ -223,7 +279,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
         </h2>
 
         <motion.div variants={container} initial="hidden" animate="show" className="mt-6 space-y-3">
-          {roles.map((role) => {
+          {experimentVisibleRoles.map((role) => {
             const statusCompleted = role.goalStatus === "completed";
             const statusLabel = lang(statusCompleted ? "ROLE_GOAL_COMPLETED" : "ROLE_GOAL_UNCOMPLETED");
             const statusClasses = statusCompleted
@@ -246,9 +302,22 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
               }
             })();
             const highScoreDisplay = role.highScore > 0 ? role.highScore.toLocaleString() : "-";
+            const experimentRoleLocked = experimentMode && !isExperimentRoleUnlocked(role.key);
+            const experimentRoleCompleted = experimentMode && !!experimentCompletedRoles?.[role.key];
+            const lockMessage = experimentRoleCompleted
+              ? lang("EXPERIMENT_ROLE_ALREADY_COMPLETED")
+              : lang("EXPERIMENT_ROLE_LOCKED");
+            const confirmButtonClasses = experimentRoleLocked
+              ? "w-full rounded-xl px-4 py-3 font-semibold text-sm bg-slate-700/60 text-white/40 cursor-not-allowed transition-all duration-200"
+              : "w-full rounded-xl px-4 py-3 font-semibold text-sm shadow-lg bg-gradient-to-r from-amber-400 to-amber-600 text-gray-900 hover:from-amber-300 hover:to-amber-500 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200";
 
             return (
-              <motion.div key={role.key} variants={itemVariants} data-role-card>
+              <motion.div
+                key={role.key}
+                variants={itemVariants}
+                data-role-card
+                className={experimentRoleLocked ? "opacity-70" : undefined}
+              >
               {/* Golden frame wrapper that contains both title and expanded content */}
               <div className={`rounded-2xl overflow-hidden shadow-xl transition-all duration-300 ${
                 expandedRole === role.key
@@ -367,12 +436,27 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (experimentRoleLocked) {
+                                logger.log(
+                                  'role_locked_attempt',
+                                  role.key,
+                                  'User attempted to confirm a locked role from button press'
+                                );
+                                return;
+                              }
                               handleRoleConfirm(role);
                             }}
-                            className="w-full rounded-xl px-4 py-3 font-semibold text-sm shadow-lg bg-gradient-to-r from-amber-400 to-amber-600 text-gray-900 hover:from-amber-300 hover:to-amber-500 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                            className={confirmButtonClasses}
+                            disabled={experimentRoleLocked}
+                            aria-disabled={experimentRoleLocked}
                           >
-                            {lang("CONFIRM")}
+                            {experimentRoleLocked ? lang("LOCKED") : lang("CONFIRM")}
                           </button>
+                          {experimentMode && experimentRoleLocked && (
+                            <p className="mt-2 text-xs text-amber-100/80 text-center">
+                              {lockMessage}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </motion.div>
@@ -383,20 +467,27 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
             );
           })}
 
-          {/* Suggest your own button */}
-          <motion.div variants={itemVariants}>
-            <button
-              onClick={() => {
-                logger.log('button_click', 'Suggest Your Own', 'User clicked "Suggest your own" button');
-                openSuggest();
-              }}
-              className="w-full px-6 py-4 rounded-2xl bg-gradient-to-r from-purple-900/90 to-purple-700/90 hover:from-purple-800/95 hover:to-purple-700/95 text-white border border-purple-500/30 hover:border-purple-400/40 transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-3 shadow-xl"
-            >
-              <span className="text-xl leading-none">❓</span>
-              <span className="text-base font-medium tracking-wide drop-shadow-sm">{lang("SUGGEST_YOUR_OWN")}</span>
-            </button>
-          </motion.div>
+          {!experimentMode && (
+            <motion.div variants={itemVariants}>
+              <button
+                onClick={() => {
+                  logger.log('button_click', 'Suggest Your Own', 'User clicked "Suggest your own" button');
+                  openSuggest();
+                }}
+                className="w-full px-6 py-4 rounded-2xl bg-gradient-to-r from-purple-900/90 to-purple-700/90 hover:from-purple-800/95 hover:to-purple-700/95 text-white border border-purple-500/30 hover:border-purple-400/40 transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-3 shadow-xl"
+              >
+                <span className="text-xl leading-none">❓</span>
+                <span className="text-base font-medium tracking-wide drop-shadow-sm">{lang("SUGGEST_YOUR_OWN")}</span>
+              </button>
+            </motion.div>
+          )}
         </motion.div>
+
+        {experimentMode && experimentAllCompleted && (
+          <div className="mt-6 rounded-2xl border border-amber-400/40 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
+            {lang("EXPERIMENT_ALL_ROLES_COMPLETE")}
+          </div>
+        )}
 
         {/* Suggest-your-own Modal */}
         <AnimatePresence>

@@ -13,6 +13,8 @@ import { Coins, CheckCircle2 } from "lucide-react";
 import type { ActionCard } from "../../hooks/useActionDeckState";
 import { useAudioManager } from "../../hooks/useAudioManager";
 import { useLogger } from "../../hooks/useLogger";
+import { getTreatmentConfig, type TreatmentType } from "../../data/experimentConfig";
+import { useSettingsStore } from "../../store/settingsStore";
 
 // Visual constants
 const ENTER_STAGGER = 0.12;
@@ -105,6 +107,10 @@ export default function ActionDeckContent({
   const { playSfx } = useAudioManager();
   const logger = useLogger();
 
+  // Get treatment configuration for conditional rendering
+  const treatment = useSettingsStore((state) => state.treatment) as TreatmentType;
+  const config = getTreatmentConfig(treatment);
+
   const canAffordSuggestion = !showBudget || budget >= Math.abs(suggestCost);
   const suggestTextValid = suggestText.trim().length >= 4;
 
@@ -183,13 +189,14 @@ export default function ActionDeckContent({
           animate="show"
           variants={{ hidden: {}, show: { transition: { staggerChildren: ENTER_STAGGER } } }}
         >
-        {/* Cards row (3 columns) */}
-        <div className="grid grid-cols-3 gap-3">
-          {cards.map((c) => {
-            const isSelected = selectedCard?.id === c.id;
-            const disabled = Boolean(confirmingId) || !c.affordable;
+        {/* Cards row (3 columns) - TREATMENT: semiAutonomy & noAutonomy show AI options */}
+        {config.showAIOptions && cards.length > 0 && (
+          <div className="grid grid-cols-3 gap-3">
+            {cards.map((c) => {
+              const isSelected = selectedCard?.id === c.id;
+              const disabled = Boolean(confirmingId) || !c.affordable;
 
-            return (
+              return (
               <motion.div
                 key={c.id}
                 layout
@@ -262,9 +269,19 @@ export default function ActionDeckContent({
               </motion.div>
             );
           })}
-        </div>
+          </div>
+        )}
 
-        {/* Suggest-your-own pill (part of stagger sequence) */}
+        {/* TREATMENT: fullAutonomy hides AI options, shows message */}
+        {!config.showAIOptions && (
+          <div className="col-span-3 text-center py-12 space-y-2">
+            <p className="text-lg font-semibold text-gray-300">Full Autonomy Mode</p>
+            <p className="text-sm text-gray-400">Create your own action using the button below</p>
+          </div>
+        )}
+
+        {/* Suggest-your-own pill (part of stagger sequence) - TREATMENT: fullAutonomy & semiAutonomy show button */}
+        {config.showCustomAction && (
         <motion.div className="mt-3 flex justify-center" layout
           variants={{
             hidden: { opacity: 0, scale: 0.85 },
@@ -301,6 +318,8 @@ export default function ActionDeckContent({
           </motion.button>
           </div>
         </motion.div>
+        )}
+        {/* End of showCustomAction conditional */}
         </motion.div>
 
         {/* Expanded overlay */}

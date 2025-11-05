@@ -1032,6 +1032,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
   }
 ];
 
+export const EXPERIMENT_PREDEFINED_ROLE_KEYS = PREDEFINED_ROLES_ARRAY.slice(0, 3).map((role) => role.legacyKey);
+
 /**
  * Record mapping for quick lookup by legacy key
  */

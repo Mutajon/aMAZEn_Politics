@@ -72,8 +72,8 @@ type SettingsState = {
   toggleDataCollectionEnabled: () => void;
 
   // --- NEW: Treatment assignment (for research variants) ---
-  treatment: string;
-  setTreatment: (v: string) => void;
+  treatment: 'fullAutonomy' | 'semiAutonomy' | 'noAutonomy';
+  setTreatment: (v: 'fullAutonomy' | 'semiAutonomy' | 'noAutonomy') => void;
 
   // --- NEW: Experiment mode gate ---
   experimentMode: boolean;
@@ -158,8 +158,8 @@ export const useSettingsStore = create<SettingsState>()(
       setDataCollectionEnabled: (v) => set({ dataCollectionEnabled: v }),
       toggleDataCollectionEnabled: () => set({ dataCollectionEnabled: !get().dataCollectionEnabled }),
 
-      // NEW: Treatment assignment (default "control")
-      treatment: "control",
+      // NEW: Treatment assignment (default "semiAutonomy" - current balanced behavior)
+      treatment: "semiAutonomy",
       setTreatment: (v) => set({ treatment: v }),
 
       // NEW: Experiment mode gate (default OFF)

@@ -197,6 +197,48 @@ TTS_VOICE=alloy
 - Displayed in ResourceBar during gameplay
 - Data: `src/data/goals.ts`
 
+**Experiment Configuration System:**
+- Centralized configuration for A/B testing and research experiments
+- File: `src/data/experimentConfig.ts`
+- Controls feature availability based on treatment assignment
+
+**Treatment Types:**
+
+| Treatment | AI Options | Custom Action | API Call |
+|-----------|-----------|---------------|----------|
+| **fullAutonomy** | ❌ Hidden | ✅ Only option shown | Skipped (token savings) |
+| **semiAutonomy** | ✅ 3 cards shown | ✅ Button below cards | Called (default) |
+| **noAutonomy** | ✅ 3 cards shown | ❌ Hidden | Called |
+
+**Usage Pattern:**
+```typescript
+import { getTreatmentConfig } from '@/data/experimentConfig';
+import { useSettingsStore } from '@/store/settingsStore';
+
+const treatment = useSettingsStore((state) => state.treatment);
+const config = getTreatmentConfig(treatment);
+
+// Check feature availability
+if (config.generateAIOptions) { /* Call API */ }
+if (config.showCustomAction) { /* Show button */ }
+if (config.inquiryTokensPerDilemma > 0) { /* Future feature */ }
+```
+
+**Token Optimization:**
+When treatment is `fullAutonomy`, the `/api/game-turn` endpoint skips generating AI action options, saving ~40-50% of dilemma generation tokens. The `generateActions` flag is passed from frontend to backend automatically.
+
+**Implementation Points:**
+- **Settings Store** (`settingsStore.ts`): Stores treatment assignment
+- **API Hook** (`useEventDataCollector.ts`): Sends `generateActions` flag to backend
+- **Backend** (`server/index.mjs`): Conditionally generates actions based on flag
+- **UI** (`ActionDeckContent.tsx`): Shows/hides AI cards and custom button
+
+**Adding New Experimental Features:**
+1. Add field to `TreatmentConfig` interface in `experimentConfig.ts`
+2. Set values for each treatment in `EXPERIMENT_CONFIG`
+3. Read config in component/hook and implement conditional logic
+4. Update this documentation
+
 ## Audio System
 
 **Architecture:**

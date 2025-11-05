@@ -128,12 +128,18 @@ function resetState() {
 }
 
 /**
- * Set treatment (for testing)
+ * Set treatment (for testing) - Updates BOTH loggingStore and settingsStore
  */
-function setTreatment(treatment: string) {
+function setTreatment(treatment: 'fullAutonomy' | 'semiAutonomy' | 'noAutonomy') {
+  // Update loggingStore (for backend analytics/logging)
   loggingService.setTreatment(treatment);
-  console.log('[Logging Debug] 🧪 Treatment set to:', treatment);
-  console.log('State:', useLoggingStore.getState());
+
+  // Update settingsStore (for UI/gameplay behavior)
+  useSettingsStore.getState().setTreatment(treatment);
+
+  console.log('[Debug] 🧪 Treatment set to:', treatment);
+  console.log('  📊 Logging Store:', useLoggingStore.getState().treatment);
+  console.log('  ⚙️  Settings Store:', useSettingsStore.getState().treatment);
 }
 
 /**
@@ -201,7 +207,7 @@ export function attachLoggingDebug() {
     console.log('  testLog()              - Add a test log entry');
     console.log('  showState()            - Show current logging state');
     console.log('  resetState()           - Reset logging state (WARNING: clears userId)');
-    console.log('  setTreatment(name)     - Set treatment condition');
+    console.log('  setTreatment(name)     - Set treatment condition (updates both stores)');
     console.log('  generateTestSession()  - Generate complete test session with sample data');
   }
 }

@@ -3255,7 +3255,8 @@ app.post("/api/game-turn", async (req, res) => {
       crisisContext, // Optional: rich context about the crisis (NEW)
       totalDays: totalDaysInput,
       daysLeft: daysLeftInput,
-      debugMode // Optional: enable verbose logging (from settingsStore.debugEnabled)
+      debugMode, // Optional: enable verbose logging (from settingsStore.debugEnabled)
+      generateActions = true // Optional: whether to generate AI action options (default true, false for fullAutonomy)
     } = req.body;
 
     const numericTotalDays = Number(totalDaysInput);
@@ -3281,7 +3282,8 @@ app.post("/api/game-turn", async (req, res) => {
     let totalDaysForTurn = hasTotalDaysFromBody ? numericTotalDays : null;
     let daysLeftForTurn = hasDaysLeftFromBody ? Math.max(numericDaysLeft, 0) : null;
     let isAftermathTurn = false;
-    let allowEmptyActions = crisisMode === "downfall";
+    // Allow empty actions for downfall OR when AI generation is disabled (fullAutonomy)
+    let allowEmptyActions = crisisMode === "downfall" || generateActions === false;
 
     // ============================================================================
     // DAY 1: Initialize conversation with full game context
@@ -3316,7 +3318,7 @@ app.post("/api/game-turn", async (req, res) => {
         : null;
 
       // Build comprehensive system prompt for the entire game
-      const systemPrompt = buildGameSystemPrompt(enrichedContext);
+      const systemPrompt = buildGameSystemPrompt(enrichedContext, generateActions);
 
       // Initial user message requesting first dilemma
       const userMessage = buildDay1UserPrompt(enrichedContext);
@@ -3644,12 +3646,21 @@ app.post("/api/game-turn", async (req, res) => {
         turnData.dynamicParams = sanitizedDynamicParams;
 
         if (allowEmptyActions) {
-          turnData.isGameEnd = true;
-          turnData.dynamicParams = [];
-          if (!turnData.topic) {
-            turnData.topic = "Conclusion";
-          }
+          // Clear actions array
           turnData.actions = [];
+
+          // Only set isGameEnd for ACTUAL game-ending scenarios
+          if (isAftermathTurn || crisisMode === "downfall") {
+            // Legitimate game end (Day 8 or total collapse)
+            turnData.isGameEnd = true;
+            turnData.dynamicParams = [];
+            if (!turnData.topic) {
+              turnData.topic = "Conclusion";
+            }
+          } else if (generateActions === false) {
+            // fullAutonomy treatment - empty actions is NORMAL, not game end
+            turnData.isGameEnd = false;
+          }
         } else {
           turnData.actions = sanitizeTurnActions(turnData.actions);
           if (turnData.isGameEnd) {
@@ -4535,7 +4546,7 @@ WHITHER (recipients) – prop "whither"
 /**
  * Helper: Build comprehensive system prompt for entire game
  */
-function buildGameSystemPrompt(gameContext) {
+function buildGameSystemPrompt(gameContext, generateActions = true) {
   const {
     role,
     roleTitle,
@@ -4824,9 +4835,9 @@ ${buildLightSystemPrompt()}
 OUTPUT FORMAT (JSON):
 {
   "title": "Guard the Coastline",
-  "description": "As provincial governor, you survey the shoreline while courtiers press conflicting demands about the expelled foreigners’ ships.",
+  "description": "As provincial governor, you survey the shoreline while courtiers press conflicting demands about the expelled foreigners' ships.",
   "selectedThreadIndex": 1,
-  "selectedThreadSummary": "Demonstrations over autonomy boil over, forcing you to confront the governor-versus-activists thread head-on.",
+  "selectedThreadSummary": "Demonstrations over autonomy boil over, forcing you to confront the governor-versus-activists thread head-on.",${generateActions ? `
   "actions": [
     {
       "id": "a",
@@ -4849,7 +4860,8 @@ OUTPUT FORMAT (JSON):
       "cost": -100,
       "iconHint": "diplomacy"
     }
-  ],
+  ],` : `
+  "actions": [],`}
   "topic": "Security",
   "scope": "Local",
   "supportShift": {
@@ -4874,11 +4886,13 @@ OUTPUT FORMAT (JSON):
 }
 
 CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no prose.
-Follow these rules outside the JSON:
+Follow these rules outside the JSON:${generateActions ? `
 - Provide exactly three mutually conflicting actions.
 - Keep the title concise and evocative (≤ ~70 characters is ideal).
 - Action summaries should read as one clear sentence; avoid numbered lists or option letters.
-- Use allowed cost tiers {0, ±50, ±100, ±150, ±200, ±250} and assign them by escalating real-world intensity.
+- Use allowed cost tiers {0, ±50, ±100, ±150, ±200, ±250} and assign them by escalating real-world intensity.` : `
+- DO NOT generate action options. Leave the "actions" array empty [].
+- IMPORTANT: Empty actions array does NOT mean game end. Keep "isGameEnd": false unless this is the final day or a downfall crisis.`}
 - Fill supportShift, dynamicParams, and corruptionJudgment only when previous context exists (Day 2+). Every supportShift "why" must quote the faction voice and feel natural.
 - When writing supportShift deltas, use plain integers (e.g., 8, -6) with no leading plus sign.
 - Dynamic parameters must contain specific numbers and vary emoji/tone logically.

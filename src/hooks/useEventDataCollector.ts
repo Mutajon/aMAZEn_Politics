@@ -20,6 +20,7 @@ import type { Dilemma } from "../lib/dilemma";
 import type { TickerItem } from "../components/event/NewsTicker";
 import { audioManager } from "../lib/audioManager";
 import { calculateLiveScoreBreakdown } from "../lib/scoring";
+import { shouldGenerateAIOptions, type TreatmentType } from "../data/experimentConfig";
 
 // ============================================================================
 // TYPES
@@ -328,7 +329,11 @@ async function fetchGameTurn(): Promise<{
   const debugMode = useSettingsStore.getState().debugMode;
   payload.debugMode = debugMode;
 
-  console.log(`[fetchGameTurn] Calling /api/game-turn for Day ${day}, gameId=${currentGameId}`);
+  // Pass treatment-based AI option generation flag (token optimization)
+  const treatment = useSettingsStore.getState().treatment as TreatmentType;
+  payload.generateActions = shouldGenerateAIOptions(treatment);
+
+  console.log(`[fetchGameTurn] Calling /api/game-turn for Day ${day}, gameId=${currentGameId}, treatment=${treatment}, generateActions=${payload.generateActions}`);
 
   const response = await fetch("/api/game-turn", {
     method: "POST",
@@ -348,12 +353,13 @@ async function fetchGameTurn(): Promise<{
     throw new Error("Invalid game turn response: missing required fields");
   }
 
-  // Allow empty actions array ONLY when isGameEnd is true
+  // Allow empty actions array when: (1) isGameEnd is true, OR (2) generateActions is false (fullAutonomy)
   if (!Array.isArray(data.actions)) {
     data.actions = [];
   }
 
-  if (!data.isGameEnd) {
+  if (!data.isGameEnd && payload.generateActions) {
+    // Only validate action count when we actually requested AI to generate them
     if (data.actions.length > 3) {
       console.warn("[fetchGameTurn] ⚠️ Received more than 3 actions. Truncating to 3.");
       data.actions = data.actions.slice(0, 3);

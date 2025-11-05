@@ -33,10 +33,14 @@ import {
 import { useAftermathSequence } from "../hooks/useAftermathSequence";
 import AftermathContent from "../components/aftermath/AftermathContent";
 import { useLang } from "../i18n/lang";
+import { useLoggingStore } from "../store/loggingStore";
+import { EXPERIMENT_PREDEFINED_ROLE_KEYS } from "../data/predefinedRoles";
 
 type Props = {
   push: PushFn;
 };
+
+const EXPERIMENT_ROLE_KEY_SET = new Set(EXPERIMENT_PREDEFINED_ROLE_KEYS);
 
 export default function AftermathScreen({ push }: Props) {
   const lang = useLang();
@@ -44,6 +48,9 @@ export default function AftermathScreen({ push }: Props) {
   const { character, roleBackgroundImage } = useRoleStore();
   const { progress, start: startProgress, notifyReady } = useLoadingProgress();
   const top3ByDimension = useMirrorTop3();
+  const experimentActiveRoleKey = useLoggingStore((s) => s.experimentProgress.activeRoleKey);
+  const experimentCompletedRoles = useLoggingStore((s) => s.experimentProgress.completedRoles);
+  const markExperimentRoleCompleted = useLoggingStore((s) => s.markExperimentRoleCompleted);
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
 
   // ========================================================================
@@ -89,6 +96,20 @@ export default function AftermathScreen({ push }: Props) {
       notifyReady();
     }
   }, [data, notifyReady, initializedFromSnapshot]);
+
+  useEffect(() => {
+    if (!data) return;
+    if (!experimentActiveRoleKey) return;
+    if (!EXPERIMENT_ROLE_KEY_SET.has(experimentActiveRoleKey)) return;
+    if (experimentCompletedRoles?.[experimentActiveRoleKey]) return;
+
+    markExperimentRoleCompleted(experimentActiveRoleKey);
+  }, [
+    data,
+    experimentActiveRoleKey,
+    experimentCompletedRoles,
+    markExperimentRoleCompleted
+  ]);
 
   // ========================================================================
   // RENDER: Loading State
