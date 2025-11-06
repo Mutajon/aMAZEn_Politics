@@ -755,7 +755,11 @@ export const useDilemmaStore = create<DilemmaState>()(
 
     set({
       gameId,
-      conversationActive: true
+      conversationActive: true,
+      // Explicitly reset corruption to ensure clean slate for new game
+      corruptionLevel: 0,
+      corruptionHistory: [],
+      previousCorruptionValue: null
     });
   },
 
@@ -960,8 +964,7 @@ export const useDilemmaStore = create<DilemmaState>()(
         gameId: state.gameId, // Persist gameId for conversation continuity
         conversationActive: state.conversationActive,
         difficulty: state.difficulty,
-        selectedGoals: state.selectedGoals,
-        finalScoreSubmitted: state.finalScoreSubmitted
+        selectedGoals: state.selectedGoals
       })
     }
   )
