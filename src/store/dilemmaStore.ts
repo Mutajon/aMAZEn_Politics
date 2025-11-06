@@ -62,6 +62,16 @@ type DilemmaState = {
   inquiryHistory: Map<number, Array<{ question: string; answer: string; timestamp: number }>>;
   inquiryCreditsRemaining: number;  // Resets each dilemma based on treatment config
 
+  // Reasoning System (Treatment-based feature for player to explain decisions)
+  reasoningHistory: Array<{
+    day: number;
+    actionId: string;
+    actionTitle: string;
+    actionDescription: string;
+    reasoningText: string;
+    timestamp: number;
+  }>;
+
   current: Dilemma | null;
   history: Dilemma[];
   loading: boolean;
@@ -193,6 +203,15 @@ type DilemmaState = {
   getInquiriesForCurrentDay: () => Array<{question: string, answer: string, timestamp: number}>;  // Retrieve current day inquiries
   canInquire: () => boolean;                                   // Check if inquiries are available
 
+  // Reasoning system methods (Treatment-based feature)
+  addReasoningEntry: (entry: {
+    day: number;
+    actionId: string;
+    actionTitle: string;
+    actionDescription: string;
+    reasoningText: string;
+  }) => void;                                                   // Store reasoning entry
+
   // Crisis detection methods (NEW)
   detectAndSetCrisis: () => "downfall" | "people" | "challenger" | "caring" | null;  // Detect crisis after support updates, returns crisis mode
   clearCrisis: () => void;          // Clear crisis state after handling
@@ -226,6 +245,9 @@ export const useDilemmaStore = create<DilemmaState>()(
   // Inquiry system (initialized with 0 credits, reset per dilemma based on treatment)
   inquiryHistory: new Map(),
   inquiryCreditsRemaining: 0,
+
+  // Reasoning system (initialized empty, populated as player provides reasoning)
+  reasoningHistory: [],
 
   current: null,
   history: [],
@@ -388,6 +410,7 @@ export const useDilemmaStore = create<DilemmaState>()(
       error: null,
       lastChoice: null,
       dilemmaHistory: [],
+      reasoningHistory: [],
       dayProgression: {
         isProgressing: false,
         progressingToDay: 1,
@@ -815,6 +838,27 @@ export const useDilemmaStore = create<DilemmaState>()(
 
     // Feature available if treatment allows it AND player has credits
     return config.inquiryTokensPerDilemma > 0 && inquiryCreditsRemaining > 0;
+  },
+
+  // ========================================================================
+  // REASONING SYSTEM METHODS
+  // ========================================================================
+
+  addReasoningEntry(entry) {
+    const { reasoningHistory } = get();
+
+    // Add timestamp to entry
+    const entryWithTimestamp = {
+      ...entry,
+      timestamp: Date.now()
+    };
+
+    // Append to history
+    const newHistory = [...reasoningHistory, entryWithTimestamp];
+
+    dlog("addReasoningEntry -> day", entry.day, "action:", entry.actionTitle, "length:", entry.reasoningText.length);
+
+    set({ reasoningHistory: newHistory });
   },
 
   // ========================================================================

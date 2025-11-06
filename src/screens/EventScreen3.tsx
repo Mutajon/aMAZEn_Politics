@@ -40,6 +40,9 @@ import { useLang } from "../i18n/lang";
 import { useRoleProgressStore } from "../store/roleProgressStore";
 import { useTimingLogger } from "../hooks/useTimingLogger";
 import { useAIOutputLogger } from "../hooks/useAIOutputLogger";
+import { useReasoning } from "../hooks/useReasoning";
+import { useLogger } from "../hooks/useLogger";
+import ReasoningModal from "../components/event/ReasoningModal";
 
 type Props = {
   push: (path: string) => void;
@@ -112,7 +115,7 @@ export default function EventScreen3({ push }: Props) {
   const { progress, start: startProgress, reset: resetProgress, notifyReady } = useLoadingProgress();
 
   // Phase tracking
-  const [phase, setPhase] = useState<'collecting' | 'presenting' | 'interacting' | 'cleaning'>('collecting');
+  const [phase, setPhase] = useState<'collecting' | 'presenting' | 'interacting' | 'reasoning' | 'cleaning'>('collecting');
 
   // Presentation step tracking (controls what's visible)
   const [presentationStep, setPresentationStep] = useState<number>(-1);
@@ -132,6 +135,15 @@ export default function EventScreen3({ push }: Props) {
   // Note: State change tracking is handled globally in App.tsx via useStateChangeLogger
   const timingLogger = useTimingLogger();
   const aiLogger = useAIOutputLogger();
+  const logger = useLogger();
+
+  // Reasoning feature (treatment-based)
+  const reasoning = useReasoning();
+  const [showReasoningModal, setShowReasoningModal] = useState(false);
+  const [reasoningModalAction, setReasoningModalAction] = useState<ActionCard | null>(null);
+  const [isSubmittingReasoning, setIsSubmittingReasoning] = useState(false);
+  const reasoningResolveRef = useRef<(() => void) | null>(null);
+  const addReasoningEntry = useDilemmaStore((s) => s.addReasoningEntry);
 
   // Timing tracker: time from dilemma presented to action confirmed
   const decisionTimingIdRef = useRef<string | null>(null);
@@ -442,6 +454,77 @@ export default function EventScreen3({ push }: Props) {
   // ========================================================================
 
   /**
+   * Show reasoning modal and wait for completion
+   */
+  const showReasoningModalForAction = (actionCard: ActionCard): Promise<void> => {
+    return new Promise((resolve) => {
+      reasoningResolveRef.current = resolve;
+      setReasoningModalAction(actionCard);
+      setShowReasoningModal(true);
+    });
+  };
+
+  /**
+   * Handle reasoning submission
+   */
+  const handleReasoningSubmit = async (reasoningText: string) => {
+    if (!reasoningModalAction) return;
+
+    setIsSubmittingReasoning(true);
+
+    // Store reasoning in dilemmaStore
+    addReasoningEntry({
+      day,
+      actionId: reasoningModalAction.id,
+      actionTitle: reasoningModalAction.title,
+      actionDescription: reasoningModalAction.summary,
+      reasoningText,
+    });
+
+    // Log reasoning stored
+    logger.logSystem(
+      "reasoning_stored",
+      {
+        day,
+        actionId: reasoningModalAction.id,
+        entryCount: useDilemmaStore.getState().reasoningHistory.length,
+        willSendToAI: true,
+      },
+      `Reasoning entry added to history (total: ${useDilemmaStore.getState().reasoningHistory.length})`
+    );
+
+    setIsSubmittingReasoning(false);
+
+    // Resolve the promise to continue game flow
+    if (reasoningResolveRef.current) {
+      reasoningResolveRef.current();
+      reasoningResolveRef.current = null;
+    }
+  };
+
+  /**
+   * Handle reasoning skip (optional prompts only)
+   */
+  const handleReasoningSkip = () => {
+    setShowReasoningModal(false);
+    setReasoningModalAction(null);
+
+    // Resolve the promise to continue game flow
+    if (reasoningResolveRef.current) {
+      reasoningResolveRef.current();
+      reasoningResolveRef.current = null;
+    }
+  };
+
+  /**
+   * Handle reasoning modal close
+   */
+  const handleReasoningClose = () => {
+    setShowReasoningModal(false);
+    setReasoningModalAction(null);
+  };
+
+  /**
    * Handle action confirmation - delegates ALL logic to EventDataCleaner
    */
   const handleConfirm = async (id: string) => {
@@ -469,6 +552,21 @@ export default function EventScreen3({ push }: Props) {
       });
       console.log(`[EventScreen3] ⏱️ Decision time: ${duration}ms`);
       decisionTimingIdRef.current = null;
+    }
+
+    // Check if reasoning is required for this day
+    const shouldShowReasoning = reasoning.shouldShowReasoning();
+
+    if (shouldShowReasoning) {
+      console.log('[EventScreen3] 💭 Reasoning required - entering reasoning phase');
+
+      // Enter reasoning phase
+      setPhase('reasoning');
+
+      // Show reasoning modal and wait for completion
+      await showReasoningModalForAction(actionCard);
+
+      console.log('[EventScreen3] ✅ Reasoning complete - continuing to cleaning');
     }
 
     // Advance to cleaning phase
@@ -631,9 +729,9 @@ export default function EventScreen3({ push }: Props) {
   }
 
   // ========================================================================
-  // RENDER: Presenting/Interacting/Cleaning Phase
+  // RENDER: Presenting/Interacting/Reasoning/Cleaning Phase
   // ========================================================================
-  if (collectedData && (phase === 'presenting' || phase === 'interacting' || phase === 'cleaning')) {
+  if (collectedData && (phase === 'presenting' || phase === 'interacting' || phase === 'reasoning' || phase === 'cleaning')) {
     // Calculate derived values
     const daysLeft = totalDays - day + 1;
 
@@ -795,6 +893,21 @@ export default function EventScreen3({ push }: Props) {
             />
           )}
         </AnimatePresence>
+
+        {/* Reasoning Modal - appears after action confirmation (treatment-based) */}
+        {reasoningModalAction && (
+          <ReasoningModal
+            isOpen={showReasoningModal}
+            onClose={handleReasoningClose}
+            onSubmit={handleReasoningSubmit}
+            onSkip={reasoning.isOptional() ? handleReasoningSkip : undefined}
+            actionTitle={reasoningModalAction.title}
+            actionSummary={reasoningModalAction.summary}
+            day={day}
+            isOptional={reasoning.isOptional()}
+            isSubmitting={isSubmittingReasoning}
+          />
+        )}
       </div>
     );
   }

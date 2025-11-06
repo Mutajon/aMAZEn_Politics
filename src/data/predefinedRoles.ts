@@ -1032,7 +1032,12 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
   }
 ];
 
-export const EXPERIMENT_PREDEFINED_ROLE_KEYS = PREDEFINED_ROLES_ARRAY.slice(0, 3).map((role) => role.legacyKey);
+// Experiment roles: Athens (index 0), North America (index 3), Mars (index 9)
+export const EXPERIMENT_PREDEFINED_ROLE_KEYS = [
+  PREDEFINED_ROLES_ARRAY[0].legacyKey,  // Athens (-404)
+  PREDEFINED_ROLES_ARRAY[3].legacyKey,  // North America (1607)
+  PREDEFINED_ROLES_ARRAY[9].legacyKey   // Mars (2179)
+];
 
 /**
  * Record mapping for quick lookup by legacy key

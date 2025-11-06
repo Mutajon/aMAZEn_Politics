@@ -249,6 +249,18 @@ async function fetchGameTurn(): Promise<{
     payload.compassUpdate = compassValues;
   }
 
+  // Include reasoning history (for all days, treatment-based feature)
+  const reasoningHistory = useDilemmaStore.getState().reasoningHistory;
+  if (reasoningHistory.length > 0) {
+    // Send reasoning history for AI context
+    // Format: Array of {day, actionTitle, reasoningText} objects
+    payload.reasoningHistory = reasoningHistory.map(entry => ({
+      day: entry.day,
+      actionTitle: entry.actionTitle,
+      reasoningText: entry.reasoningText
+    }));
+  }
+
   // CRISIS MODE: Use crisis state detected on PREVIOUS turn
   // (Crisis is detected AFTER support updates, so we use stored state from last turn)
   const { crisisMode: storedCrisisMode, crisisEntity, previousSupportValues } = useDilemmaStore.getState();

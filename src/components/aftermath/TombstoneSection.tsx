@@ -63,7 +63,7 @@ const TombstoneSection = forwardRef<HTMLDivElement, Props>(
           {/* Haiku Overlay */}
           <div className="absolute inset-0 flex items-center justify-center px-12">
             <p
-              className="text-amber-300 text-center font-serif italic text-sm whitespace-pre-line max-w-[200px]"
+              className="text-gray-700 text-center font-serif italic text-sm whitespace-pre-line max-w-[200px]"
               style={{
                 textShadow: "2px 2px 4px rgba(0, 0, 0, 0.8)"
               }}

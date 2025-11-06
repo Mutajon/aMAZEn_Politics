@@ -5013,12 +5013,19 @@ TOPIC VARIETY (Natural Flow):
 STYLE & VOICE (ALWAYS APPLY):
 - Keep language punchy and clear; every sentence should make sense to a bright high-school student without prior context.
 - Anchor descriptions in sights, sounds, or immediate human reactions so the scene feels lived-in.
-- - Always end the description with a direct player question that forces an immediate choice.
+- **CRITICAL**: Always end the description with a direct player question that forces an immediate choice (e.g., "What will you do?", "How will you respond?", "What's your decision?").
 - Name the player's role in the first sentence of the description (e.g., "As the district police chief...").
 - Avoid passive policy-speak; prefer vivid verbs over abstract nouns.
 ${buildLightSystemPrompt()}
 
 OUTPUT FORMAT (JSON):
+
+EXAMPLES OF GOOD DESCRIPTION ENDINGS (vary your question format):
+- "As provincial governor, you survey the shoreline while courtiers press conflicting demands about the expelled foreigners' ships. How will you respond?"
+- "As district police chief, you watch riot shields forming a line while protesters chant slogans at the courthouse gates. What will you do?"
+- "As finance minister, you review budget reports showing empty coffers while three faction leaders demand increased spending. Which path will you choose?"
+- "As military commander, intelligence reports suggest an imminent border incursion but your forces are stretched thin. How will you act?"
+
 {
   "title": "Guard the Coastline",
   "description": "As provincial governor, you survey the shoreline while courtiers press conflicting demands about the expelled foreigners' ships. How will you respond?",
