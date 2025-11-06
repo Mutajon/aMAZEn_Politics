@@ -184,8 +184,8 @@ const COMPASS_VALUES = {
     },
     {
       idx: 7,
-      name: 'Design/UX',
-      support: ['design', 'architecture', 'nudging', 'policy', 'influence', 'default', 'opt-out', 'interface', 'system design'],
+      name: 'Design',
+      support: ['interface', 'system design', 'user interface', 'digital design', 'platform design', 'app design', 'website design', 'software design', 'interaction design'],
       oppose: ['randomness', 'neglect', 'chaos']
     },
     {
@@ -285,7 +285,7 @@ const NEGATIVE_MODIFIERS = [
   'undermine', 'threaten', 'attack', 'oppose', 'reject'
 ];
 
-// Special case: coercive action keywords that should map to Enforce (how:6) NOT Design/UX (how:7)
+// Special case: coercive action keywords that should map to Enforce (how:6) NOT Design (how:7)
 const COERCIVE_KEYWORDS = [
   'martial law', 'military action', 'troops', 'deploy forces',
   'ban', 'prohibit', 'mandate', 'compel', 'force', 'impose',

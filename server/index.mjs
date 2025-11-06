@@ -4110,13 +4110,13 @@ app.post("/api/compass-hints", async (req, res) => {
 COMPASS DIMENSIONS (40 values total):
 WHAT (goals): Truth/Trust, Liberty/Agency, Equality/Equity, Care/Solidarity, Create/Courage, Wellbeing, Security/Safety, Freedom/Responsibility, Honor/Sacrifice, Sacred/Awe
 WHENCE (justifications): Evidence, Public Reason, Personal, Tradition, Revelation, Nature, Pragmatism, Aesthesis, Fidelity, Law
-HOW (means): Law/Std., Deliberation, Mobilize, Markets, Mutual Aid, Ritual, Enforce, Design/UX (voluntary nudges only), Civic Culture, Philanthropy
+HOW (means): Law/Std., Deliberation, Mobilize, Markets, Mutual Aid, Ritual, Enforce, Design, Civic Culture, Philanthropy
 WHITHER (recipients): Self, Family, Friends, In-Group, Nation, Civilization, Humanity, Earth, Cosmos, God
 
 KEY RULES:
 - Match actions to values using common sense and literal interpretation
 - Enforce = coercion/force/military, NOT voluntary persuasion
-- Design/UX = voluntary nudges/defaults, NOT laws/mandates/enforcement
+- Design = modern system/interface design, NOT traditional architecture or military strategy
 - Pick 2-6 values that most clearly fit the action
 - PRIORITY: If keyword hints are provided, validate them FIRST using the stored compass definitions
 - Only adjust keyword hint polarity/strength if context clearly contradicts
@@ -4148,10 +4148,10 @@ TASK INSTRUCTIONS:
 6. Return JSON only—no prose, no inline comments, no explanations.
 
 ANTI-PATTERNS (DO NOT DO THESE):
-❌ Do NOT use "Design/UX" for coercive actions (laws, enforcement, mandates, bans, military force)
-   → Design/UX is ONLY for voluntary nudges (cafeteria layouts, opt-out checkboxes, interface defaults)
+❌ Do NOT use "Design" for coercive actions, military strategy, or traditional architecture
+   → Design is for modern digital/system interfaces (apps, websites, platforms, software)
 ❌ Do NOT stretch value definitions to force creative interpretations
-   → Example: "Impose martial law" is NOT Design/UX—it's Enforce (coercion) + Security/Safety (order)
+   → Example: "Impose martial law" is NOT Design—it's Enforce (coercion) + Security/Safety (order)
 ❌ Do NOT use abstract interpretations when concrete values match better
    → Match actions to their most literal, direct value alignment using the support/oppose cues
 
@@ -4686,8 +4686,8 @@ HOW (means) – prop "how"
  6 Enforce – Maintaining order through legitimate authority.
    Support: enforcement, policing, punishment, discipline, authority.
    Oppose: disobedience, impunity, anarchy.
- 7 Design/UX – Influencing behavior through design or systems (voluntary nudges only, NOT coercion).
-   Support: design, architecture, nudging, policy, influence.
+ 7 Design – Shaping modern systems and interfaces (digital platforms, apps, software).
+   Support: interface, system design, user interface, digital design, platform design.
    Oppose: randomness, neglect, chaos.
  8 Civic Culture – Shared norms, education, and media that sustain society.
    Support: citizenship, education, journalism, civic duty, culture.

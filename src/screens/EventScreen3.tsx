@@ -643,30 +643,38 @@ export default function EventScreen3({ push }: Props) {
    * Useful for testing epic finale and game conclusion
    */
   const jumpToFinalDay = () => {
-    if (!collectedData?.dilemma?.actions || collectedData.dilemma.actions.length === 0) {
-      console.warn('[EventScreen3] Cannot jump - no actions available');
-      return;
+    const actions = collectedData?.dilemma?.actions || [];
+
+    let choiceData;
+    if (actions.length === 0) {
+      // Full autonomy mode or no actions - create mock action
+      console.log('[EventScreen3] 🚀 Jumping to final day (debug mode - mock action)');
+      choiceData = {
+        id: 'debug_mock' as 'a' | 'b' | 'c',
+        title: '[Debug Jump] Custom Action',
+        summary: 'Mock action created by debug tool',
+        cost: 0
+      };
+    } else {
+      // Normal mode - pick random action
+      const randomIndex = Math.floor(Math.random() * actions.length);
+      const randomAction = actions[randomIndex];
+      console.log('[EventScreen3] 🚀 Jumping to final day with random choice:', randomAction.title);
+      choiceData = {
+        id: randomAction.id as 'a' | 'b' | 'c',
+        title: randomAction.title,
+        summary: randomAction.summary,
+        cost: randomAction.cost
+      };
     }
-
-    // Pick random action from current dilemma
-    const actions = collectedData.dilemma.actions;
-    const randomIndex = Math.floor(Math.random() * actions.length);
-    const randomAction = actions[randomIndex];
-
-    console.log('[EventScreen3] 🚀 Jumping to final day with random choice:', randomAction.title);
 
     // Save this as last choice
     const { setLastChoice, setBudget } = useDilemmaStore.getState();
-    setLastChoice({
-      id: randomAction.id as 'a' | 'b' | 'c',
-      title: randomAction.title,
-      summary: randomAction.summary,
-      cost: randomAction.cost
-    });
+    setLastChoice(choiceData);
 
     // Apply budget change immediately (so it's reflected in the context)
     const currentBudget = useDilemmaStore.getState().budget;
-    setBudget(currentBudget + randomAction.cost);
+    setBudget(currentBudget + choiceData.cost);
 
     // Set day to 7 directly (daysLeft will be 1)
     useDilemmaStore.setState({ day: 7 });

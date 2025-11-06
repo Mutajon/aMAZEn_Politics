@@ -25,7 +25,7 @@ Final Compass Hints
 **Features**:
 - **Fuzzy matching**: Handles variations (e.g., "enforce" matches "enforcement", "enforcing", "enforced")
 - **Polarity detection**: Recognizes modifiers like "increase/decrease", "strengthen/weaken"
-- **Coercive action detection**: Special handling for "martial law", "ban", "prohibit", etc. → maps to Enforce (not Design/UX)
+- **Coercive action detection**: Special handling for "martial law", "ban", "prohibit", etc. → maps to Enforce (not Design)
 - **Context analysis**: Examines 30-char window around keywords to determine polarity
 - **Confidence scoring**: 0.6-0.95 based on modifier clarity
 
@@ -153,7 +153,7 @@ Result: 100% keyword preservation + 2 contextual additions
 
 ### Before Enhancement
 ❌ AI would sometimes ignore obvious keywords
-❌ "Martial law" could be misclassified as Design/UX instead of Enforce
+❌ "Martial law" could be misclassified as Design instead of Enforce
 ❌ No way to debug why certain values were chosen
 ❌ Inconsistent handling of modifier words (increase/decrease)
 
@@ -179,7 +179,7 @@ Scans 30-char window before keyword:
 - **Strong modifiers** (polarity ±2): drastically, completely, eliminate, ban, mandate, impose
 
 ### Coercive Action Detection
-Special list of coercive keywords that always map to Enforce (never Design/UX):
+Special list of coercive keywords that always map to Enforce (never Design):
 - `martial law`, `military action`, `deploy forces`, `troops`
 - `ban`, `prohibit`, `mandate`, `compel`, `force`, `impose`
 - `arrest`, `imprison`, `detention`, `police action`, `crack down`
