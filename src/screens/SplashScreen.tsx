@@ -11,9 +11,11 @@ import { useRoleStore } from "../store/roleStore";
 import { useMirrorQuizStore } from "../store/mirrorQuizStore";
 import { clearAllSnapshots } from "../lib/eventScreenSnapshot";
 import { loggingService } from "../lib/loggingService";
+import { useLoggingStore } from "../store/loggingStore";
 import { useLang } from "../i18n/lang";
 import { useLanguage } from "../i18n/LanguageContext";
 import LanguageSelector from "../components/LanguageSelector";
+import IDCollectionModal from "../components/IDCollectionModal";
 
 const SUBTITLES = [
   "Choose your path. Discover yourself."
@@ -35,6 +37,8 @@ export default function SplashScreen({
   const [showButton, setShowButton] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showIDModal, setShowIDModal] = useState(false);
+  const [isCollectingID, setIsCollectingID] = useState(false);
 
   // Helper function to get correct transform for toggle
   const getToggleTransform = (isEnabled: boolean) => {
@@ -88,6 +92,35 @@ export default function SplashScreen({
   const setDataCollectionEnabled = useSettingsStore((s) => s.setDataCollectionEnabled);
 
   // -------------------------------------------------------------------------
+
+  // Handle ID submission from modal
+  const handleIDSubmit = async (id: string) => {
+    // Save ID to loggingStore (replaces auto-generated UUID)
+    useLoggingStore.getState().setUserId(id);
+
+    // Close modal
+    setShowIDModal(false);
+
+    // Proceed with game start
+    setIsLoading(true);
+    setShowSettings(false);
+
+    // Start new logging session (will use the ID we just set)
+    await loggingService.startSession();
+
+    // Reset all game stores for fresh start
+    useCompassStore.getState().reset();
+    useDilemmaStore.getState().reset();
+    useRoleStore.getState().reset();
+    useMirrorQuizStore.getState().resetAll();
+    clearAllSnapshots();
+
+    // Prime narrator and start music (user interaction unlocks browser autoplay)
+    narrator.prime();
+    playMusic('background', true);
+
+    onStart();
+  };
 
   // Simple subtitle reveal: show title, wait 0.5s, fade in all subtitles
   useEffect(() => {
@@ -455,7 +488,7 @@ export default function SplashScreen({
   {/* Primary: Start */}
   <motion.button
     initial={{ opacity: 0, rotate: 0 }}
-    animate={{ opacity: showButton ? 1 : 0, rotate: 0 }}
+    animate={{ opacity: showButton && !isCollectingID ? 1 : 0, rotate: 0 }}
     whileHover={{
       scale: 1.02,
       rotate: [0, -2, 2, -2, 2, 0],
@@ -470,26 +503,37 @@ export default function SplashScreen({
       }
     }}
     transition={{ type: "spring", stiffness: 250, damping: 22 }}
-    style={{ visibility: showButton ? "visible" : "hidden" }}
+    style={{ visibility: showButton && !isCollectingID ? "visible" : "hidden" }}
     onClick={async () => {
-      setIsLoading(true);
-      setShowSettings(false);
+      const { dataCollectionEnabled } = useSettingsStore.getState();
 
-      // Start new logging session
-      await loggingService.startSession();
+      if (dataCollectionEnabled && !debugMode) {
+        // Show ID collection modal
+        setIsCollectingID(true);
+        setShowIDModal(true);
+        setShowSettings(false);
+        // Don't proceed yet - wait for ID submission via handleIDSubmit
+      } else {
+        // Original flow: proceed immediately
+        setIsLoading(true);
+        setShowSettings(false);
 
-      // Reset all game stores for fresh start
-      useCompassStore.getState().reset();
-      useDilemmaStore.getState().reset();
-      useRoleStore.getState().reset();
-      useMirrorQuizStore.getState().resetAll();
-      clearAllSnapshots();
+        // Start new logging session
+        await loggingService.startSession();
 
-      // Prime narrator and start music (user interaction unlocks browser autoplay)
-      narrator.prime();
-      playMusic('background', true);
+        // Reset all game stores for fresh start
+        useCompassStore.getState().reset();
+        useDilemmaStore.getState().reset();
+        useRoleStore.getState().reset();
+        useMirrorQuizStore.getState().resetAll();
+        clearAllSnapshots();
 
-      onStart();
+        // Prime narrator and start music (user interaction unlocks browser autoplay)
+        narrator.prime();
+        playMusic('background', true);
+
+        onStart();
+      }
     }}
     className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
   >
@@ -499,9 +543,9 @@ export default function SplashScreen({
   {/* Secondary: High Scores (subtle/glass) */}
   <motion.button
     initial={{ opacity: 0 }}
-    animate={{ opacity: showButton ? 1 : 0 }}
+    animate={{ opacity: showButton && !isCollectingID ? 1 : 0 }}
     transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
-    style={{ visibility: showButton ? "visible" : "hidden" }}
+    style={{ visibility: showButton && !isCollectingID ? "visible" : "hidden" }}
     onClick={() => {
       // Start music on any user interaction
       playMusic('background', true);
@@ -519,9 +563,9 @@ export default function SplashScreen({
   {/* Tertiary: Book of Achievements (subtle/glass) */}
   <motion.button
     initial={{ opacity: 0 }}
-    animate={{ opacity: showButton ? 1 : 0 }}
+    animate={{ opacity: showButton && !isCollectingID ? 1 : 0 }}
     transition={{ delay: 0.1, type: "spring", stiffness: 250, damping: 22 }}
-    style={{ visibility: showButton ? "visible" : "hidden" }}
+    style={{ visibility: showButton && !isCollectingID ? "visible" : "hidden" }}
     onClick={() => {
       // Start music on any user interaction
       playMusic('background', true);
@@ -540,6 +584,8 @@ export default function SplashScreen({
         )}
       </div>
 
+      {/* ID Collection Modal */}
+      <IDCollectionModal isOpen={showIDModal} onSubmit={handleIDSubmit} />
     </div>
   );
 }
