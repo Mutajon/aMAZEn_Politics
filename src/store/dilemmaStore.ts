@@ -451,6 +451,9 @@ export const useDilemmaStore = create<DilemmaState>()(
       previousCorruptionValue: null,
       corruptionHistory: [],
       pendingCompassPills: null,
+      narrativeMemory: null,
+      inquiryHistory: new Map(),
+      inquiryCreditsRemaining: 0,
     });
   },
 
