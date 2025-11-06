@@ -32,7 +32,6 @@ import { useAudioManager } from "./hooks/useAudioManager";
 import { useSettingsStore } from "./store/settingsStore";
 import { useLoggingStore } from "./store/loggingStore";
 import { loggingService } from "./lib/loggingService";
-import DataCollectionBanner from "./components/DataCollectionBanner";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { useStateChangeLogger } from "./hooks/useStateChangeLogger";
 import { useSessionLogger } from "./hooks/useSessionLogger";
@@ -139,9 +138,6 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: any
 
   return (
     <>
-      {/* Data collection consent banner - shows on first visit if backend enabled */}
-      <DataCollectionBanner />
-
       {/* Global audio controls - visible on all screens */}
       <AudioControls />
 

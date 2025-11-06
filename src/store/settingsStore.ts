@@ -153,8 +153,8 @@ export const useSettingsStore = create<SettingsState>()(
       setSkipPreviousContext: (v) => set({ skipPreviousContext: v }),
       toggleSkipPreviousContext: () => set({ skipPreviousContext: !get().skipPreviousContext }),
 
-      // NEW: Data collection (default ON - experiment mode)
-      dataCollectionEnabled: true,
+      // NEW: Data collection (default OFF - requires consent)
+      dataCollectionEnabled: false,
       setDataCollectionEnabled: (v) => set({ dataCollectionEnabled: v }),
       toggleDataCollectionEnabled: () => set({ dataCollectionEnabled: !get().dataCollectionEnabled }),
 

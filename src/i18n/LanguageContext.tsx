@@ -23,10 +23,10 @@ interface LanguageProviderProps {
 
 // Language provider component
 export function LanguageProvider({ children }: LanguageProviderProps) {
-  // Load language from localStorage or default to Hebrew
+  // Load language from localStorage or default to English
   const [language, setLanguageState] = useState<Language>(() => {
     const saved = localStorage.getItem('game-language');
-    return (saved as Language) || 'he';
+    return (saved as Language) || 'en';
   });
   const [translations, setTranslations] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -48,11 +48,11 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
         updateGlobalTranslations(translationsModule.default, language);
       } catch (error) {
         console.error(`Failed to load translations for language: ${language}`, error);
-        // Fallback to Hebrew if loading fails
-        if (language !== 'he') {
-          const fallbackModule = await import('./languages/he.json');
+        // Fallback to English if loading fails
+        if (language !== 'en') {
+          const fallbackModule = await import('./languages/en.json');
           setTranslations(fallbackModule.default);
-          updateGlobalTranslations(fallbackModule.default, 'he');
+          updateGlobalTranslations(fallbackModule.default, 'en');
         }
       } finally {
         setIsLoading(false);
