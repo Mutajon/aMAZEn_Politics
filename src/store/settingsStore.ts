@@ -95,7 +95,7 @@ export const useSettingsStore = create<SettingsState>()(
       toggleGenerateImages: () => set({ generateImages: !get().generateImages }),
 
       // Narration
-      narrationEnabled: false,
+      narrationEnabled: true,
       narrationVoice: null,
       setNarrationEnabled: (v) => set({ narrationEnabled: v }),
       toggleNarrationEnabled: () => set({ narrationEnabled: !get().narrationEnabled }),
@@ -120,7 +120,7 @@ export const useSettingsStore = create<SettingsState>()(
       setDilemmasSubject: (s) => set({ dilemmasSubject: s }),
 
       // NEW: Enable modifiers
-      enableModifiers: true,
+      enableModifiers: false,
       setEnableModifiers: (v) => set({ enableModifiers: v }),
       toggleEnableModifiers: () => set({ enableModifiers: !get().enableModifiers }),
 
@@ -153,8 +153,8 @@ export const useSettingsStore = create<SettingsState>()(
       setSkipPreviousContext: (v) => set({ skipPreviousContext: v }),
       toggleSkipPreviousContext: () => set({ skipPreviousContext: !get().skipPreviousContext }),
 
-      // NEW: Data collection (default OFF - requires consent)
-      dataCollectionEnabled: false,
+      // NEW: Data collection (default ON - experiment mode)
+      dataCollectionEnabled: true,
       setDataCollectionEnabled: (v) => set({ dataCollectionEnabled: v }),
       toggleDataCollectionEnabled: () => set({ dataCollectionEnabled: !get().dataCollectionEnabled }),
 
@@ -162,8 +162,8 @@ export const useSettingsStore = create<SettingsState>()(
       treatment: "semiAutonomy",
       setTreatment: (v) => set({ treatment: v }),
 
-      // NEW: Experiment mode gate (default OFF)
-      experimentMode: false,
+      // NEW: Experiment mode gate (default ON - for experimental distribution)
+      experimentMode: true,
       setExperimentMode: (v) => set({ experimentMode: v }),
       toggleExperimentMode: () => set({ experimentMode: !get().experimentMode }),
 

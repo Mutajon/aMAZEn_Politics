@@ -30,6 +30,7 @@ import {
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
+import { useMirrorQuizStore } from "../store/mirrorQuizStore";
 import { useHighscoreStore } from "../store/highscoreStore";
 import { useRoleProgressStore } from "../store/roleProgressStore";
 import { useMirrorTop3 } from "../hooks/useMirrorTop3";
@@ -365,6 +366,7 @@ export default function FinalScoreScreen({ push }: Props) {
     useDilemmaStore.getState().reset();
     useRoleStore.getState().reset();
     useCompassStore.getState().reset();
+    useMirrorQuizStore.getState().resetAll();
     clearAllSnapshots();
     push("/role");
   };

@@ -128,6 +128,18 @@ function resetState() {
 }
 
 /**
+ * Reset experiment role progress (for testing)
+ * Allows replaying experiment roles without clearing userId or other data
+ */
+function resetExperimentRoles() {
+  const { resetExperimentProgress } = useLoggingStore.getState();
+  resetExperimentProgress();
+  console.log('[Logging Debug] 🔄 Experiment role progress reset');
+  console.log('✅ Completed roles cleared - all experiment roles unlocked');
+  console.log('📊 Current state:', useLoggingStore.getState().experimentProgress);
+}
+
+/**
  * Set treatment (for testing) - Updates BOTH loggingStore and settingsStore
  */
 function setTreatment(treatment: 'fullAutonomy' | 'semiAutonomy' | 'noAutonomy') {
@@ -192,22 +204,26 @@ export function attachLoggingDebug() {
     (window as any).testLog = testLog;
     (window as any).showState = showState;
     (window as any).resetState = resetState;
+    (window as any).resetExperimentRoles = resetExperimentRoles;
     (window as any).setTreatment = setTreatment;
     (window as any).generateTestSession = generateTestSession;
 
-    console.log('[Logging Debug] 🛠️ Debug tools attached to window');
-    console.log('Available commands:');
-    console.log('  enableLogging()        - Enable data collection');
-    console.log('  disableLogging()       - Disable data collection');
-    console.log('  showLogs()             - Show queued logs');
-    console.log('  flushLogs()            - Force send logs to backend');
-    console.log('  clearQueue()           - Clear local queue');
-    console.log('  startSession()         - Start new session');
-    console.log('  endSession()           - End current session');
-    console.log('  testLog()              - Add a test log entry');
-    console.log('  showState()            - Show current logging state');
-    console.log('  resetState()           - Reset logging state (WARNING: clears userId)');
-    console.log('  setTreatment(name)     - Set treatment condition (updates both stores)');
-    console.log('  generateTestSession()  - Generate complete test session with sample data');
+    // HIDDEN FOR EXPERIMENTAL DISTRIBUTION
+    // Debug tools are still available but not advertised to users
+    // console.log('[Logging Debug] 🛠️ Debug tools attached to window');
+    // console.log('Available commands:');
+    // console.log('  enableLogging()        - Enable data collection');
+    // console.log('  disableLogging()       - Disable data collection');
+    // console.log('  showLogs()             - Show queued logs');
+    // console.log('  flushLogs()            - Force send logs to backend');
+    // console.log('  clearQueue()           - Clear local queue');
+    // console.log('  startSession()         - Start new session');
+    // console.log('  endSession()           - End current session');
+    // console.log('  testLog()              - Add a test log entry');
+    // console.log('  showState()            - Show current logging state');
+    // console.log('  resetState()           - Reset logging state (WARNING: clears userId)');
+    // console.log('  resetExperimentRoles() - Reset experiment role tracking (keep userId)');
+    // console.log('  setTreatment(name)     - Set treatment condition (updates both stores)');
+    // console.log('  generateTestSession()  - Generate complete test session with sample data');
   }
 }

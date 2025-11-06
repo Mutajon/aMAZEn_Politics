@@ -88,8 +88,10 @@ export function attachStoresDebug() {
     // localStorage.removeItem("settings-v1");
   };
 
-  console.info("%c[stores] debug helpers attached (debugStores, setRoleStore, resetRoleStore, setCompassValue, bumpCompass, resetCompass, setSettings, resetAllStores)",
-    "color:#93c5fd");
+  // HIDDEN FOR EXPERIMENTAL DISTRIBUTION
+  // Debug helpers are still available but not advertised to users
+  // console.info("%c[stores] debug helpers attached (debugStores, setRoleStore, resetRoleStore, setCompassValue, bumpCompass, resetCompass, setSettings, resetAllStores)",
+  //   "color:#93c5fd");
 
   // Attach logging debug tools
   attachLoggingDebug();

@@ -277,6 +277,210 @@ function sanitizeMirrorAdvice(text) {
 
   return cleaned.length ? cleaned : DEFAULT_MIRROR_ADVICE;
 }
+
+/**
+ * Helper: Find which institution/seat controls a specific policy domain
+ * Returns a descriptive string based on E-12 decisive seats and power holders
+ */
+function findDomainController(domain, decisiveSeats, powerHolders) {
+  // Default fallback
+  const fallback = "Contested among multiple power holders";
+
+  if (!Array.isArray(decisiveSeats) || decisiveSeats.length === 0) {
+    return fallback;
+  }
+
+  // Check if player is in decisive seats
+  const playerIsDecisive = decisiveSeats.some(seat =>
+    seat.toLowerCase().includes("you") ||
+    seat.toLowerCase().includes("player") ||
+    seat.toLowerCase().includes("character")
+  );
+
+  if (playerIsDecisive && decisiveSeats.length === 1) {
+    return "You (decisive authority)";
+  } else if (playerIsDecisive) {
+    return `Shared: You + ${decisiveSeats.filter(s => !s.toLowerCase().includes("you")).slice(0, 2).join(", ")}`;
+  } else {
+    // Player is not decisive - list who controls it
+    return decisiveSeats.slice(0, 2).join(" + ");
+  }
+}
+
+/**
+ * Helper: Format E-12 authority data for AI prompt
+ * Converts E-12 domain structure into readable policy domain list with controllers
+ */
+function formatE12ForPrompt(e12, powerHolders) {
+  if (!e12 || typeof e12 !== 'object') {
+    return "⚠️ E-12 authority analysis not available - use generic role scope constraints.";
+  }
+
+  const { tierI = [], tierII = [], tierIII = [], decisive = [] } = e12;
+
+  // Domain name mappings for better readability
+  const domainNames = {
+    "Security": "Security (military, police, emergency)",
+    "CivilLib": "Civil Liberties (rights, freedoms)",
+    "InfoOrder": "Information Order (media, propaganda)",
+    "Diplomacy": "Diplomacy (treaties, foreign relations)",
+    "Justice": "Justice (courts, rule of law)",
+    "Economy": "Economy (trade, currency, taxation)",
+    "Appointments": "Appointments (officials, ministers)",
+    "Infrastructure": "Infrastructure (roads, public works)",
+    "Curricula": "Curricula (education content)",
+    "Healthcare": "Healthcare (medical policy)",
+    "Immigration": "Immigration (borders, citizenship)",
+    "Environment": "Environment (natural resources)"
+  };
+
+  let text = "";
+
+  // Tier I - Existential domains (highest stakes)
+  if (tierI.length > 0) {
+    text += "\nTIER I DOMAINS (Existential - highest stakes):\n";
+    tierI.forEach(domain => {
+      const fullName = domainNames[domain] || domain;
+      const controller = findDomainController(domain, decisive, powerHolders);
+      text += `  • ${fullName}\n    Controlled by: ${controller}\n`;
+    });
+  }
+
+  // Tier II - Constitutive domains
+  if (tierII.length > 0) {
+    text += "\nTIER II DOMAINS (Constitutive - institutional foundation):\n";
+    tierII.forEach(domain => {
+      const fullName = domainNames[domain] || domain;
+      const controller = findDomainController(domain, decisive, powerHolders);
+      text += `  • ${fullName}\n    Controlled by: ${controller}\n`;
+    });
+  }
+
+  // Tier III - Contextual domains
+  if (tierIII.length > 0) {
+    text += "\nTIER III DOMAINS (Contextual - day-to-day policy):\n";
+    tierIII.forEach(domain => {
+      const fullName = domainNames[domain] || domain;
+      const controller = findDomainController(domain, decisive, powerHolders);
+      text += `  • ${fullName}\n    Controlled by: ${controller}\n`;
+    });
+  }
+
+  return text;
+}
+
+/**
+ * Helper: Generate role-specific authority boundaries ("Cannot Do" list)
+ * Creates explicit examples of actions beyond the player's authority
+ */
+function generateAuthorityBoundaries(gameContext) {
+  const {
+    powerHolders = [],
+    systemName = "",
+    role = "",
+    e12 = null
+  } = gameContext;
+
+  // Find player's power percentage
+  const playerHolder = powerHolders.find(h =>
+    h.note?.toLowerCase().includes("you") ||
+    h.name?.toLowerCase().includes("player")
+  );
+  const playerPower = playerHolder?.percent || 0;
+
+  const boundaries = [];
+
+  // Generic low-power boundaries
+  if (playerPower < 30) {
+    boundaries.push("• Unilaterally command military forces (requires military leadership approval)");
+    boundaries.push("• Override institutional decisions without negotiation or coalition-building");
+    boundaries.push("• Make binding treaties with foreign powers (requires council/assembly approval)");
+  }
+
+  // System-specific boundaries
+  const systemLower = systemName.toLowerCase();
+
+  if (systemLower.includes("democracy")) {
+    boundaries.push("• Act without assembly/council vote on major policy changes");
+    boundaries.push("• Imprison citizens without due process or judicial approval");
+    boundaries.push("• Change constitutional rules unilaterally");
+    boundaries.push("• Ignore referendum results or bypass public consultation");
+  }
+
+  if (systemLower.includes("oligarchy")) {
+    boundaries.push("• Make major decisions without consulting the oligarchic council");
+    boundaries.push("• Redistribute wealth from oligarchs without their collective consent");
+    boundaries.push("• Appoint officials to key positions without council approval");
+  }
+
+  if (systemLower.includes("republic") && !systemLower.includes("oligarchy")) {
+    boundaries.push("• Bypass legislative processes or ignore senate/parliament decisions");
+    boundaries.push("• Act outside constitutional constraints");
+  }
+
+  if ((systemLower.includes("monarchy") || systemLower.includes("autocracy")) && playerPower < 70) {
+    boundaries.push("• Challenge or override the monarch's/autocrat's direct authority");
+    boundaries.push("• Make succession decisions or interfere with royal prerogatives");
+    boundaries.push("• Act independently in domains the monarch has reserved");
+  }
+
+  if (systemLower.includes("theocracy") || systemLower.includes("theocratic")) {
+    boundaries.push("• Violate or contradict religious law and clerical authority");
+    boundaries.push("• Act without consultation or blessing from religious leadership");
+    boundaries.push("• Implement secular policies that conflict with sacred doctrine");
+  }
+
+  if (systemLower.includes("technocracy")) {
+    boundaries.push("• Override expert consensus or scientific recommendations without justification");
+    boundaries.push("• Make decisions in technical domains without expert panel approval");
+  }
+
+  if (systemLower.includes("stratocracy") || systemLower.includes("military")) {
+    boundaries.push("• Act against military chain of command or operational authority");
+    boundaries.push("• Weaken military capabilities without military leadership approval");
+  }
+
+  // E-12 specific boundaries (if available)
+  if (e12 && Array.isArray(e12.decisive) && e12.decisive.length > 0) {
+    const playerIsDecisive = e12.decisive.some(seat =>
+      seat.toLowerCase().includes("you") ||
+      seat.toLowerCase().includes("player") ||
+      seat.toLowerCase().includes(role.toLowerCase())
+    );
+
+    if (!playerIsDecisive) {
+      boundaries.push("• Make final decisions on existential matters (Security, Civil Liberties, Information Order) - these require approval from decisive authority");
+      boundaries.push("• Unilaterally appoint or remove officials in positions controlled by other institutions");
+    }
+
+    // Check for autocratization flags
+    if (e12.stopA) {
+      boundaries.push("• Ignore or defy military authority - military holds autocratic veto power");
+    }
+    if (e12.stopB) {
+      boundaries.push("• Violate religious or ideological orthodoxy - theocratic authorities have final say");
+    }
+  }
+
+  // If player has high power, note what they CAN do instead of cannot
+  if (playerPower >= 70) {
+    return "⚠️ PLAYER AUTHORITY LEVEL: HIGH\n" +
+           "You hold significant unilateral authority in most domains. However:\n" +
+           (boundaries.length > 0 ? boundaries.join("\n") : "• Still constrained by political system norms and institutional structures\n• Actions that violate system legitimacy may trigger opposition or crisis");
+  }
+
+  // If player has moderate power
+  if (playerPower >= 40 && playerPower < 70) {
+    return "⚠️ PLAYER AUTHORITY LEVEL: MODERATE\n" +
+           "You can act independently in some areas but require cooperation/approval for:\n" +
+           (boundaries.length > 0 ? boundaries.join("\n") : "• Major policy changes that affect other power holders\n• Actions outside your direct institutional mandate");
+  }
+
+  // Low power
+  return "⚠️ PLAYER AUTHORITY LEVEL: LIMITED\n" +
+         "Your role has constrained authority. You CANNOT:\n" +
+         (boundaries.length > 0 ? boundaries.join("\n") : "• Act unilaterally on major decisions - requires institutional approval\n• Command institutions or officials you don't directly control");
+}
 // Helper: call Chat Completions and try to parse JSON from the reply
 // Automatically falls back to gpt-4o if quota error (429) is encountered
 async function aiJSON({ system, user, model = CHAT_MODEL_DEFAULT, temperature = undefined, fallback = null }) {
@@ -1501,7 +1705,7 @@ function analyzeSystemType(systemName) {
 function buildCoreStylePrompt() {
   return `You write short, punchy political situations for a choice-based mobile game.
 - Never use the word "dilemma".
-- Title ≤ 60 chars. Description 2–3 sentences. Mature, gripping, in-world.
+- Title ≤ 60 chars. **Description: UP TO 2 SENTENCES MAXIMUM** (keep it tight and punchy). Mature, gripping, in-world.
 - Natural language (no bullets). Feels like live politics (calls, memos, press, leaks).
 - Plain modern English—no specialist jargon. Prefer "high court", "parliament", "council".
 - Democratic systems feel like pluralism and checks: rivals push back, media probes, courts constrain.
@@ -1735,18 +1939,24 @@ STYLE
 - Slightly cynical: dry wit and side-eye, not sneering or mean. One wink, not a roast.
 - Avoid jargon and bureaucratese. Describe what roles do, not rare titles (e.g., "regional governor (jiedushi)" instead of "jiedushi").
 - Never say "dilemma" or refer to game mechanics.
-- Title ≤ 60 chars. Description: 2–3 sentences, real and concrete.
+- Title ≤ 60 chars. **DESCRIPTION LENGTH (CRITICAL): UP TO 2 SENTENCES MAXIMUM** - keep it tight, punchy, and concrete.
 - Favor human stakes and visible consequences over technical phrasing.
 
 DECISION-FORCING DILEMMA (CRITICAL)
 - Every description must present a CONCRETE PROBLEM that demands immediate action.
+- **LENGTH REQUIREMENT: UP TO 2 SENTENCES MAXIMUM**
+  * Sentence 1: Setup with concrete details (who, what, where)
+  * Sentence 2: The forcing question
+  * DO NOT add a third sentence - merge setup and question if needed (can be a single sentence)
 - End with a question that forces the player to choose (vary the phrasing):
   * "What do you choose to do?"
   * "How will you respond?"
   * "What is your decision?"
   * "How will you act?"
-- ❌ BAD: "You've ignited local pride, but now face Rome's wary grace." (abstract, no problem, no question)
-- ✅ GOOD: "A Roman centurion demands you shut down tomorrow's festival or face martial law. Do you comply, negotiate, or defy?"
+- ❌ BAD (abstract, no problem): "You've ignited local pride, but now face Rome's wary grace."
+- ❌ BAD (too long, 3 sentences): "You've returned from the provincial tour to find urgent reports. The grain merchants are hoarding supplies. How will you respond?"
+- ✅ GOOD (1 sentence, concrete): "A Roman centurion demands you shut down tomorrow's festival or face martial law. Do you comply, negotiate, or defy?"
+- ✅ GOOD (2 sentences, concrete): "As provincial governor, you survey the shoreline while courtiers press conflicting demands about the expelled foreigners' ships. How will you respond?"
 
 IMMERSIVE POINT OF VIEW (CRITICAL)
 - Write from the character's actual knowledge and perspective.
@@ -3500,6 +3710,9 @@ app.post("/api/game-turn", async (req, res) => {
         playerCompassTopValues: initialTopValues || null,
         // Compass Definitions: Store once for reuse in compass hints (token optimization)
         compassDefinitions: COMPASS_DEFINITION_BLOCK,
+        // E-12 Authority Analysis: Store for authority constraints on Day 2+
+        e12: enrichedContext.e12 || null,
+        role: enrichedContext.role || "Unknown Leader",
         // Corruption tracking: Start clean (0=no corruption), increases only with corrupt actions
         corruptionLevel: 0,         // 0-100 scale (0=no corruption, 100=kleptocratic)
         corruptionHistory: []       // Track last 3 judgments for AI context
@@ -3589,7 +3802,10 @@ app.post("/api/game-turn", async (req, res) => {
             powerHolders,
             supportProfiles,
             playerCompass: conversation.meta?.playerCompass || null,
-            playerCompassTopValues: conversation.meta?.playerCompassTopValues || null
+            playerCompassTopValues: conversation.meta?.playerCompassTopValues || null,
+            e12: conversation.meta?.e12 || null,
+            role: conversation.meta?.role || null,
+            systemName: conversation.meta?.systemName || null
           });
       const userMessage = isAftermathTurn
         ? buildGameTurnConclusionUserPrompt({
@@ -4019,11 +4235,22 @@ app.post("/api/game-turn", async (req, res) => {
     console.log(`[GAME-TURN] Conversation updated: ${messages.length} messages total`);
 
     // ============================================================================
+    // Monitor description length (no rejection, just visibility)
+    // ============================================================================
+    const description = String(turnData.description || "");
+    const sentenceCount = (description.match(/[.!?]/g) || []).length;
+    if (sentenceCount > 2) {
+      console.warn(`⚠️ [DESCRIPTION LENGTH] Dilemma description has ${sentenceCount} sentences (target: up to 2)`);
+      console.warn(`   Title: "${turnData.title}"`);
+      console.warn(`   Description: "${description}"`);
+    }
+
+    // ============================================================================
     // Return unified response
     // ============================================================================
     const response = {
       title: String(turnData.title || "").slice(0, 120),
-      description: String(turnData.description || "").slice(0, 500),
+      description: description.slice(0, 500),
       actions: Array.isArray(turnData.actions) ? turnData.actions : [],
       topic: String(turnData.topic || "Security"),
       scope: String(turnData.scope || "National"),
@@ -4826,6 +5053,17 @@ PLAYER ROLE & CONTEXT:
 ROLE MANDATE (DO NOT EXCEED):
 - ${roleScopeText}
 
+AUTHORITY DOMAINS (Exception-12 Framework):
+${gameContext.e12 ? formatE12ForPrompt(gameContext.e12, powerHolders) : "⚠️ E-12 authority analysis not available - use generic role scope constraints."}
+
+${gameContext.e12 ? generateAuthorityBoundaries(gameContext) : ""}
+
+⚠️ ACTION GENERATION CONSTRAINTS (CRITICAL):
+- Player can only generate DIRECT action options in domains where they hold decisive authority
+- For domains controlled by other institutions, actions must be framed as: "Propose to [Institution]...", "Request [Authority] to...", "Advocate for...", "Negotiate with [Institution]..."
+- Example: If Security is controlled by Military Commander, action must be "Request military to deploy troops" NOT "Deploy troops"
+- Example: If Economy requires Assembly vote, action must be "Propose to Assembly: new taxation" NOT "Implement new taxes"
+
 THEMATIC TRACKS TO WEAVE THROUGH THE WEEK:
 - ${themeList}
 
@@ -5165,7 +5403,10 @@ function buildTurnSystemPrompt({
   powerHolders = null,
   supportProfiles = null,
   playerCompass = null,
-  playerCompassTopValues = null
+  playerCompassTopValues = null,
+  e12 = null,
+  role = null,
+  systemName = null
 }) {
   const safeTotal = Number.isFinite(totalDays) ? totalDays : 7;
   const lines = [
@@ -5223,6 +5464,23 @@ When analyzing consequences of their chosen action, you MUST consider these inqu
     lines.push(`ROLE SCOPE GUARDRAIL: ${roleScope}`);
   }
 
+  // Add E-12 authority constraints for Day 2+
+  if (e12 && powerHolders) {
+    const authorityText = formatE12ForPrompt(e12, powerHolders);
+    lines.push(`AUTHORITY DOMAINS (Exception-12 Framework - ENFORCE STRICTLY):\n${authorityText}`);
+
+    const boundariesText = generateAuthorityBoundaries({ e12, powerHolders, systemName, role });
+    if (boundariesText) {
+      lines.push(boundariesText);
+    }
+
+    lines.push(`⚠️ ACTION GENERATION CONSTRAINTS (CRITICAL):
+- Player can only generate DIRECT action options in domains where they hold decisive authority
+- For domains controlled by other institutions, actions must be framed as: "Propose to [Institution]...", "Request [Authority] to...", "Advocate for...", "Negotiate with [Institution]..."
+- Example: If Security is controlled by Military Commander, action must be "Request military to deploy troops" NOT "Deploy troops"
+- Example: If Economy requires Assembly vote, action must be "Propose to Assembly: new taxation" NOT "Implement new taxes"`);
+  }
+
   if (Array.isArray(storyThemes) && storyThemes.length > 0) {
     lines.push(`ACTIVE THEMES TO THREAD THROUGHOUT THE ARC: ${storyThemes.join(', ')}`);
   }
@@ -5244,6 +5502,51 @@ When analyzing consequences of their chosen action, you MUST consider these inqu
     if (reminder) {
       lines.push(`SUPPORT BASELINE REMINDER:\n${reminder}`);
     }
+  }
+
+  // Authority violation consequences and authority-aware support shifts
+  if (e12) {
+    lines.push(`
+═══════════════════════════════════════════════════════════
+⚠️ AUTHORITY VIOLATION CONSEQUENCES
+═══════════════════════════════════════════════════════════
+
+When evaluating the player's PREVIOUS action (Day ${day - 1}), check if they overstepped their institutional authority:
+
+1. **Identify Authority Violations:**
+   - Did player act in a domain they don't control? (Check E-12 domains above)
+   - Did player command institutions/forces they don't lead?
+   - Did player bypass required institutional approval processes?
+   - Did player make unilateral decisions requiring collective authority?
+
+2. **Support Shift Responses to Violations:**
+   IF player overstepped authority (acted in domain they don't control):
+   - Power holders who control that domain: LARGE NEGATIVE shift (-15 to -25)
+     * Reason: "You overstepped institutional bounds / violated established authority"
+   - Institutional seats: Negative shift with specific reference to norm violation
+   - Challenger: Uses this as ammunition to pressure/delegitimize player
+
+3. **Next Dilemma Generation (THIS turn):**
+   IF previous action violated authority:
+   - Feature institutional pushback, investigation, or power struggle
+   - Show consequences of bypassing proper channels
+   - Give violated institution opportunity to reassert control
+   - Example: If player commanded military without authority → military leaders demand explanation or resist
+
+4. **Escalation on Repeated Violations:**
+   IF player has violated authority multiple times:
+   - Escalate toward removal attempt, coup attempt, or constitutional crisis
+   - Make stakes clear: continued violations risk complete downfall
+
+AUTHORITY-AWARE SUPPORT REASONING:
+- **Within Authority:** Normal faction reactions based on policy content
+- **Stretched Authority (plausible but bold):** Mixed reactions - some praise boldness, others express concern
+- **Violated Authority:** Institutional holders very negative, cite norm violation explicitly
+- **Deferred Appropriately (in democracy):** Positive from democratic institutions
+- **Deferred Inappropriately (in autocracy):** Perceived as weakness, negative from hardliners
+
+═══════════════════════════════════════════════════════════
+`);
   }
 
   const mirrorValuesText = formatCompassTopValuesForPrompt(playerCompassTopValues || extractTopCompassFromStrings(playerCompass));

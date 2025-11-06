@@ -625,6 +625,21 @@ export default function EventScreen3({ push }: Props) {
       cardGradientClass: ''
     };
 
+    // Check if reasoning is required for this day
+    const shouldShowReasoning = reasoning.shouldShowReasoning();
+
+    if (shouldShowReasoning) {
+      console.log('[EventScreen3] 💭 Reasoning required - entering reasoning phase');
+
+      // Enter reasoning phase
+      setPhase('reasoning');
+
+      // Show reasoning modal and wait for completion
+      await showReasoningModalForAction(suggestionCard);
+
+      console.log('[EventScreen3] ✅ Reasoning complete - continuing to cleaning');
+    }
+
     // Advance to cleaning phase
     setPhase('cleaning');
 
