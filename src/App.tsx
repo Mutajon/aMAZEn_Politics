@@ -33,6 +33,9 @@ import { useSettingsStore } from "./store/settingsStore";
 import { useLoggingStore } from "./store/loggingStore";
 import { loggingService } from "./lib/loggingService";
 import DataCollectionBanner from "./components/DataCollectionBanner";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { useStateChangeLogger } from "./hooks/useStateChangeLogger";
+import { useSessionLogger } from "./hooks/useSessionLogger";
 
 if (import.meta.env.DEV) {
   import("./dev/storesDebug").then(m => m.attachStoresDebug());
@@ -110,20 +113,26 @@ export default function App() {
 
   // Render current screen with global audio controls
   return (
-    <LanguageProvider>
-      {/* RTL direction handler */}
-      <RTLHandler />
-      
-      {/* App content with loading check */}
-      <AppContent route={route} push={push} enableModifiers={enableModifiers} />
-    </LanguageProvider>
+    <ErrorBoundary>
+      <LanguageProvider>
+        {/* RTL direction handler */}
+        <RTLHandler />
+
+        {/* App content with loading check */}
+        <AppContent route={route} push={push} enableModifiers={enableModifiers} />
+      </LanguageProvider>
+    </ErrorBoundary>
   );
 }
 
 // Separate component to access language context
 function AppContent({ route, push, enableModifiers }: { route: string; push: any; enableModifiers: boolean }) {
   const { isLoading } = useLanguage();
-  
+
+  // Global logging hooks (run once at app level for comprehensive coverage)
+  useStateChangeLogger(); // Automatically logs all Zustand store changes
+  useSessionLogger();     // Automatically logs tab visibility, window blur/focus
+
   if (isLoading) {
     return <LoadingScreen />;
   }

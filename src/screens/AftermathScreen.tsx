@@ -35,6 +35,9 @@ import AftermathContent from "../components/aftermath/AftermathContent";
 import { useLang } from "../i18n/lang";
 import { useLoggingStore } from "../store/loggingStore";
 import { EXPERIMENT_PREDEFINED_ROLE_KEYS } from "../data/predefinedRoles";
+import { useSessionLogger } from "../hooks/useSessionLogger";
+import { useDilemmaStore } from "../store/dilemmaStore";
+import { useLogger } from "../hooks/useLogger";
 
 type Props = {
   push: PushFn;
@@ -52,6 +55,15 @@ export default function AftermathScreen({ push }: Props) {
   const experimentCompletedRoles = useLoggingStore((s) => s.experimentProgress.completedRoles);
   const markExperimentRoleCompleted = useLoggingStore((s) => s.markExperimentRoleCompleted);
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
+
+  // Logging hooks for session summary
+  const sessionLogger = useSessionLogger();
+  const logger = useLogger();
+  const inquiryHistory = useDilemmaStore((s) => s.inquiryHistory);
+  const customActionCount = useDilemmaStore((s) => s.customActionCount);
+  const selectedRole = useRoleStore((s) => s.selectedRole);
+  const day = useDilemmaStore((s) => s.day);
+  const score = useDilemmaStore((s) => s.score);
 
   // ========================================================================
   // SNAPSHOT RESTORATION (synchronous, before first render)
@@ -110,6 +122,56 @@ export default function AftermathScreen({ push }: Props) {
     experimentCompletedRoles,
     markExperimentRoleCompleted
   ]);
+
+  // ========================================================================
+  // EFFECT: LOG SESSION SUMMARY (only on first visit, not on restoration)
+  // ========================================================================
+  useEffect(() => {
+    // Only log on first visit (when data first loads, not when restored from snapshot)
+    if (!data || !isFirstVisit) return;
+
+    // Calculate total inquiries across all days
+    let totalInquiries = 0;
+    inquiryHistory.forEach((dayInquiries) => {
+      totalInquiries += dayInquiries.length;
+    });
+
+    // Calculate session duration (if available)
+    const sessionDuration = sessionLogger.getSessionDuration();
+
+    // Log session reached aftermath
+    logger.logSystem(
+      'session_aftermath_reached',
+      {
+        totalInquiries,
+        totalCustomActions: customActionCount,
+        totalDays: day,
+        role: selectedRole,
+        finalScore: score,
+        sessionDuration,
+        hasIdeologyRatings: !!data.ideologyRatings
+      },
+      `Session reached aftermath: ${totalInquiries} inquiries, ${customActionCount} custom actions, ${day} days completed`
+    );
+
+    // End session with summary data
+    sessionLogger.end({
+      totalInquiries,
+      totalCustomActions: customActionCount,
+      totalDays: day,
+      role: selectedRole,
+      finalScore: score,
+      hasIdeologyRatings: !!data.ideologyRatings,
+      completedSuccessfully: true
+    });
+
+    console.log('[AftermathScreen] 📊 Session summary logged:', {
+      totalInquiries,
+      customActionCount,
+      totalDays: day,
+      sessionDuration: sessionDuration ? `${Math.round(sessionDuration / 1000)}s` : 'unknown'
+    });
+  }, [data, isFirstVisit, inquiryHistory, customActionCount, selectedRole, day, score, sessionLogger, logger]);
 
   // ========================================================================
   // RENDER: Loading State

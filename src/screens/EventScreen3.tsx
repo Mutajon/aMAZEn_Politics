@@ -38,6 +38,8 @@ import type { CompassEffectPing } from "../components/MiniCompass";
 import { loadEventScreenSnapshot, clearEventScreenSnapshot } from "../lib/eventScreenSnapshot";
 import { useLang } from "../i18n/lang";
 import { useRoleProgressStore } from "../store/roleProgressStore";
+import { useTimingLogger } from "../hooks/useTimingLogger";
+import { useAIOutputLogger } from "../hooks/useAIOutputLogger";
 
 type Props = {
   push: (path: string) => void;
@@ -125,6 +127,14 @@ export default function EventScreen3({ push }: Props) {
 
   // Coin flight system (persists across all phases)
   const { flights, triggerCoinFlight, clearFlights } = useCoinFlights();
+
+  // Data logging hooks (Timing, AI outputs)
+  // Note: State change tracking is handled globally in App.tsx via useStateChangeLogger
+  const timingLogger = useTimingLogger();
+  const aiLogger = useAIOutputLogger();
+
+  // Timing tracker: time from dilemma presented to action confirmed
+  const decisionTimingIdRef = useRef<string | null>(null);
 
   // Compass pills state (for visual display during Step 4A)
   const [showCompassPills, setShowCompassPills] = useState(false);
@@ -310,6 +320,45 @@ export default function EventScreen3({ push }: Props) {
   }, [presentationStep, initialSupportValues]);
 
   // ========================================================================
+  // EFFECT 2A: Log AI outputs when collected data arrives
+  // ========================================================================
+  useEffect(() => {
+    if (!collectedData) return;
+
+    // Log dilemma generation
+    if (collectedData.dilemma) {
+      aiLogger.logDilemma(collectedData.dilemma, {
+        crisisMode: storedCrisisMode
+      });
+    }
+
+    // Log mirror advice
+    if (collectedData.mirrorText) {
+      aiLogger.logMirrorAdvice(collectedData.mirrorText);
+    }
+
+    // Log support shifts (Day 2+)
+    if (collectedData.supportEffects) {
+      aiLogger.logSupportShifts(collectedData.supportEffects);
+    }
+
+    // Log compass pills if available
+    if (collectedData.compassPills) {
+      aiLogger.logCompassHints(collectedData.compassPills);
+    }
+
+    // Log dynamic parameters if available
+    if (collectedData.dynamicParams) {
+      aiLogger.logDynamicParams(collectedData.dynamicParams);
+    }
+
+    // Log corruption shift (Day 2+)
+    if (collectedData.corruptionShift) {
+      aiLogger.logCorruptionShift(collectedData.corruptionShift);
+    }
+  }, [collectedData, aiLogger, storedCrisisMode]);
+
+  // ========================================================================
   // EFFECT 3: Advance to presenting when data ready
   // ========================================================================
   useEffect(() => {
@@ -333,6 +382,20 @@ export default function EventScreen3({ push }: Props) {
         });
     }
   }, [isReady, canShowDilemma, isCollecting, phase, collectedData, startNarrationIfReady, setPresentationStep, restoredFromSnapshot]);
+
+  // ========================================================================
+  // EFFECT 3A: Start timing when entering interacting phase
+  // ========================================================================
+  useEffect(() => {
+    if (phase === 'interacting' && !decisionTimingIdRef.current) {
+      // Start timing decision
+      decisionTimingIdRef.current = timingLogger.start('decision_time', {
+        day,
+        dilemmaTitle: collectedData?.dilemma?.title
+      });
+      console.log('[EventScreen3] ⏱️ Decision timing started');
+    }
+  }, [phase, day, collectedData?.dilemma?.title, timingLogger]);
 
   // ========================================================================
   // EFFECT 4: Control compass pills visibility (data-based, not step-based)
@@ -393,6 +456,21 @@ export default function EventScreen3({ push }: Props) {
       return;
     }
 
+    console.log('[EventScreen3] ✅ Action confirmed:', actionCard.title);
+
+    // End decision timing
+    if (decisionTimingIdRef.current) {
+      const duration = timingLogger.end(decisionTimingIdRef.current, {
+        day,
+        actionId: actionCard.id,
+        actionTitle: actionCard.title,
+        actionCost: actionCard.cost,
+        wasCustomAction: false
+      });
+      console.log(`[EventScreen3] ⏱️ Decision time: ${duration}ms`);
+      decisionTimingIdRef.current = null;
+    }
+
     // Advance to cleaning phase
     setPhase('cleaning');
 
@@ -416,6 +494,19 @@ export default function EventScreen3({ push }: Props) {
     }
 
     console.log('[EventScreen3] 💡 Processing custom suggestion:', text);
+
+    // End decision timing (custom action confirmed)
+    if (decisionTimingIdRef.current) {
+      const duration = timingLogger.end(decisionTimingIdRef.current, {
+        day,
+        actionId: 'suggest',
+        actionTitle: text.trim(),
+        actionLength: text.trim().length,
+        wasCustomAction: true
+      });
+      console.log(`[EventScreen3] ⏱️ Decision time (custom): ${duration}ms`);
+      decisionTimingIdRef.current = null;
+    }
 
     // Track custom action for goals system
     const { incrementCustomActions } = useDilemmaStore.getState();
@@ -546,8 +637,9 @@ export default function EventScreen3({ push }: Props) {
     // Calculate derived values
     const daysLeft = totalDays - day + 1;
 
-    // Game end detection - empty actions array signals conclusion
-    const isGameEnd = Array.isArray(collectedData.dilemma.actions) && collectedData.dilemma.actions.length === 0;
+    // Game end detection - use backend's isGameEnd flag (not actions length)
+    // Note: Empty actions are normal in fullAutonomy mode, but that doesn't mean game end
+    const isGameEnd = collectedData.dilemma.isGameEnd === true;
 
     // Build support items with deltas and initial values for animation
     const rawSupportItems = buildSupportItems(presentationStep, collectedData, initialSupportValues);

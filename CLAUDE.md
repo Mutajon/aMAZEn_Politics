@@ -393,3 +393,278 @@ Benefits: Better React optimizations, improved maintainability
 - **Annotate new code** with clear descriptions and file relationships
 - **Update CLAUDE.md** whenever making significant changes
 - **Keep dependencies clean** - Review `useEffect` cleanup functions
+- **ALWAYS integrate data logging** (see Data Logging Integration section below)
+
+## Data Logging Integration (MANDATORY)
+
+When adding or modifying ANY feature, ALWAYS integrate logging. The codebase has a comprehensive data logging system for research analysis.
+
+### Logging Architecture
+
+**Core Components:**
+- `src/hooks/useLogger.ts` - Main logging hook (player actions)
+- `src/hooks/useTimingLogger.ts` - Timing measurements (decision time, typing duration)
+- `src/hooks/useAIOutputLogger.ts` - AI-generated content logging
+- `src/hooks/useSessionLogger.ts` - Session lifecycle tracking
+- `src/hooks/useStateChangeLogger.ts` - Automatic state change tracking
+- `src/lib/loggingService.ts` - Core service with queue management, auto-flush, retry logic
+- `src/store/loggingStore.ts` - Zustand store for userId, sessionId, treatment
+- `server/api/logging.mjs` - Backend endpoints with MongoDB storage
+
+**Log Structure:**
+```typescript
+{
+  timestamp: Date,
+  userId: string,          // Anonymous UUID
+  sessionId: string,       // Per-game session
+  gameVersion: string,     // From package.json
+  treatment: string,       // Experiment treatment
+  source: 'player' | 'system',
+  action: string,          // Event name
+  value: string | number | boolean | object,  // Event data
+  currentScreen: string,   // Route
+  day: number,             // Game day
+  role: string,            // Selected role
+  comments: string         // Human-readable description
+}
+```
+
+### User Interactions (Use `useLogger`)
+
+**Required Logging:**
+- All button clicks
+- All text inputs (with character counts)
+- All form submissions (with timing)
+- All modal open/close events
+- All navigation events
+
+**Examples:**
+```typescript
+const logger = useLogger();
+
+// Button click
+logger.log('button_click_start', { buttonId: 'start', screen: '/splash' }, 'User clicked start button');
+
+// Text input submission
+logger.log('custom_action_submitted', {
+  text: customText,
+  charCount: customText.length,
+  typingDuration: duration
+}, `Custom action submitted (${customText.length} chars, ${duration}ms)`);
+
+// Modal opened
+logger.log('inquiry_modal_opened', {
+  remainingCredits,
+  dilemmaTitle
+}, 'User opened inquiry modal');
+```
+
+### System Events (Use `useLogger.logSystem`)
+
+**Required Logging:**
+- All AI-generated content (dilemmas, mirror advice, support shifts, compass hints)
+- All state changes (support, budget, corruption, compass values)
+- All screen transitions
+- All errors and failures
+
+**Examples:**
+```typescript
+const logger = useLogger();
+
+// AI output
+logger.logSystem('dilemma_generated', {
+  title: dilemma.title,
+  description: dilemma.description,
+  actionCount: dilemma.actions.length
+}, `Dilemma generated: ${dilemma.title}`);
+
+// State change
+logger.logSystem('state_support_changed', {
+  from: oldValue,
+  to: newValue,
+  delta: newValue - oldValue
+}, `Support changed: ${oldValue} → ${newValue}`);
+```
+
+### Timing Measurements (Use `useTimingLogger`)
+
+**Required Timing:**
+- Decision time (dilemma presented → action confirmed)
+- Typing duration (input focused → text submitted)
+- Session duration (game start → game end)
+- Screen time (screen entered → screen exited)
+
+**Examples:**
+```typescript
+const timingLogger = useTimingLogger();
+
+// Start timing
+const timingId = timingLogger.start('decision_time', {
+  day,
+  dilemmaTitle
+});
+
+// End timing (automatically logs duration)
+const duration = timingLogger.end(timingId, {
+  actionId: 'a',
+  actionTitle: 'Deploy troops'
+});
+```
+
+### AI Output Logging (Use `useAIOutputLogger`)
+
+**Required AI Logging:**
+- Dilemma generation (title, description, actions, topic, scope)
+- Mirror advice (text, length)
+- Support shifts (deltas, explanations)
+- Compass hints (value changes)
+- Dynamic parameters (consequences)
+- Corruption shifts (delta, reason)
+- Narrative seeds (story threads)
+- Inquiry responses (questions, answers)
+- Custom action validation (approval/rejection)
+
+**Examples:**
+```typescript
+const aiLogger = useAIOutputLogger();
+
+// Log dilemma
+aiLogger.logDilemma(dilemma, {
+  topic: 'economy',
+  scope: 'national',
+  crisisMode: 'people'
+});
+
+// Log mirror advice
+aiLogger.logMirrorAdvice(mirrorText);
+
+// Log support shifts
+aiLogger.logSupportShifts(supportEffects);
+```
+
+### State Change Tracking (Use `useStateChangeLogger`)
+
+**Automatic Tracking:**
+The `useStateChangeLogger` hook automatically subscribes to all Zustand store changes and logs:
+- Support value changes (people, middle, mom)
+- Budget changes
+- Corruption level changes
+- Compass value changes
+- Score changes
+- Day progression
+- Goal status changes
+- Crisis mode changes
+- Treatment changes
+
+**Usage:**
+```typescript
+// In a top-level component (e.g., App.tsx or EventScreen3)
+useStateChangeLogger(); // That's it! No manual logging needed
+```
+
+### Integration Checklist
+
+When adding or modifying features, verify:
+
+- [ ] **User Interactions**: All clicks, inputs, submissions logged
+- [ ] **System Events**: All AI outputs, state changes logged
+- [ ] **Timing**: Decision time, typing duration tracked where applicable
+- [ ] **Character Counts**: All text inputs log character count
+- [ ] **Error Handling**: All errors logged with context
+- [ ] **Navigation**: Screen changes logged with timing
+- [ ] **Treatment Field**: Experiment treatment included in logs
+- [ ] **Comments**: Human-readable descriptions provided
+
+### File-Specific Guidelines
+
+**App.tsx** (`src/App.tsx`):
+- ✅ Wrapped with `ErrorBoundary` for global error catching and logging
+- ✅ Uses `useStateChangeLogger` globally (all Zustand store changes auto-logged)
+- ✅ Uses `useSessionLogger` globally (tab visibility, window blur/focus auto-logged)
+- Pattern: Global hooks run once at app level for comprehensive coverage
+
+**EventScreen3** (`src/screens/EventScreen3.tsx`):
+- ✅ Uses `useTimingLogger` for decision time (start when interacting, end when confirmed)
+- ✅ Uses `useAIOutputLogger` for all AI outputs when collected data arrives
+- ✅ Logs dilemma generation, mirror advice, support shifts, compass hints, dynamic params, corruption
+- Pattern: Start timing when phase becomes 'interacting', end when action confirmed
+
+**InquiringModal** (`src/components/event/InquiringModal.tsx`):
+- ✅ Uses `useTimingLogger` for typing duration
+- ✅ Logs modal open/close, inquiry submission, answer received
+- ✅ Logs character counts for questions
+- Pattern: Start timing on modal open, end on submission
+
+**AftermathScreen** (`src/screens/AftermathScreen.tsx`):
+- ✅ Uses `useSessionLogger.end()` with comprehensive session summary
+- ✅ Logs: session duration, total inquiries, total custom actions, final score, role
+- ✅ Only logs on first visit (not on snapshot restoration)
+- Pattern: Calculate aggregates from stores, log once when data loads
+
+**ErrorBoundary** (`src/components/ErrorBoundary.tsx`):
+- ✅ Catches all uncaught React errors
+- ✅ Logs fatal errors with stack traces, component stacks, metadata
+- ✅ Forces immediate flush (doesn't wait for auto-flush)
+- ✅ Provides user-friendly error UI with retry options
+- Pattern: Class component with componentDidCatch lifecycle
+
+**MirrorQuizScreen** (`src/screens/MirrorQuizScreen.tsx`):
+- ✅ Uses `useTimingLogger` for per-question timing
+- ✅ Logs all quiz questions presented (system events)
+- ✅ Logs all player answers with timing (player events)
+- ✅ Logs compass pills displayed (system events)
+- ✅ Logs AI-generated summary (system event)
+- ✅ Logs quiz completion
+- Pattern: Start timing on question presentation, end on answer selection
+
+**ActionDeck + useActionDeckState** (`src/components/event/`):
+- ✅ Uses `useTimingLogger` for custom action typing duration
+- ✅ Logs custom action modal open/close
+- ✅ Logs custom action submission (text, character count, typing duration)
+- Pattern: Start timing on modal open, end on submission
+
+**All Other Screens**:
+- TODO: Systematic audit needed (8 screens remaining)
+- Use `useLogger` for all user interactions
+- Use `useSessionLogger.logScreenChange()` for navigation
+- Follow patterns from completed screens above
+
+### Testing Logging
+
+**Verify Logging Works:**
+```bash
+# 1. Enable data collection in .env
+ENABLE_DATA_COLLECTION=true
+
+# 2. Check MongoDB logs collection
+# Logs are stored in MongoDB and can be exported to CSV
+
+# 3. Console logging
+# All log events appear in browser console with [Logging] prefix
+```
+
+**Debug Logging:**
+```javascript
+// Browser console commands
+loggingService.getQueue()     // View queued logs
+loggingService.clearQueue()   // Clear queue
+loggingService.flush()        // Force flush
+```
+
+### Common Mistakes to Avoid
+
+❌ **DON'T:**
+- Skip logging because "it's just a small change"
+- Log only some user interactions in a screen
+- Forget to log character counts for text inputs
+- Forget to track timing for decisions/typing
+- Log state changes manually (use `useStateChangeLogger`)
+- Mix up `logger.log()` (player) and `logger.logSystem()` (system)
+
+✅ **DO:**
+- Log every user interaction, no exceptions
+- Log all AI-generated content
+- Include timing measurements for all decisions
+- Use appropriate hook for the logging type
+- Include descriptive comments in logs
+- Test that logs appear in console during development

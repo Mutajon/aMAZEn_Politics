@@ -10,6 +10,7 @@ import { useSettingsStore } from "./settingsStore";
 import { useRoleStore } from "./roleStore";
 import { useCompassStore } from "./compassStore"; // <-- A) use compass values (0..10)
 import { COMPONENTS } from "../data/compass-data"; // <-- B) component definitions for value names
+import { getTreatmentConfig, type TreatmentType } from "../data/experimentConfig"; // <-- Inquiry system config
 
 // Prevent duplicate fetches (React StrictMode or fast double click)
 let loadNextInFlight = false;
@@ -56,6 +57,10 @@ type DilemmaState = {
       summary: string;
     }>;
   } | null;
+
+  // Inquiry System (Treatment-based feature for player questions about dilemmas)
+  inquiryHistory: Map<number, Array<{ question: string; answer: string; timestamp: number }>>;
+  inquiryCreditsRemaining: number;  // Resets each dilemma based on treatment config
 
   current: Dilemma | null;
   history: Dilemma[];
@@ -182,6 +187,12 @@ type DilemmaState = {
   endConversation: () => void;     // Cleanup after game ends
   setNarrativeMemory: (memory: DilemmaState['narrativeMemory']) => void; // Store narrative scaffold
 
+  // Inquiry system methods (Treatment-based feature)
+  resetInquiryCredits: () => void;                             // Reset credits for new dilemma
+  addInquiry: (question: string, answer: string) => void;      // Store Q&A pair
+  getInquiriesForCurrentDay: () => Array<{question: string, answer: string, timestamp: number}>;  // Retrieve current day inquiries
+  canInquire: () => boolean;                                   // Check if inquiries are available
+
   // Crisis detection methods (NEW)
   detectAndSetCrisis: () => "downfall" | "people" | "challenger" | "caring" | null;  // Detect crisis after support updates, returns crisis mode
   clearCrisis: () => void;          // Clear crisis state after handling
@@ -211,6 +222,10 @@ export const useDilemmaStore = create<DilemmaState>()(
   gameId: null,
   conversationActive: false,
   narrativeMemory: null, // Will be populated during BackgroundIntroScreen
+
+  // Inquiry system (initialized with 0 credits, reset per dilemma based on treatment)
+  inquiryHistory: new Map(),
+  inquiryCreditsRemaining: 0,
 
   current: null,
   history: [],
@@ -743,6 +758,63 @@ export const useDilemmaStore = create<DilemmaState>()(
   setNarrativeMemory(memory) {
     dlog("setNarrativeMemory ->", memory);
     set({ narrativeMemory: memory });
+  },
+
+  // ========================================================================
+  // INQUIRY SYSTEM METHODS
+  // ========================================================================
+
+  resetInquiryCredits() {
+    // Get treatment config from settings store
+    const treatment = useSettingsStore.getState().treatment as TreatmentType;
+    const config = getTreatmentConfig(treatment);
+
+    dlog("resetInquiryCredits ->", config.inquiryTokensPerDilemma);
+
+    set({
+      inquiryCreditsRemaining: config.inquiryTokensPerDilemma
+    });
+  },
+
+  addInquiry(question, answer) {
+    const { day, inquiryHistory, inquiryCreditsRemaining } = get();
+
+    // Get or create array for current day
+    if (!inquiryHistory.has(day)) {
+      inquiryHistory.set(day, []);
+    }
+
+    // Add new inquiry
+    const dayInquiries = inquiryHistory.get(day)!;
+    dayInquiries.push({
+      question,
+      answer,
+      timestamp: Date.now()
+    });
+
+    // Decrement credits
+    const newCredits = Math.max(0, inquiryCreditsRemaining - 1);
+
+    dlog("addInquiry -> day", day, "remaining credits:", newCredits);
+
+    set({
+      inquiryHistory: new Map(inquiryHistory), // Create new Map to trigger reactivity
+      inquiryCreditsRemaining: newCredits
+    });
+  },
+
+  getInquiriesForCurrentDay() {
+    const { day, inquiryHistory } = get();
+    return inquiryHistory.get(day) || [];
+  },
+
+  canInquire() {
+    const { inquiryCreditsRemaining } = get();
+    const treatment = useSettingsStore.getState().treatment as TreatmentType;
+    const config = getTreatmentConfig(treatment);
+
+    // Feature available if treatment allows it AND player has credits
+    return config.inquiryTokensPerDilemma > 0 && inquiryCreditsRemaining > 0;
   },
 
   // ========================================================================

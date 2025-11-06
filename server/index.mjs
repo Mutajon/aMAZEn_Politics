@@ -3226,6 +3226,139 @@ Return STRICT JSON ONLY.`;
   }
 });
 
+// -------------------- NEW: Player Inquiry API (Treatment-based Feature) -------
+/**
+ * /api/inquire - Handle player questions about current dilemma
+ *
+ * Feature gated by treatment variable (experimentConfig):
+ * - fullAutonomy: 2 inquiries per dilemma
+ * - semiAutonomy: 1 inquiry per dilemma
+ * - noAutonomy: 0 inquiries (feature hidden)
+ *
+ * Inquiry Q&A pairs are added to hosted conversation history for context
+ * in subsequent consequence analysis (AI considers what player asked about).
+ */
+app.post("/api/inquire", async (req, res) => {
+  try {
+    console.log("\n========================================");
+    console.log("❓ [INQUIRY] /api/inquire called");
+    console.log("========================================\n");
+
+    const { gameId, question, currentDilemma, day } = req.body;
+
+    // Validation
+    if (!gameId || typeof gameId !== 'string') {
+      return res.status(400).json({ error: "Missing or invalid gameId" });
+    }
+
+    if (!question || typeof question !== 'string' || question.trim().length < 5) {
+      return res.status(400).json({ error: "Missing or invalid question (min 5 characters)" });
+    }
+
+    if (!currentDilemma || !currentDilemma.title || !currentDilemma.description) {
+      return res.status(400).json({ error: "Missing or invalid currentDilemma" });
+    }
+
+    if (!day || typeof day !== 'number') {
+      return res.status(400).json({ error: "Missing or invalid day" });
+    }
+
+    console.log(`[INQUIRY] gameId=${gameId}, day=${day}`);
+    console.log(`[INQUIRY] question="${question.substring(0, 100)}..."`);
+
+    // Retrieve conversation
+    const conversation = getConversation(gameId);
+    if (!conversation) {
+      console.warn(`[INQUIRY] ⚠️ Conversation not found or expired for gameId=${gameId}`);
+      return res.status(404).json({
+        error: "Game session expired",
+        answer: "Your game session has expired. Please restart the game."
+      });
+    }
+
+    const messages = conversation.messages || [];
+
+    // Add player inquiry to conversation history with clear tagging
+    const userMessage = {
+      role: "user",
+      content: `[INQUIRY - Day ${day}] Regarding "${currentDilemma.title}": ${question.trim()}`
+    };
+    messages.push(userMessage);
+
+    console.log(`[INQUIRY] Added user inquiry to conversation (${messages.length} total messages)`);
+
+    // System prompt for answering inquiries with natural language emphasis
+    const systemPrompt = `You are answering a player's question about the current political situation in their game.
+
+Dilemma Title: ${currentDilemma.title}
+Dilemma Description: ${currentDilemma.description}
+
+CRITICAL GUIDELINES:
+- Answer in very natural, conversational language
+- Avoid ALL jargon, technical terms, and formal language
+- Maximum 2 sentences - be concise and straight to the point
+- Speak like a helpful friend explaining something simply
+- DO NOT reveal hidden consequences of specific actions
+- DO NOT tell them which action to choose
+- Focus on clarifying the situation, stakeholder perspectives, or context
+
+Examples of GOOD answers (natural, concise, clear):
+"The workers want better pay and working conditions because they feel you broke promises from last year."
+"Most people in the city support the strike, but business owners and the military are strongly against it."
+"The economy is already fragile, so any disruption could make things worse for everyone."
+
+Examples of BAD answers (too formal, jargon-heavy):
+"The labor faction is experiencing dissatisfaction due to unfulfilled commitments regarding compensation restructuring."
+"There exists a bifurcation in public opinion across socioeconomic strata regarding this labor dispute."
+"The macroeconomic indicators suggest fiscal vulnerability in the current conjuncture."
+
+Remember: Be conversational, be concise (2 sentences max), be clear.`;
+
+    // Get AI response
+    let answer;
+    try {
+      answer = await aiText({
+        system: systemPrompt,
+        user: question.trim(),
+        model: MODEL_DILEMMA,
+        temperature: 0.7,
+        maxTokens: 150 // Strict limit for conciseness (2 sentences)
+      });
+
+      console.log(`[INQUIRY] AI answer: "${answer.substring(0, 100)}..."`);
+    } catch (aiError) {
+      console.error("[INQUIRY] ❌ AI call failed:", aiError?.message || aiError);
+      return res.status(500).json({
+        error: "Failed to generate answer",
+        answer: "The advisor is unavailable right now. Please try again."
+      });
+    }
+
+    // Add AI response to conversation history
+    const assistantMessage = {
+      role: "assistant",
+      content: answer
+    };
+    messages.push(assistantMessage);
+
+    // Update conversation store
+    conversation.messages = messages;
+    conversation.lastUsedAt = Date.now();
+    conversation.turnCount = (conversation.turnCount || 0) + 1;
+
+    console.log(`[INQUIRY] ✅ Successfully answered inquiry (${messages.length} total messages)`);
+
+    return res.json({ answer });
+
+  } catch (error) {
+    console.error("[INQUIRY] ❌ Unexpected error:", error);
+    return res.status(500).json({
+      error: "Failed to process inquiry",
+      answer: "The advisor is unavailable right now. Please try again."
+    });
+  }
+});
+
 // -------------------- NEW: Unified Game Turn API (Hosted State) -------
 /**
  * /api/game-turn - Single endpoint for all event screen data using conversation state
@@ -3659,7 +3792,14 @@ app.post("/api/game-turn", async (req, res) => {
             }
           } else if (generateActions === false) {
             // fullAutonomy treatment - empty actions is NORMAL, not game end
+            // Safety check: AI might have incorrectly flagged isGameEnd=true
+            if (turnData.isGameEnd && daysLeftForTurn > 0) {
+              console.warn(`[GAME-TURN] ⚠️ Model incorrectly flagged isGameEnd=true in fullAutonomy mode with daysLeft=${daysLeftForTurn}. Forcing normal dilemma.`);
+            }
             turnData.isGameEnd = false;
+            if (!Array.isArray(turnData.dynamicParams)) {
+              turnData.dynamicParams = [];
+            }
           }
         } else {
           turnData.actions = sanitizeTurnActions(turnData.actions);
@@ -3731,6 +3871,51 @@ app.post("/api/game-turn", async (req, res) => {
         turnData.actions = [];
       }
     }
+
+    // ============================================================================
+    // FOOLPROOF SAFETY CHECK: Prevent game end on Day 1 under ANY circumstances
+    // ============================================================================
+    /**
+     * Validates that game end only happens on appropriate days
+     * ABSOLUTE RULE: Day 1 can NEVER be game end
+     */
+    function validateGameEndByDay(turnData, day, daysLeft, totalDays, crisisMode) {
+      if (!turnData.isGameEnd) {
+        // Not flagged as game end, nothing to check
+        return;
+      }
+
+      // ABSOLUTE RULE: Day 1 can NEVER be game end
+      if (day === 1) {
+        console.error(`[GAME-TURN] 🚨 CRITICAL: Game end detected on Day 1! This is ALWAYS wrong. Forcing normal dilemma.`);
+        console.error(`[GAME-TURN] Debug info: day=${day}, daysLeft=${daysLeft}, totalDays=${totalDays}, crisisMode=${crisisMode}, isGameEnd=${turnData.isGameEnd}`);
+        turnData.isGameEnd = false;
+        if (!Array.isArray(turnData.dynamicParams)) {
+          turnData.dynamicParams = [];
+        }
+        return;
+      }
+
+      // STRONG RULE: Days 2-6 should only be game end for downfall crisis
+      if (day >= 2 && day <= (totalDays - 1)) {
+        // Allow game end ONLY for downfall (total collapse)
+        if (crisisMode !== "downfall" && daysLeft > 0) {
+          console.warn(`[GAME-TURN] ⚠️ Game end detected on Day ${day} (daysLeft=${daysLeft}) without downfall crisis. This is unusual. Forcing normal dilemma.`);
+          console.warn(`[GAME-TURN] Debug info: crisisMode=${crisisMode}, totalDays=${totalDays}`);
+          turnData.isGameEnd = false;
+          if (!Array.isArray(turnData.dynamicParams)) {
+            turnData.dynamicParams = [];
+          }
+          return;
+        }
+      }
+
+      // NORMAL: Day 7+ or daysLeft <= 0 or downfall crisis - game end is allowed
+      console.log(`[GAME-TURN] ✅ Game end allowed: day=${day}, daysLeft=${daysLeft}, totalDays=${totalDays}, crisisMode=${crisisMode}`);
+    }
+
+    // Apply foolproof safety check
+    validateGameEndByDay(turnData, day, daysLeftForTurn, totalDaysForTurn, crisisMode);
 
     messages.push({ role: "assistant", content: aiResponse.content });
 
@@ -4828,6 +5013,7 @@ TOPIC VARIETY (Natural Flow):
 STYLE & VOICE (ALWAYS APPLY):
 - Keep language punchy and clear; every sentence should make sense to a bright high-school student without prior context.
 - Anchor descriptions in sights, sounds, or immediate human reactions so the scene feels lived-in.
+- - Always end the description with a direct player question that forces an immediate choice.
 - Name the player's role in the first sentence of the description (e.g., "As the district police chief...").
 - Avoid passive policy-speak; prefer vivid verbs over abstract nouns.
 ${buildLightSystemPrompt()}
@@ -4835,7 +5021,7 @@ ${buildLightSystemPrompt()}
 OUTPUT FORMAT (JSON):
 {
   "title": "Guard the Coastline",
-  "description": "As provincial governor, you survey the shoreline while courtiers press conflicting demands about the expelled foreigners' ships.",
+  "description": "As provincial governor, you survey the shoreline while courtiers press conflicting demands about the expelled foreigners' ships. How will you respond?",
   "selectedThreadIndex": 1,
   "selectedThreadSummary": "Demonstrations over autonomy boil over, forcing you to confront the governor-versus-activists thread head-on.",${generateActions ? `
   "actions": [
@@ -4984,6 +5170,47 @@ function buildTurnSystemPrompt({
     `When calculating support shifts, explicitly tie reasoning to faction motivations and the player's recent actions.`,
     `⚠️ CRITICAL: supportShift "why" must reference the action the player already took (sent in user message), NOT the new options you're about to generate.`
   ];
+
+  // Inquiry reinforcement: Make AI explicitly consider player questions in consequence analysis
+  lines.push(`
+═══════════════════════════════════════════════════════════
+📋 PLAYER INQUIRIES & INFORMED DECISION-MAKING
+═══════════════════════════════════════════════════════════
+
+The player may have asked clarifying questions about the previous dilemma before making their decision.
+These inquiries appear in the conversation history as: [INQUIRY - Day X] Regarding "Dilemma Title": question
+
+When analyzing consequences of their chosen action, you MUST consider these inquiries:
+
+1. **Information Access**: The player had this information when deciding
+   - Their choice was informed by what they learned
+   - Don't present consequences as if they were uninformed or surprised by predictable outcomes
+
+2. **Priority Signals**: What they asked about reveals their concerns
+   - Questions about public opinion → they care about popular support
+   - Questions about economic impact → they're tracking fiscal consequences
+   - Questions about specific factions → they're managing those relationships
+   - Questions about risks/benefits → they're weighing trade-offs carefully
+
+3. **Support Shift Explanations**: Reference their informed awareness
+   - GOOD: "Having consulted advisors about public sentiment, your decision to..."
+   - GOOD: "With knowledge of the economic risks, you chose to..."
+   - GOOD: "After asking about military attitudes, you proceeded with..."
+   - BAD: "Your decision surprised many..." (if they specifically asked about reactions)
+   - BAD: Ignoring that they had specific information before acting
+
+4. **Narrative Continuity**: Acknowledge their due diligence
+   - If they asked about risks and took a cautious approach, note their careful consideration
+   - If they asked about benefits and went bold, acknowledge their informed confidence
+   - If they asked about stakeholders and tried to balance interests, recognize that awareness
+
+5. **New Dilemma Context**: Build on their knowledge base
+   - Reference information they previously sought when relevant
+   - Show how their inquiries relate to unfolding events
+   - Don't repeat information they already requested unless circumstances changed
+
+═══════════════════════════════════════════════════════════
+`);
 
   if (roleScope) {
     lines.push(`ROLE SCOPE GUARDRAIL: ${roleScope}`);

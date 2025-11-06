@@ -866,6 +866,9 @@ export function useEventDataCollector() {
       // Update global dilemma store for narration
       useDilemmaStore.setState({ current: dilemma });
 
+      // Reset inquiry credits for new dilemma (treatment-based feature)
+      useDilemmaStore.getState().resetInquiryCredits();
+
       // Mark collecting as done - UI can render!
       setIsCollecting(false);
 

@@ -10,6 +10,8 @@
 
 import { useState, useRef, useLayoutEffect, useEffect } from "react";
 import { useAnimationControls } from "framer-motion";
+import { useTimingLogger } from "./useTimingLogger";
+import { useLogger } from "./useLogger";
 
 export type ActionCard = {
   id: string;
@@ -29,6 +31,10 @@ async function waitNextFrame(times = 2) {
 }
 
 export function useActionDeckState(actions: ActionCard[]) {
+  // Logging hooks
+  const timingLogger = useTimingLogger();
+  const logger = useLogger();
+
   // Card selection state
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -54,6 +60,9 @@ export function useActionDeckState(actions: ActionCard[]) {
   // DOM refs for measuring
   const cardRefs = useRef<Record<string, HTMLElement | null>>({});
   const suggestRef = useRef<HTMLButtonElement | null>(null);
+
+  // Typing timing tracker for custom action suggestions
+  const suggestTypingTimingIdRef = useRef<string | null>(null);
 
   // Measure deck height when actions change
   useLayoutEffect(() => {
@@ -85,10 +94,29 @@ export function useActionDeckState(actions: ActionCard[]) {
     setSuggestText("");
     setSuggestError(null);
     setSuggestOpen(true);
+
+    // Start timing custom action typing
+    suggestTypingTimingIdRef.current = timingLogger.start('custom_action_typing_duration');
+
+    // Log modal opened
+    logger.log('custom_action_modal_opened', {
+      timestamp: new Date().toISOString()
+    }, 'User opened custom action modal');
   };
 
   const closeSuggestModal = () => {
     setSuggestOpen(false);
+
+    // Cancel timing if modal closed without submitting
+    if (suggestTypingTimingIdRef.current) {
+      timingLogger.cancel(suggestTypingTimingIdRef.current);
+      suggestTypingTimingIdRef.current = null;
+
+      logger.log('custom_action_modal_closed', {
+        textLength: suggestText.length,
+        submitted: false
+      }, 'User closed custom action modal without submitting');
+    }
   };
 
   const startConfirmationFlow = async (cardId: string) => {
@@ -138,6 +166,23 @@ export function useActionDeckState(actions: ActionCard[]) {
     setValidatingSuggest(false);
   };
 
+  // Log suggestion submission with timing
+  const logSuggestionSubmitted = () => {
+    if (suggestTypingTimingIdRef.current) {
+      const duration = timingLogger.end(suggestTypingTimingIdRef.current, {
+        textLength: suggestText.length
+      });
+
+      logger.log('custom_action_submitted', {
+        text: suggestText,
+        textLength: suggestText.length,
+        typingDuration: duration
+      }, `Custom action submitted (${suggestText.length} chars, ${duration}ms)`);
+
+      suggestTypingTimingIdRef.current = null;
+    }
+  };
+
   return {
     // Selection state
     selected,
@@ -174,5 +219,6 @@ export function useActionDeckState(actions: ActionCard[]) {
     startConfirmationFlow,
     startSuggestConfirmationFlow,
     resetState,
+    logSuggestionSubmitted,
   };
 }

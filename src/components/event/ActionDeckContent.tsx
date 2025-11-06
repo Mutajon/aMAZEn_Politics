@@ -8,6 +8,7 @@
  * Uses: framer-motion for animations, lucide-react for icons
  */
 
+import { useEffect } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { Coins, CheckCircle2 } from "lucide-react";
 import type { ActionCard } from "../../hooks/useActionDeckState";
@@ -113,6 +114,17 @@ export default function ActionDeckContent({
 
   const canAffordSuggestion = !showBudget || budget >= Math.abs(suggestCost);
   const suggestTextValid = suggestText.trim().length >= 4;
+
+  // Auto-open suggest modal in full autonomy mode
+  useEffect(() => {
+    if (!config.showAIOptions && config.showCustomAction && !isSuggestOpen && !confirmingId) {
+      // Open modal after brief delay to allow animations to settle
+      const timer = setTimeout(() => {
+        onOpenSuggest();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [config.showAIOptions, config.showCustomAction, isSuggestOpen, confirmingId, onOpenSuggest]);
 
   // Wrapper handlers with click sound + logging
   const handleSelectCard = (id: string) => {
@@ -272,16 +284,11 @@ export default function ActionDeckContent({
           </div>
         )}
 
-        {/* TREATMENT: fullAutonomy hides AI options, shows message */}
-        {!config.showAIOptions && (
-          <div className="col-span-3 text-center py-12 space-y-2">
-            <p className="text-lg font-semibold text-gray-300">Full Autonomy Mode</p>
-            <p className="text-sm text-gray-400">Create your own action using the button below</p>
-          </div>
-        )}
+        {/* TREATMENT: fullAutonomy hides AI options - modal opens automatically */}
+        {/* No message needed - modal opens directly */}
 
-        {/* Suggest-your-own pill (part of stagger sequence) - TREATMENT: fullAutonomy & semiAutonomy show button */}
-        {config.showCustomAction && (
+        {/* Suggest-your-own pill (part of stagger sequence) - TREATMENT: semiAutonomy shows button, fullAutonomy hides (modal auto-opens) */}
+        {config.showCustomAction && config.showAIOptions && (
         <motion.div className="mt-3 flex justify-center" layout
           variants={{
             hidden: { opacity: 0, scale: 0.85 },
@@ -397,7 +404,7 @@ export default function ActionDeckContent({
           {isSuggestOpen && (
             <motion.div
               key="suggest"
-              className="absolute inset-0 z-30 flex items-center justify-center p-3"
+              className="absolute inset-0 z-30 flex items-start justify-center p-3 pt-6"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -426,7 +433,9 @@ export default function ActionDeckContent({
                     autoFocus
                     value={suggestText}
                     onChange={(e) => onSuggestTextChange(e.target.value)}
-                    placeholder="Type your suggestion…"
+                    placeholder={!config.showAIOptions
+                      ? "Type in your desired action"
+                      : "Type your suggestion…"}
                     className="w-full rounded-xl bg-black/35 ring-1 ring-white/25 text-white placeholder-white/70 px-3 py-2 outline-none focus:ring-white/35"
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
