@@ -6,6 +6,7 @@ import { LanguageProvider, useLanguage } from "./i18n/LanguageContext";
 
 import { useHashRoute } from "./lib/router";
 import SplashScreen from "./screens/SplashScreen";
+import BackstageScreen from "./screens/BackstageScreen";
 // import CompassIntro from "./screens/CompassIntro"; // (legacy monolith – no longer used)
 import IntroScreen from "./screens/IntroScreen";
 import RoleSelectionScreen from "./screens/RoleSelectionScreen";
@@ -171,6 +172,15 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: any
       {route === "/aftermath" && <AftermathScreen push={push} />}
       {route === "/final-score" && <FinalScoreScreen push={push} />}
 
+
+      {/* Backstage route - Development mode (bypasses experiments) */}
+      {route === "/backstage" && (
+        <BackstageScreen
+          onStart={() => push("/intro")}
+          onHighscores={() => push("/highscores")}
+          onAchievements={() => push("/achievements")}
+        />
+      )}
 
       {/* Default route - SplashScreen */}
       {route === "/" && (

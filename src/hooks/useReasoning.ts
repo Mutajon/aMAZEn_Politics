@@ -128,6 +128,7 @@ export function validateReasoningText(text: string): ValidationResult {
 export function useReasoning() {
   const currentDay = useDilemmaStore((state: any) => state.day);
   const treatment = useSettingsStore((state: any) => state.treatment);
+  const experimentMode = useSettingsStore((state: any) => state.experimentMode);
   const reasoningHistory = useDilemmaStore((state: any) => state.reasoningHistory);
 
   /**
@@ -140,10 +141,15 @@ export function useReasoning() {
 
   /**
    * Check if reasoning should be shown for the current day.
+   * Reasoning is completely disabled when experimentMode is false.
    */
   const shouldShowReasoning = useCallback(() => {
+    // Disable reasoning completely when experiment mode is off (classic gameplay)
+    if (!experimentMode) {
+      return false;
+    }
     return currentPromptType !== 'none';
-  }, [currentPromptType]);
+  }, [experimentMode, currentPromptType]);
 
   /**
    * Check if the current prompt is optional (can be skipped).

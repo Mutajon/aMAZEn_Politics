@@ -87,11 +87,24 @@ export default function SplashScreen({
   const experimentMode = useSettingsStore((s) => s.experimentMode);
   const setExperimentMode = useSettingsStore((s) => s.setExperimentMode);
 
+  // Treatment (experiment configuration)
+  const treatment = useSettingsStore((s) => s.treatment);
+  const setTreatment = useSettingsStore((s) => s.setTreatment);
+
   // Data collection
   const dataCollectionEnabled = useSettingsStore((s) => s.dataCollectionEnabled);
   const setDataCollectionEnabled = useSettingsStore((s) => s.setDataCollectionEnabled);
 
   // -------------------------------------------------------------------------
+
+  // Global effect: Enforce semiAutonomy treatment when experiment mode is disabled
+  useEffect(() => {
+    if (!experimentMode && treatment !== 'semiAutonomy') {
+      console.log("[SplashScreen] Experiment mode disabled, forcing semiAutonomy treatment");
+      setTreatment('semiAutonomy');
+      useLoggingStore.getState().setTreatment('semiAutonomy');
+    }
+  }, [experimentMode, treatment, setTreatment]);
 
   // Handle ID submission from modal
   const handleIDSubmit = async (id: string) => {
