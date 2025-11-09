@@ -17,9 +17,45 @@ import {
   detectKeywordHints,
   formatKeywordHintsForPrompt
 } from "./compassKeywordDetector.mjs";
+import { getCountersCollection, incrementCounter } from "./db/mongodb.mjs";
 
 const app = express();
 app.use(bodyParser.json());
+
+
+const GAME_LIMIT = 100;
+// -------------------- Game Slot Reservation --------------------
+app.post("/api/reserve-game-slot", async (req, res) => {
+  try {
+    const countersCollection = await getCountersCollection();
+
+    // Atomically find and increment the counter, but only if its value is less than the limit.
+    const result = await countersCollection.findOneAndUpdate(
+      { name: 'total_games', value: { $lt: GAME_LIMIT } },
+      { $inc: { value: 1 } },
+      { returnDocument: 'after' }
+    );
+
+    if (result.value) {
+      // Successfully incremented, meaning we got a slot.
+      console.log(`[Reserve Slot] Slot reserved. New count: ${result.value}`);
+      res.json({ success: true, gameCount: result.value });
+    } else {
+      // The findOneAndUpdate came back empty, which means the condition value < GAME_LIMIT failed.
+      const currentCounter = await countersCollection.findOne({ name: 'total_games' });
+      const currentCount = currentCounter ? currentCounter.value : 'unknown';
+      console.log(`[Reserve Slot] Game limit reached. Current count: ${currentCount}`);
+      res.status(403).json({
+        success: false,
+        message: "The game has reached its player limit.",
+        isCapped: true,
+      });
+    }
+  } catch (error) {
+    console.error("Error in /api/reserve-game-slot:", error?.message || error);
+    res.status(500).json({ success: false, error: "Failed to reserve game slot" });
+  }
+});
 
 // -------------------- Data Logging Routes --------------------
 // Mount logging API endpoints (for research data collection)
