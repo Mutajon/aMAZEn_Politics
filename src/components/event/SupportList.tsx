@@ -4,8 +4,11 @@
 // - Minimal knobs live at the top (sizes + colors).
 
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Users, Landmark, Heart, ArrowUp, ArrowDown } from "lucide-react";
+import { useSupportEntityPopover } from "../../hooks/useSupportEntityPopover";
+import { useLogger } from "../../hooks/useLogger";
+import SupportEntityPopover from "./SupportEntityPopover";
 
 /* ====================== TUNABLES (EDIT HERE) ====================== */
 // Sizing
@@ -56,6 +59,9 @@ export default function SupportList({
   animatePercent = true,
   animateDurationMs = 1000,
 }: Props) {
+  const { openEntity, togglePopover, closePopover, getEntityData } = useSupportEntityPopover();
+  const logger = useLogger();
+
   return (
     <div className="border-slate-400/30 bg-slate-900/60 backdrop-blur-sm rounded-2xl p-4">
       <div className="space-y-2">
@@ -66,6 +72,34 @@ export default function SupportList({
             index={index}
             animatePercent={animatePercent}
             animateDurationMs={animateDurationMs}
+            onCardClick={(entityType) => {
+              togglePopover(entityType);
+              if (openEntity !== entityType) {
+                logger.log(
+                  "support_entity_info_opened",
+                  { entityType },
+                  `User opened support entity info for ${entityType}`
+                );
+              } else {
+                logger.log(
+                  "support_entity_info_closed",
+                  { entityType },
+                  `User closed support entity info for ${entityType}`
+                );
+              }
+            }}
+            openEntity={openEntity}
+            onClosePopover={() => {
+              if (openEntity) {
+                logger.log(
+                  "support_entity_info_closed",
+                  { entityType: openEntity },
+                  `User closed support entity info for ${openEntity}`
+                );
+              }
+              closePopover();
+            }}
+            getEntityData={getEntityData}
           />
         ))}
       </div>
@@ -78,11 +112,19 @@ function SupportCard({
   index,
   animatePercent,
   animateDurationMs,
+  onCardClick,
+  openEntity,
+  onClosePopover,
+  getEntityData,
 }: {
   item: SupportItem;
   index: number;
   animatePercent: boolean;
   animateDurationMs: number;
+  onCardClick: (entityType: "people" | "challenger") => void;
+  openEntity: "people" | "challenger" | null;
+  onClosePopover: () => void;
+  getEntityData: (entityType: "people" | "challenger", currentSupport: number) => any;
 }) {
   const {
     id,
@@ -160,13 +202,35 @@ function SupportCard({
   // Colored badge bg + white strokes
   const badgeBg = ICON_BADGE_BG[id] ?? "bg-white/20";
 
+  // Determine if this entity can show popover (people or middle only, not mom)
+  const isClickable = id === "people" || id === "middle";
+  const entityType: "people" | "challenger" | null = id === "people" ? "people" : id === "middle" ? "challenger" : null;
+  const isPopoverOpen = entityType && openEntity === entityType;
+
+  // Get entity data if popover should be shown
+  const entityData = entityType && isPopoverOpen ? getEntityData(entityType, pctDisplay) : null;
+
+  const handleClick = () => {
+    if (isClickable && entityType) {
+      onCardClick(entityType);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (isClickable && entityType && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      onCardClick(entityType);
+    }
+  };
+
   return (
     <motion.div
       className={[
-        "rounded-xl px-3 py-2.5 text-white",
+        "rounded-xl px-3 py-2.5 text-white relative",
         isCrisis
           ? "bg-red-500/15 border-2 border-red-500/60" // Crisis: red background + thicker red border
-          : "bg-white/3 border border-white/5" // Normal: subtle background + border
+          : "bg-white/3 border border-white/5", // Normal: subtle background + border
+        isClickable ? "cursor-pointer hover:bg-white/10 transition-colors" : "", // Make clickable entities interactive
       ].join(" ")}
       initial={{ opacity: 0, x: -30 }}
       animate={
@@ -186,6 +250,11 @@ function SupportCard({
               ease: [0.25, 0.46, 0.45, 0.94] // easeOutQuart
             }
       }
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      role={isClickable ? "button" : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      aria-label={isClickable ? `View ${name} details` : undefined}
     >
       <div className="flex items-start">
         {/* Left icon badge — colored background + white lines */}
@@ -276,6 +345,19 @@ function SupportCard({
           )}
         </div>
       </div>
+
+      {/* Support Entity Popover */}
+      <AnimatePresence>
+        {isPopoverOpen && entityData && entityType && (
+          <SupportEntityPopover
+            entityType={entityType}
+            entityName={entityData.name}
+            supportProfile={entityData.profile}
+            currentSupport={entityData.currentSupport}
+            onClose={onClosePopover}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

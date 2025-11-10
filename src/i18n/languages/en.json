@@ -708,5 +708,17 @@
   "COMPASS_INTRO_PACKAGE": "A package arrives with no return address, only the words:",
   "COMPASS_INTRO_KNOW_THYSELF": "Know Thyself",
   "COMPASS_INTRO_MIRROR": "Inside, a mirror—black, breathless, waiting.",
-  "COMPASS_INTRO_LOOK_IN_MIRROR": "Look in the mirror"
+  "COMPASS_INTRO_LOOK_IN_MIRROR": "Look in the mirror",
+  "SUPPORT_ENTITY_PEOPLE_TITLE": "The People",
+  "SUPPORT_ENTITY_CHALLENGER_TITLE": "Opposition",
+  "SUPPORT_ENTITY_CURRENT_SUPPORT": "Current Support",
+  "SUPPORT_ENTITY_SUMMARY": "Summary",
+  "SUPPORT_ENTITY_SHOW_STANCES": "Show detailed stances ▼",
+  "SUPPORT_ENTITY_HIDE_STANCES": "Hide detailed stances ▲",
+  "SUPPORT_ENTITY_STANCE_GOVERNANCE": "Governance",
+  "SUPPORT_ENTITY_STANCE_ORDER": "Order & Security",
+  "SUPPORT_ENTITY_STANCE_ECONOMY": "Economy",
+  "SUPPORT_ENTITY_STANCE_JUSTICE": "Justice",
+  "SUPPORT_ENTITY_STANCE_CULTURE": "Culture & Society",
+  "SUPPORT_ENTITY_STANCE_FOREIGN": "Foreign Policy"
 }

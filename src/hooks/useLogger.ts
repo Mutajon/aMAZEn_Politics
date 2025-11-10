@@ -25,7 +25,8 @@ function getCurrentRoute(): string {
 }
 
 export function useLogger() {
-  const day = useDilemmaStore((s) => s.day);
+  // Don't capture day/role in closure - read fresh at log time to avoid stale values
+  // This fixes the "all events showing Day 1" bug where day was captured at hook init
   const selectedRole = useRoleStore((s) => s.selectedRole);
 
   /**
@@ -40,16 +41,19 @@ export function useLogger() {
       // Debug mode check is handled in loggingService, no need to check here
       // Data collection is always enabled (unless debug mode)
 
+      // Read day fresh from store at log time (not from closure)
+      const currentDay = useDilemmaStore.getState().day;
+
       // Automatically attach metadata from application state
       const metadata = {
         screen: getCurrentRoute(),  // Read directly without creating listener
-        day: day || undefined,
+        day: currentDay || undefined,
         role: selectedRole || undefined,
       };
 
       loggingService.log(action, value, comments, metadata);
     },
-    [day, selectedRole]  // Removed currentRoute dependency and debugMode (handled in service)
+    [selectedRole]  // Only selectedRole in deps - day read fresh each time
   );
 
   /**
@@ -65,16 +69,19 @@ export function useLogger() {
       // Debug mode check is handled in loggingService, no need to check here
       // Data collection is always enabled (unless debug mode)
 
+      // Read day fresh from store at log time (not from closure)
+      const currentDay = useDilemmaStore.getState().day;
+
       // Automatically attach metadata from application state
       const metadata = {
         screen: getCurrentRoute(),
-        day: day || undefined,
+        day: currentDay || undefined,
         role: selectedRole || undefined,
       };
 
       loggingService.logSystem(action, value, comments, metadata);
     },
-    [day, selectedRole]
+    [selectedRole]  // Only selectedRole in deps - day read fresh each time
   );
 
   // Stabilize object reference to prevent unnecessary effect re-triggers

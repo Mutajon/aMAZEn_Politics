@@ -172,9 +172,19 @@ TTS_VOICE=alloy
 - Turn 7: Climax directive brings threads to decisive conclusion
 - Graceful degradation if seeding fails
 
-**Vote Outcome Continuity:**
-- If previous action called a vote/referendum, next dilemma MUST present results
-- System-specific outcomes (e.g., direct democracies implement immediately)
+**Action Continuity System:**
+- **Automatic Detection**: Backend detects votes, referendums, negotiations, consultations via regex
+- **Mandatory Results**: When detected, AI receives explicit directive to show ACTUAL RESULTS, not preparation
+- **Implementation**: `server/index.mjs` lines 4695-4769 in `buildTurnUserPrompt`
+- **Covers**: votes/referendums (show outcome %), negotiations (show what happened in talks), consultations (show input received)
+- **System Feel**: Results play differently across political systems (democracies implement, autocracies may override)
+
+**Faction Identity Mapping:**
+- **Challenge**: AI doesn't inherently know power holder names = faction profiles (e.g., "Coercive Force" = "Challenger")
+- **Solution**: Explicit identity mapping injected in Day 2+ prompts
+- **Implementation**: `server/index.mjs` lines 4569-4580 in `buildTurnUserPrompt`
+- **Effect**: AI understands when player engages respectfully with a power holder, that faction should respond positively
+- **Example**: Athens scenario - negotiating with Spartans makes Coercive Force (the Spartans) respond positively
 
 **Action Confirmation Pipeline:**
 1. Immediate UI: Card animation, coin flight, budget update

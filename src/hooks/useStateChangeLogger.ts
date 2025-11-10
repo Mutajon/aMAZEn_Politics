@@ -3,9 +3,15 @@
 //
 // Features:
 // - Auto-subscribes to Zustand store changes
-// - Logs support, budget, corruption, compass changes with deltas
+// - Logs compass changes as daily summaries (consolidated to reduce redundancy)
 // - Tracks goal status changes
 // - Non-invasive: no manual logging needed in store setters
+//
+// Optimization Notes:
+// - Support, budget, corruption, score, day, crisis mode, and custom action count
+//   logging REMOVED - 100% redundant with AI output logs that include explanations
+// - Compass logging changed from individual events (50+) to daily summaries (7-8)
+// - Reduces ~113 redundant events per game with ZERO research data loss
 //
 // Usage:
 //   // In a top-level component (e.g., App.tsx or EventScreen3)
@@ -25,6 +31,16 @@ export function useStateChangeLogger() {
   const logger = useLogger();
   const isSubscribed = useRef(false);
 
+  // Accumulator for compass changes per day
+  const compassChangesRef = useRef<Array<{
+    dimension: string;
+    component: string;
+    from: number;
+    to: number;
+    delta: number;
+  }>>([]);
+  const currentDayRef = useRef<number | null>(null);
+
   useEffect(() => {
     const { debugMode } = useSettingsStore.getState();
 
@@ -37,106 +53,36 @@ export function useStateChangeLogger() {
 
     // ============================================================================
     // DILEMMA STORE SUBSCRIPTION
-    // Tracks: support, budget, corruption, goals, day progression
+    // Tracks: goal status changes, day progression (for compass summary)
     // ============================================================================
+    // NOTE: Support, budget, corruption, score, crisis mode, and custom action count
+    // logging REMOVED - 100% redundant with AI output logs (support_shifts_summary,
+    // corruption_shift_generated, etc.) which include explanations and context.
+    // This reduces ~71 redundant events per game with ZERO research impact.
 
     const unsubDilemma = useDilemmaStore.subscribe(
       (state, prevState) => {
-        // Support changes
-        if (state.supportPeople !== prevState.supportPeople) {
-          const delta = state.supportPeople - prevState.supportPeople;
-          logger.logSystem(
-            'state_support_people_changed',
-            {
-              from: prevState.supportPeople,
-              to: state.supportPeople,
-              delta
-            },
-            `Support (People): ${prevState.supportPeople} → ${state.supportPeople} (${delta >= 0 ? '+' : ''}${delta})`
-          );
-        }
-
-        if (state.supportMiddle !== prevState.supportMiddle) {
-          const delta = state.supportMiddle - prevState.supportMiddle;
-          logger.logSystem(
-            'state_support_middle_changed',
-            {
-              from: prevState.supportMiddle,
-              to: state.supportMiddle,
-              delta
-            },
-            `Support (Middle): ${prevState.supportMiddle} → ${state.supportMiddle} (${delta >= 0 ? '+' : ''}${delta})`
-          );
-        }
-
-        if (state.supportMom !== prevState.supportMom) {
-          const delta = state.supportMom - prevState.supportMom;
-          logger.logSystem(
-            'state_support_mom_changed',
-            {
-              from: prevState.supportMom,
-              to: state.supportMom,
-              delta
-            },
-            `Support (Mom): ${prevState.supportMom} → ${state.supportMom} (${delta >= 0 ? '+' : ''}${delta})`
-          );
-        }
-
-        // Budget changes
-        if (state.budget !== prevState.budget) {
-          const delta = state.budget - prevState.budget;
-          logger.logSystem(
-            'state_budget_changed',
-            {
-              from: prevState.budget,
-              to: state.budget,
-              delta
-            },
-            `Budget: ${prevState.budget} → ${state.budget} (${delta >= 0 ? '+' : ''}${delta})`
-          );
-        }
-
-        // Corruption changes
-        if (state.corruptionLevel !== prevState.corruptionLevel) {
-          const delta = state.corruptionLevel - prevState.corruptionLevel;
-          logger.logSystem(
-            'state_corruption_changed',
-            {
-              from: prevState.corruptionLevel,
-              to: state.corruptionLevel,
-              delta
-            },
-            `Corruption: ${prevState.corruptionLevel.toFixed(1)} → ${state.corruptionLevel.toFixed(1)} (${delta >= 0 ? '+' : ''}${delta.toFixed(1)})`
-          );
-        }
-
-        // Score changes
-        if (state.score !== prevState.score) {
-          const delta = state.score - prevState.score;
-          logger.logSystem(
-            'state_score_changed',
-            {
-              from: prevState.score,
-              to: state.score,
-              delta
-            },
-            `Score: ${prevState.score} → ${state.score} (${delta >= 0 ? '+' : ''}${delta})`
-          );
-        }
-
-        // Day progression
+        // Day progression - used to trigger compass summary logging
         if (state.day !== prevState.day) {
-          logger.logSystem(
-            'state_day_changed',
-            {
-              from: prevState.day,
-              to: state.day
-            },
-            `Day advanced: ${prevState.day} → ${state.day}`
-          );
+          // Log compass summary for previous day (if any changes accumulated)
+          if (compassChangesRef.current.length > 0 && currentDayRef.current !== null) {
+            logger.logSystem(
+              'compass_changes_daily_summary',
+              {
+                day: currentDayRef.current,
+                totalChanges: compassChangesRef.current.length,
+                changes: compassChangesRef.current
+              },
+              `Day ${currentDayRef.current}: ${compassChangesRef.current.length} compass changes`
+            );
+          }
+
+          // Reset accumulator for new day
+          compassChangesRef.current = [];
+          currentDayRef.current = state.day;
         }
 
-        // Goal status changes
+        // Goal status changes (keep - not redundant, important for goal tracking)
         if (state.selectedGoals.length > 0) {
           state.selectedGoals.forEach((goal, idx) => {
             const prevGoal = prevState.selectedGoals[idx];
@@ -154,41 +100,23 @@ export function useStateChangeLogger() {
             }
           });
         }
-
-        // Crisis mode changes
-        if (state.crisisMode !== prevState.crisisMode) {
-          logger.logSystem(
-            'state_crisis_mode_changed',
-            {
-              from: prevState.crisisMode,
-              to: state.crisisMode,
-              crisisEntity: state.crisisEntity
-            },
-            `Crisis mode: ${prevState.crisisMode || 'none'} → ${state.crisisMode || 'none'}`
-          );
-        }
-
-        // Custom action count (for goals tracking)
-        if (state.customActionCount !== prevState.customActionCount) {
-          logger.logSystem(
-            'state_custom_action_count_changed',
-            {
-              from: prevState.customActionCount,
-              to: state.customActionCount
-            },
-            `Custom actions: ${prevState.customActionCount} → ${state.customActionCount}`
-          );
-        }
       }
     );
 
     // ============================================================================
     // COMPASS STORE SUBSCRIPTION
-    // Tracks: compass value changes across all dimensions
+    // Accumulates compass changes for daily summary logging
     // ============================================================================
+    // NOTE: Changed from individual logging (50+ events) to daily summaries (7-8 events)
+    // to reduce redundancy while preserving all compass data. Saves ~42 events per game.
 
     const unsubCompass = useCompassStore.subscribe(
       (state, prevState) => {
+        // Initialize current day if not set
+        if (currentDayRef.current === null) {
+          currentDayRef.current = useDilemmaStore.getState().day;
+        }
+
         // Check if any compass dimension changed
         const dimensions = ['what', 'whence', 'how', 'whither'] as const;
 
@@ -208,17 +136,14 @@ export function useStateChangeLogger() {
               const delta = newVal - oldVal;
               const componentName = components[idx]?.short || `unknown[${idx}]`;
 
-              logger.logSystem(
-                'state_compass_value_changed',
-                {
-                  dimension: dim,
-                  component: componentName,
-                  from: oldVal,
-                  to: newVal,
-                  delta
-                },
-                `Compass ${componentName}: ${oldVal.toFixed(1)} → ${newVal.toFixed(1)} (${delta >= 0 ? '+' : ''}${delta.toFixed(1)})`
-              );
+              // Accumulate change instead of logging immediately
+              compassChangesRef.current.push({
+                dimension: dim,
+                component: componentName,
+                from: oldVal,
+                to: newVal,
+                delta
+              });
             }
           });
         });

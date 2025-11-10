@@ -165,19 +165,22 @@ export function useAIOutputLogger() {
    * Log corruption shift analysis
    * Records AI's corruption judgment and reasoning
    *
-   * @param corruptionShift - Corruption shift data
+   * @param corruptionShift - Corruption shift data (score + reason)
+   * @param delta - Calculated change in corruption level
+   * @param newLevel - New corruption level after blending
    */
   const logCorruptionShift = useCallback(
-    (corruptionShift: CorruptionShift) => {
+    (corruptionShift: CorruptionShift, delta: number, newLevel: number) => {
       logger.logSystem(
         'corruption_shift_generated',
         {
-          delta: corruptionShift.delta,
-          newLevel: corruptionShift.newLevel,
+          score: corruptionShift.score,
+          delta,
+          newLevel,
           reason: corruptionShift.reason,
           reasonLength: corruptionShift.reason.length
         },
-        `Corruption shift: ${corruptionShift.delta >= 0 ? '+' : ''}${corruptionShift.delta} (reason: ${corruptionShift.reason.substring(0, 50)}...)`
+        `Corruption: ${corruptionShift.score}/10 → ${delta >= 0 ? '+' : ''}${delta.toFixed(2)} (${corruptionShift.reason.substring(0, 50)}...)`
       );
     },
     [logger]
