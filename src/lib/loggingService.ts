@@ -47,7 +47,7 @@ class LoggingService {
 
       if (!status.enabled) {
         console.log('[Logging] Data collection is disabled on backend');
-        useSettingsStore.setState({ dataCollectionEnabled: false });
+        // Note: Frontend always tries to log (unless debug mode), backend controls actual storage
         return;
       }
 
@@ -74,7 +74,7 @@ class LoggingService {
 
     } catch (error) {
       console.error('[Logging] Initialization failed:', error);
-      useSettingsStore.setState({ dataCollectionEnabled: false });
+      // Note: Data collection stays enabled even if init fails (backend may be down temporarily)
     }
   }
 
@@ -83,11 +83,16 @@ class LoggingService {
    * Generates sessionId and logs session start event
    */
   async startSession(): Promise<string | null> {
-    const { dataCollectionEnabled } = useSettingsStore.getState();
+    const { debugMode } = useSettingsStore.getState();
     const { userId, gameVersion, treatment } = useLoggingStore.getState();
 
-    if (!dataCollectionEnabled || !userId) {
-      console.log('[Logging] Session start skipped (logging disabled or no userId)');
+    if (debugMode) {
+      console.log('[Logging] Session start skipped (debug mode)');
+      return null;
+    }
+
+    if (!userId) {
+      console.log('[Logging] Session start skipped (no userId)');
       return null;
     }
 
@@ -197,11 +202,17 @@ class LoggingService {
     comments?: string,
     metadata?: { screen?: string; day?: number; role?: string }
   ): void {
-    const { dataCollectionEnabled } = useSettingsStore.getState();
+    const { debugMode } = useSettingsStore.getState();
     const { userId, gameVersion, treatment } = useLoggingStore.getState();
 
-    if (!dataCollectionEnabled || !userId) {
-      // Silently skip if logging is disabled
+    // Skip logging if debug mode is enabled
+    if (debugMode) {
+      console.log('[Logging] Skipped (debug mode):', action, value);
+      return;
+    }
+
+    if (!userId) {
+      // Silently skip if no userId (not initialized)
       return;
     }
 
@@ -254,11 +265,11 @@ class LoggingService {
       return;
     }
 
-    const { dataCollectionEnabled } = useSettingsStore.getState();
+    const { debugMode } = useSettingsStore.getState();
     const { sessionId } = useLoggingStore.getState();
 
-    if (!dataCollectionEnabled) {
-      // If logging was disabled, clear queue
+    if (debugMode) {
+      // If debug mode enabled, clear queue (don't send logs)
       this.queue = [];
       return;
     }
@@ -372,10 +383,10 @@ export const loggingService = new LoggingService();
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
     // Use sendBeacon for reliable delivery on page unload
-    const { dataCollectionEnabled } = useSettingsStore.getState();
+    const { debugMode } = useSettingsStore.getState();
     const { sessionId } = useLoggingStore.getState();
 
-    if (dataCollectionEnabled && loggingService.getQueue().length > 0) {
+    if (!debugMode && loggingService.getQueue().length > 0) {
       const queue = loggingService.getQueue();
 
       // Prepare batch request

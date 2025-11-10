@@ -25,9 +25,9 @@ export function useStateChangeLogger() {
   const isSubscribed = useRef(false);
 
   useEffect(() => {
-    const { dataCollectionEnabled } = useSettingsStore.getState();
+    const { debugMode } = useSettingsStore.getState();
 
-    if (!dataCollectionEnabled || isSubscribed.current) {
+    if (!debugMode || isSubscribed.current) {
       return;
     }
 

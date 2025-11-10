@@ -103,7 +103,7 @@ function LoadingScreen() {
 export default function App() {
   const { route, push } = useHashRoute();
   const enableModifiers = useSettingsStore((s) => s.enableModifiers);
-  const dataCollectionEnabled = useSettingsStore((s) => s.dataCollectionEnabled);
+  const debugMode = useSettingsStore((s) => s.debugMode);
   const consented = useLoggingStore((s) => s.consented);
   // const [gameStatus, setGameStatus] = useState<GameStatus>('loading');
 
@@ -124,24 +124,24 @@ export default function App() {
 
   // The game status is now checked on "Start Game" button click.
 
-  // Initialize logging service when consented
+  // Initialize logging service when consented (unless debug mode)
   useEffect(() => {
-    if (consented && dataCollectionEnabled) {
+    if (consented && !debugMode) {
       loggingService.init();
     }
-  }, [consented, dataCollectionEnabled]);
+  }, [consented, debugMode]);
 
-  // Handle browser close - flush remaining logs
+  // Handle browser close - flush remaining logs (unless debug mode)
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (dataCollectionEnabled) {
+      if (!debugMode) {
         loggingService.flush(true);
       }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [dataCollectionEnabled]);
+  }, [debugMode]);
 
   // Render current screen with global audio controls
   return (

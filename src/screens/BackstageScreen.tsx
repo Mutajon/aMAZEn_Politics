@@ -45,7 +45,7 @@ export default function BackstageScreen({
   // Store setters for backstage configuration
   const setExperimentMode = useSettingsStore((s) => s.setExperimentMode);
   const setTreatment = useSettingsStore((s) => s.setTreatment);
-  const setDataCollectionEnabled = useSettingsStore((s) => s.setDataCollectionEnabled);
+  const setBackstageMode = useSettingsStore((s) => s.setBackstageMode);
 
   // Configure backstage mode on mount
   useEffect(() => {
@@ -58,17 +58,23 @@ export default function BackstageScreen({
     setTreatment("semiAutonomy");
     useLoggingStore.getState().setTreatment("semiAutonomy");
 
-    // Disable data collection (skips ID modal)
-    setDataCollectionEnabled(false);
+    // Enable backstage mode (bypasses email modal, keeps data collection active)
+    setBackstageMode(true);
 
     // Clear experiment progress (removes role completion tracking)
     useLoggingStore.getState().resetExperimentProgress();
 
     console.log("[Backstage] ✅ Experiment mode disabled");
     console.log("[Backstage] ✅ Treatment set to semiAutonomy");
-    console.log("[Backstage] ✅ Data collection disabled");
+    console.log("[Backstage] ✅ Backstage mode enabled");
     console.log("[Backstage] ✅ All roles unlocked");
-  }, [setExperimentMode, setTreatment, setDataCollectionEnabled]);
+
+    // Cleanup: reset backstage mode when leaving
+    return () => {
+      setBackstageMode(false);
+      console.log("[Backstage] ✅ Backstage mode disabled (cleanup)");
+    };
+  }, [setExperimentMode, setTreatment, setBackstageMode]);
 
   // Simple subtitle reveal: show title, wait 0.5s, fade in all subtitles
   useEffect(() => {

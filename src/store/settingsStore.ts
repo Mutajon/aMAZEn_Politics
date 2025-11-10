@@ -66,10 +66,9 @@ type SettingsState = {
   setSkipPreviousContext: (v: boolean) => void;
   toggleSkipPreviousContext: () => void;
 
-  // --- NEW: Data collection (for research) ---
-  dataCollectionEnabled: boolean;
-  setDataCollectionEnabled: (v: boolean) => void;
-  toggleDataCollectionEnabled: () => void;
+  // --- NEW: Backstage mode (session-only, bypasses email collection) ---
+  backstageMode: boolean;
+  setBackstageMode: (v: boolean) => void;
 
   // --- NEW: Treatment assignment (for research variants) ---
   treatment: 'fullAutonomy' | 'semiAutonomy' | 'noAutonomy';
@@ -153,10 +152,9 @@ export const useSettingsStore = create<SettingsState>()(
       setSkipPreviousContext: (v) => set({ skipPreviousContext: v }),
       toggleSkipPreviousContext: () => set({ skipPreviousContext: !get().skipPreviousContext }),
 
-      // NEW: Data collection (default OFF - requires consent)
-      dataCollectionEnabled: false,
-      setDataCollectionEnabled: (v) => set({ dataCollectionEnabled: v }),
-      toggleDataCollectionEnabled: () => set({ dataCollectionEnabled: !get().dataCollectionEnabled }),
+      // NEW: Backstage mode (default OFF, session-only - NOT persisted to localStorage)
+      backstageMode: false,
+      setBackstageMode: (v) => set({ backstageMode: v }),
 
       // NEW: Treatment assignment (default "semiAutonomy" - current balanced behavior)
       treatment: "semiAutonomy",
@@ -191,7 +189,7 @@ export const useSettingsStore = create<SettingsState>()(
         sfxEnabled: s.sfxEnabled,
         sfxVolume: s.sfxVolume,
         skipPreviousContext: s.skipPreviousContext,
-        dataCollectionEnabled: s.dataCollectionEnabled,
+        // NOTE: backstageMode is NOT persisted - session-only
         treatment: s.treatment,
         experimentMode: s.experimentMode,
         corruptionTrackingEnabled: s.corruptionTrackingEnabled,

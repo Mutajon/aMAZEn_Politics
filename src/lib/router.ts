@@ -41,8 +41,8 @@ export function useHashRoute() {
       const previousRoute = previousRouteRef.current || '/';  // Guard against empty/undefined
 
       // Log navigation if logging is enabled
-      const { dataCollectionEnabled } = useSettingsStore.getState();
-      if (dataCollectionEnabled && newRoute !== previousRoute) {
+      const { debugMode } = useSettingsStore.getState();
+      if (debugMode && newRoute !== previousRoute) {
         loggingService.log(
           'navigation',
           newRoute,  // Simple value: where user is going

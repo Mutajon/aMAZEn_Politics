@@ -62,9 +62,9 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   logError(error: Error, errorInfo: { componentStack: string }) {
-    const { dataCollectionEnabled } = useSettingsStore.getState();
+    const { debugMode } = useSettingsStore.getState();
 
-    if (!dataCollectionEnabled) {
+    if (debugMode) {
       return;
     }
 

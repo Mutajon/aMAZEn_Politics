@@ -97,9 +97,8 @@ export default function SplashScreen({
   const treatment = useSettingsStore((s) => s.treatment);
   const setTreatment = useSettingsStore((s) => s.setTreatment);
 
-  // Data collection
-  const dataCollectionEnabled = useSettingsStore((s) => s.dataCollectionEnabled);
-  const setDataCollectionEnabled = useSettingsStore((s) => s.setDataCollectionEnabled);
+  // Backstage mode (bypasses email collection)
+  const backstageMode = useSettingsStore((s) => s.backstageMode);
 
   // -------------------------------------------------------------------------
 
@@ -479,32 +478,6 @@ export default function SplashScreen({
 
 {/* Divider */}
 <div className="my-4 border-t border-white/10" />
-
-{/* Data collection ------------------------------------------------------------- */}
-<div className="flex items-center justify-between gap-3">
-  <div>
-    <div className="text-sm font-medium">{lang("DATA_COLLECTION")}</div>
-    <div className="text-xs text-white/60">
-      {lang("DATA_COLLECTION_DESC")}
-    </div>
-  </div>
-  <button
-    onClick={() => setDataCollectionEnabled(!dataCollectionEnabled)}
-    role="switch"
-    aria-checked={dataCollectionEnabled}
-    className={[
-      "w-12 h-7 rounded-full p-1 transition-colors",
-      dataCollectionEnabled ? "bg-emerald-500/70" : "bg-white/20",
-    ].join(" ")}
-  >
-    <span
-      className={[
-        "block w-5 h-5 rounded-full bg-white transition-transform",
-        getToggleTransform(dataCollectionEnabled),
-      ].join(" ")}
-    />
-  </button>
-</div>
 
 {/* Experiment mode ------------------------------------------------------------- */}
 <div className="mt-3 flex items-center justify-between gap-3">
