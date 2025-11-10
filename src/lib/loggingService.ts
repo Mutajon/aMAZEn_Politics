@@ -11,6 +11,7 @@
 import { useLoggingStore, ensureUserId } from '../store/loggingStore';
 import { useSettingsStore } from '../store/settingsStore';
 import type { LogEntry, BatchLogRequest, SessionStartRequest, LoggingStatusResponse } from '../types/logging';
+import packageJson from '../../package.json';
 
 // Configuration
 const BATCH_SIZE = 50;              // Max logs per batch
@@ -60,8 +61,8 @@ class LoggingService {
         setTreatment(status.defaultTreatment);
       }
 
-      // Set game version (hardcoded for now, can be fetched from package.json)
-      useLoggingStore.setState({ gameVersion: '0.0.0' });
+      // Set game version from package.json
+      useLoggingStore.setState({ gameVersion: packageJson.version });
 
       // Mark as initialized
       useLoggingStore.setState({ isInitialized: true });

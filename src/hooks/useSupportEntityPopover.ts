@@ -1,0 +1,77 @@
+// src/hooks/useSupportEntityPopover.ts
+// Hook for managing support entity popover state
+// Handles opening/closing popovers and ensures only one is open at a time
+
+import { useState, useCallback } from "react";
+import { useRoleStore } from "../store/roleStore";
+import type { SupportProfile } from "../data/supportProfiles";
+
+export type OpenEntityType = "people" | "challenger" | null;
+
+export type EntityData = {
+  name: string;
+  profile: SupportProfile;
+  currentSupport: number;
+} | null;
+
+export function useSupportEntityPopover() {
+  const [openEntity, setOpenEntity] = useState<OpenEntityType>(null);
+
+  // Get support profiles from roleStore
+  const supportProfiles = useRoleStore((s) => s.supportProfiles);
+  const challengerSeat = useRoleStore((s) => s.analysis?.challengerSeat);
+
+  // Open popover for a specific entity
+  const openPopover = useCallback((entityType: "people" | "challenger") => {
+    setOpenEntity(entityType);
+  }, []);
+
+  // Close any open popover
+  const closePopover = useCallback(() => {
+    setOpenEntity(null);
+  }, []);
+
+  // Toggle popover for a specific entity
+  const togglePopover = useCallback((entityType: "people" | "challenger") => {
+    setOpenEntity((current) => (current === entityType ? null : entityType));
+  }, []);
+
+  // Get entity data for the currently open popover
+  const getEntityData = useCallback(
+    (entityType: "people" | "challenger", currentSupport: number): EntityData => {
+      if (!supportProfiles) return null;
+
+      if (entityType === "people") {
+        const profile = supportProfiles.people;
+        if (!profile) return null;
+        return {
+          name: "The People",
+          profile,
+          currentSupport,
+        };
+      }
+
+      if (entityType === "challenger") {
+        const profile = supportProfiles.challenger;
+        const name = challengerSeat?.name || "Opposition";
+        if (!profile) return null;
+        return {
+          name,
+          profile,
+          currentSupport,
+        };
+      }
+
+      return null;
+    },
+    [supportProfiles, challengerSeat]
+  );
+
+  return {
+    openEntity,
+    openPopover,
+    closePopover,
+    togglePopover,
+    getEntityData,
+  };
+}

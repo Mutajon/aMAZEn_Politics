@@ -41,7 +41,7 @@ export function useSessionLogger() {
     (metadata?: Record<string, unknown>) => {
       const { debugMode } = useSettingsStore.getState();
 
-      if (!debugMode) {
+      if (debugMode) {
         return;
       }
 
@@ -71,7 +71,7 @@ export function useSessionLogger() {
     (summary?: Record<string, unknown>) => {
       const { debugMode } = useSettingsStore.getState();
 
-      if (!debugMode || !sessionStartTime.current) {
+      if (debugMode || !sessionStartTime.current) {
         return;
       }
 
@@ -106,7 +106,7 @@ export function useSessionLogger() {
     (from: string, to: string) => {
       const { debugMode } = useSettingsStore.getState();
 
-      if (!debugMode) {
+      if (debugMode) {
         return;
       }
 
@@ -146,75 +146,16 @@ export function useSessionLogger() {
   }, []);
 
   /**
-   * Set up visibility tracking
-   * Automatically logs when user leaves/returns to tab
+   * REMOVED: Visibility tracking (window blur/focus, player left/returned)
+   *
+   * These events created excessive noise in logs:
+   * - 4 events fired for simple tab switch (visibilitychange + blur + focus)
+   * - Low research value (doesn't indicate gameplay decisions)
+   * - Overlapping/redundant information
+   *
+   * If needed in future, consider adding ONLY visibilitychange (player_left/returned)
+   * and remove window blur/focus entirely.
    */
-  useEffect(() => {
-    const { debugMode } = useSettingsStore.getState();
-
-    if (!debugMode || visibilityListenerAdded.current) {
-      return;
-    }
-
-    const handleVisibilityChange = () => {
-      const isVisible = !document.hidden;
-
-      if (isVisible) {
-        logger.log(
-          'player_returned',
-          {
-            hidden: false,
-            screen: currentScreen.current || window.location.hash
-          },
-          'Player returned to tab'
-        );
-      } else {
-        logger.log(
-          'player_left',
-          {
-            hidden: true,
-            screen: currentScreen.current || window.location.hash
-          },
-          'Player left tab'
-        );
-      }
-    };
-
-    const handleWindowBlur = () => {
-      logger.log(
-        'window_blur',
-        {
-          screen: currentScreen.current || window.location.hash
-        },
-        'Window lost focus'
-      );
-    };
-
-    const handleWindowFocus = () => {
-      logger.log(
-        'window_focus',
-        {
-          screen: currentScreen.current || window.location.hash
-        },
-        'Window gained focus'
-      );
-    };
-
-    // Add event listeners
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleWindowBlur);
-    window.addEventListener('focus', handleWindowFocus);
-
-    visibilityListenerAdded.current = true;
-
-    // Cleanup
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleWindowBlur);
-      window.removeEventListener('focus', handleWindowFocus);
-      visibilityListenerAdded.current = false;
-    };
-  }, [logger]);
 
   return {
     start,

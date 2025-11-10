@@ -16,7 +16,7 @@
 // - src/components/aftermath/AftermathContent.tsx: main content renderer
 // - server/index.mjs: POST /api/aftermath
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAftermathData } from "../hooks/useAftermathData";
 import { useRoleStore } from "../store/roleStore";
 import { useLoadingProgress } from "../hooks/useLoadingProgress";
@@ -126,9 +126,16 @@ export default function AftermathScreen({ push }: Props) {
   // ========================================================================
   // EFFECT: LOG SESSION SUMMARY (only on first visit, not on restoration)
   // ========================================================================
+  // Guard ref to prevent duplicate logging (fixes 81x duplication bug)
+  const hasLoggedAftermathRef = useRef(false);
+
   useEffect(() => {
     // Only log on first visit (when data first loads, not when restored from snapshot)
-    if (!data || !isFirstVisit) return;
+    // AND only if we haven't already logged (prevent re-fires from dependency changes)
+    if (!data || !isFirstVisit || hasLoggedAftermathRef.current) return;
+
+    // Mark as logged immediately to prevent any re-fires
+    hasLoggedAftermathRef.current = true;
 
     // Calculate total inquiries across all days
     let totalInquiries = 0;

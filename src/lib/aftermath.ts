@@ -18,6 +18,7 @@ export type TopCompassValue = {
 
 /** Request payload for /api/aftermath */
 export type AftermathRequest = {
+  gameId?: string; // optional gameId to retrieve conversation history from backend
   playerName: string; // from roleStore.character.name
   role: string; // from roleStore.selectedRole
   systemName: string; // from roleStore.analysis.systemName

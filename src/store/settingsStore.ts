@@ -172,13 +172,13 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       // Bump key so no stale objects hide the new fields
-      name: "settings-v14",
+      name: "settings-v15",
       partialize: (s) => ({
         generateImages: s.generateImages,
         narrationEnabled: s.narrationEnabled,
         narrationVoice: s.narrationVoice,
         showBudget: s.showBudget,
-        debugMode: s.debugMode,
+        // NOTE: debugMode is NOT persisted - session-only (always starts false)
         dilemmasSubjectEnabled: s.dilemmasSubjectEnabled,
         dilemmasSubject: s.dilemmasSubject,
         enableModifiers: s.enableModifiers,
@@ -191,7 +191,7 @@ export const useSettingsStore = create<SettingsState>()(
         skipPreviousContext: s.skipPreviousContext,
         // NOTE: backstageMode is NOT persisted - session-only
         treatment: s.treatment,
-        experimentMode: s.experimentMode,
+        // NOTE: experimentMode is NOT persisted - session-only (always starts true)
         corruptionTrackingEnabled: s.corruptionTrackingEnabled,
       }),
     }

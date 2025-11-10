@@ -94,28 +94,16 @@ export function useAIOutputLogger() {
    */
   const logSupportShifts = useCallback(
     (supportEffects: SupportEffect[]) => {
-      // Log each support shift individually for better analysis
-      supportEffects.forEach(effect => {
-        logger.logSystem(
-          'support_shift_generated',
-          {
-            supportTrack: effect.id,
-            delta: effect.delta,
-            explanation: effect.explain,
-            explanationLength: effect.explain.length
-          },
-          `Support shift for ${effect.id}: ${effect.delta >= 0 ? '+' : ''}${effect.delta}`
-        );
-      });
-
-      // Also log aggregate summary
+      // Log aggregate summary only (removed individual logs to reduce redundancy)
+      // Individual state changes are already logged by useStateChangeLogger
       logger.logSystem(
         'support_shifts_summary',
         {
           totalShifts: supportEffects.length,
           shifts: supportEffects.map(e => ({
             track: e.id,
-            delta: e.delta
+            delta: e.delta,
+            explanation: e.explain
           }))
         },
         `Support shifts generated for ${supportEffects.length} tracks`
@@ -177,19 +165,22 @@ export function useAIOutputLogger() {
    * Log corruption shift analysis
    * Records AI's corruption judgment and reasoning
    *
-   * @param corruptionShift - Corruption shift data
+   * @param corruptionShift - Corruption shift data (score + reason)
+   * @param delta - Calculated change in corruption level
+   * @param newLevel - New corruption level after blending
    */
   const logCorruptionShift = useCallback(
-    (corruptionShift: CorruptionShift) => {
+    (corruptionShift: CorruptionShift, delta: number, newLevel: number) => {
       logger.logSystem(
         'corruption_shift_generated',
         {
-          delta: corruptionShift.delta,
-          newLevel: corruptionShift.newLevel,
+          score: corruptionShift.score,
+          delta,
+          newLevel,
           reason: corruptionShift.reason,
           reasonLength: corruptionShift.reason.length
         },
-        `Corruption shift: ${corruptionShift.delta >= 0 ? '+' : ''}${corruptionShift.delta} (reason: ${corruptionShift.reason.substring(0, 50)}...)`
+        `Corruption: ${corruptionShift.score}/10 → ${delta >= 0 ? '+' : ''}${delta.toFixed(2)} (${corruptionShift.reason.substring(0, 50)}...)`
       );
     },
     [logger]

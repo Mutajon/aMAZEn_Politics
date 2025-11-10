@@ -17,6 +17,7 @@ import { useLanguage } from "../i18n/LanguageContext";
 import LanguageSelector from "../components/LanguageSelector";
 import IDCollectionModal from "../components/IDCollectionModal";
 import { useReserveGameSlot } from "../hooks/useReserveGameSlot";
+import { useLogger } from "../hooks/useLogger";
 
 const SUBTITLES = [
   "Choose your path. Discover yourself."
@@ -36,6 +37,7 @@ export default function SplashScreen({
   const lang = useLang();
   const { language } = useLanguage();
   const reserveGameSlotMutation = useReserveGameSlot();
+  const logger = useLogger();
 
   const [visibleSubtitles, setVisibleSubtitles] = useState(0);
   const [showButton, setShowButton] = useState(false);
@@ -227,6 +229,11 @@ export default function SplashScreen({
     }
   };
 
+  // Log splash screen loaded (runs once on mount)
+  useEffect(() => {
+    logger.logSystem('splash_screen_loaded', true, 'Splash screen loaded');
+  }, [logger]);
+
   // Simple subtitle reveal: show title, wait 0.5s, fade in all subtitles
   useEffect(() => {
     // Wait 500ms after title, then show all subtitles at once
@@ -244,6 +251,11 @@ export default function SplashScreen({
       clearTimeout(buttonTimer);
     };
   }, []);
+
+  // Log splash screen loaded (runs once on mount)
+  useEffect(() => {
+    logger.logSystem('splash_screen_loaded', true, 'Splash screen loaded');
+  }, [logger]);
 
   return (
     <div

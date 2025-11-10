@@ -72,6 +72,7 @@ export function useAftermathData() {
       const { character } = useRoleStore.getState();
       const { selectedRole, analysis } = useRoleStore.getState();
       const {
+        gameId,
         dilemmaHistory,
         supportPeople,
         supportMiddle,
@@ -91,6 +92,7 @@ export function useAftermathData() {
 
       // Build request
       const request: AftermathRequest = {
+        gameId, // Add gameId to get conversation history from backend
         playerName,
         role,
         systemName,

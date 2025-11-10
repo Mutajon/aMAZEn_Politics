@@ -167,7 +167,8 @@ export function useActionDeckState(actions: ActionCard[]) {
   };
 
   // Log suggestion submission with timing
-  const logSuggestionSubmitted = () => {
+  // Consolidated logging with all data (cost, budget, text, timing) to prevent duplicates
+  const logSuggestionSubmitted = (cost?: number, budgetBefore?: number) => {
     if (suggestTypingTimingIdRef.current) {
       const duration = timingLogger.end(suggestTypingTimingIdRef.current, {
         textLength: suggestText.length
@@ -176,8 +177,10 @@ export function useActionDeckState(actions: ActionCard[]) {
       logger.log('custom_action_submitted', {
         text: suggestText,
         textLength: suggestText.length,
+        cost,
+        budgetBefore,
         typingDuration: duration
-      }, `Custom action submitted (${suggestText.length} chars, ${duration}ms)`);
+      }, `Custom action: ${suggestText.substring(0, 50)}... (${suggestText.length} chars, ${duration}ms, cost: ${cost})`);
 
       suggestTypingTimingIdRef.current = null;
     }

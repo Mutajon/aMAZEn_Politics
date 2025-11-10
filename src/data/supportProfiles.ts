@@ -41,7 +41,7 @@ export const ROLE_SUPPORT_PROFILES: Record<string, RoleSupportProfiles> = {
         order: "Use harsh policing and exile to silence dissent.",
         economy: "Shield elite property; impose fiscal discipline fast.",
         justice: "Favor exemplary punishments to deter unrest.",
-        foreign: "Defer to Sparta; reject risky adventures.",
+        foreign: "Appreciate when leader engages Sparta respectfully and acknowledges their authority; oppose actions that undermine Spartan control or bypass their oversight.",
       },
       origin: "predefined",
     },

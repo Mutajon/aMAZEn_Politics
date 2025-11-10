@@ -194,7 +194,7 @@
   "ATHENS_TITLE": "Athens — The Day Democracy Died",
   "ATHENS_SUBTITLE": "Power and Legitimacy",
   "ATHENS_INTRO": "Sparta defeated Athens, ending democracy. A military junta enforces order. You survived—now you face the ruins of the Assembly, choosing between obedience and resistance.",
-  "ATHENS_YOU_ARE": "a respected citizen chosen to help rebuild Athens after its fall",
+  "ATHENS_YOU_ARE": "a neighborhood representative trying to protect your community under occupation",
   "ALEXANDRIA_TITLE": "Alexandria — Fire over the Nile",
   "ALEXANDRIA_SUBTITLE": "Knowledge and Loyalty",
   "ALEXANDRIA_INTRO": "Caesar pursued Pompey to Alexandria, sparking conflict. Fire threatens the Great Library. You stand between warring powers and burning knowledge.",
@@ -708,5 +708,17 @@
   "COMPASS_INTRO_PACKAGE": "A package arrives with no return address, only the words:",
   "COMPASS_INTRO_KNOW_THYSELF": "Know Thyself",
   "COMPASS_INTRO_MIRROR": "Inside, a mirror—black, breathless, waiting.",
-  "COMPASS_INTRO_LOOK_IN_MIRROR": "Look in the mirror"
+  "COMPASS_INTRO_LOOK_IN_MIRROR": "Look in the mirror",
+  "SUPPORT_ENTITY_PEOPLE_TITLE": "The People",
+  "SUPPORT_ENTITY_CHALLENGER_TITLE": "Opposition",
+  "SUPPORT_ENTITY_CURRENT_SUPPORT": "Current Support",
+  "SUPPORT_ENTITY_SUMMARY": "Summary",
+  "SUPPORT_ENTITY_SHOW_STANCES": "Show detailed stances ▼",
+  "SUPPORT_ENTITY_HIDE_STANCES": "Hide detailed stances ▲",
+  "SUPPORT_ENTITY_STANCE_GOVERNANCE": "Governance",
+  "SUPPORT_ENTITY_STANCE_ORDER": "Order & Security",
+  "SUPPORT_ENTITY_STANCE_ECONOMY": "Economy",
+  "SUPPORT_ENTITY_STANCE_JUSTICE": "Justice",
+  "SUPPORT_ENTITY_STANCE_CULTURE": "Culture & Society",
+  "SUPPORT_ENTITY_STANCE_FOREIGN": "Foreign Policy"
 }

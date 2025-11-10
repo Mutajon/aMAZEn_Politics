@@ -60,7 +60,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "ATHENS_YOU_ARE",
     year: "-404",
     imageId: "greece",
-    roleScope: "Acts as a respected citizen on the oligarch-controlled civic council, influencing local decrees and relief efforts but never commanding the Spartan garrison.",
+    roleScope: "You serve as a neighborhood representative on a local civic council under the Thirty Tyrants' occupation. You can mediate disputes, distribute limited relief, and advocate for your community's basic needs—but you have no power over the oligarchy or Spartan garrison. Your dilemmas center on navigating daily survival: securing food, protecting neighbors from persecution, balancing collaboration vs. resistance, and making ethical compromises under authoritarian rule.",
     storyThemes: ["autonomy_vs_heteronomy", "liberalism_vs_totalism", "reconciliation"],
     scoreGoal: 1000,
     defaultGoalStatus: "uncompleted",
@@ -111,7 +111,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
           stype: { t: "Eraser", i: "-" }
         }
       ],
-      playerIndex: 1,
+      playerIndex: 4,
       challengerSeat: {
         name: "Coercive Force",
         percent: 35,

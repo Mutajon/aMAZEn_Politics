@@ -965,7 +965,17 @@ export const useDilemmaStore = create<DilemmaState>()(
         conversationActive: state.conversationActive,
         difficulty: state.difficulty,
         selectedGoals: state.selectedGoals
-      })
+      }),
+      onRehydrateStorage: () => (state) => {
+        // Recalculate corruption level from history on page reload
+        if (state && Array.isArray(state.corruptionHistory) && state.corruptionHistory.length > 0) {
+          const lastEntry = state.corruptionHistory[state.corruptionHistory.length - 1];
+          if (typeof lastEntry.level === 'number') {
+            state.corruptionLevel = lastEntry.level;
+            dlog('Hydrated corruption level from history:', lastEntry.level);
+          }
+        }
+      }
     }
   )
 );

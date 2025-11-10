@@ -2017,6 +2017,55 @@ function stripJsonComments(text) {
 }
 
 /**
+ * Normalize control characters in JSON text that would cause parse errors
+ * This is a last-resort recovery mechanism for malformed AI responses
+ */
+function normalizeControlCharacters(text) {
+  if (typeof text !== "string") return text;
+
+  // Strategy: Remove literal control characters from within quoted strings
+  // while preserving escaped sequences like \n, \t, etc.
+  let result = '';
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const charCode = text.charCodeAt(i);
+
+    if (inString) {
+      if (escapeNext) {
+        // Preserve escaped characters
+        result += char;
+        escapeNext = false;
+      } else if (char === '\\') {
+        result += char;
+        escapeNext = true;
+      } else if (char === '"') {
+        result += char;
+        inString = false;
+      } else if (charCode >= 0x00 && charCode <= 0x1F && char !== '\n' && char !== '\r' && char !== '\t') {
+        // Remove other control characters in strings
+        continue;
+      } else if (char === '\n' || char === '\r' || char === '\t') {
+        // Replace literal newlines/tabs in strings with space
+        result += ' ';
+      } else {
+        result += char;
+      }
+    } else {
+      // Outside strings, preserve everything including control chars (they're valid JSON structure)
+      result += char;
+      if (char === '"') {
+        inString = true;
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
  * Safely parse JSON with fallback extraction
  * Handles markdown code blocks (```json...\n{...}\n```) by extracting content between { }
  */
@@ -2044,20 +2093,31 @@ function safeParseJSON(text, { debugTag = "safeParseJSON", maxLogLength = 400 } 
     }
   };
 
+  // Attempt 1: Direct parse
   const direct = tryParse(text, "direct");
   if (direct) return direct;
 
+  // Attempt 2: Strip comments and retry
   const cleaned = stripJsonComments(text);
   if (cleaned && cleaned !== text) {
     const parsedClean = tryParse(cleaned, "strip-comments");
     if (parsedClean) return parsedClean;
   }
 
-  const fallbackSource = typeof cleaned === "string" ? cleaned : text;
+  // Attempt 3: Normalize control characters and retry
+  const normalized = normalizeControlCharacters(cleaned || text);
+  if (normalized !== (cleaned || text)) {
+    const parsedNormalized = tryParse(normalized, "normalized-control-chars");
+    if (parsedNormalized) return parsedNormalized;
+  }
+
+  // Attempt 4: Extract braces and retry
+  const fallbackSource = normalized || cleaned || text;
   const match = typeof fallbackSource === "string" ? fallbackSource.match(/\{[\s\S]*\}/) : null;
   if (match) {
     const candidate = stripJsonComments(match[0]);
-    const parsed = tryParse(candidate, "fallback-braces");
+    const candidateNormalized = normalizeControlCharacters(candidate);
+    const parsed = tryParse(candidateNormalized, "fallback-braces-normalized");
     if (parsed) return parsed;
   } else {
     console.warn(`[${debugTag}] No JSON object detected using fallback brace extraction.`);
@@ -3183,6 +3243,7 @@ Based on this political decision, generate 1-3 specific dynamic parameters that 
 app.post("/api/aftermath", async (req, res) => {
   try {
     const {
+      gameId,
       playerName,
       role,
       systemName,
@@ -3194,6 +3255,7 @@ app.post("/api/aftermath", async (req, res) => {
 
     if (debug) {
       console.log("[/api/aftermath] Request received:", {
+        gameId,
         playerName,
         role,
         systemName,
@@ -3203,21 +3265,26 @@ app.post("/api/aftermath", async (req, res) => {
       });
     }
 
-    // Fallback response if API fails
+    // Improved fallback response with contextual data
+    // This is used when JSON parsing fails - make it semi-personalized
+    const leaderName = playerName || "the leader";
+    const avgSupport = Math.round(((finalSupport?.people ?? 50) + (finalSupport?.middle ?? 50) + (finalSupport?.mom ?? 50)) / 3);
+    const supportDesc = avgSupport >= 70 ? "widely supported" : avgSupport >= 40 ? "contested" : "deeply unpopular";
+
     const fallback = {
-      intro: "After many years of rule, the leader passed into history.",
-      remembrance: "They will be remembered for their decisions, both bold and cautious. Time will tell how history judges their reign.",
-      rank: "The Leader",
+      intro: `After years of rule in ${role || "this land"}, ${leaderName} passed into history.`,
+      remembrance: `They will be remembered as a ${supportDesc} leader who navigated the complexities of ${systemName || "their political system"}. Their decisions shaped the lives of many, for better or worse. Time will tell how history judges their reign.`,
+      rank: supportDesc === "widely supported" ? "The Popular Leader" : supportDesc === "contested" ? "The Controversial Ruler" : "The Embattled Leader",
       decisions: (dilemmaHistory || []).map((entry, i) => ({
-        title: entry.choiceTitle || `Decision ${i + 1}`,
-        reflection: "A choice was made, consequences followed."
+        title: sanitizeText(entry.choiceTitle || `Decision ${i + 1}`).slice(0, 120),
+        reflection: "This decision had complex consequences that affected multiple constituencies."
       })),
       ratings: {
         autonomy: "medium",
         liberalism: "medium"
       },
-      valuesSummary: "A leader who navigated complex political terrain with determination.",
-      haiku: "Power came and went\nDecisions echo through time\nHistory records"
+      valuesSummary: `A leader who tried to balance competing interests in ${systemName || "a complex political environment"}.`,
+      haiku: `${supportDesc === "widely supported" ? "Beloved" : supportDesc === "contested" ? "Debated" : "Opposed"} by many\nDecisions echo through time\nHistory will judge`
     };
 
     // Build system prompt using EXACT text from user's preliminary plan
@@ -3273,12 +3340,54 @@ Return only:
       .map(cv => `${cv.dimension}:${cv.componentName}(${cv.value})`)
       .join(", ");
 
+    // Helper to escape control characters that would break JSON parsing
+    const sanitizeText = (text) => {
+      if (!text) return "";
+      return String(text)
+        // Replace literal newlines with space
+        .replace(/\r?\n/g, ' ')
+        // Replace tabs with space
+        .replace(/\t/g, ' ')
+        // Remove other control characters (0x00-0x1F except space)
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+        // Normalize multiple spaces to single space
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
+
     const historySummary = (dilemmaHistory || [])
       .map(entry =>
-        `Day ${entry.day}: "${entry.dilemmaTitle}" → chose "${entry.choiceTitle}" (${entry.choiceSummary}). ` +
+        `Day ${entry.day}: "${sanitizeText(entry.dilemmaTitle)}" → chose "${sanitizeText(entry.choiceTitle)}" (${sanitizeText(entry.choiceSummary)}). ` +
         `Support after: people=${entry.supportPeople}, middle=${entry.supportMiddle}, mom=${entry.supportMom}.`
       )
       .join("\n");
+
+    // Extract conversation history for richer context (if available)
+    let conversationContext = "";
+    if (gameId) {
+      const conversation = getConversation(gameId);
+      if (conversation && conversation.messages && Array.isArray(conversation.messages)) {
+        // Get last 15 messages (skip system message, focus on user/assistant exchanges)
+        const recentMessages = conversation.messages
+          .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+          .slice(-15);
+
+        if (recentMessages.length > 0) {
+          conversationContext = "\n\nCONVERSATION EXCERPTS (for narrative context):\n" +
+            recentMessages.map((msg, idx) => {
+              const role = msg.role === 'user' ? 'PLAYER' : 'AI';
+              const content = typeof msg.content === 'string'
+                ? sanitizeText(msg.content).slice(0, 300) // Truncate to 300 chars
+                : '[complex content]';
+              return `${idx + 1}. ${role}: ${content}${content.length >= 300 ? '...' : ''}`;
+            }).join('\n');
+
+          if (debug) {
+            console.log(`[/api/aftermath] Including ${recentMessages.length} conversation messages for context`);
+          }
+        }
+      }
+    }
 
     const user = `PLAYER: ${playerName || "Unknown Leader"}
 ROLE: ${role || "Unknown Role"}
@@ -3293,7 +3402,7 @@ TOP COMPASS VALUES:
 ${compassSummary || "None"}
 
 DECISION HISTORY:
-${historySummary || "No decisions recorded"}
+${historySummary || "No decisions recorded"}${conversationContext}
 
 Generate the aftermath epilogue following the structure above. Return STRICT JSON ONLY.`;
 
@@ -3856,9 +3965,8 @@ app.post("/api/game-turn", async (req, res) => {
         // E-12 Authority Analysis: Store for authority constraints on Day 2+
         e12: enrichedContext.e12 || null,
         role: enrichedContext.role || "Unknown Leader",
-        // Corruption tracking: Start clean (0=no corruption), increases only with corrupt actions
-        corruptionLevel: 0,         // 0-100 scale (0=no corruption, 100=kleptocratic)
-        corruptionHistory: []       // Track last 3 judgments for AI context
+        // Corruption tracking: Frontend calculates corruption level from history
+        corruptionHistory: []       // Track last 3 raw AI judgments (0-10 scale)
       };
       storeConversation(gameId, "pending", "openai", conversationMeta);
 
@@ -3974,8 +4082,7 @@ app.post("/api/game-turn", async (req, res) => {
             narrativeMemory: conversation.meta?.narrativeMemory || null,  // Dynamic Story Spine
             playerCompass: conversation.meta?.playerCompass || null,  // Player compass values
             playerCompassTopValues: conversation.meta?.playerCompassTopValues || null,
-            corruptionLevel: conversation.meta?.corruptionLevel ?? 0,  // Corruption tracking (start clean)
-            corruptionHistory: conversation.meta?.corruptionHistory || []
+            corruptionHistory: conversation.meta?.corruptionHistory || []  // Frontend calculates level
           });
 
       // Inject per-turn system prompt so new constraints override the initial system message
@@ -4325,39 +4432,27 @@ app.post("/api/game-turn", async (req, res) => {
       // Corruption judgment update (Day 2+)
       if (turnData.corruptionJudgment && typeof turnData.corruptionJudgment.score === 'number') {
         const rawScore = Math.max(0, Math.min(10, turnData.corruptionJudgment.score));
-        const prevCorruption = typeof meta.corruptionLevel === 'number' ? meta.corruptionLevel : 0;
 
-        // Smooth blending: 70% previous + 30% new (scaled to 0-100)
-        // Raw score 0-10 → multiply by 10 → 0-100 range
-        const newScoreScaled = rawScore * 10; // Convert 0-10 to 0-100
-        const newCorruption = Number((prevCorruption * 0.7 + newScoreScaled * 0.3).toFixed(2));
-        const delta = Number((newCorruption - prevCorruption).toFixed(2));
-
-        meta.corruptionLevel = newCorruption;
-
-        // Store history (keep last 3)
+        // Store history (keep last 3) - Frontend calculates blended level
         if (!Array.isArray(meta.corruptionHistory)) {
           meta.corruptionHistory = [];
         }
         meta.corruptionHistory.push({
           day,
-          score: rawScore,           // Original 0-10 score
-          reason: String(turnData.corruptionJudgment.reason || '').slice(0, 150),
-          level: newCorruption       // Updated 0-100 level
+          score: rawScore,           // Raw 0-10 score
+          reason: String(turnData.corruptionJudgment.reason || '').slice(0, 150)
         });
         if (meta.corruptionHistory.length > 3) {
           meta.corruptionHistory = meta.corruptionHistory.slice(-3);
         }
 
-        // COMPREHENSIVE DEBUG LOGGING
+        // DEBUG LOGGING
         console.log(`🔸 [CORRUPTION] Day ${day}:`);
         console.log(`   AI judgment: ${rawScore}/10 (${turnData.corruptionJudgment.reason})`);
-        console.log(`   Old level: ${prevCorruption.toFixed(2)}`);
-        console.log(`   New level: ${newCorruption.toFixed(2)} (${delta >= 0 ? '+' : ''}${delta.toFixed(2)})`);
 
         if (debugMode) {
-          console.log(`   🐛 [DEBUG] Blending formula: (${prevCorruption.toFixed(2)} * 0.7) + (${newScoreScaled} * 0.3) = ${newCorruption.toFixed(2)}`);
           console.log(`   🐛 [DEBUG] History length: ${meta.corruptionHistory.length}`);
+          console.log(`   🐛 [DEBUG] History:`, JSON.stringify(meta.corruptionHistory, null, 2));
         }
       }
     };
@@ -4407,14 +4502,10 @@ app.post("/api/game-turn", async (req, res) => {
       // Dynamic parameters (Day 2+ only)
       dynamicParams: Array.isArray(turnData.dynamicParams) ? turnData.dynamicParams : [],
 
-      // Corruption shift (Day 2+ only)
+      // Corruption shift (Day 2+ only) - Frontend calculates level from score
       corruptionShift: day > 1 && conversation?.meta?.corruptionHistory?.length > 0 ? {
-        delta: Number((conversation.meta.corruptionHistory[conversation.meta.corruptionHistory.length - 1].level -
-                (conversation.meta.corruptionHistory.length > 1
-                  ? conversation.meta.corruptionHistory[conversation.meta.corruptionHistory.length - 2].level
-                  : 50)).toFixed(2)),
-        reason: conversation.meta.corruptionHistory[conversation.meta.corruptionHistory.length - 1].reason,
-        newLevel: conversation.meta.corruptionLevel
+        score: conversation.meta.corruptionHistory[conversation.meta.corruptionHistory.length - 1].score,
+        reason: conversation.meta.corruptionHistory[conversation.meta.corruptionHistory.length - 1].reason
       } : null,
 
       // Game end flag
@@ -4653,8 +4744,7 @@ function buildTurnUserPrompt({
   narrativeMemory = null,  // Dynamic Story Spine
   playerCompass = null,  // Player compass values for optional integration
   playerCompassTopValues = null,
-  corruptionLevel = 0,   // Corruption tracking (0-100, start clean)
-  corruptionHistory = []
+  corruptionHistory = []  // Corruption tracking - raw AI scores only (frontend calculates level)
 }) {
   const clampedTotal = Number.isFinite(totalDays) ? totalDays : 7;
   const lines = [
@@ -4689,6 +4779,18 @@ function buildTurnUserPrompt({
     const reminder = buildSupportProfileReminder(supportProfiles);
     if (reminder) {
       lines.push(``, `BASELINE REFERENCE:`, reminder);
+
+      // FACTION IDENTITY MAPPING: Connect power holder names to faction profiles
+      if (challengerSeat && supportProfiles.challenger) {
+        lines.push(
+          ``,
+          `⚠️ CRITICAL FACTION IDENTITY:`,
+          `"${challengerSeat.name}" (power holder) = "Challenger" faction in support profiles above.`,
+          `When the player ENGAGES WITH "${challengerSeat.name}" respectfully (negotiates, consults, acknowledges their authority),`,
+          `the Challenger faction should respond POSITIVELY because they're being treated with respect.`,
+          `When the player IGNORES or UNDERMINES "${challengerSeat.name}", then they should respond negatively.`
+        );
+      }
     }
   }
 
@@ -4777,24 +4879,21 @@ function buildTurnUserPrompt({
     );
   }
 
-  // Corruption context (for AI continuity)
-  if (typeof corruptionLevel === 'number') {
+  // Corruption context (for AI continuity) - Show history only
+  if (Array.isArray(corruptionHistory) && corruptionHistory.length > 0) {
     lines.push(
       ``,
       `🔸 CORRUPTION TRACKING:`,
-      `Current level: ${corruptionLevel.toFixed(1)}/100 (0=selfless public service, 100=kleptocratic exploitation)`
+      `Recent AI judgments of player's actions (0-10 scale):`
     );
+    const recent = corruptionHistory.slice(-3).map(h =>
+      `Day ${h.day}: ${h.score}/10 - ${h.reason.slice(0, 80)}${h.reason.length > 80 ? '...' : ''}`
+    ).join('\n  ');
+    lines.push(`  ${recent}`);
+  }
 
-    if (Array.isArray(corruptionHistory) && corruptionHistory.length > 0) {
-      const recent = corruptionHistory.slice(-3).map(h =>
-        `Day ${h.day}: ${h.score}/10 - ${h.reason.slice(0, 60)}${h.reason.length > 60 ? '...' : ''}`
-      ).join('\n  ');
-      lines.push(
-        `Recent judgments:`,
-        `  ${recent}`
-      );
-    }
-
+  // Corruption evaluation task (Day 2+ only)
+  if (day > 1) {
     lines.push(
       ``,
       `TASK C: Evaluate the player's PREVIOUS action (shown in STEP 1 above) using the corruption rubric.`,
@@ -4804,17 +4903,81 @@ function buildTurnUserPrompt({
     );
   }
 
+  // ACTION CONTINUITY ENFORCEMENT: Detect actions requiring immediate results
+  const actionText = (playerChoice.title + ' ' + (playerChoice.summary || '')).toLowerCase();
+  const isVoteAction = /\b(vote|referendum|ballot|election|consult|poll|plebiscite)\b/i.test(actionText);
+  const isNegotiationAction = /\b(negotiate|negotiation|talk|talks|meeting|dialogue|summit|discuss)\b/i.test(actionText);
+  const isConsultationAction = /\b(assemble|assembly|council|gathering|forum|hear from|listen to)\b/i.test(actionText);
+  const requiresResults = isVoteAction || isNegotiationAction || isConsultationAction;
+
+  if (requiresResults) {
+    const actionType = isVoteAction
+      ? 'VOTING/REFERENDUM/CONSULTATION'
+      : isNegotiationAction
+      ? 'NEGOTIATION/DIALOGUE/TALKS'
+      : 'CONSULTATION/ASSEMBLY';
+
+    lines.push(
+      ``,
+      `🚨 CONTINUITY DIRECTIVE (MANDATORY):`,
+      `The previous action involved ${actionType}.`,
+      ``,
+      `The next dilemma MUST show the ACTUAL RESULTS of that process:`,
+      ``
+    );
+
+    if (isVoteAction) {
+      lines.push(
+        `✓ Show the vote/referendum outcome with specific results (e.g., "57% voted yes, 43% no")`,
+        `✓ Show immediate reactions from key factions to the result`,
+        `✓ Frame the NEW dilemma around responding to those results`,
+        `✓ DO NOT show "preparations" or "as you prepare for..." - skip directly to the outcome`,
+        `✓ Apply SYSTEM FEEL: how does this political system handle the result? (e.g., democracies implement, autocracies may override)`
+      );
+    } else if (isNegotiationAction) {
+      lines.push(
+        `✓ Show what happened IN the negotiation (agreement reached? demands made? talks collapsed? compromises offered?)`,
+        `✓ Show specific terms, demands, or concessions discussed`,
+        `✓ Show immediate reactions from the parties involved`,
+        `✓ Frame the NEW dilemma around responding to the negotiation outcome`,
+        `✓ DO NOT show "preparations for talks" - skip directly to what happened during/after the talks`
+      );
+    } else {
+      lines.push(
+        `✓ Show what happened IN the consultation/assembly (consensus? disagreement? recommendations?)`,
+        `✓ Show specific input or positions from those consulted`,
+        `✓ Show immediate reactions and what was decided`,
+        `✓ Frame the NEW dilemma around acting on the consultation results`,
+        `✓ DO NOT show "preparations" - skip directly to the outcome`
+      );
+    }
+
+    lines.push(``);
+  }
+
   // STEP 2 separator: Generate new dilemma
   lines.push(
     ``,
     `STEP 2: GENERATE NEW SITUATION (Day ${day})`,
     `───────────────────────────────────────────────────────────────────────────────`,
-    ``,
-    `TASK B: Now create the new political dilemma and three new options.`,
-    `Show what happens next as a consequence of the previous action.`,
-    `Remember: These new options haven't been chosen yet - they're future possibilities.`,
     ``
   );
+
+  if (requiresResults) {
+    lines.push(
+      `TASK B: Present the RESULTS of the previous ${isVoteAction ? 'vote/referendum' : isNegotiationAction ? 'negotiation' : 'consultation'} and create a new dilemma responding to those results.`,
+      `Show the outcome of the process FIRST, then present new choices based on that outcome.`,
+      `Remember: These new options haven't been chosen yet - they're future possibilities.`,
+      ``
+    );
+  } else {
+    lines.push(
+      `TASK B: Now create the new political dilemma and three new options.`,
+      `Show what happens next as a consequence of the previous action.`,
+      `Remember: These new options haven't been chosen yet - they're future possibilities.`,
+      ``
+    );
+  }
 
   if (crisisMode && crisisContext) {
     lines.push(``, `🚨 CRISIS MODE: "${crisisMode.toUpperCase()}"`);
@@ -5286,15 +5449,20 @@ YOUR RESPONSIBILITIES:
    - Democratic processes (votes, consultations) ALWAYS score 0 regardless of timing
 
    WHAT IS NOT CORRUPTION (score 0-1):
-   - Calling referendums, votes, or public consultations
-   - Collaborative decision-making or delays for stakeholder input
-   - Emergency actions with legitimate public safety justification
-   - Transparent processes with procedural integrity
-   - Following institutional channels even if slow
-   - Risk-averse governance or "indecision" without evidence of hiding wrongdoing
-   - Prioritizing one legitimate value over another (e.g., security vs. liberty)
-   - Political allegiance or support for movements
-   - Building coalitions or support bases through legitimate means
+   - Calling referendums, votes, or public consultations → ALWAYS 0
+   - Collaborative decision-making or delays for stakeholder input → ALWAYS 0
+   - Emergency actions with legitimate public safety justification → ALWAYS 0
+   - Transparent processes with procedural integrity → ALWAYS 0
+   - Following institutional channels even if slow → ALWAYS 0
+   - Risk-averse governance or "indecision" without evidence of hiding wrongdoing → ALWAYS 0
+   - Prioritizing one legitimate value over another (e.g., security vs. liberty) → ALWAYS 0
+   - Political allegiance or support for movements → ALWAYS 0
+   - Building coalitions or support bases through legitimate means → ALWAYS 0
+   - Asking community for input or feedback → ALWAYS 0
+   - Civic responsibility and community engagement → ALWAYS 0
+   - Attempting to comply with authorities without personal gain → ALWAYS 0
+   - Actions lacking transparency BUT without evidence of self-serving intent → Maximum 1
+   - Actions lacking wider organizational support BUT with civic intent → ALWAYS 0
 
    EVIDENCE REQUIREMENT — NO SPECULATION:
    - Base score ONLY on explicit actions stated in the player's choice text

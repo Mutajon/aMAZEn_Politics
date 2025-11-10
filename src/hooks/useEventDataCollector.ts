@@ -21,6 +21,7 @@ import type { TickerItem } from "../components/event/NewsTicker";
 import { audioManager } from "../lib/audioManager";
 import { calculateLiveScoreBreakdown } from "../lib/scoring";
 import { shouldGenerateAIOptions, type TreatmentType } from "../data/experimentConfig";
+import { useAIOutputLogger } from "./useAIOutputLogger";
 
 // ============================================================================
 // TYPES
@@ -46,9 +47,8 @@ export type DynamicParam = {
 };
 
 export type CorruptionShift = {
-  delta: number;       // Change from previous turn
+  score: number;       // Raw AI judgment (0-10 scale)
   reason: string;      // AI's explanation
-  newLevel: number;    // Updated 0-100 level
 };
 
 // PHASE 1: Critical data - must load before showing anything
@@ -483,53 +483,66 @@ async function fetchGameTurn(): Promise<{
     ];
   }
 
-  // Extract corruption shift (Day 2+ only, mirrors support pattern)
+  // Extract corruption shift (Day 2+ only) - Frontend calculates blended level
   let corruptionShift: CorruptionShift | null = null;
+  let corruptionDelta = 0;
+  let corruptionNewLevel = 0;
 
   if (data.corruptionShift && day > 1) {
-    const { savePreviousCorruption, setCorruptionLevel, corruptionHistory } =
-      useDilemmaStore.getState();
+    const {
+      savePreviousCorruption,
+      setCorruptionLevel,
+      corruptionLevel: prevLevel,
+      corruptionHistory
+    } = useDilemmaStore.getState();
 
     // STEP 0: Save previous value (for animation)
     savePreviousCorruption();
 
-    // STEP 1: Apply new corruption level
-    const newLevel = Math.max(0, Math.min(100, Number(data.corruptionShift.newLevel) || 50));
+    // STEP 1: Calculate new corruption level using blending formula
+    const rawScore = Math.max(0, Math.min(10, data.corruptionShift.score));
+    const newScoreScaled = rawScore * 10; // 0-10 → 0-100 scale
+    const prevCorruption = typeof prevLevel === 'number' ? prevLevel : 0;
+
+    // Blending formula: 90% previous + 10% new (gradual accumulation)
+    const newLevel = Number((prevCorruption * 0.9 + newScoreScaled * 0.1).toFixed(2));
+    const delta = Number((newLevel - prevCorruption).toFixed(2));
+
+    // Store for logging
+    corruptionDelta = delta;
+    corruptionNewLevel = newLevel;
+
+    // STEP 2: Apply new corruption level
     setCorruptionLevel(newLevel);
 
-    // STEP 2: Store history entry
+    // STEP 3: Store history entry (raw score + calculated level)
     useDilemmaStore.setState({
       corruptionHistory: [
         ...corruptionHistory,
         {
           day,
-          score: Math.round(newLevel / 10), // Approximate reverse-calc
+          score: rawScore,           // Raw 0-10 AI judgment
           reason: data.corruptionShift.reason,
-          level: newLevel
+          level: newLevel            // Calculated 0-100 level
         }
       ].slice(-3)  // Keep last 3
     });
 
-    // STEP 3: Prepare for UI display
-    // Recalculate delta from store values (don't trust API value)
-    const previousValue = useDilemmaStore.getState().previousCorruptionValue || 0;
-    const calculatedDelta = newLevel - previousValue;
-
+    // STEP 4: Prepare for logging
     corruptionShift = {
-      delta: calculatedDelta,
-      reason: String(data.corruptionShift.reason || '').slice(0, 150),
-      newLevel
+      score: rawScore,
+      reason: String(data.corruptionShift.reason || '').slice(0, 150)
     };
 
     // COMPREHENSIVE DEBUG LOGGING
-    console.log('[fetchGameTurn] 🔸 Corruption shift received:');
-    console.log(`   Delta: ${corruptionShift.delta >= 0 ? '+' : ''}${corruptionShift.delta.toFixed(2)}`);
-    console.log(`   New Level: ${corruptionShift.newLevel.toFixed(2)}`);
+    console.log('[fetchGameTurn] 🔸 Corruption calculated:');
+    console.log(`   AI judgment: ${rawScore}/10`);
+    console.log(`   Old level: ${prevCorruption.toFixed(2)}`);
+    console.log(`   New level: ${newLevel.toFixed(2)} (${delta >= 0 ? '+' : ''}${delta.toFixed(2)})`);
     console.log(`   Reason: ${corruptionShift.reason}`);
 
     if (debugMode) {
-      console.log(`   🐛 [DEBUG] Previous: ${useDilemmaStore.getState().previousCorruptionValue}`);
-      console.log(`   🐛 [DEBUG] Current: ${useDilemmaStore.getState().corruptionLevel}`);
+      console.log(`   🐛 [DEBUG] Formula: (${prevCorruption.toFixed(2)} * 0.9) + (${newScoreScaled} * 0.1) = ${newLevel.toFixed(2)}`);
       console.log(`   🐛 [DEBUG] History: ${JSON.stringify(useDilemmaStore.getState().corruptionHistory)}`);
     }
   }
@@ -819,6 +832,9 @@ export function useEventDataCollector() {
   // Progress callback - using ref to avoid re-renders
   const onReadyCallbackRef = useRef<(() => void) | null>(null);
 
+  // AI output logger - for logging once at source
+  const aiLogger = useAIOutputLogger();
+
   // Backward compatibility - reconstruct legacy CollectedData format
   const collectedData: CollectedData | null = phase1Data ? {
     ...phase1Data,
@@ -863,6 +879,36 @@ export function useEventDataCollector() {
       } = turnData;
 
       console.log(`[Collector] ✅ Unified data received for Day ${day}`);
+
+      // ========================================================================
+      // LOG AI OUTPUTS ONCE AT SOURCE (prevents duplication from reactive effects)
+      // ========================================================================
+      const { crisisMode: storedCrisisMode } = useDilemmaStore.getState();
+
+      // Log dilemma generation
+      aiLogger.logDilemma(dilemma, {
+        crisisMode: storedCrisisMode
+      });
+
+      // Log mirror advice
+      aiLogger.logMirrorAdvice(mirrorText);
+
+      // Log support shifts (Day 2+)
+      if (supportEffects) {
+        aiLogger.logSupportShifts(supportEffects);
+      }
+
+      // Log dynamic parameters
+      if (dynamicParams && dynamicParams.length > 0) {
+        aiLogger.logDynamicParams(dynamicParams);
+      }
+
+      // Log corruption shift (Day 2+)
+      if (corruptionShift) {
+        aiLogger.logCorruptionShift(corruptionShift, corruptionDelta, corruptionNewLevel);
+      }
+
+      console.log(`[Collector] ✅ AI outputs logged for Day ${day}`);
 
       // Build Phase 1 data (critical path)
       const p1: Phase1Data = {

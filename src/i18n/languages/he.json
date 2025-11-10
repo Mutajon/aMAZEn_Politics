@@ -189,7 +189,7 @@
   "ROLE_REPRESENTATIVE_DEMOCRACY": "דמוקרטיה ייצוגית",
   "ATHENS_TITLE": "אתונה — היום שבו הדמוקרטיה מתה",
   "ATHENS_INTRO": "ספרטה ניצחה את אתונה וסיימה את הדמוקרטיה. חונטה צבאית אוכפת סדר. שרדת—עכשיו אתה עומד מול חורבות האספה, בוחר בין ציות להתנגדות.",
-  "ATHENS_YOU_ARE": "אזרח מכובד שנבחר לעזור בשיקום אתונה לאחר נפילתה",
+  "ATHENS_YOU_ARE": "נציג שכונתי המנסה להגן על קהילתך תחת כיבוש",
   "ALEXANDRIA_TITLE": "אלכסנדריה — אש מעל הנילוס",
   "ALEXANDRIA_SUBTITLE": "ידע ונאמנות",
   "ALEXANDRIA_INTRO": "קיסר רדף אחרי פומפיוס לאלכסנדריה, והצית קונפליקט. אש מאיימת על הספרייה הגדולה. אתה עומד בין כוחות לוחמים וידע בוער.",
@@ -702,5 +702,17 @@
   "COMPASS_INTRO_PACKAGE": "חבילה מגיעה ללא כתובת חזרה, רק עם המילים:",
   "COMPASS_INTRO_KNOW_THYSELF": "דע את עצמך",
   "COMPASS_INTRO_MIRROR": "בפנים, מראה — שחורה, חסרת נשימה, ממתינה.",
-  "COMPASS_INTRO_LOOK_IN_MIRROR": "הסתכל במראה"
+  "COMPASS_INTRO_LOOK_IN_MIRROR": "הסתכל במראה",
+  "SUPPORT_ENTITY_PEOPLE_TITLE": "העם",
+  "SUPPORT_ENTITY_CHALLENGER_TITLE": "האופוזיציה",
+  "SUPPORT_ENTITY_CURRENT_SUPPORT": "תמיכה נוכחית",
+  "SUPPORT_ENTITY_SUMMARY": "סיכום",
+  "SUPPORT_ENTITY_SHOW_STANCES": "הצג עמדות מפורטות ▼",
+  "SUPPORT_ENTITY_HIDE_STANCES": "הסתר עמדות מפורטות ▲",
+  "SUPPORT_ENTITY_STANCE_GOVERNANCE": "ממשל",
+  "SUPPORT_ENTITY_STANCE_ORDER": "סדר וביטחון",
+  "SUPPORT_ENTITY_STANCE_ECONOMY": "כלכלה",
+  "SUPPORT_ENTITY_STANCE_JUSTICE": "משפט",
+  "SUPPORT_ENTITY_STANCE_CULTURE": "תרבות וחברה",
+  "SUPPORT_ENTITY_STANCE_FOREIGN": "מדיניות חוץ"
 }

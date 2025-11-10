@@ -7,6 +7,7 @@ import type { PushFn } from "../lib/router";
 import { validateRoleStrict, AIConnectionError } from "../lib/validation";
 import { useRoleStore } from "../store/roleStore";
 import { useLogger } from "../hooks/useLogger";
+import { useSessionLogger } from "../hooks/useSessionLogger";
 import { useLang } from "../i18n/lang";
 import { PREDEFINED_ROLES_ARRAY, getRoleImagePaths, type RoleGoalStatus, EXPERIMENT_PREDEFINED_ROLE_KEYS } from "../data/predefinedRoles";
 import { useSettingsStore } from "../store/settingsStore";
@@ -33,6 +34,7 @@ type RoleItem = {
 export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const lang = useLang();
   const logger = useLogger();
+  const sessionLogger = useSessionLogger();
   const setRole = useRoleStore((s) => s.setRole);
   const setAnalysis = useRoleStore(s => s.setAnalysis);
   const setRoleBackgroundImage = useRoleStore(s => s.setRoleBackgroundImage);
@@ -173,6 +175,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
 
       setAiMsg(lang("AI_NICE_ROLE"));
       logger.log('role_confirm', input.trim(), 'User confirmed custom role');
+      sessionLogger.start({ roleType: 'custom', role: input.trim() });
 
       setChecking(false);
       setRole(input.trim());
@@ -225,6 +228,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
     }
 
     logger.log('role_confirm', role.key, `User confirmed predefined role: ${role.key}`);
+    sessionLogger.start({ roleType: 'predefined', role: role.key });
 
     setRole(role.key);
     setExperimentActiveRole(experimentMode ? role.key : null);
@@ -338,7 +342,6 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                 >
                   <div className="flex-1 flex flex-col gap-0.5">
                     <span className="text-base text-white font-cinzel font-semibold tracking-wide drop-shadow-md">{role.title}</span>
-                    <span className="text-xs text-gray-400 font-normal tracking-normal">{role.subtitle}</span>
                   </div>
 
                   {/* Banner image - fades out when expanded */}
@@ -360,8 +363,10 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                   )}
 
                   <div className="flex flex-col items-end gap-1">
-                    <span className="text-[10px] uppercase tracking-wider text-amber-300/80">{lang("ROLE_YEAR_LABEL")}</span>
-                    <span className="text-sm text-amber-300 font-light tracking-wider drop-shadow-md">{role.year}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] uppercase tracking-wider text-amber-300/80">{lang("ROLE_YEAR_LABEL")}</span>
+                      <span className="text-sm text-amber-300 font-light tracking-wider drop-shadow-md">{role.year}</span>
+                    </div>
                     <span
                       className={[
                         "text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full",

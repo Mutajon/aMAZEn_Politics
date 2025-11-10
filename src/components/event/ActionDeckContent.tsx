@@ -179,12 +179,8 @@ export default function ActionDeckContent({
 
   const handleConfirmSuggestion = () => {
     playSfx('click-soft');
-    logger.log('custom_action_submitted', {
-      customText: suggestText,
-      textLength: suggestText.length,
-      suggestCost,
-      budgetBefore: budget
-    }, `User submitted custom action: ${suggestText.substring(0, 50)}...`);
+    // Note: Logging moved to useActionDeckState.ts to consolidate with timing data
+    // and prevent duplicate logs (fixes 2x custom action logging bug)
     onConfirmSuggestion();
   };
 

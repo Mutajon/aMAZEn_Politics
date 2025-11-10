@@ -204,8 +204,8 @@ export default function ActionDeck({
   };
 
   const handleConfirmSuggestion = async () => {
-    // Log suggestion submission with typing duration
-    logSuggestionSubmitted();
+    // Log suggestion submission with typing duration + cost/budget data
+    logSuggestionSubmitted(suggestCost, budget);
 
     // Validate and confirm
     await suggestion.validateAndConfirmSuggestion(suggestText);

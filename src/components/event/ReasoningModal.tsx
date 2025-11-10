@@ -247,20 +247,6 @@ export default function ReasoningModal({
           className="relative w-full max-w-2xl mx-4 max-h-[85vh] bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl border border-white/20 shadow-2xl overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Mirror Avatar (top-left, half-cut) */}
-          <div className="absolute top-0 left-0 pointer-events-none overflow-hidden">
-            <img
-              src={MIRROR_IMG_SRC}
-              alt=""
-              style={{
-                width: `${IMG_WIDTH_PX}px`,
-                opacity: IMG_OPACITY,
-                transform: "translateX(-32px)", // Half-cut effect
-              }}
-              className="select-none"
-            />
-          </div>
-
           {/* Header */}
           <div className="relative px-6 pt-6 pb-4 border-b border-white/10">
             {/* Close Button (only shown after submission) */}
@@ -275,9 +261,18 @@ export default function ReasoningModal({
             )}
 
             {/* Icon and Title */}
-            <div className="flex items-start gap-4 pl-10">
-              <div className="rounded-2xl bg-purple-500/10 p-4 text-purple-400">
-                <Sparkles className="h-8 w-8" />
+            <div className="flex items-start gap-4">
+              {/* Mirror Image Icon */}
+              <div className="flex-shrink-0">
+                <img
+                  src={MIRROR_IMG_SRC}
+                  alt=""
+                  style={{
+                    width: `${IMG_WIDTH_PX}px`,
+                    opacity: IMG_OPACITY,
+                  }}
+                  className="select-none"
+                />
               </div>
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl font-bold text-white mb-2" style={{ fontFamily: "Georgia, serif" }}>
@@ -296,10 +291,6 @@ export default function ReasoningModal({
               <>
                 {/* Input Section */}
                 <div className="space-y-3">
-                  <label className="block text-sm font-semibold text-white/80" style={{ fontFamily: "Georgia, serif" }}>
-                    Please share your reasoning:
-                  </label>
-
                   <textarea
                     value={reasoningText}
                     onChange={(e) => {
