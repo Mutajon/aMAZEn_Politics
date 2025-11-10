@@ -36,6 +36,7 @@ import { loggingService } from "./lib/loggingService";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { useStateChangeLogger } from "./hooks/useStateChangeLogger";
 import { useSessionLogger } from "./hooks/useSessionLogger";
+import GameCappedScreen from "./screens/GameCappedScreen";
 
 if (import.meta.env.DEV) {
   import("./dev/storesDebug").then(m => m.attachStoresDebug());
@@ -75,11 +76,14 @@ function LoadingScreen() {
   );
 }
 
+
+
 export default function App() {
   const { route, push } = useHashRoute();
   const enableModifiers = useSettingsStore((s) => s.enableModifiers);
   const debugMode = useSettingsStore((s) => s.debugMode);
   const consented = useLoggingStore((s) => s.consented);
+  // const [gameStatus, setGameStatus] = useState<GameStatus>('loading');
 
   console.debug("[App] 📍 Current route:", route);
   console.debug("[App] enableModifiers:", enableModifiers);
@@ -91,6 +95,8 @@ export default function App() {
   useEffect(() => {
     fetchAndStoreGameSettings();
   }, []);
+
+  // The game status is now checked on "Start Game" button click.
 
   // Initialize logging service when consented (unless debug mode)
   useEffect(() => {
@@ -126,7 +132,7 @@ export default function App() {
 }
 
 // Separate component to access language context
-function AppContent({ route, push, enableModifiers }: { route: string; push: any; enableModifiers: boolean }) {
+function AppContent({ route, push, enableModifiers }: { route: string; push: (route: string) => void; enableModifiers: boolean }) {
   const { isLoading } = useLanguage();
 
   // Global logging hooks (run once at app level for comprehensive coverage)
@@ -171,6 +177,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: any
       {route === "/achievements" && <AchievementsScreen />}
       {route === "/aftermath" && <AftermathScreen push={push} />}
       {route === "/final-score" && <FinalScoreScreen push={push} />}
+      {route === "/capped" && <GameCappedScreen push={push} />}
 
 
       {/* Backstage route - Development mode (bypasses experiments) */}
@@ -188,6 +195,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: any
           onStart={() => push("/intro")}
           onHighscores={() => push("/highscores")}
           onAchievements={() => push("/achievements")}
+          push={push}
         />
       )}
     </>

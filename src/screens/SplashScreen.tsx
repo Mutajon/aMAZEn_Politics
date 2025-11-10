@@ -25,10 +25,12 @@ export default function SplashScreen({
   onStart,
   onHighscores,
   onAchievements,
+  push,
 }: {
   onStart: () => void;
   onHighscores?: () => void; // optional, so we don't break existing callers
   onAchievements?: () => void; // optional, navigates to achievements screen
+  push: (route: string) => void;
 }) {
   const lang = useLang();
   const { language } = useLanguage();
@@ -491,33 +493,58 @@ export default function SplashScreen({
     transition={{ type: "spring", stiffness: 250, damping: 22 }}
     style={{ visibility: showButton && !isCollectingID ? "visible" : "hidden" }}
     onClick={async () => {
-      // Show email modal unless backstage mode or debug mode
-      if (!backstageMode && !debugMode) {
-        // Show ID collection modal
-        setIsCollectingID(true);
-        setShowIDModal(true);
-        setShowSettings(false);
-        // Don't proceed yet - wait for ID submission via handleIDSubmit
-      } else {
-        // Backstage or debug flow: proceed immediately (skip email modal)
-        setIsLoading(true);
-        setShowSettings(false);
+      setIsLoading(true);
+      setShowSettings(false);
 
-        // Start new logging session (will respect debug mode in loggingService)
-        await loggingService.startSession();
+      try {
+        // Reserve game slot (new from development branch)
+        const response = await fetch('/api/reserve-game-slot', { method: 'POST' });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Failed to reserve game slot:', errorData.message || 'Server error');
+          if (push) {
+            push('/capped');
+          }
+          return;
+        }
 
-        // Reset all game stores for fresh start
-        useCompassStore.getState().reset();
-        useDilemmaStore.getState().reset();
-        useRoleStore.getState().reset();
-        useMirrorQuizStore.getState().resetAll();
-        clearAllSnapshots();
+        const { success } = await response.json();
+        if (!success) {
+          if (push) {
+            push('/capped');
+          }
+          return;
+        }
 
-        // Prime narrator and start music (user interaction unlocks browser autoplay)
-        narrator.prime();
-        playMusic('background', true);
+        // Reservation successful, proceed with email modal or game start
+        // Show email modal unless backstage mode or debug mode
+        if (!backstageMode && !debugMode) {
+          // Show ID collection modal
+          setIsCollectingID(true);
+          setShowIDModal(true);
+          // Loading state is already true
+        } else {
+          // Backstage or debug flow: proceed immediately (skip email modal)
+          await loggingService.startSession();
 
-        onStart();
+          // Reset all game stores for fresh start
+          useCompassStore.getState().reset();
+          useDilemmaStore.getState().reset();
+          useRoleStore.getState().reset();
+          useMirrorQuizStore.getState().resetAll();
+          clearAllSnapshots();
+
+          // Prime narrator and start music (user interaction unlocks browser autoplay)
+          narrator.prime();
+          playMusic('background', true);
+
+          onStart();
+        }
+      } catch (error) {
+        console.error('Error reserving game slot:', error);
+        setIsLoading(false);
+        // Optionally, show a generic error message to the user
+        alert('An error occurred while starting the game. Please try again.');
       }
     }}
     className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
