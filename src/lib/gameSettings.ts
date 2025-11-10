@@ -184,7 +184,7 @@ export const applyGameSettingsToStore = (apiSettings: ApiGameSettings | Record<s
  */
 export const fetchAndStoreGameSettings = async () => {
   const urlParams = new URLSearchParams(window.location.search);
-  const researcherId = urlParams.get('rid') || '12';
+  const researcherId = urlParams.get('rid') || '10';
 
   try {
     const url = 'https://democracygame-backend.onrender.com'
