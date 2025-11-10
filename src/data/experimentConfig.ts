@@ -106,24 +106,3 @@ export function shouldGenerateAIOptions(treatment: TreatmentType): boolean {
   return config.generateAIOptions;
 }
 
-/**
- * Role-to-Treatment Mapping for Experiment Mode
- *
- * Maps role IDs to specific treatment assignments:
- * - Athens (-404) → semiAutonomy: Balanced AI + custom actions
- * - North America (1607) → noAutonomy: AI options only
- * - Mars (2179) → fullAutonomy: Custom actions only
- */
-export const ROLE_TREATMENT_MAP: Record<string, TreatmentType> = {
-  'athens_404': 'semiAutonomy',
-  'north_america_1607': 'noAutonomy',
-  'mars_2179': 'fullAutonomy',
-};
-
-/**
- * Get treatment assignment for a specific role ID
- * Returns null if role is not in experiment or has no assigned treatment
- */
-export function getTreatmentForRole(roleId: string): TreatmentType | null {
-  return ROLE_TREATMENT_MAP[roleId] || null;
-}

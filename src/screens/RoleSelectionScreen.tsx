@@ -12,7 +12,6 @@ import { PREDEFINED_ROLES_ARRAY, getRoleImagePaths, type RoleGoalStatus, EXPERIM
 import { useSettingsStore } from "../store/settingsStore";
 import { useRoleProgressStore } from "../store/roleProgressStore";
 import { useLoggingStore } from "../store/loggingStore";
-import { getTreatmentForRole } from "../data/experimentConfig";
 
 const EXPERIMENT_ROLE_KEY_SET = new Set(EXPERIMENT_PREDEFINED_ROLE_KEYS);
 
@@ -44,11 +43,9 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const setStoryThemes = useRoleStore(s => s.setStoryThemes);
   const debugMode = useSettingsStore(s => s.debugMode);
   const experimentMode = useSettingsStore(s => s.experimentMode);
-  const setTreatment = useSettingsStore(s => s.setTreatment);
   const roleGoals = useRoleProgressStore((s) => s.goals);
   const experimentProgress = useLoggingStore((s) => s.experimentProgress);
   const setExperimentActiveRole = useLoggingStore((s) => s.setExperimentActiveRole);
-  const setLoggingTreatment = useLoggingStore((s) => s.setTreatment);
 
   // Generate roles array dynamically from centralized database
   const roles: RoleItem[] = PREDEFINED_ROLES_ARRAY.map((roleData) => {
@@ -232,29 +229,11 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
     setRole(role.key);
     setExperimentActiveRole(experimentMode ? role.key : null);
 
-    // Automatic treatment assignment in experiment mode
-    const roleData = PREDEFINED_ROLES_ARRAY.find(r => r.legacyKey === role.key);
-    if (experimentMode && roleData) {
-      const assignedTreatment = getTreatmentForRole(roleData.id);
-      if (assignedTreatment) {
-        // Update both stores to keep them in sync
-        setTreatment(assignedTreatment);
-        setLoggingTreatment(assignedTreatment);
-
-        logger.log(
-          'treatment_assigned',
-          {
-            roleId: roleData.id,
-            roleName: role.key,
-            assignedTreatment,
-            experimentMode: true
-          },
-          `Treatment automatically assigned: ${assignedTreatment} for role ${roleData.id}`
-        );
-      }
-    }
+    // Treatment is assigned during user registration (via /api/users/register)
+    // and should not be changed based on role selection
 
     // Prime analysis from centralized predefined roles database
+    const roleData = PREDEFINED_ROLES_ARRAY.find(r => r.legacyKey === role.key);
     if (roleData) {
       setAnalysis(roleData.powerDistribution);
       setRoleBackgroundImage(getRoleImagePaths(roleData.imageId).full);

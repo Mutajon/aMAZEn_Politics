@@ -1,6 +1,11 @@
 // src/App.tsx
 import { useEffect } from "react";
-import { fetchAndStoreGameSettings } from "./lib/gameSettings";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fetchAndStoreGameSettings, loadGameSettingsFromLocalStorage } from "./lib/gameSettings";
+
+// Load game settings from localStorage IMMEDIATELY before any components render
+// This ensures settings are available before Zustand persist loads old values
+loadGameSettingsFromLocalStorage();
 import MiniCompassDebugScreen from "./screens/MiniCompassDebugScreen";
 import { LanguageProvider, useLanguage } from "./i18n/LanguageContext";
 
@@ -41,6 +46,23 @@ import GameCappedScreen from "./screens/GameCappedScreen";
 if (import.meta.env.DEV) {
   import("./dev/storesDebug").then(m => m.attachStoresDebug());
 }
+
+
+// Create a QueryClient instance for React Query
+const queryClient = new QueryClient({
+  defaultOptions: {
+    mutations: {
+      // Prevent duplicate mutations
+      retry: false,
+    },
+    queries: {
+      // Prevent duplicate queries
+      retry: false,
+      staleTime: 0,
+      gcTime: 0, // Don't cache mutations
+    },
+  },
+});
 
 // Component to handle RTL direction based on language
 function RTLHandler() {
@@ -92,7 +114,11 @@ export default function App() {
   // Initialize audio manager hook to sync settings with audio playback
   useAudioManager();
 
+  // Load settings from localStorage immediately (before API call completes)
+  // This ensures settings are available right away, then API will update them if available
   useEffect(() => {
+    loadGameSettingsFromLocalStorage();
+    // Then fetch fresh settings from API (will override localStorage if successful)
     fetchAndStoreGameSettings();
   }, []);
 
@@ -120,13 +146,15 @@ export default function App() {
   // Render current screen with global audio controls
   return (
     <ErrorBoundary>
-      <LanguageProvider>
-        {/* RTL direction handler */}
-        <RTLHandler />
+      <QueryClientProvider client={queryClient}>
+        <LanguageProvider>
+          {/* RTL direction handler */}
+          <RTLHandler />
 
-        {/* App content with loading check */}
-        <AppContent route={route} push={push} enableModifiers={enableModifiers} />
-      </LanguageProvider>
+          {/* App content with loading check */}
+          <AppContent route={route} push={push} enableModifiers={enableModifiers} />
+        </LanguageProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 }
