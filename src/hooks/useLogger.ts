@@ -25,7 +25,6 @@ function getCurrentRoute(): string {
 }
 
 export function useLogger() {
-  const enabled = useSettingsStore((s) => s.dataCollectionEnabled);
   const day = useDilemmaStore((s) => s.day);
   const selectedRole = useRoleStore((s) => s.selectedRole);
 
@@ -38,9 +37,8 @@ export function useLogger() {
    */
   const log = useCallback(
     (action: string, value: string | number | boolean | Record<string, unknown>, comments?: string) => {
-      if (!enabled) {
-        return;
-      }
+      // Debug mode check is handled in loggingService, no need to check here
+      // Data collection is always enabled (unless debug mode)
 
       // Automatically attach metadata from application state
       const metadata = {
@@ -51,7 +49,7 @@ export function useLogger() {
 
       loggingService.log(action, value, comments, metadata);
     },
-    [enabled, day, selectedRole]  // Removed currentRoute dependency
+    [day, selectedRole]  // Removed currentRoute dependency and debugMode (handled in service)
   );
 
   /**
@@ -64,9 +62,8 @@ export function useLogger() {
    */
   const logSystem = useCallback(
     (action: string, value: string | number | boolean | Record<string, unknown>, comments?: string) => {
-      if (!enabled) {
-        return;
-      }
+      // Debug mode check is handled in loggingService, no need to check here
+      // Data collection is always enabled (unless debug mode)
 
       // Automatically attach metadata from application state
       const metadata = {
@@ -77,7 +74,7 @@ export function useLogger() {
 
       loggingService.logSystem(action, value, comments, metadata);
     },
-    [enabled, day, selectedRole]
+    [day, selectedRole]
   );
 
   // Stabilize object reference to prevent unnecessary effect re-triggers

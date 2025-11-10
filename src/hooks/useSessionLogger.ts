@@ -39,9 +39,9 @@ export function useSessionLogger() {
    */
   const start = useCallback(
     (metadata?: Record<string, unknown>) => {
-      const { dataCollectionEnabled } = useSettingsStore.getState();
+      const { debugMode } = useSettingsStore.getState();
 
-      if (!dataCollectionEnabled) {
+      if (!debugMode) {
         return;
       }
 
@@ -69,9 +69,9 @@ export function useSessionLogger() {
    */
   const end = useCallback(
     (summary?: Record<string, unknown>) => {
-      const { dataCollectionEnabled } = useSettingsStore.getState();
+      const { debugMode } = useSettingsStore.getState();
 
-      if (!dataCollectionEnabled || !sessionStartTime.current) {
+      if (!debugMode || !sessionStartTime.current) {
         return;
       }
 
@@ -104,9 +104,9 @@ export function useSessionLogger() {
    */
   const logScreenChange = useCallback(
     (from: string, to: string) => {
-      const { dataCollectionEnabled } = useSettingsStore.getState();
+      const { debugMode } = useSettingsStore.getState();
 
-      if (!dataCollectionEnabled) {
+      if (!debugMode) {
         return;
       }
 
@@ -150,9 +150,9 @@ export function useSessionLogger() {
    * Automatically logs when user leaves/returns to tab
    */
   useEffect(() => {
-    const { dataCollectionEnabled } = useSettingsStore.getState();
+    const { debugMode } = useSettingsStore.getState();
 
-    if (!dataCollectionEnabled || visibilityListenerAdded.current) {
+    if (!debugMode || visibilityListenerAdded.current) {
       return;
     }
 

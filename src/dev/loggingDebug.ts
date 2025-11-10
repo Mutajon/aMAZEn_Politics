@@ -11,28 +11,28 @@ import { loggingService } from '../lib/loggingService';
  */
 function enableLogging() {
   const { setConsented } = useLoggingStore.getState();
-  const { setDataCollectionEnabled } = useSettingsStore.getState();
-  setDataCollectionEnabled(true);
+  const { setDebugMode } = useSettingsStore.getState();
+  setDebugMode(false);  // Disable debug mode to enable logging
   setConsented(true);
 
   // Initialize if not already initialized
   loggingService.init();
 
-  console.log('[Logging Debug] ✅ Logging enabled');
+  console.log('[Logging Debug] ✅ Logging enabled (debug mode disabled)');
   console.log('Logging State:', useLoggingStore.getState());
-  console.log('Settings (dataCollectionEnabled):', useSettingsStore.getState().dataCollectionEnabled);
+  console.log('Settings (debugMode):', useSettingsStore.getState().debugMode);
 }
 
 /**
  * Disable logging (for testing)
  */
 function disableLogging() {
-  const { setDataCollectionEnabled } = useSettingsStore.getState();
-  setDataCollectionEnabled(false);
+  const { setDebugMode } = useSettingsStore.getState();
+  setDebugMode(true);  // Enable debug mode to disable logging
 
-  console.log('[Logging Debug] ❌ Logging disabled');
+  console.log('[Logging Debug] ❌ Logging disabled (debug mode enabled)');
   console.log('Logging State:', useLoggingStore.getState());
-  console.log('Settings (dataCollectionEnabled):', useSettingsStore.getState().dataCollectionEnabled);
+  console.log('Settings (debugMode):', useSettingsStore.getState().debugMode);
 }
 
 /**
@@ -103,10 +103,10 @@ function testLog() {
  */
 function showState() {
   const loggingState = useLoggingStore.getState();
-  const { dataCollectionEnabled } = useSettingsStore.getState();
+  const { debugMode } = useSettingsStore.getState();
   console.log('[Logging Debug] 📊 Current state:');
   console.table({
-    dataCollectionEnabled: dataCollectionEnabled,
+    debugMode: debugMode,
     consented: loggingState.consented,
     userId: loggingState.userId,
     sessionId: loggingState.sessionId,
@@ -114,7 +114,7 @@ function showState() {
     treatment: loggingState.treatment,
     isInitialized: loggingState.isInitialized,
   });
-  return { ...loggingState, dataCollectionEnabled };
+  return { ...loggingState, debugMode };
 }
 
 /**
