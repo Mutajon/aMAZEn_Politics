@@ -97,9 +97,6 @@ export default function SplashScreen({
   const treatment = useSettingsStore((s) => s.treatment);
   const setTreatment = useSettingsStore((s) => s.setTreatment);
 
-  // Backstage mode (bypasses email collection)
-  const backstageMode = useSettingsStore((s) => s.backstageMode);
-
   // -------------------------------------------------------------------------
 
   // Global effect: Enforce semiAutonomy treatment when experiment mode is disabled
