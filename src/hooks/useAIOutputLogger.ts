@@ -94,28 +94,16 @@ export function useAIOutputLogger() {
    */
   const logSupportShifts = useCallback(
     (supportEffects: SupportEffect[]) => {
-      // Log each support shift individually for better analysis
-      supportEffects.forEach(effect => {
-        logger.logSystem(
-          'support_shift_generated',
-          {
-            supportTrack: effect.id,
-            delta: effect.delta,
-            explanation: effect.explain,
-            explanationLength: effect.explain.length
-          },
-          `Support shift for ${effect.id}: ${effect.delta >= 0 ? '+' : ''}${effect.delta}`
-        );
-      });
-
-      // Also log aggregate summary
+      // Log aggregate summary only (removed individual logs to reduce redundancy)
+      // Individual state changes are already logged by useStateChangeLogger
       logger.logSystem(
         'support_shifts_summary',
         {
           totalShifts: supportEffects.length,
           shifts: supportEffects.map(e => ({
             track: e.id,
-            delta: e.delta
+            delta: e.delta,
+            explanation: e.explain
           }))
         },
         `Support shifts generated for ${supportEffects.length} tracks`

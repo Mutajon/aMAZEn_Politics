@@ -7,6 +7,7 @@ import type { PushFn } from "../lib/router";
 import { validateRoleStrict, AIConnectionError } from "../lib/validation";
 import { useRoleStore } from "../store/roleStore";
 import { useLogger } from "../hooks/useLogger";
+import { useSessionLogger } from "../hooks/useSessionLogger";
 import { useLang } from "../i18n/lang";
 import { PREDEFINED_ROLES_ARRAY, getRoleImagePaths, type RoleGoalStatus, EXPERIMENT_PREDEFINED_ROLE_KEYS } from "../data/predefinedRoles";
 import { useSettingsStore } from "../store/settingsStore";
@@ -34,6 +35,7 @@ type RoleItem = {
 export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const lang = useLang();
   const logger = useLogger();
+  const sessionLogger = useSessionLogger();
   const setRole = useRoleStore((s) => s.setRole);
   const setAnalysis = useRoleStore(s => s.setAnalysis);
   const setRoleBackgroundImage = useRoleStore(s => s.setRoleBackgroundImage);
@@ -176,6 +178,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
 
       setAiMsg(lang("AI_NICE_ROLE"));
       logger.log('role_confirm', input.trim(), 'User confirmed custom role');
+      sessionLogger.start({ roleType: 'custom', role: input.trim() });
 
       setChecking(false);
       setRole(input.trim());
@@ -228,6 +231,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
     }
 
     logger.log('role_confirm', role.key, `User confirmed predefined role: ${role.key}`);
+    sessionLogger.start({ roleType: 'predefined', role: role.key });
 
     setRole(role.key);
     setExperimentActiveRole(experimentMode ? role.key : null);

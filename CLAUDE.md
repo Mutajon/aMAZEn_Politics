@@ -395,6 +395,71 @@ Benefits: Better React optimizations, improved maintainability
 - **Keep dependencies clean** - Review `useEffect` cleanup functions
 - **ALWAYS integrate data logging** (see Data Logging Integration section below)
 
+## Recent Logging System Improvements (Nov 2024)
+
+### Critical Bug Fixes
+
+**1. Debug Mode Logic Inversions (FIXED)**
+- **Files**: `useSessionLogger.ts`, `useStateChangeLogger.ts`
+- **Issue**: Debug mode checks were inverted (`if (!debugMode)` instead of `if (debugMode)`)
+- **Impact**: Logging only worked in debug mode, completely broken in production
+- **Fix**: Inverted logic to skip logging when debugMode is true
+- **Lines**: useSessionLogger.ts (44, 74, 109), useStateChangeLogger.ts (30)
+
+**2. Massive Duplication Bug (FIXED)**
+- **File**: `EventScreen3.tsx` → `useEventDataCollector.ts`
+- **Issue**: AI output logging in EventScreen3 useEffect fired every time collectedData changed
+- **Impact**: 10-30 duplicate logs per dilemma (750 dilemma_generated logs instead of ~21)
+- **Fix**: Moved logging to `useEventDataCollector.ts` collectData() function (logs once at source)
+- **Reduction**: ~90% reduction in AI output logs
+
+**3. Visibility Event Noise (FIXED)**
+- **File**: `useSessionLogger.ts`
+- **Issue**: 4 overlapping events per tab switch (window_blur, window_focus, player_left, player_returned)
+- **Impact**: ~58 noise events per playthrough with low research value
+- **Fix**: Removed entire visibility tracking useEffect (lines 148-217)
+- **Justification**: Events overlapped, provided no gameplay insight
+
+### Feature Improvements
+
+**4. Session Lifecycle (FIXED)**
+- **Files**: `RoleSelectionScreen.tsx`, `AftermathScreen.tsx`, `SplashScreen.tsx`
+- **Changes**:
+  - Session starts when role is confirmed (not on splash screen)
+  - Session ends when aftermath screen loads
+  - Added splash_screen_loaded event
+- **Impact**: More accurate session timing, cleaner event sequence
+
+**5. Compass Logging Enhancement (FIXED)**
+- **File**: `useStateChangeLogger.ts`
+- **Issue**: Logged compass changes as dimension[index] (e.g., "what[6]: +2")
+- **Fix**: Now logs component names from compass-data.ts (e.g., "Care +2")
+- **Impact**: Human-readable compass logs, easier analysis
+
+**6. Support Shift Redundancy (FIXED)**
+- **File**: `useAIOutputLogger.ts`
+- **Issue**: Logged both individual support_shift_generated AND support_shifts_summary
+- **Impact**: 1,540 redundant individual logs + 513 summary logs
+- **Fix**: Removed individual logs, kept only summary with explanations
+- **Reduction**: ~75% reduction in support shift logs
+
+**7. Player Interaction Logging (IMPROVED)**
+- **File**: `CompassPillsOverlay.tsx`
+- **Added**: compass_pills_opened, compass_pills_closed events
+- **Impact**: Track user engagement with compass feedback UI
+
+### Data Quality Improvements Summary
+
+| Issue | Before | After | Reduction |
+|-------|--------|-------|-----------|
+| AI Output Duplicates | ~2,277 logs | ~75 logs | 90% |
+| Visibility Noise | 58 events | 0 events | 100% |
+| Support Redundancy | 2,053 logs | 513 logs | 75% |
+| Debug Mode Bug | Broken in prod | Fixed | N/A |
+| Compass Readability | "what[6]" | "Care" | N/A |
+
+**Total Impact**: ~3,000 fewer logs per playthrough, cleaner data, human-readable output
+
 ## Data Logging Integration (MANDATORY)
 
 When adding or modifying ANY feature, ALWAYS integrate logging. The codebase has a comprehensive data logging system for research analysis.
@@ -623,8 +688,22 @@ When adding or modifying features, verify:
 - ✅ Logs custom action submission (text, character count, typing duration)
 - Pattern: Start timing on modal open, end on submission
 
+**CompassPillsOverlay** (`src/components/event/CompassPillsOverlay.tsx`):
+- ✅ Logs compass pills opened/closed (player events)
+- ✅ Logs pill count with each interaction
+- Pattern: onClick handlers for expand/collapse buttons
+
+**SplashScreen** (`src/screens/SplashScreen.tsx`):
+- ✅ Logs splash_screen_loaded (system event)
+- Pattern: useEffect on mount
+
+**RoleSelectionScreen** (`src/screens/RoleSelectionScreen.tsx`):
+- ✅ Starts session when role is confirmed (both predefined and custom roles)
+- ✅ Logs session_start with role metadata
+- Pattern: sessionLogger.start() after role confirmation
+
 **All Other Screens**:
-- TODO: Systematic audit needed (8 screens remaining)
+- TODO: Systematic audit needed (6 screens remaining)
 - Use `useLogger` for all user interactions
 - Use `useSessionLogger.logScreenChange()` for navigation
 - Follow patterns from completed screens above

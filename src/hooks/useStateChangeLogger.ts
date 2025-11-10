@@ -19,6 +19,7 @@ import { useDilemmaStore } from '../store/dilemmaStore';
 import { useCompassStore } from '../store/compassStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { useLogger } from './useLogger';
+import { COMPONENTS, type PropKey } from '../data/compass-data';
 
 export function useStateChangeLogger() {
   const logger = useLogger();
@@ -27,7 +28,7 @@ export function useStateChangeLogger() {
   useEffect(() => {
     const { debugMode } = useSettingsStore.getState();
 
-    if (!debugMode || isSubscribed.current) {
+    if (debugMode || isSubscribed.current) {
       return;
     }
 
@@ -197,21 +198,26 @@ export function useStateChangeLogger() {
 
           if (!newValues || !oldValues) return;
 
+          // Get component names for this dimension
+          const components = COMPONENTS[dim as PropKey];
+
           // Check each component in dimension
           newValues.forEach((newVal, idx) => {
             const oldVal = oldValues[idx];
             if (newVal !== oldVal) {
               const delta = newVal - oldVal;
+              const componentName = components[idx]?.short || `unknown[${idx}]`;
+
               logger.logSystem(
                 'state_compass_value_changed',
                 {
                   dimension: dim,
-                  index: idx,
+                  component: componentName,
                   from: oldVal,
                   to: newVal,
                   delta
                 },
-                `Compass ${dim}[${idx}]: ${oldVal.toFixed(1)} → ${newVal.toFixed(1)} (${delta >= 0 ? '+' : ''}${delta.toFixed(1)})`
+                `Compass ${componentName}: ${oldVal.toFixed(1)} → ${newVal.toFixed(1)} (${delta >= 0 ? '+' : ''}${delta.toFixed(1)})`
               );
             }
           });

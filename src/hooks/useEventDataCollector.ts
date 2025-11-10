@@ -21,6 +21,7 @@ import type { TickerItem } from "../components/event/NewsTicker";
 import { audioManager } from "../lib/audioManager";
 import { calculateLiveScoreBreakdown } from "../lib/scoring";
 import { shouldGenerateAIOptions, type TreatmentType } from "../data/experimentConfig";
+import { useAIOutputLogger } from "./useAIOutputLogger";
 
 // ============================================================================
 // TYPES
@@ -819,6 +820,9 @@ export function useEventDataCollector() {
   // Progress callback - using ref to avoid re-renders
   const onReadyCallbackRef = useRef<(() => void) | null>(null);
 
+  // AI output logger - for logging once at source
+  const aiLogger = useAIOutputLogger();
+
   // Backward compatibility - reconstruct legacy CollectedData format
   const collectedData: CollectedData | null = phase1Data ? {
     ...phase1Data,
@@ -863,6 +867,36 @@ export function useEventDataCollector() {
       } = turnData;
 
       console.log(`[Collector] ✅ Unified data received for Day ${day}`);
+
+      // ========================================================================
+      // LOG AI OUTPUTS ONCE AT SOURCE (prevents duplication from reactive effects)
+      // ========================================================================
+      const { crisisMode: storedCrisisMode } = useDilemmaStore.getState();
+
+      // Log dilemma generation
+      aiLogger.logDilemma(dilemma, {
+        crisisMode: storedCrisisMode
+      });
+
+      // Log mirror advice
+      aiLogger.logMirrorAdvice(mirrorText);
+
+      // Log support shifts (Day 2+)
+      if (supportEffects) {
+        aiLogger.logSupportShifts(supportEffects);
+      }
+
+      // Log dynamic parameters
+      if (dynamicParams && dynamicParams.length > 0) {
+        aiLogger.logDynamicParams(dynamicParams);
+      }
+
+      // Log corruption shift (Day 2+)
+      if (corruptionShift) {
+        aiLogger.logCorruptionShift(corruptionShift);
+      }
+
+      console.log(`[Collector] ✅ AI outputs logged for Day ${day}`);
 
       // Build Phase 1 data (critical path)
       const p1: Phase1Data = {

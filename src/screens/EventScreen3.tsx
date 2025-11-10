@@ -334,41 +334,19 @@ export default function EventScreen3({ push }: Props) {
   // ========================================================================
   // EFFECT 2A: Log AI outputs when collected data arrives
   // ========================================================================
+  // REMOVED: Logging moved to useEventDataCollector.ts to prevent duplicates
+  // AI outputs are now logged ONCE at the source when data is fetched
+  //
+  // NOTE: Compass pills are still logged separately in eventDataCleaner.ts
+  // after action confirmation, as they're fetched at a different time
   useEffect(() => {
     if (!collectedData) return;
 
-    // Log dilemma generation
-    if (collectedData.dilemma) {
-      aiLogger.logDilemma(collectedData.dilemma, {
-        crisisMode: storedCrisisMode
-      });
-    }
-
-    // Log mirror advice
-    if (collectedData.mirrorText) {
-      aiLogger.logMirrorAdvice(collectedData.mirrorText);
-    }
-
-    // Log support shifts (Day 2+)
-    if (collectedData.supportEffects) {
-      aiLogger.logSupportShifts(collectedData.supportEffects);
-    }
-
-    // Log compass pills if available
+    // Log compass pills if available (these are fetched separately after action)
     if (collectedData.compassPills) {
       aiLogger.logCompassHints(collectedData.compassPills);
     }
-
-    // Log dynamic parameters if available
-    if (collectedData.dynamicParams) {
-      aiLogger.logDynamicParams(collectedData.dynamicParams);
-    }
-
-    // Log corruption shift (Day 2+)
-    if (collectedData.corruptionShift) {
-      aiLogger.logCorruptionShift(collectedData.corruptionShift);
-    }
-  }, [collectedData, aiLogger, storedCrisisMode]);
+  }, [collectedData, aiLogger]);
 
   // ========================================================================
   // EFFECT 3: Advance to presenting when data ready
@@ -494,6 +472,10 @@ export default function EventScreen3({ push }: Props) {
     );
 
     setIsSubmittingReasoning(false);
+
+    // Close modal and clear action (prevents ghost appearances on subsequent days)
+    setShowReasoningModal(false);
+    setReasoningModalAction(null);
 
     // Resolve the promise to continue game flow
     if (reasoningResolveRef.current) {
