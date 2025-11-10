@@ -359,7 +359,6 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                 >
                   <div className="flex-1 flex flex-col gap-0.5">
                     <span className="text-base text-white font-cinzel font-semibold tracking-wide drop-shadow-md">{role.title}</span>
-                    <span className="text-xs text-gray-400 font-normal tracking-normal">{role.subtitle}</span>
                   </div>
 
                   {/* Banner image - fades out when expanded */}
@@ -381,8 +380,10 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                   )}
 
                   <div className="flex flex-col items-end gap-1">
-                    <span className="text-[10px] uppercase tracking-wider text-amber-300/80">{lang("ROLE_YEAR_LABEL")}</span>
-                    <span className="text-sm text-amber-300 font-light tracking-wider drop-shadow-md">{role.year}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] uppercase tracking-wider text-amber-300/80">{lang("ROLE_YEAR_LABEL")}</span>
+                      <span className="text-sm text-amber-300 font-light tracking-wider drop-shadow-md">{role.year}</span>
+                    </div>
                     <span
                       className={[
                         "text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full",
