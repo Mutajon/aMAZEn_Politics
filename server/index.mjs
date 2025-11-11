@@ -2334,16 +2334,16 @@ LENGTH & TONE:
 - Avoid: "Feared violence, got it" / "Wanted decisive action" → TOO DRY
 - Prefer: "We're so relieved you didn't escalate this!" / "Finally, someone who takes security seriously!"
 
-DILEMMA DESCRIPTION EXAMPLES:
+DILEMMA DESCRIPTION EXAMPLES (FIRST-PERSON FROM CONFIDANT):
 
-✅ GOOD (concrete problem + immersive POV + decision-forcing question):
-"Three hooded figures were caught sabotaging grain shipments to the northern garrison. Your military commander demands immediate execution as a deterrent, but they claim to be acting on orders from your political rival. The crowd has gathered to watch your judgment. What will you do?"
+✅ GOOD (first-person report + concrete problem + decision-forcing question):
+"I bring word that three hooded figures were caught sabotaging grain shipments to the northern garrison. Your military commander demands immediate execution as a deterrent, but they claim to be acting on orders from your political rival. The crowd has gathered outside, waiting for your judgment. What will you do?"
 
-✅ GOOD (experiential storytelling + specific situation + varied question):
-"A delegation of farmers kneels before you in the throne room, their clothes still mud-stained from the flooded fields. They beg for tax relief after the monsoon destroyed half the harvest. Your treasurer quietly shows you the ledger—waiving taxes will bankrupt the public works fund. How will you respond?"
+✅ GOOD (first-person experiential + specific situation + varied question):
+"I've just come from the throne room where a delegation of farmers awaits you, their clothes still mud-stained from the flooded fields. They beg for tax relief after the monsoon destroyed half the harvest. Your treasurer quietly showed me the ledger—waiving taxes will bankrupt the public works fund. How will you respond?"
 
-✅ GOOD (character's actual knowledge + vivid scene + action prompt):
-"Strange pale-skinned foreigners with thunderous fire-weapons have built wooden structures near the sacred burial grounds. Your warriors report they are felling trees and refuse to leave. The elders demand you drive them out before they anger the spirits. What do you choose to do?"
+✅ GOOD (first-person intelligence report + vivid scene + action prompt):
+"Reports reach me that strange pale-skinned foreigners with thunderous fire-weapons have built wooden structures near the sacred burial grounds. Your warriors tell me they are felling trees and refuse to leave. The elders demand you drive them out before they anger the spirits. What do you choose to do?"
 
 ❌ BAD (abstract, no concrete problem, no decision point):
 "Amidst the cultural resurgence in Alexandria, a Roman general hints at growing unease over your reforms. You've ignited local pride, but now face Rome's wary grace."
@@ -4508,6 +4508,10 @@ app.post("/api/game-turn", async (req, res) => {
         reason: conversation.meta.corruptionHistory[conversation.meta.corruptionHistory.length - 1].reason
       } : null,
 
+      // Speaker/Confidant information (NEW)
+      speaker: turnData.speaker ? String(turnData.speaker).slice(0, 100) : undefined,
+      speakerDescription: turnData.speakerDescription ? String(turnData.speakerDescription).slice(0, 300) : undefined,
+
       // Game end flag
       isGameEnd: isAftermathTurn || !!turnData.isGameEnd
     };
@@ -5281,7 +5285,8 @@ function buildGameSystemPrompt(gameContext, generateActions = true) {
     thematicGuidance,
     supportProfiles,
     roleScope,
-    storyThemes
+    storyThemes,
+    confidant  // NEW: Confidant information for speaker avatar
   } = gameContext;
 
   // Format power holders
@@ -5340,6 +5345,70 @@ MIRROR BRIEFING:
 - Tie at least one of the top values above to a concrete tension inside the current dilemma.
 - Phrase as a sly observation or question that makes the player inspect their own alignment; never issue a directive or name option letters.`;
 
+  // Format confidant briefing (if available)
+  const confidantBriefing = confidant ? `
+═══════════════════════════════════════════════════════════
+🎭 NARRATIVE VOICE (CRITICAL - OVERRIDES ALL OTHER STYLE GUIDANCE)
+═══════════════════════════════════════════════════════════
+
+CONFIDANT/SPEAKER CHARACTER:
+- Name: ${confidant.name}
+- Role: ${confidant.description}
+
+🔴 MANDATORY NARRATIVE VOICE:
+- You MUST write EVERY dilemma description in first-person from this confidant's perspective
+- NEVER use third-person narration ("you stand", "the player faces", etc.)
+- The description field should read like a verbal report from ${confidant.name} to the player
+- Maintain ${confidant.name}'s personality: ${confidant.description.split('.')[0]}
+
+REQUIRED FIRST-PERSON OPENING PHRASES (use variety):
+- "I bring word that..."
+- "Reports reach me that..."
+- "Sources tell me..."
+- "I've learned that..."
+- "I must inform you that..."
+- "Word has come to me that..."
+- "I've just discovered that..."
+- "Intelligence suggests that..."
+
+⚠️ CRITICAL OVERRIDE: This first-person narrative voice takes precedence over ANY other
+style guidance in this prompt that suggests third-person perspective. The description field
+uses first-person from ${confidant.name}, ALWAYS.
+
+JSON REQUIREMENT:
+- ALWAYS include "speaker": "${confidant.name}" in your response` : `
+═══════════════════════════════════════════════════════════
+🎭 NARRATIVE VOICE (CRITICAL - OVERRIDES ALL OTHER STYLE GUIDANCE)
+═══════════════════════════════════════════════════════════
+
+CONFIDANT/SPEAKER CHARACTER (Custom Role):
+- Create an appropriate confidant character who serves as a trusted advisor
+- Generate a fitting name based on the role's historical/cultural context
+- The confidant should be someone who would realistically have access to information and the player's trust
+
+🔴 MANDATORY NARRATIVE VOICE:
+- You MUST write EVERY dilemma description in first-person from this confidant's perspective
+- NEVER use third-person narration ("you stand", "the player faces", etc.)
+- The description field should read like a verbal report from the confidant to the player
+
+REQUIRED FIRST-PERSON OPENING PHRASES (use variety):
+- "I bring word that..."
+- "Reports reach me that..."
+- "Sources tell me..."
+- "I've learned that..."
+- "I must inform you that..."
+- "Word has come to me that..."
+- "I've just discovered that..."
+- "Intelligence suggests that..."
+
+⚠️ CRITICAL OVERRIDE: This first-person narrative voice takes precedence over ANY other
+style guidance in this prompt that suggests third-person perspective. The description field
+uses first-person from the confidant, ALWAYS.
+
+JSON REQUIREMENT:
+- ALWAYS include "speaker": "[generated name]" in your response
+- ALWAYS include "speakerDescription": "[1-2 sentence description]" in your response`;
+
   // Include thematic guidance if provided
   const thematicText = thematicGuidance ? `\n\nTHEMATIC GUIDANCE:\n${thematicGuidance}` : "";
   const supportBaselineText = formatSupportProfilesForPrompt(supportProfiles);
@@ -5350,6 +5419,8 @@ MIRROR BRIEFING:
 
 You are the AI game engine for a ${totalDays}-day political simulation game.
 You maintain full narrative context and generate ALL event screen data in a single response.
+
+${confidantBriefing}
 
 PLAYER ROLE & CONTEXT:
 - Role: ${role}${roleTitle ? `\n- Scenario: ${roleTitle}` : ''}${roleYear ? `\n- Historical Period: ${roleYear}` : ''}${roleIntro ? `\n- Historical Context: ${roleIntro}` : ''}
@@ -5569,15 +5640,16 @@ ${buildLightSystemPrompt()}
 
 OUTPUT FORMAT (JSON):
 
-EXAMPLES OF GOOD DESCRIPTION ENDINGS (vary your question format):
-- "As provincial governor, you survey the shoreline while courtiers press conflicting demands about the expelled foreigners' ships. How will you respond?"
-- "As district police chief, you watch riot shields forming a line while protesters chant slogans at the courthouse gates. What will you do?"
-- "As finance minister, you review budget reports showing empty coffers while three faction leaders demand increased spending. Which path will you choose?"
-- "As military commander, intelligence reports suggest an imminent border incursion but your forces are stretched thin. How will you act?"
+EXAMPLES OF GOOD DESCRIPTION (FIRST-PERSON FROM CONFIDANT - vary your question format):
+- "I bring word that courtiers are pressing conflicting demands about the expelled foreigners' ships gathering near the shoreline. How will you respond?"
+- "Reports reach me that protesters have gathered at the courthouse gates, chanting slogans as riot shields form a defensive line. What will you do?"
+- "I've just reviewed the budget reports—the coffers are empty, yet three faction leaders demand increased spending. Which path will you choose?"
+- "Intelligence suggests an imminent border incursion, but I must inform you that our forces are stretched thin. How will you act?"
 
 {
   "title": "Guard the Coastline",
-  "description": "As provincial governor, you survey the shoreline while courtiers press conflicting demands about the expelled foreigners' ships. How will you respond?",
+  "description": "I bring word that courtiers are pressing conflicting demands about the expelled foreigners' ships gathering near the shoreline. How will you respond?",
+  "speaker": "Lysandra",
   "selectedThreadIndex": 1,
   "selectedThreadSummary": "Demonstrations over autonomy boil over, forcing you to confront the governor-versus-activists thread head-on.",${generateActions ? `
   "actions": [

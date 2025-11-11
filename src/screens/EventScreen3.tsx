@@ -840,6 +840,8 @@ export default function EventScreen3({ push }: Props) {
                 <DilemmaCard
                   title={collectedData.dilemma.title}
                   description={collectedData.dilemma.description}
+                  speaker={collectedData.dilemma.speaker}
+                  speakerDescription={collectedData.dilemma.speakerDescription}
                 />
               )}
             </>

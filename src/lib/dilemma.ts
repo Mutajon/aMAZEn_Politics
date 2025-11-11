@@ -15,6 +15,8 @@ export type Dilemma = {
   source?: string;
   supportEffects?: any; // Added dynamically by light API for Day 2+ support shifts
   isGameEnd?: boolean; // True when game reaches Day 8 (aftermath trigger)
+  speaker?: string; // Name of the confidant delivering this dilemma
+  speakerDescription?: string; // AI-generated description for custom role confidants
 };
 
 export type DilemmaHistoryEntry = {

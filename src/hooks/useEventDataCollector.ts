@@ -22,6 +22,7 @@ import { audioManager } from "../lib/audioManager";
 import { calculateLiveScoreBreakdown } from "../lib/scoring";
 import { shouldGenerateAIOptions, type TreatmentType } from "../data/experimentConfig";
 import { useAIOutputLogger } from "./useAIOutputLogger";
+import { getConfidantByLegacyKey } from "../data/confidants";
 
 // ============================================================================
 // TYPES
@@ -210,6 +211,9 @@ async function fetchGameTurn(): Promise<{
       }
     }
 
+    // Get confidant information for predefined roles
+    const confidant = roleState.selectedRole ? getConfidantByLegacyKey(roleState.selectedRole) : undefined;
+
     payload.gameContext = {
       role: roleState.selectedRole || "Unicorn King",
       roleTitle: roleState.roleTitle || null,          // Scenario title (predefined only)
@@ -222,6 +226,7 @@ async function fetchGameTurn(): Promise<{
       supportProfiles: roleState.supportProfiles || roleState.analysis?.supportProfiles || null,
       roleScope: roleState.roleScope || roleState.analysis?.roleScope || null,
       storyThemes: roleState.storyThemes || roleState.analysis?.storyThemes || null,
+      confidant: confidant ? { name: confidant.name, description: confidant.description, imageId: confidant.imageId } : null, // NEW: Confidant information
       playerCompass: {
         what: topWhatValues.join(', '),
         whence: topKWithNames(compassValues?.whence, 'whence', 2).map(v => v.name).join(', '),
