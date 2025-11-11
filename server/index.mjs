@@ -17,13 +17,120 @@ import {
   detectKeywordHints,
   formatKeywordHintsForPrompt
 } from "./compassKeywordDetector.mjs";
-import { getCountersCollection, incrementCounter } from "./db/mongodb.mjs";
+import { getCountersCollection, incrementCounter, getUsersCollection } from "./db/mongodb.mjs";
 
 const app = express();
 app.use(bodyParser.json());
 
 
 const GAME_LIMIT = 100;
+
+/**
+ * Randomly assign treatment to ensure balanced distribution
+ * @returns {string} One of: 'fullAutonomy', 'semiAutonomy', 'noAutonomy'
+ */
+function assignRandomTreatment() {
+  const treatments = ['fullAutonomy', 'semiAutonomy', 'noAutonomy'];
+  const randomIndex = Math.floor(Math.random() * treatments.length);
+  return treatments[randomIndex];
+}
+
+// -------------------- User Registration & Treatment Assignment --------------------
+/**
+ * POST /api/users/register
+ * Register a new user or get existing user with treatment assignment
+ * 
+ * Body: {
+ *   userId: string (email address)
+ * }
+ * 
+ * Returns: {
+ *   success: boolean,
+ *   userId: string,
+ *   treatment: 'fullAutonomy' | 'semiAutonomy' | 'noAutonomy',
+ *   isNewUser: boolean
+ * }
+ */
+app.post("/api/users/register", async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    // Validate userId (email)
+    if (!userId || typeof userId !== 'string' || !userId.includes('@')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid userId (email) is required'
+      });
+    }
+
+    const usersCollection = await getUsersCollection();
+    
+    // Check if user already exists
+    const existingUser = await usersCollection.findOne({ userId });
+
+    if (existingUser) {
+      // User exists - return existing treatment
+      console.log(`[User Register] Existing user: ${userId}, treatment: ${existingUser.treatment}`);
+      return res.json({
+        success: true,
+        userId: existingUser.userId,
+        treatment: existingUser.treatment,
+        isNewUser: false
+      });
+    }
+
+    // New user - assign random treatment
+    const treatment = assignRandomTreatment();
+    const now = new Date();
+
+    const newUser = {
+      userId,
+      treatment,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    await usersCollection.insertOne(newUser);
+
+    console.log(`[User Register] New user registered: ${userId}, treatment: ${treatment}`);
+
+    res.json({
+      success: true,
+      userId: newUser.userId,
+      treatment: newUser.treatment,
+      isNewUser: true
+    });
+
+  } catch (error) {
+    console.error('[User Register] ❌ Error:', error?.message || error);
+    
+    // Handle duplicate key error (race condition)
+    if (error.code === 11000) {
+      // User was created between check and insert - fetch existing
+      try {
+        const usersCollection = await getUsersCollection();
+        const existingUser = await usersCollection.findOne({ userId: req.body.userId });
+        if (existingUser) {
+          return res.json({
+            success: true,
+            userId: existingUser.userId,
+            treatment: existingUser.treatment,
+            isNewUser: false
+          });
+        }
+      } catch (fetchError) {
+        console.error('[User Register] Failed to fetch existing user:', fetchError);
+      }
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to register user',
+      details: error.message
+    });
+  }
+});
+
 // -------------------- Game Slot Reservation --------------------
 app.post("/api/reserve-game-slot", async (req, res) => {
   try {

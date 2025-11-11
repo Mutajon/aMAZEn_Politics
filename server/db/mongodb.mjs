@@ -88,6 +88,12 @@ async function createIndexes() {
     const countersCollection = db.collection('counters');
     await countersCollection.createIndex({ name: 1 }, { name: 'name', unique: true, background: true });
 
+    // users collection
+    const usersCollection = db.collection('users');
+    await usersCollection.createIndex({ userId: 1 }, { name: 'userId_unique', unique: true, background: true });
+    await usersCollection.createIndex({ treatment: 1 }, { name: 'treatment', background: true });
+    await usersCollection.createIndex({ createdAt: -1 }, { name: 'createdAt', background: true });
+
     console.log('[MongoDB] ✅ Indexes created/verified');
   } catch (error) {
     console.warn('[MongoDB] ⚠️ Index creation failed (non-critical):', error.message);
@@ -114,6 +120,17 @@ export async function getLogsCollection() {
 export async function getCountersCollection() {
   const database = await connectDB();
   return database.collection('counters');
+}
+
+/**
+ * Get users collection
+ * Automatically connects to database if not connected
+ *
+ * @returns {Promise<Collection>} MongoDB collection instance
+ */
+export async function getUsersCollection() {
+  const database = await connectDB();
+  return database.collection('users');
 }
 
 /**

@@ -16,6 +16,7 @@ import { useLang } from "../i18n/lang";
 import { useLanguage } from "../i18n/LanguageContext";
 import LanguageSelector from "../components/LanguageSelector";
 import IDCollectionModal from "../components/IDCollectionModal";
+import { useReserveGameSlot } from "../hooks/useReserveGameSlot";
 import { useLogger } from "../hooks/useLogger";
 
 const SUBTITLES = [
@@ -35,14 +36,13 @@ export default function SplashScreen({
 }) {
   const lang = useLang();
   const { language } = useLanguage();
+  const reserveGameSlotMutation = useReserveGameSlot();
   const logger = useLogger();
 
   const [visibleSubtitles, setVisibleSubtitles] = useState(0);
   const [showButton, setShowButton] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [showIDModal, setShowIDModal] = useState(false);
-  const [isCollectingID, setIsCollectingID] = useState(false);
 
   // Helper function to get correct transform for toggle
   const getToggleTransform = (isEnabled: boolean) => {
@@ -90,13 +90,14 @@ export default function SplashScreen({
 
   const experimentMode = useSettingsStore((s) => s.experimentMode);
   const setExperimentMode = useSettingsStore((s) => s.setExperimentMode);
+  
+  // Show ID modal only in experiment mode
+  const [showIDModal, setShowIDModal] = useState(experimentMode);
+  const [isCollectingID] = useState(false);
 
   // Treatment (experiment configuration)
   const treatment = useSettingsStore((s) => s.treatment);
   const setTreatment = useSettingsStore((s) => s.setTreatment);
-
-  // Backstage mode (bypasses email collection)
-  const backstageMode = useSettingsStore((s) => s.backstageMode);
 
   // -------------------------------------------------------------------------
 
@@ -109,41 +110,123 @@ export default function SplashScreen({
     }
   }, [experimentMode, treatment, setTreatment]);
 
-  // Force experiment mode ON when entering splash screen (unless in debug mode)
+  // Update showIDModal when experimentMode changes
   useEffect(() => {
-    if (!debugMode && !experimentMode) {
-      console.log("[SplashScreen] Auto-enabling experiment mode on splash screen mount");
-      setExperimentMode(true);
+    // Only show modal if experiment mode is enabled
+    if (!experimentMode) {
+      setShowIDModal(false);
     }
-  }, [debugMode, experimentMode, setExperimentMode]);
+  }, [experimentMode]);
 
-  // Handle ID submission from modal
+  // Handle ID submission from modal (only called in experiment mode)
   const handleIDSubmit = async (id: string) => {
-    // Save ID to loggingStore (replaces auto-generated UUID)
-    useLoggingStore.getState().setUserId(id);
-
     // Close modal
     setShowIDModal(false);
 
-    // Proceed with game start
+    // Proceed with game start - check for available slot only in experiment mode
     setIsLoading(true);
     setShowSettings(false);
 
-    // Start new logging session (will use the ID we just set)
-    await loggingService.startSession();
+    try {
+      // Register user and get treatment assignment
+      const registerResponse = await fetch('/api/users/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: id }),
+      });
 
-    // Reset all game stores for fresh start
-    useCompassStore.getState().reset();
-    useDilemmaStore.getState().reset();
-    useRoleStore.getState().reset();
-    useMirrorQuizStore.getState().resetAll();
-    clearAllSnapshots();
+      if (!registerResponse.ok) {
+        throw new Error('Failed to register user');
+      }
 
-    // Prime narrator and start music (user interaction unlocks browser autoplay)
-    narrator.prime();
-    playMusic('background', true);
+      const registerData = await registerResponse.json();
+      
+      if (!registerData.success) {
+        throw new Error(registerData.error || 'Failed to register user');
+      }
 
-    onStart();
+      // Save ID and treatment to stores
+      useLoggingStore.getState().setUserId(registerData.userId);
+      setTreatment(registerData.treatment as 'fullAutonomy' | 'semiAutonomy' | 'noAutonomy');
+      useLoggingStore.getState().setTreatment(registerData.treatment);
+
+      console.log(`[SplashScreen] User registered: ${registerData.userId}, treatment: ${registerData.treatment}, isNewUser: ${registerData.isNewUser}`);
+
+      // Only check slot reservation if experiment mode is enabled
+      if (experimentMode) {
+        const result = await reserveGameSlotMutation.mutateAsync();
+        
+        if (!result.success) {
+          setIsLoading(false);
+          if (push) {
+            push('/capped');
+          }
+          return;
+        }
+      }
+
+      // Reservation successful (or skipped in non-experiment mode), proceed with game start
+      // Start new logging session (will use the ID we just set)
+      await loggingService.startSession();
+
+      // Reset all game stores for fresh start
+      useCompassStore.getState().reset();
+      useDilemmaStore.getState().reset();
+      useRoleStore.getState().reset();
+      useMirrorQuizStore.getState().resetAll();
+      clearAllSnapshots();
+
+      // Prime narrator and start music (user interaction unlocks browser autoplay)
+      narrator.prime();
+      playMusic('background', true);
+
+      onStart();
+    } catch (error) {
+      console.error('Error in handleIDSubmit:', error);
+      setIsLoading(false);
+      if (push) {
+        push('/capped');
+      }
+      // Optionally, show a generic error message to the user
+      alert('An error occurred while starting the game. Please try again.');
+    }
+  };
+
+  // Handle start button click (when not in experiment mode, skip ID modal)
+  const handleStartClick = async () => {
+    if (experimentMode) {
+      // In experiment mode, show ID modal
+      setShowIDModal(true);
+      return;
+    }
+
+    // Not in experiment mode - start game directly
+    setIsLoading(true);
+    setShowSettings(false);
+
+    try {
+      // Start new logging session
+      await loggingService.startSession();
+
+      // Reset all game stores for fresh start
+      useCompassStore.getState().reset();
+      useDilemmaStore.getState().reset();
+      useRoleStore.getState().reset();
+      useMirrorQuizStore.getState().resetAll();
+      clearAllSnapshots();
+
+      // Prime narrator and start music (user interaction unlocks browser autoplay)
+      narrator.prime();
+      playMusic('background', true);
+
+      onStart();
+    } catch (error) {
+      console.error('Error starting game:', error);
+      setIsLoading(false);
+      alert('An error occurred while starting the game. Please try again.');
+    }
   };
 
   // Log splash screen loaded (runs once on mount)
@@ -168,6 +251,11 @@ export default function SplashScreen({
       clearTimeout(buttonTimer);
     };
   }, []);
+
+  // Log splash screen loaded (runs once on mount)
+  useEffect(() => {
+    logger.logSystem('splash_screen_loaded', true, 'Splash screen loaded');
+  }, [logger]);
 
   return (
     <div
@@ -491,7 +579,7 @@ export default function SplashScreen({
   {/* Primary: Start */}
   <motion.button
     initial={{ opacity: 0, rotate: 0 }}
-    animate={{ opacity: showButton && !isCollectingID ? 1 : 0, rotate: 0 }}
+    animate={{ opacity: showButton ? 1 : 0, rotate: 0 }}
     whileHover={{
       scale: 1.02,
       rotate: [0, -2, 2, -2, 2, 0],
@@ -506,62 +594,8 @@ export default function SplashScreen({
       }
     }}
     transition={{ type: "spring", stiffness: 250, damping: 22 }}
-    style={{ visibility: showButton && !isCollectingID ? "visible" : "hidden" }}
-    onClick={async () => {
-      setIsLoading(true);
-      setShowSettings(false);
-
-      try {
-        // Reserve game slot (new from development branch)
-        const response = await fetch('/api/reserve-game-slot', { method: 'POST' });
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('Failed to reserve game slot:', errorData.message || 'Server error');
-          if (push) {
-            push('/capped');
-          }
-          return;
-        }
-
-        const { success } = await response.json();
-        if (!success) {
-          if (push) {
-            push('/capped');
-          }
-          return;
-        }
-
-        // Reservation successful, proceed with email modal or game start
-        // Show email modal unless backstage mode or debug mode
-        if (!backstageMode && !debugMode) {
-          // Show ID collection modal
-          setIsCollectingID(true);
-          setShowIDModal(true);
-          // Loading state is already true
-        } else {
-          // Backstage or debug flow: proceed immediately (skip email modal)
-          await loggingService.startSession();
-
-          // Reset all game stores for fresh start
-          useCompassStore.getState().reset();
-          useDilemmaStore.getState().reset();
-          useRoleStore.getState().reset();
-          useMirrorQuizStore.getState().resetAll();
-          clearAllSnapshots();
-
-          // Prime narrator and start music (user interaction unlocks browser autoplay)
-          narrator.prime();
-          playMusic('background', true);
-
-          onStart();
-        }
-      } catch (error) {
-        console.error('Error reserving game slot:', error);
-        setIsLoading(false);
-        // Optionally, show a generic error message to the user
-        alert('An error occurred while starting the game. Please try again.');
-      }
-    }}
+    style={{ visibility: showButton ? "visible" : "hidden" }}
+    onClick={handleStartClick}
     className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
   >
     {lang("START_BUTTON")}
@@ -611,8 +645,8 @@ export default function SplashScreen({
         )}
       </div>
 
-      {/* ID Collection Modal */}
-      <IDCollectionModal isOpen={showIDModal} onSubmit={handleIDSubmit} />
+      {/* ID Collection Modal - only show in experiment mode */}
+      {experimentMode && <IDCollectionModal isOpen={showIDModal} onSubmit={handleIDSubmit} />}
     </div>
   );
 }
