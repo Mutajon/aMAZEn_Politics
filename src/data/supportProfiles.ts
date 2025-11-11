@@ -22,26 +22,28 @@ export type RoleSupportProfiles = {
 };
 
 export const ROLE_SUPPORT_PROFILES: Record<string, RoleSupportProfiles> = {
-  "Athens — The Day Democracy Died (-404)": {
+  "Athens — Shadows of War (-431)": {
     people: {
-      summary: "Broad citizen class wants democracy restored without reigniting Spartan wrath.",
+      summary: "Assembly citizens prize direct democracy, naval power, and imperial tribute but fear costly wars.",
       stances: {
-        governance: "Reopen the Assembly and widen participation.",
-        order: "Resist terror squads; keep peace with limited coercion.",
-        economy: "Ease war levies; restart trade; secure grain.",
-        justice: "Prefer amnesties and reconciliation over purges.",
-        foreign: "Obey peace terms and avoid provoking Sparta.",
+        governance: "Preserve Assembly sovereignty; resist oligarchic plots.",
+        order: "Trust law courts and citizen oversight over military strongmen.",
+        economy: "Secure tribute from allies; fund public works and navy.",
+        justice: "Favor mass juries and ostracism to check elites.",
+        foreign: "Expand Delian League; contain Sparta; avoid land wars.",
+        culture: "Celebrate festivals, drama, philosophy; honor Athena.",
       },
       origin: "predefined",
     },
     challenger: {
-      summary: "Oligarchic enforcers protect elite rule under Spartan oversight.",
+      summary: "Generals seek strategic flexibility and military prestige, sometimes chafing under popular oversight.",
       stances: {
-        governance: "Keep power in narrow councils of 'best men'.",
-        order: "Use harsh policing and exile to silence dissent.",
-        economy: "Shield elite property; impose fiscal discipline fast.",
-        justice: "Favor exemplary punishments to deter unrest.",
-        foreign: "Appreciate when leader engages Sparta respectfully and acknowledges their authority; oppose actions that undermine Spartan control or bypass their oversight.",
+        governance: "Value expert military judgment over crowd emotion.",
+        order: "Enforce discipline in ranks; demand loyalty and obedience.",
+        economy: "Prioritize fleet funding and campaign supplies.",
+        justice: "Prefer commanders' authority over Assembly trials.",
+        foreign: "Pursue bold campaigns and decisive victories for glory.",
+        culture: "Honor martial virtue and strategic excellence.",
       },
       origin: "predefined",
     },

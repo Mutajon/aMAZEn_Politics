@@ -52,86 +52,86 @@ export interface PredefinedRoleData {
  */
 export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
   {
-    id: "athens_404",
-    legacyKey: "Athens — The Day Democracy Died (-404)",
+    id: "athens_431",
+    legacyKey: "Athens — Shadows of War (-431)",
     titleKey: "ATHENS_TITLE",
     subtitleKey: "ATHENS_SUBTITLE",
     introKey: "ATHENS_INTRO",
     youAreKey: "ATHENS_YOU_ARE",
-    year: "-404",
+    year: "-431",
     imageId: "greece",
-    roleScope: "You serve as a neighborhood representative on a local civic council under the Thirty Tyrants' occupation. You can mediate disputes, distribute limited relief, and advocate for your community's basic needs—but you have no power over the oligarchy or Spartan garrison. Your dilemmas center on navigating daily survival: securing food, protecting neighbors from persecution, balancing collaboration vs. resistance, and making ethical compromises under authoritarian rule.",
-    storyThemes: ["autonomy_vs_heteronomy", "liberalism_vs_totalism", "reconciliation"],
+    roleScope: "You are a citizen of Athens with full rights in the Assembly. You can vote on war, peace, ostracism, laws, and leadership. You can speak before thousands, propose decrees, and serve on juries—but you are one voice among many. Your dilemmas center on democratic deliberation under threat: Sparta masses at the border, allies demand action, demagogues sway crowds, and every vote could mean glory or ruin for the city.",
+    storyThemes: ["democracy_vs_empire", "glory_vs_pragmatism", "citizen_vs_expert"],
     scoreGoal: 1000,
     defaultGoalStatus: "uncompleted",
     defaultHighScore: 0,
     powerDistribution: {
-      systemName: "Hard-Power Oligarchy — Stratocracy",
-      systemDesc: "Military-backed oligarchy: Spartan garrison with local rulers set rules; courts muted, citizens sidelined.",
-      flavor: "Spartan steel props the new order; a few rule, most keep heads down.",
+      systemName: "Democracy",
+      systemDesc: "Direct democracy where citizen Assembly holds decisive authority over war, peace, laws, and leaders through open vote.",
+      flavor: "40,000 citizens shout, vote, and rule themselves—glory or chaos, the demos decides.",
       holders: [
         {
-          name: "Coercive Force",
-          percent: 35,
+          name: "Assembly (Ekklesia)",
+          percent: 45,
+          icon: "👥",
+          note: "All citizens vote directly on laws, war, exile, and finances",
+          role: { A: true, E: true },
+          stype: { t: "Author", i: "+" }
+        },
+        {
+          name: "Strategos (Generals)",
+          percent: 25,
           icon: "⚔️",
-          note: "Spartan garrison and local enforcers",
-          role: { A: true, E: true },
-          stype: { t: "Author", i: "+" }
-        },
-        {
-          name: "Executive",
-          percent: 30,
-          icon: "👤",
-          note: "Thirty rulers and their core allies",
-          role: { A: true, E: true },
-          stype: { t: "Author", i: "+" }
-        },
-        {
-          name: "Wealth",
-          percent: 15,
-          icon: "💰",
-          note: "Elite backers fund and profit from seizures",
+          note: "10 elected generals lead military, propose strategy, sway crowds",
           role: { A: true, E: false },
           stype: { t: "Author", i: "•" }
         },
         {
-          name: "Bureaucracy",
-          percent: 10,
-          icon: "📜",
-          note: "Clerks and boards under oligarch control",
-          role: { A: false, E: false },
+          name: "Council of 500 (Boule)",
+          percent: 15,
+          icon: "🏛️",
+          note: "Selected by lot; prepares Assembly agenda, oversees daily affairs",
+          role: { A: true, E: false },
           stype: { t: "Agent", i: "•" }
         },
         {
-          name: "Demos",
+          name: "Law Courts (Dikasteria)",
           percent: 10,
-          icon: "👥",
-          note: "Citizens/exiles; suppressed but restive",
+          icon: "⚖️",
+          note: "Mass citizen juries; can overturn laws, punish officials",
           role: { A: false, E: true },
-          stype: { t: "Eraser", i: "-" }
+          stype: { t: "Eraser", i: "•" }
+        },
+        {
+          name: "Wealthy Elite (Liturgy Payers)",
+          percent: 5,
+          icon: "💰",
+          note: "Fund triremes, festivals; influence through prestige, not votes",
+          role: { A: false, E: false },
+          stype: { t: "Actor", i: "-" }
         }
       ],
-      playerIndex: 4,
+      playerIndex: 0,
       challengerSeat: {
-        name: "Coercive Force",
-        percent: 35,
-        index: 0
+        name: "Strategos (Generals)",
+        percent: 25,
+        index: 1
       },
       e12: {
         tierI: ["Security", "CivilLib", "InfoOrder"],
         tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
         tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
-        stopA: true,
-        stopB: true,
-        decisive: ["Coercive Force", "Executive"]
+        stopA: false,
+        stopB: false,
+        decisive: ["Assembly (Ekklesia)", "Strategos (Generals)", "Council of 500 (Boule)"]
       },
       grounding: {
         settingType: "real",
-        era: "404–403 BCE Athens"
+        era: "431 BCE Athens (outbreak of Peloponnesian War)"
       },
-      supportProfiles: ROLE_SUPPORT_PROFILES["Athens — The Day Democracy Died (-404)"] ?? null,
-      roleScope: "Acts as a respected citizen on the oligarch-controlled civic council, influencing local decrees and relief efforts but never commanding the Spartan garrison.",
-      storyThemes: ["autonomy_vs_heteronomy", "liberalism_vs_totalism", "reconciliation"]
+      supportProfiles: ROLE_SUPPORT_PROFILES["Athens — Shadows of War (-431)"] ?? null,
+      roleScope: "Acts as a citizen-assemblyman with equal voting rights, able to propose decrees and sway crowds but holding no permanent office or command authority.",
+      storyThemes: ["democracy_vs_empire", "glory_vs_pragmatism", "citizen_vs_expert"]
     },
     characters: {
       male: {
