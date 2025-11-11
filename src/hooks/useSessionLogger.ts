@@ -20,16 +20,14 @@
 //   // Manually log screen change (usually automatic via router)
 //   session.logScreenChange('/role', '/event');
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { useLogger } from './useLogger';
-import { useSettingsStore } from '../store/settingsStore';
 
 export function useSessionLogger() {
   const logger = useLogger();
   const sessionStartTime = useRef<number | null>(null);
   const currentScreen = useRef<string | null>(null);
   const screenStartTime = useRef<number | null>(null);
-  const visibilityListenerAdded = useRef(false);
 
   /**
    * Start a new session
@@ -39,12 +37,6 @@ export function useSessionLogger() {
    */
   const start = useCallback(
     (metadata?: Record<string, unknown>) => {
-      const { debugMode } = useSettingsStore.getState();
-
-      if (debugMode) {
-        return;
-      }
-
       sessionStartTime.current = Date.now();
 
       logger.logSystem(
@@ -69,9 +61,7 @@ export function useSessionLogger() {
    */
   const end = useCallback(
     (summary?: Record<string, unknown>) => {
-      const { debugMode } = useSettingsStore.getState();
-
-      if (debugMode || !sessionStartTime.current) {
+      if (!sessionStartTime.current) {
         return;
       }
 
@@ -104,12 +94,6 @@ export function useSessionLogger() {
    */
   const logScreenChange = useCallback(
     (from: string, to: string) => {
-      const { debugMode } = useSettingsStore.getState();
-
-      if (debugMode) {
-        return;
-      }
-
       // Calculate time spent on previous screen
       let timeOnScreen: number | null = null;
       if (screenStartTime.current) {

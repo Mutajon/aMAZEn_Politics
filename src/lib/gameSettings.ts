@@ -4,9 +4,7 @@ export const fetchAndStoreGameSettings = async () => {
   const researcherId = urlParams.get('rid') || '12';
 
   try {
-    const url = import.meta.env.MODE === 'development'
-      ? 'http://localhost:3000'
-      : 'https://democracygame-backend.onrender.com';
+    const url = 'https://democracygame-backend.onrender.com';
     const response = await fetch(`${url}/api/gameSettings/getGameSettings?researcherId=${researcherId}`);
     if (!response.ok) {
       throw new Error('Network response was not ok');

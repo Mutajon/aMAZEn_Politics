@@ -9,7 +9,6 @@
 // - Non-blocking (never blocks UI)
 
 import { useLoggingStore, ensureUserId } from '../store/loggingStore';
-import { useSettingsStore } from '../store/settingsStore';
 import type { LogEntry, BatchLogRequest, SessionStartRequest, LoggingStatusResponse } from '../types/logging';
 import packageJson from '../../package.json';
 
@@ -84,13 +83,7 @@ class LoggingService {
    * Generates sessionId and logs session start event
    */
   async startSession(): Promise<string | null> {
-    const { debugMode } = useSettingsStore.getState();
     const { userId, gameVersion, treatment } = useLoggingStore.getState();
-
-    if (debugMode) {
-      console.log('[Logging] Session start skipped (debug mode)');
-      return null;
-    }
 
     if (!userId) {
       console.log('[Logging] Session start skipped (no userId)');
@@ -203,14 +196,7 @@ class LoggingService {
     comments?: string,
     metadata?: { screen?: string; day?: number; role?: string }
   ): void {
-    const { debugMode } = useSettingsStore.getState();
     const { userId, gameVersion, treatment } = useLoggingStore.getState();
-
-    // Skip logging if debug mode is enabled
-    if (debugMode) {
-      console.log('[Logging] Skipped (debug mode):', action, value);
-      return;
-    }
 
     if (!userId) {
       // Silently skip if no userId (not initialized)
@@ -266,14 +252,7 @@ class LoggingService {
       return;
     }
 
-    const { debugMode } = useSettingsStore.getState();
     const { sessionId } = useLoggingStore.getState();
-
-    if (debugMode) {
-      // If debug mode enabled, clear queue (don't send logs)
-      this.queue = [];
-      return;
-    }
 
     this.isFlushing = true;
 
@@ -384,10 +363,9 @@ export const loggingService = new LoggingService();
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
     // Use sendBeacon for reliable delivery on page unload
-    const { debugMode } = useSettingsStore.getState();
     const { sessionId } = useLoggingStore.getState();
 
-    if (!debugMode && loggingService.getQueue().length > 0) {
+    if (loggingService.getQueue().length > 0) {
       const queue = loggingService.getQueue();
 
       // Prepare batch request

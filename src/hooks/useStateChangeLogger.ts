@@ -42,9 +42,7 @@ export function useStateChangeLogger() {
   const currentDayRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const { debugMode } = useSettingsStore.getState();
-
-    if (debugMode || isSubscribed.current) {
+    if (isSubscribed.current) {
       return;
     }
 
