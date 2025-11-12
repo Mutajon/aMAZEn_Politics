@@ -342,7 +342,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
 
         {/* QUIZ PANEL (only while not done) */}
         {!done && (
-          <div className="mt-4 relative">
+          <div className="mt-12 relative">
             <div className="min-h-[210px]">
               <AnimatePresence mode="wait">
                 {quiz[idx] && (
@@ -359,7 +359,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
                       className="text-[19px] font-semibold italic drop-shadow"
                       style={{ color: T.textColor, fontFamily: T.fontFamily }}
                     >
-                      {translateQuizQuestion(quiz[idx].id, quiz[idx].q, lang)}
+                      {translateQuizQuestion(quiz[idx].id, quiz[idx].q, lang, character?.gender)}
                     </div>
 
                     {/* OPTIONS — mirror bubble style buttons */}
@@ -424,7 +424,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
         {/* DONE: verdict bubble (type), then after 2s epilogue bubble (type), then buttons.
            Returning from CompassVis renders fully (no typing). */}
         {done && (
-  <div className="mt-6 mx-auto max-w-xl">
+  <div className="mt-12 mx-auto max-w-xl">
     {/* ⬇️ while AI is working, show animated typing bubble */}
     {!summary && <MirrorBubbleTyping text={lang("MIRROR_PEERING_INTO_SOUL")} />}
 

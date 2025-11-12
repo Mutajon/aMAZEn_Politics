@@ -20,20 +20,33 @@ import { motion } from "framer-motion";
 import { MessageCircle } from "lucide-react";
 import { useInquiring } from "../../hooks/useInquiring";
 import InquiringModal from "./InquiringModal";
+import { SpeakerAvatar } from "./SpeakerAvatar";
+import { SpeakerDescriptionModal } from "./SpeakerDescriptionModal";
 import { getTreatmentConfig } from "../../data/experimentConfig";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useDilemmaStore } from "../../store/dilemmaStore";
+import { useRoleStore } from "../../store/roleStore";
+import { getConfidantByLegacyKey } from "../../data/confidants";
+import { useLogger } from "../../hooks/useLogger";
+import { useState } from "react";
 import type { TreatmentType } from "../../data/experimentConfig";
 
 export type DilemmaProps = {
   title: string;
   description: string; // keep it ~2–3 sentences
+  speaker?: string; // Speaker name from AI or predefined
+  speakerDescription?: string; // AI-generated description for custom roles
 };
 
-export default function DilemmaCard({ title, description }: DilemmaProps) {
+export default function DilemmaCard({ title, description, speaker, speakerDescription }: DilemmaProps) {
   const treatment = useSettingsStore(state => state.treatment) as TreatmentType;
   const config = getTreatmentConfig(treatment);
   const inquiryCreditsRemaining = useDilemmaStore(state => state.inquiryCreditsRemaining);
+  const selectedRole = useRoleStore(state => state.selectedRole);
+  const roleTitle = useRoleStore(state => state.roleTitle);
+  const logger = useLogger();
+
+  const [isSpeakerModalOpen, setIsSpeakerModalOpen] = useState(false);
 
   const {
     isOpen,
@@ -53,15 +66,57 @@ export default function DilemmaCard({ title, description }: DilemmaProps) {
   const showInquiryButton = config.inquiryTokensPerDilemma > 0;
   const hasCredits = inquiryCreditsRemaining > 0;
 
+  // Determine speaker info
+  const confidant = selectedRole ? getConfidantByLegacyKey(selectedRole) : undefined;
+  const speakerName = speaker || confidant?.name || "";
+  const speakerDescText = speakerDescription || confidant?.description || "";
+  const speakerImageId = confidant?.imageId;
+
+  // Show speaker avatar only if we have a speaker name
+  const showSpeaker = !!speakerName;
+
+  const handleSpeakerClick = () => {
+    logger.log('speaker_avatar_clicked', {
+      speakerName,
+      hasImage: !!speakerImageId,
+      roleTitle: roleTitle || 'custom'
+    }, `User clicked speaker avatar for ${speakerName}`);
+    setIsSpeakerModalOpen(true);
+  };
+
   return (
     <>
+      {/* Speaker Avatar + Dilemma Card Layout - "Breaking the Frame" Design */}
       <motion.div
-        className={`${CARD_TONE} ${CARD_PAD}`}
+        className={`relative ${CARD_TONE} ${CARD_PAD}`}
+        style={{
+          overflow: 'visible', // Allow avatar to extend beyond boundaries
+          paddingLeft: showSpeaker ? '80px' : undefined // Space for avatar with ~20px gap
+        }}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "tween", duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         aria-label="Current dilemma"
       >
+        {/* Speaker Avatar - positioned absolutely to jut out of card boundaries */}
+        {showSpeaker && (
+          <div
+            className="absolute"
+            style={{
+              left: '-40px',  // Juts out 40px to the left
+              top: '-20px',   // Juts out 20px above the card
+              zIndex: 10      // Ensure avatar appears above card background
+            }}
+          >
+            <SpeakerAvatar
+              speakerName={speakerName}
+              imageId={speakerImageId}
+              onClick={handleSpeakerClick}
+            />
+          </div>
+        )}
+
+        {/* Dilemma Content */}
         <div className={TITLE_CLASS}>{title}</div>
         <p className={`mt-1 ${DESC_CLASS}`}>{description}</p>
 
@@ -101,6 +156,18 @@ export default function DilemmaCard({ title, description }: DilemmaProps) {
         latestAnswer={latestAnswer}
         error={error}
       />
+
+      {/* Speaker Description Modal */}
+      {showSpeaker && (
+        <SpeakerDescriptionModal
+          isOpen={isSpeakerModalOpen}
+          onClose={() => setIsSpeakerModalOpen(false)}
+          speakerName={speakerName}
+          speakerDescription={speakerDescText}
+          imageId={speakerImageId}
+          roleTitle={roleTitle || undefined}
+        />
+      )}
     </>
   );
 }

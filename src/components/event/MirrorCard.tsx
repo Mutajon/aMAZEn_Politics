@@ -24,14 +24,17 @@ const RADIUS_BR       = T.cornerBR;
 
 // Mirror art (served from /public)
 const MIRROR_IMG_SRC  = "/assets/images/mirror.png";
-const IMG_WIDTH_PX    = 65;   // your latest values
+const IMG_WIDTH_PX    = 80;   // Slightly larger to match speaker avatar prominence
 const IMG_OPACITY     = 0.95;
-const IMG_OFFSET_X    = -32;  // Position so left half is cut by component edge
-const IMG_OFFSET_Y    = 0;    // Will be calculated dynamically for vertical center
+const IMG_OFFSET_X    = -40;  // Protrudes 40px to the left (matches speaker avatar)
+const IMG_OFFSET_Y    = -20;  // Protrudes 20px above the card (matches speaker avatar)
+
+// Card left padding to compensate for protruding mirror
+const CARD_PAD_LEFT   = 60;   // Space for protruding mirror image
 
 // Keep text away from the image
-const TEXT_INSET_LEFT_PX  = 20; // nudge if the image intrudes from the left
-const TEXT_INSET_RIGHT_PX = 0;
+const TEXT_INSET_LEFT_PX  = 0;  // No longer needed, card padding handles spacing
+const TEXT_INSET_RIGHT_PX = 12;
 
 // Typewriter reveal effect (initial text reveal)
 const TYPEWRITER_ENABLED    = true;
@@ -74,20 +77,7 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
     }
   }, [text]);
 
-  // Calculate card height dynamically to position image in vertical center
-  const cardRef = React.useRef<HTMLDivElement>(null);
-  const [imageOffsetY, setImageOffsetY] = React.useState(IMG_OFFSET_Y);
-
-  React.useEffect(() => {
-    if (cardRef.current) {
-      const cardHeight = cardRef.current.offsetHeight;
-      // Position image at vertical center (subtract half of image height when rendered)
-      // Approximate image height ratio: if width is 65px, height is ~85px (based on typical mirror image aspect)
-      const approxImageHeight = IMG_WIDTH_PX * 1.3; // Adjust multiplier based on actual image
-      const centerOffset = (cardHeight - approxImageHeight) / 2;
-      setImageOffsetY(centerOffset);
-    }
-  }, [text]); // Recalculate when text changes (affects card height)
+  // Removed dynamic vertical centering - using fixed offset to match speaker avatar pattern
 
   return (
     <motion.div
@@ -99,30 +89,30 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
     >
       {/* Full-width card body */}
       <div
-        ref={cardRef}
-        className="relative overflow-hidden w-full"
+        className="relative w-full"
         style={{
           background: CARD_BG,
           color: CARD_TEXT_COLOR,
           fontFamily: CARD_FONT_FF,
           fontSize: `${CARD_FONT_PX}px`,
-          padding: `${CARD_PAD_Y}px ${CARD_PAD_X}px`,
+          padding: `${CARD_PAD_Y}px ${CARD_PAD_X}px ${CARD_PAD_Y}px ${CARD_PAD_LEFT}px`,
           boxShadow: CARD_SHADOW,
           borderTopLeftRadius: RADIUS_TL,
           borderTopRightRadius: RADIUS_TR,
           borderBottomLeftRadius: RADIUS_BL,
           borderBottomRightRadius: RADIUS_BR,
+          overflow: 'visible', // Allow mirror to protrude beyond card boundaries
         }}
       >
-        {/* Text FIRST (above image) with safe insets */}
+        {/* Text with safe insets */}
         <div
-          className={["relative z-10 whitespace-pre-wrap", italic ? "italic" : ""].join(" ")}
+          className={["relative whitespace-pre-wrap", italic ? "italic" : ""].join(" ")}
           style={{
             paddingLeft: TEXT_INSET_LEFT_PX,
             paddingRight: TEXT_INSET_RIGHT_PX,
-            wordBreak: "keep-all",
-            overflowWrap: "break-word",
-            hyphens: "none",
+            wordBreak: "break-word",
+            hyphens: "auto",
+            zIndex: 5,  // Below mirror (10) but above background
           }}
         >
           {SHIMMER_ENABLED || TYPEWRITER_ENABLED ? (
@@ -136,19 +126,27 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
           )}
         </div>
 
-        {/* Mirror image BEHIND the text, positioned at vertical center with left half cut */}
-        <img
-          src={MIRROR_IMG_SRC}
-          alt="Mirror"
-          className="pointer-events-none select-none absolute top-0 left-0 z-0"
+        {/* Mirror image protruding from left side (matches speaker avatar pattern) */}
+        <div
+          className="absolute"
           style={{
-            width: IMG_WIDTH_PX,
-            height: "auto",
-            opacity: IMG_OPACITY,
-            transform: `translate(${IMG_OFFSET_X}px, ${imageOffsetY}px)`,
+            left: `${IMG_OFFSET_X}px`,  // Protrudes 40px to the left
+            top: `${IMG_OFFSET_Y}px`,   // Protrudes 20px above
+            zIndex: 10,                  // In front like speaker avatar
           }}
-          loading="lazy"
-        />
+        >
+          <img
+            src={MIRROR_IMG_SRC}
+            alt="Mirror"
+            className="pointer-events-none select-none"
+            style={{
+              width: IMG_WIDTH_PX,
+              height: "auto",
+              opacity: IMG_OPACITY,
+            }}
+            loading="lazy"
+          />
+        </div>
 
         {/* Explore button - top-right corner */}
         {onExploreClick && (

@@ -128,6 +128,18 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
     return genderizeRole(trimEra(selectedRole), character?.gender || "any");
   }, [selectedRole, character?.gender, lang]);
 
+  // Get gender-aware translation keys
+  const getGenderKey = (baseKey: string): string => {
+    const gender = character?.gender;
+    if (gender === "female") {
+      return `${baseKey}_FEMALE`;
+    } else if (gender === "male") {
+      return `${baseKey}_MALE`;
+    }
+    // For "any" or undefined, use the base key (which defaults to male form)
+    return baseKey;
+  };
+
   // Start narration preparation immediately on mount
   useEffect(() => {
     console.log("[CompassIntroStart] 🔵 useEffect triggered");
@@ -143,7 +155,13 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
 
     console.log("[CompassIntroStart] ✅ Required data present, proceeding with narration");
 
-    const narrationText = `${lang("COMPASS_INTRO_WELCOME")} ${character.name}. ${lang("COMPASS_INTRO_NIGHT_BEFORE")} ${roleText}. ${lang("COMPASS_INTRO_PACKAGE")} ${lang("COMPASS_INTRO_KNOW_THYSELF")}. ${lang("COMPASS_INTRO_MIRROR")}`;
+    const welcomeKey = character.gender === "female" ? "COMPASS_INTRO_WELCOME_FEMALE" : 
+                       character.gender === "male" ? "COMPASS_INTRO_WELCOME_MALE" : 
+                       "COMPASS_INTRO_WELCOME";
+    const nightBeforeKey = character.gender === "female" ? "COMPASS_INTRO_NIGHT_BEFORE_FEMALE" : 
+                           character.gender === "male" ? "COMPASS_INTRO_NIGHT_BEFORE_MALE" : 
+                           "COMPASS_INTRO_NIGHT_BEFORE";
+    const narrationText = `${lang(welcomeKey)} ${character.name}. ${lang(nightBeforeKey)} ${roleText}. ${lang("COMPASS_INTRO_PACKAGE")} ${lang("COMPASS_INTRO_KNOW_THYSELF")}. ${lang("COMPASS_INTRO_MIRROR")}`;
 
     const prepareAndStartNarration = async () => {
       try {
@@ -190,7 +208,7 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
         preparedTTSRef.current = null;
       }
     };
-  }, [character?.name, roleText, prepare, narrationEnabled]);
+  }, [character?.name, character?.gender, roleText, lang, prepare, narrationEnabled]);
 
   return (
     <div className="min-h-[100dvh] px-5 py-6" style={roleBgStyle}>
@@ -229,9 +247,9 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
               transition={{ duration: 0.3 }}
               className="mt-5 text-center text-white/90 leading-relaxed"
             >
-              <p className="text-lg">{lang("COMPASS_INTRO_WELCOME")} {character?.name},</p>
+              <p className="text-lg">{lang(getGenderKey("COMPASS_INTRO_WELCOME"))} {character?.name},</p>
               <p className="mt-3">
-                {lang("COMPASS_INTRO_NIGHT_BEFORE")}{" "}
+                {lang(getGenderKey("COMPASS_INTRO_NIGHT_BEFORE"))}{" "}
                 <span className="font-semibold">{roleText}</span>. {lang("COMPASS_INTRO_PACKAGE")}{" "}
                 <span className="font-extrabold text-amber-300">{lang("COMPASS_INTRO_KNOW_THYSELF")}</span>.
               </p>

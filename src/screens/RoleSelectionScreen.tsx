@@ -404,7 +404,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                                 {/* "You are:" section */}
                                 <div className="pt-2 border-t border-slate-700/40">
                                   <p className="text-sm text-white/95">
-                                    <span className="font-semibold text-amber-300">You are:</span>{" "}
+                                    <span className="font-semibold text-amber-300">{lang("YOU_ARE")}</span>{" "}
                                     <span className="text-white/90">{role.youAre}</span>
                                   </p>
                                 </div>

@@ -274,7 +274,7 @@ function ScorePill({
       : "text-rose-300";
   return (
     <div
-      className="relative z-[70]"
+      className="relative z-10"
       onMouseEnter={() => setTooltipHovered(true)}
       onMouseLeave={() => setTooltipHovered(false)}
     >
@@ -317,7 +317,7 @@ function ScorePill({
 
       {showTooltip && (
         <div
-          className="absolute left-0 top-full mt-2 w-64 rounded-xl border border-white/15 bg-slate-900/95 p-3 text-white shadow-xl backdrop-blur-sm z-[80]"
+          className="absolute left-0 top-full mt-2 w-64 rounded-xl border border-white/15 bg-slate-900/95 p-3 text-white shadow-xl backdrop-blur-sm z-20"
           onMouseEnter={(event) => {
             event.stopPropagation();
             setTooltipHovered(true);

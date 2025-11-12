@@ -73,15 +73,27 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
   // Logging hook for data collection
   const logger = useLogger();
 
-  // script
+  // Get gender-aware translation keys
+  const getGenderKey = (baseKey: string): string => {
+    const gender = character?.gender;
+    if (gender === "female") {
+      return `${baseKey}_FEMALE`;
+    } else if (gender === "male") {
+      return `${baseKey}_MALE`;
+    }
+    // For "any" or undefined, use the base key (which defaults to male form)
+    return baseKey;
+  };
+
+  // script - memoized to update when character gender or name changes
   const playerName = character?.name || lang("PLAYER_DEFAULT_NAME");
-  const script: Array<{ side: "mirror" | "player"; text: string; italic?: boolean }> = [
-    { side: "mirror", text: lang("MIRROR_DIALOGUE_1"), italic: true },
-    { side: "player", text: lang("MIRROR_DIALOGUE_2") },
-    { side: "mirror", text: lang("MIRROR_DIALOGUE_3").replace("{playerName}", playerName), italic: true },
-    { side: "mirror", text: lang("MIRROR_DIALOGUE_4"), italic: true },
-    { side: "mirror", text: lang("MIRROR_DIALOGUE_5"), italic: true },
-  ];
+  const script = useMemo<Array<{ side: "mirror" | "player"; text: string; italic?: boolean }>>(() => [
+    { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_1")), italic: true },
+    { side: "player", text: lang(getGenderKey("MIRROR_DIALOGUE_2")) },
+    { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_3")).replace("{playerName}", playerName), italic: true },
+    { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_4")), italic: true },
+    { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_5")), italic: true },
+  ], [character?.gender, character?.name, lang]);
 
   const [chatIndex, setChatIndex] = useState(0);
 
@@ -140,7 +152,7 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
         </div>
 
         {/* CHAT THREAD */}
-        <div className="mt-4">
+        <div className="mt-12">
           <AnimatePresence>
             {chatIndex > 0 && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mx-auto max-w-xl">

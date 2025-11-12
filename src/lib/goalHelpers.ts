@@ -189,19 +189,21 @@ export function formatPoints(points: number): string {
 /**
  * Get difficulty label for display
  * @param difficulty Difficulty level
+ * @param lang Translation function
  * @returns Formatted difficulty name
  */
-export function formatDifficulty(difficulty: string | null): string {
-  if (!difficulty) return 'None';
+export function formatDifficulty(difficulty: string | null, lang: (key: string) => string): string {
+  if (!difficulty) return lang('DIFFICULTY_FRESHMAN') || 'None';
 
-  const labels: Record<string, string> = {
-    'baby-boss': 'Baby Boss',
-    'freshman': 'Freshman',
-    'tactician': 'Tactician',
-    'old-fox': 'Old Fox',
+  const keyMap: Record<string, string> = {
+    'baby-boss': 'DIFFICULTY_BABY_BOSS',
+    'freshman': 'DIFFICULTY_FRESHMAN',
+    'tactician': 'DIFFICULTY_TACTICIAN',
+    'old-fox': 'DIFFICULTY_OLD_FOX',
   };
 
-  return labels[difficulty] || difficulty;
+  const key = keyMap[difficulty];
+  return key ? lang(key) : difficulty;
 }
 
 // ========================================================================
