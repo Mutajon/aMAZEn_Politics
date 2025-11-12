@@ -8,7 +8,6 @@ export type ApiGameSettings = {
   showBudget?: boolean;
   debugMode?: boolean;
   enableModifiers?: boolean;
-  dataCollectionEnabled?: boolean;
   experimentMode?: boolean;
   corruptionTrackingEnabled?: boolean;
   dilemmasSubjectEnabled?: boolean;
@@ -58,12 +57,6 @@ export const applyGameSettingsToStore = (apiSettings: ApiGameSettings | Record<s
   const enableModifiersValue = getApiValue('enableModifiers', 'EnableModifiers');
   if (typeof enableModifiersValue === 'boolean') {
     store.setEnableModifiers(enableModifiersValue);
-    settingsApplied = true;
-  }
-
-  const dataCollectionValue = getApiValue('dataCollectionEnabled', 'DataCollection');
-  if (typeof dataCollectionValue === 'boolean') {
-    store.setDataCollectionEnabled(dataCollectionValue);
     settingsApplied = true;
   }
 
@@ -165,7 +158,6 @@ export const applyGameSettingsToStore = (apiSettings: ApiGameSettings | Record<s
           sfxEnabled: currentState.sfxEnabled,
           sfxVolume: currentState.sfxVolume,
           skipPreviousContext: currentState.skipPreviousContext,
-          dataCollectionEnabled: currentState.dataCollectionEnabled,
           treatment: currentState.treatment,
           experimentMode: currentState.experimentMode,
           corruptionTrackingEnabled: currentState.corruptionTrackingEnabled,
@@ -259,9 +251,6 @@ export const loadGameSettingsFromLocalStorage = () => {
       
       const enableModifiersValue = getApiValue('enableModifiers', 'EnableModifiers');
       if (typeof enableModifiersValue === 'boolean') persistData.state.enableModifiers = enableModifiersValue;
-      
-      const dataCollectionValue = getApiValue('dataCollectionEnabled', 'DataCollection');
-      if (typeof dataCollectionValue === 'boolean') persistData.state.dataCollectionEnabled = dataCollectionValue;
       
       const experimentModeValue = getApiValue('experimentMode', 'ExperimentMode');
       if (typeof experimentModeValue === 'boolean') persistData.state.experimentMode = experimentModeValue;
