@@ -20,8 +20,21 @@ export function SpeakerAvatar({ speakerName, imageId, onClick }: SpeakerAvatarPr
     <motion.div
       className="relative cursor-pointer group"
       initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.5, ease: "easeOut" }}
+      animate={{
+        opacity: 1,
+        x: 0,
+        y: [0, -5, 0] // Subtle floating animation
+      }}
+      transition={{
+        opacity: { duration: 0.5, ease: "easeOut" },
+        x: { duration: 0.5, ease: "easeOut" },
+        y: {
+          repeat: Infinity,
+          duration: 3.5,
+          ease: "easeInOut",
+          times: [0, 0.5, 1]
+        }
+      }}
       onClick={onClick}
     >
       {/* Avatar Image - Non-circular, preserves aspect ratio */}

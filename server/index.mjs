@@ -4227,6 +4227,14 @@ app.post("/api/game-turn", async (req, res) => {
         }
 
         const rawDynamicParams = turnData.dynamicParams;
+
+        // Forbidden words filter for dynamic parameters
+        const hasForbiddenDynamicText = (text) => {
+          const forbiddenWords = ["approval", "support", "backing", "popularity", "favorability", "loyalty", "morale", "confidence", "satisfaction", "trust"];
+          const lowerText = String(text).toLowerCase();
+          return forbiddenWords.some(word => lowerText.includes(word));
+        };
+
         const sanitizedDynamicParams = Array.isArray(rawDynamicParams)
           ? rawDynamicParams
               .map((param, index) => {
@@ -4236,12 +4244,37 @@ app.post("/api/game-turn", async (req, res) => {
                 const text = String(param.text || "").slice(0, 120);
                 const tone = param.tone === "up" || param.tone === "down" || param.tone === "neutral" ? param.tone : "neutral";
                 if (!id || !icon || !text) return null;
+                if (hasForbiddenDynamicText(text)) {
+                  console.warn(`[GAME-TURN] ⚠️ Rejected dynamic param with forbidden word: "${text}"`);
+                  return null;
+                }
                 return { id, icon, text, tone };
               })
               .filter(Boolean)
           : [];
 
-        // Allow 0-3 dynamic parameters (0 is valid)
+        // Log dynamic parameter issues (Day 2+ only)
+        if (day > 1) {
+          const rawCount = Array.isArray(rawDynamicParams) ? rawDynamicParams.length : 0;
+          const rejectedCount = rawCount - sanitizedDynamicParams.length;
+
+          if (rejectedCount > 0) {
+            console.warn(`[GAME-TURN] ⚠️ ${rejectedCount} dynamic param(s) rejected during sanitization/filtering`);
+          }
+
+          if (sanitizedDynamicParams.length === 0) {
+            console.error(`[GAME-TURN] ❌ ZERO dynamic params after sanitization on Day ${day}. Raw: ${JSON.stringify(rawDynamicParams)}`);
+          } else if (sanitizedDynamicParams.length === 1) {
+            console.warn(`[GAME-TURN] ⚠️ Only 1 dynamic param on Day ${day} (minimum 2 required). Params: ${JSON.stringify(sanitizedDynamicParams)}`);
+          }
+        }
+
+        // Log warning if fewer than 2 params on Day 2+, but allow graceful degradation
+        // (Prevents wasted API retries when AI omits dynamicParams field)
+        if (day > 1 && sanitizedDynamicParams.length < 2 && !allowEmptyActions) {
+          console.warn(`[GAME-TURN] ⚠️ Only ${sanitizedDynamicParams.length} dynamic param(s) on Day ${day} (expected 2+). Allowing anyway to prevent retry loop.`);
+        }
+
         turnData.dynamicParams = sanitizedDynamicParams;
 
         if (allowEmptyActions) {
@@ -5469,40 +5502,61 @@ ${roleIntro ? `- ALL dilemmas must be deeply rooted in the specific historical/f
 
 YOUR RESPONSIBILITIES:
 1. Generate one concrete political dilemma per turn (title, description, 3 actions with costs)
-2. Calculate support shifts based on previous player choices (Day 2+ only)
-   ⚠️ CRITICAL: supportShift "why" explanations must ONLY reference the action the player
-   already took (provided in the user message), NOT the new options you're generating.
-   The player hasn't seen the new options yet - they're future possibilities.
-3. Provide mirror advice (one sentence, 20–25 words, dry wit) that highlights how the player's strongest value(s) collide with or reinforce the dilemma's options—provoke reflection, never dictate a choice.
-4. Generate 1-3 dynamic parameters showing numerical consequences of player's last action (Day 2+ only)
+2. 🔴 Generate EXACTLY 2-3 dynamic parameters showing dramatic consequences of player's last action (Day 2+ MANDATORY - NEVER SKIP)
 
-   🔢 NUMERICAL REQUIREMENT (MANDATORY - NEVER SKIP):
+   ⚡ DRAMA REQUIREMENT (CRITICAL):
+   - Parameters must reveal STAKES, TENSION, or IRONY
+   - Choose metrics that matter emotionally/politically (deaths, riots, defections, shortages, purges)
+   - Parameters should make player think "Oh shit" or "Wow"
+   - BORING: "3 meetings held", "debate started", "report filed"
+   - DRAMATIC: "47 generals purged", "palace stormed", "treasury looted"
+
+   🔢 NUMERICAL REQUIREMENT (MANDATORY):
    - EVERY parameter MUST contain a specific measurable value with a positive or negative number (avoid percentages)
    - NEVER use qualitative/abstract language without numbers
    - Format: emoji + NUMBER + outcome (3-5 words TOTAL)
 
-   ✅ GOOD EXAMPLES (copy this pattern - all have numbers):
-   - "🔥 +47 buildings burned"
-   - "👥 3,000 protesters arrested"
-   - "⚔️ 12,400 troops deployed"
-   - "💼 800K jobs lost"
-   - "🎨 1,723 artworks rescued"
+   ✅ GOOD EXAMPLES (DRAMATIC + NUMERICAL - copy this pattern):
+   - "⚔️ 47 generals purged overnight"
+   - "🔥 Royal palace stormed, 12 dead"
+   - "👥 4 million march against regime"
+   - "💰 Treasury looted, ₪2.3M gone"
+   - "🚢 Eastern fleet defects to rebels"
+   - "⚡ Power grid fails, 800K in dark"
+   - "🌾 Food riots erupt, 23 cities"
+   - "🏛️ Parliament dissolved, 89 arrested"
+   - "💣 Coup attempt fails, 156 executed"
 
-   ❌ BAD EXAMPLES (NEVER generate these - no numbers):
-   - "+42% support"
+   ❌ BAD EXAMPLES (NEVER generate these):
+   - "+42% support" (percentage, not dramatic)
    - "trust declines" (abstract, no number)
    - "protests gather" (vague, no number)
-   - "tightening demands" (qualitative, no number)
-   - "mood shifts" (abstract, no number)
-   - "tensions rise" (vague, no number)
-   - "-10% trust"
+   - "3 meetings scheduled" (procedural, boring)
+   - "debate initiated" (vague, who cares?)
+   - "report submitted" (clerical, no stakes)
+   - "committee formed" (bureaucratic, boring)
+   - "tensions rise" (abstract, no number)
 
+   🚫 FORBIDDEN CONTENT (AUTO-REJECT):
+   - NEVER reference support/approval/popularity/morale/trust/confidence (already shown in support bars)
+   - NEVER use percentages for sentiment metrics
+   - NEVER generate procedural/bureaucratic/abstract consequences
 
    REQUIREMENTS:
    - Base strictly on player's LAST ACTION and story context
-   - parameters must embody the numerical consequences of the player's last action
+   - If last action was mundane (meeting/consultation/study), show DOWNSTREAM EFFECTS:
+     * Meeting → Leaked contents spark protest
+     * Consultation → Rival faction feels excluded, mobilizes
+     * Study → Report reveals shocking truth, triggers crisis
    - Choose contextually-appropriate emoji (vary each turn, avoid repeating)
    - Can show escalating metrics across turns if relevant
+   - MANDATORY: Return EXACTLY 2-3 parameters (never 0, never 1, never 4+)
+
+3. Calculate support shifts based on previous player choices (Day 2+ only)
+   ⚠️ CRITICAL: supportShift "why" explanations must ONLY reference the action the player
+   already took (provided in the user message), NOT the new options you're generating.
+   The player hasn't seen the new options yet - they're future possibilities.
+4. Provide mirror advice (one sentence, 20–25 words, dry wit) that highlights how the player's strongest value(s) collide with or reinforce the dilemma's options—provoke reflection, never dictate a choice.
 
 5. Evaluate corruption of previous action (Day 2+ only)
 
@@ -5946,6 +6000,9 @@ AUTHORITY-AWARE SUPPORT REASONING:
     lines.push(`TASK: Provide a narrative-only collapse sequence. Include title, description (2-3 vivid sentences), supportShift, mirrorAdvice, dynamicParams (may be empty), set "actions": [] and "isGameEnd": true.`);
   } else {
     lines.push(`TASK: Generate the next turn with ALL required data (dilemma + supportShift + mirrorAdvice + dynamicParams).`);
+    if (day > 1) {
+      lines.push(`CRITICAL: Day ${day} MUST include "dynamicParams" array with minimum 2 concrete measurable consequences (e.g., GDP change, casualties, construction projects). DO NOT omit this field.`);
+    }
   }
 
   lines.push(`Return complete JSON as specified in the system prompt.`);

@@ -140,7 +140,7 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
         </div>
 
         {/* CHAT THREAD */}
-        <div className="mt-4">
+        <div className="mt-12">
           <AnimatePresence>
             {chatIndex > 0 && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mx-auto max-w-xl">

@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, X, Users, Swords } from "lucide-react";
+import { ChevronDown, ChevronUp, X, Users, Landmark, Scale, Shield, TrendingUp, Gavel, Users2, Globe } from "lucide-react";
 import type { SupportProfile } from "../../data/supportProfiles";
 import { useLang } from "../../i18n/lang";
 
@@ -19,6 +19,26 @@ type Props = {
 
 // Map stance keys to i18n keys
 const STANCE_KEYS = ["governance", "order", "economy", "justice", "culture", "foreign"] as const;
+
+// Map stance keys to icons
+const STANCE_ICONS = {
+  governance: Scale,
+  order: Shield,
+  economy: TrendingUp,
+  justice: Gavel,
+  culture: Users2,
+  foreign: Globe,
+} as const;
+
+// Map stance keys to colored backgrounds
+const STANCE_COLORS = {
+  governance: "bg-indigo-600",
+  order: "bg-cyan-600",
+  economy: "bg-green-600",
+  justice: "bg-purple-600",
+  culture: "bg-pink-600",
+  foreign: "bg-orange-600",
+} as const;
 
 export default function SupportEntityPopover({
   entityType,
@@ -45,9 +65,9 @@ export default function SupportEntityPopover({
     (key) => supportProfile.stances[key] !== undefined
   );
 
-  // Determine icon and color based on entity type
-  const Icon = entityType === "people" ? Users : Swords;
-  const iconColorClass = entityType === "people" ? "bg-blue-500/10 text-blue-500" : "bg-red-500/10 text-red-500";
+  // Determine icon and color based on entity type (matching support list)
+  const Icon = entityType === "people" ? Users : Landmark;
+  const iconColorClass = entityType === "people" ? "bg-emerald-600" : "bg-amber-600";
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">
@@ -82,8 +102,8 @@ export default function SupportEntityPopover({
 
           {/* Icon and Title */}
           <div className="flex items-start gap-4 pr-12">
-            <div className={`rounded-2xl p-4 ${iconColorClass}`}>
-              <Icon className="h-8 w-8" />
+            <div className={`rounded-xl p-4 ${iconColorClass} ring-1 ring-white/15 shadow-sm`}>
+              <Icon className="h-8 w-8 text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-2xl font-bold text-white mb-1">
@@ -151,10 +171,18 @@ export default function SupportEntityPopover({
                           const stanceValue = supportProfile.stances[stanceKey];
                           if (!stanceValue) return null;
 
+                          const StanceIcon = STANCE_ICONS[stanceKey];
+                          const stanceBgColor = STANCE_COLORS[stanceKey];
+
                           return (
                             <div key={stanceKey} className="bg-white/5 rounded-xl p-4 border border-white/10">
-                              <div className="text-sm font-semibold text-white/80 mb-2">
-                                {stanceLabels[stanceKey]}
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className={`rounded-lg p-2 ${stanceBgColor} ring-1 ring-white/15 shadow-sm`}>
+                                  <StanceIcon className="h-4 w-4 text-white" />
+                                </div>
+                                <div className="text-sm font-semibold text-white/80">
+                                  {stanceLabels[stanceKey]}
+                                </div>
                               </div>
                               <div className="text-white/75 leading-relaxed">
                                 {stanceValue}

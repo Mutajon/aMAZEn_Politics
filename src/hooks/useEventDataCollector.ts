@@ -156,6 +156,8 @@ async function fetchGameTurn(): Promise<{
   supportEffects: SupportEffect[] | null;
   newsItems: TickerItem[];
   corruptionShift: CorruptionShift | null;
+  corruptionDelta: number;
+  corruptionNewLevel: number;
   compassPills: CompassPill[] | null;
   dynamicParams: DynamicParam[] | null;
   mirrorText: string;
@@ -595,6 +597,8 @@ async function fetchGameTurn(): Promise<{
     supportEffects,
     newsItems: [], // Empty array (disabled)
     corruptionShift,
+    corruptionDelta,
+    corruptionNewLevel,
     compassPills,
     dynamicParams,
     mirrorText
@@ -881,6 +885,8 @@ export function useEventDataCollector() {
         dynamicParams,
         mirrorText,
         corruptionShift,
+        corruptionDelta,
+        corruptionNewLevel,
       } = turnData;
 
       console.log(`[Collector] ✅ Unified data received for Day ${day}`);
