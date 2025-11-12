@@ -91,8 +91,8 @@ export default function SplashScreen({
   const experimentMode = useSettingsStore((s) => s.experimentMode);
   const setExperimentMode = useSettingsStore((s) => s.setExperimentMode);
   
-  // Show ID modal only in experiment mode
-  const [showIDModal, setShowIDModal] = useState(experimentMode);
+  // Show ID modal only in experiment mode (after user clicks Start)
+  const [showIDModal, setShowIDModal] = useState(false);
   const [isCollectingID] = useState(false);
 
   // Treatment (experiment configuration)

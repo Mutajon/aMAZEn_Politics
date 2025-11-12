@@ -12,6 +12,8 @@ import { MongoClient } from 'mongodb';
 let client = null;
 let db = null;
 let isConnecting = false;
+let lastHealthCheck = null;
+const HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
 
 /**
  * Connect to MongoDB
@@ -49,6 +51,10 @@ export async function connectDB() {
       maxPoolSize: 10,
       minPoolSize: 2,
       serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      heartbeatFrequencyMS: 10000, // Check connection health every 10s
+      retryWrites: true,
+      retryReads: true,
     });
 
     // Connect to MongoDB
@@ -59,8 +65,14 @@ export async function connectDB() {
 
     console.log('[MongoDB] ✅ Connected successfully');
 
+    // Set up connection event handlers
+    setupConnectionHandlers();
+
     // Create indexes if they don't exist
     await createIndexes();
+
+    // Mark last health check
+    lastHealthCheck = Date.now();
 
     isConnecting = false;
     return db;
@@ -70,6 +82,80 @@ export async function connectDB() {
     console.error('[MongoDB] ❌ Connection failed:', error.message);
     throw error;
   }
+}
+
+/**
+ * Set up connection event handlers for automatic reconnection
+ */
+function setupConnectionHandlers() {
+  if (!client) return;
+
+  client.on('close', () => {
+    console.warn('[MongoDB] ⚠️ Connection closed - will reconnect on next operation');
+    db = null;
+    client = null;
+    lastHealthCheck = null;
+  });
+
+  client.on('error', (error) => {
+    console.error('[MongoDB] ❌ Connection error:', error.message);
+    db = null;
+    client = null;
+    lastHealthCheck = null;
+  });
+
+  client.on('timeout', () => {
+    console.warn('[MongoDB] ⚠️ Connection timeout - will reconnect on next operation');
+    db = null;
+    client = null;
+    lastHealthCheck = null;
+  });
+}
+
+/**
+ * Check if MongoDB connection is healthy
+ * Performs periodic ping to ensure connection is alive
+ *
+ * @returns {Promise<boolean>} True if connection is healthy
+ */
+async function isConnectionHealthy() {
+  if (!db || !client) return false;
+
+  // If health check was recent, assume healthy
+  const now = Date.now();
+  if (lastHealthCheck && (now - lastHealthCheck) < HEALTH_CHECK_INTERVAL) {
+    return true;
+  }
+
+  try {
+    // Ping database to verify connection
+    await db.admin().ping();
+    lastHealthCheck = now;
+    return true;
+  } catch (error) {
+    console.warn('[MongoDB] ⚠️ Health check failed:', error.message);
+    // Clear stale connection
+    db = null;
+    client = null;
+    lastHealthCheck = null;
+    return false;
+  }
+}
+
+/**
+ * Ensure MongoDB connection is healthy, reconnect if needed
+ *
+ * @returns {Promise<Db>} MongoDB database instance
+ */
+async function ensureConnection() {
+  const isHealthy = await isConnectionHealthy();
+
+  if (!isHealthy) {
+    console.log('[MongoDB] Reconnecting due to unhealthy connection...');
+    return await connectDB();
+  }
+
+  return db;
 }
 
 /**
@@ -103,33 +189,36 @@ async function createIndexes() {
 /**
  * Get gameLogs collection
  * Automatically connects to database if not connected
+ * Ensures connection is healthy before returning collection
  *
  * @returns {Promise<Collection>} MongoDB collection instance
  */
 export async function getLogsCollection() {
-  const database = await connectDB();
+  const database = await ensureConnection();
   return database.collection('gameLogs');
 }
 
 /**
  * Get counters collection
  * Automatically connects to database if not connected
+ * Ensures connection is healthy before returning collection
  *
  * @returns {Promise<Collection>} MongoDB collection instance
  */
 export async function getCountersCollection() {
-  const database = await connectDB();
+  const database = await ensureConnection();
   return database.collection('counters');
 }
 
 /**
  * Get users collection
  * Automatically connects to database if not connected
+ * Ensures connection is healthy before returning collection
  *
  * @returns {Promise<Collection>} MongoDB collection instance
  */
 export async function getUsersCollection() {
-  const database = await connectDB();
+  const database = await ensureConnection();
   return database.collection('users');
 }
 

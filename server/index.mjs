@@ -2334,16 +2334,16 @@ LENGTH & TONE:
 - Avoid: "Feared violence, got it" / "Wanted decisive action" → TOO DRY
 - Prefer: "We're so relieved you didn't escalate this!" / "Finally, someone who takes security seriously!"
 
-DILEMMA DESCRIPTION EXAMPLES:
+DILEMMA DESCRIPTION EXAMPLES (FIRST-PERSON FROM CONFIDANT):
 
-✅ GOOD (concrete problem + immersive POV + decision-forcing question):
-"Three hooded figures were caught sabotaging grain shipments to the northern garrison. Your military commander demands immediate execution as a deterrent, but they claim to be acting on orders from your political rival. The crowd has gathered to watch your judgment. What will you do?"
+✅ GOOD (first-person report + concrete problem + decision-forcing question):
+"I bring word that three hooded figures were caught sabotaging grain shipments to the northern garrison. Your military commander demands immediate execution as a deterrent, but they claim to be acting on orders from your political rival. The crowd has gathered outside, waiting for your judgment. What will you do?"
 
-✅ GOOD (experiential storytelling + specific situation + varied question):
-"A delegation of farmers kneels before you in the throne room, their clothes still mud-stained from the flooded fields. They beg for tax relief after the monsoon destroyed half the harvest. Your treasurer quietly shows you the ledger—waiving taxes will bankrupt the public works fund. How will you respond?"
+✅ GOOD (first-person experiential + specific situation + varied question):
+"I've just come from the throne room where a delegation of farmers awaits you, their clothes still mud-stained from the flooded fields. They beg for tax relief after the monsoon destroyed half the harvest. Your treasurer quietly showed me the ledger—waiving taxes will bankrupt the public works fund. How will you respond?"
 
-✅ GOOD (character's actual knowledge + vivid scene + action prompt):
-"Strange pale-skinned foreigners with thunderous fire-weapons have built wooden structures near the sacred burial grounds. Your warriors report they are felling trees and refuse to leave. The elders demand you drive them out before they anger the spirits. What do you choose to do?"
+✅ GOOD (first-person intelligence report + vivid scene + action prompt):
+"Reports reach me that strange pale-skinned foreigners with thunderous fire-weapons have built wooden structures near the sacred burial grounds. Your warriors tell me they are felling trees and refuse to leave. The elders demand you drive them out before they anger the spirits. What do you choose to do?"
 
 ❌ BAD (abstract, no concrete problem, no decision point):
 "Amidst the cultural resurgence in Alexandria, a Roman general hints at growing unease over your reforms. You've ignited local pride, but now face Rome's wary grace."
@@ -4227,6 +4227,14 @@ app.post("/api/game-turn", async (req, res) => {
         }
 
         const rawDynamicParams = turnData.dynamicParams;
+
+        // Forbidden words filter for dynamic parameters
+        const hasForbiddenDynamicText = (text) => {
+          const forbiddenWords = ["approval", "support", "backing", "popularity", "favorability", "loyalty", "morale", "confidence", "satisfaction", "trust"];
+          const lowerText = String(text).toLowerCase();
+          return forbiddenWords.some(word => lowerText.includes(word));
+        };
+
         const sanitizedDynamicParams = Array.isArray(rawDynamicParams)
           ? rawDynamicParams
               .map((param, index) => {
@@ -4236,12 +4244,37 @@ app.post("/api/game-turn", async (req, res) => {
                 const text = String(param.text || "").slice(0, 120);
                 const tone = param.tone === "up" || param.tone === "down" || param.tone === "neutral" ? param.tone : "neutral";
                 if (!id || !icon || !text) return null;
+                if (hasForbiddenDynamicText(text)) {
+                  console.warn(`[GAME-TURN] ⚠️ Rejected dynamic param with forbidden word: "${text}"`);
+                  return null;
+                }
                 return { id, icon, text, tone };
               })
               .filter(Boolean)
           : [];
 
-        // Allow 0-3 dynamic parameters (0 is valid)
+        // Log dynamic parameter issues (Day 2+ only)
+        if (day > 1) {
+          const rawCount = Array.isArray(rawDynamicParams) ? rawDynamicParams.length : 0;
+          const rejectedCount = rawCount - sanitizedDynamicParams.length;
+
+          if (rejectedCount > 0) {
+            console.warn(`[GAME-TURN] ⚠️ ${rejectedCount} dynamic param(s) rejected during sanitization/filtering`);
+          }
+
+          if (sanitizedDynamicParams.length === 0) {
+            console.error(`[GAME-TURN] ❌ ZERO dynamic params after sanitization on Day ${day}. Raw: ${JSON.stringify(rawDynamicParams)}`);
+          } else if (sanitizedDynamicParams.length === 1) {
+            console.warn(`[GAME-TURN] ⚠️ Only 1 dynamic param on Day ${day} (minimum 2 required). Params: ${JSON.stringify(sanitizedDynamicParams)}`);
+          }
+        }
+
+        // Log warning if fewer than 2 params on Day 2+, but allow graceful degradation
+        // (Prevents wasted API retries when AI omits dynamicParams field)
+        if (day > 1 && sanitizedDynamicParams.length < 2 && !allowEmptyActions) {
+          console.warn(`[GAME-TURN] ⚠️ Only ${sanitizedDynamicParams.length} dynamic param(s) on Day ${day} (expected 2+). Allowing anyway to prevent retry loop.`);
+        }
+
         turnData.dynamicParams = sanitizedDynamicParams;
 
         if (allowEmptyActions) {
@@ -4507,6 +4540,10 @@ app.post("/api/game-turn", async (req, res) => {
         score: conversation.meta.corruptionHistory[conversation.meta.corruptionHistory.length - 1].score,
         reason: conversation.meta.corruptionHistory[conversation.meta.corruptionHistory.length - 1].reason
       } : null,
+
+      // Speaker/Confidant information (NEW)
+      speaker: turnData.speaker ? String(turnData.speaker).slice(0, 100) : undefined,
+      speakerDescription: turnData.speakerDescription ? String(turnData.speakerDescription).slice(0, 300) : undefined,
 
       // Game end flag
       isGameEnd: isAftermathTurn || !!turnData.isGameEnd
@@ -5281,7 +5318,8 @@ function buildGameSystemPrompt(gameContext, generateActions = true) {
     thematicGuidance,
     supportProfiles,
     roleScope,
-    storyThemes
+    storyThemes,
+    confidant  // NEW: Confidant information for speaker avatar
   } = gameContext;
 
   // Format power holders
@@ -5340,6 +5378,70 @@ MIRROR BRIEFING:
 - Tie at least one of the top values above to a concrete tension inside the current dilemma.
 - Phrase as a sly observation or question that makes the player inspect their own alignment; never issue a directive or name option letters.`;
 
+  // Format confidant briefing (if available)
+  const confidantBriefing = confidant ? `
+═══════════════════════════════════════════════════════════
+🎭 NARRATIVE VOICE (CRITICAL - OVERRIDES ALL OTHER STYLE GUIDANCE)
+═══════════════════════════════════════════════════════════
+
+CONFIDANT/SPEAKER CHARACTER:
+- Name: ${confidant.name}
+- Role: ${confidant.description}
+
+🔴 MANDATORY NARRATIVE VOICE:
+- You MUST write EVERY dilemma description in first-person from this confidant's perspective
+- NEVER use third-person narration ("you stand", "the player faces", etc.)
+- The description field should read like a verbal report from ${confidant.name} to the player
+- Maintain ${confidant.name}'s personality: ${confidant.description.split('.')[0]}
+
+REQUIRED FIRST-PERSON OPENING PHRASES (use variety):
+- "I bring word that..."
+- "Reports reach me that..."
+- "Sources tell me..."
+- "I've learned that..."
+- "I must inform you that..."
+- "Word has come to me that..."
+- "I've just discovered that..."
+- "Intelligence suggests that..."
+
+⚠️ CRITICAL OVERRIDE: This first-person narrative voice takes precedence over ANY other
+style guidance in this prompt that suggests third-person perspective. The description field
+uses first-person from ${confidant.name}, ALWAYS.
+
+JSON REQUIREMENT:
+- ALWAYS include "speaker": "${confidant.name}" in your response` : `
+═══════════════════════════════════════════════════════════
+🎭 NARRATIVE VOICE (CRITICAL - OVERRIDES ALL OTHER STYLE GUIDANCE)
+═══════════════════════════════════════════════════════════
+
+CONFIDANT/SPEAKER CHARACTER (Custom Role):
+- Create an appropriate confidant character who serves as a trusted advisor
+- Generate a fitting name based on the role's historical/cultural context
+- The confidant should be someone who would realistically have access to information and the player's trust
+
+🔴 MANDATORY NARRATIVE VOICE:
+- You MUST write EVERY dilemma description in first-person from this confidant's perspective
+- NEVER use third-person narration ("you stand", "the player faces", etc.)
+- The description field should read like a verbal report from the confidant to the player
+
+REQUIRED FIRST-PERSON OPENING PHRASES (use variety):
+- "I bring word that..."
+- "Reports reach me that..."
+- "Sources tell me..."
+- "I've learned that..."
+- "I must inform you that..."
+- "Word has come to me that..."
+- "I've just discovered that..."
+- "Intelligence suggests that..."
+
+⚠️ CRITICAL OVERRIDE: This first-person narrative voice takes precedence over ANY other
+style guidance in this prompt that suggests third-person perspective. The description field
+uses first-person from the confidant, ALWAYS.
+
+JSON REQUIREMENT:
+- ALWAYS include "speaker": "[generated name]" in your response
+- ALWAYS include "speakerDescription": "[1-2 sentence description]" in your response`;
+
   // Include thematic guidance if provided
   const thematicText = thematicGuidance ? `\n\nTHEMATIC GUIDANCE:\n${thematicGuidance}` : "";
   const supportBaselineText = formatSupportProfilesForPrompt(supportProfiles);
@@ -5350,6 +5452,8 @@ MIRROR BRIEFING:
 
 You are the AI game engine for a ${totalDays}-day political simulation game.
 You maintain full narrative context and generate ALL event screen data in a single response.
+
+${confidantBriefing}
 
 PLAYER ROLE & CONTEXT:
 - Role: ${role}${roleTitle ? `\n- Scenario: ${roleTitle}` : ''}${roleYear ? `\n- Historical Period: ${roleYear}` : ''}${roleIntro ? `\n- Historical Context: ${roleIntro}` : ''}
@@ -5398,40 +5502,61 @@ ${roleIntro ? `- ALL dilemmas must be deeply rooted in the specific historical/f
 
 YOUR RESPONSIBILITIES:
 1. Generate one concrete political dilemma per turn (title, description, 3 actions with costs)
-2. Calculate support shifts based on previous player choices (Day 2+ only)
-   ⚠️ CRITICAL: supportShift "why" explanations must ONLY reference the action the player
-   already took (provided in the user message), NOT the new options you're generating.
-   The player hasn't seen the new options yet - they're future possibilities.
-3. Provide mirror advice (one sentence, 20–25 words, dry wit) that highlights how the player's strongest value(s) collide with or reinforce the dilemma's options—provoke reflection, never dictate a choice.
-4. Generate 1-3 dynamic parameters showing numerical consequences of player's last action (Day 2+ only)
+2. 🔴 Generate EXACTLY 2-3 dynamic parameters showing dramatic consequences of player's last action (Day 2+ MANDATORY - NEVER SKIP)
 
-   🔢 NUMERICAL REQUIREMENT (MANDATORY - NEVER SKIP):
+   ⚡ DRAMA REQUIREMENT (CRITICAL):
+   - Parameters must reveal STAKES, TENSION, or IRONY
+   - Choose metrics that matter emotionally/politically (deaths, riots, defections, shortages, purges)
+   - Parameters should make player think "Oh shit" or "Wow"
+   - BORING: "3 meetings held", "debate started", "report filed"
+   - DRAMATIC: "47 generals purged", "palace stormed", "treasury looted"
+
+   🔢 NUMERICAL REQUIREMENT (MANDATORY):
    - EVERY parameter MUST contain a specific measurable value with a positive or negative number (avoid percentages)
    - NEVER use qualitative/abstract language without numbers
    - Format: emoji + NUMBER + outcome (3-5 words TOTAL)
 
-   ✅ GOOD EXAMPLES (copy this pattern - all have numbers):
-   - "🔥 +47 buildings burned"
-   - "👥 3,000 protesters arrested"
-   - "⚔️ 12,400 troops deployed"
-   - "💼 800K jobs lost"
-   - "🎨 1,723 artworks rescued"
+   ✅ GOOD EXAMPLES (DRAMATIC + NUMERICAL - copy this pattern):
+   - "⚔️ 47 generals purged overnight"
+   - "🔥 Royal palace stormed, 12 dead"
+   - "👥 4 million march against regime"
+   - "💰 Treasury looted, ₪2.3M gone"
+   - "🚢 Eastern fleet defects to rebels"
+   - "⚡ Power grid fails, 800K in dark"
+   - "🌾 Food riots erupt, 23 cities"
+   - "🏛️ Parliament dissolved, 89 arrested"
+   - "💣 Coup attempt fails, 156 executed"
 
-   ❌ BAD EXAMPLES (NEVER generate these - no numbers):
-   - "+42% support"
+   ❌ BAD EXAMPLES (NEVER generate these):
+   - "+42% support" (percentage, not dramatic)
    - "trust declines" (abstract, no number)
    - "protests gather" (vague, no number)
-   - "tightening demands" (qualitative, no number)
-   - "mood shifts" (abstract, no number)
-   - "tensions rise" (vague, no number)
-   - "-10% trust"
+   - "3 meetings scheduled" (procedural, boring)
+   - "debate initiated" (vague, who cares?)
+   - "report submitted" (clerical, no stakes)
+   - "committee formed" (bureaucratic, boring)
+   - "tensions rise" (abstract, no number)
 
+   🚫 FORBIDDEN CONTENT (AUTO-REJECT):
+   - NEVER reference support/approval/popularity/morale/trust/confidence (already shown in support bars)
+   - NEVER use percentages for sentiment metrics
+   - NEVER generate procedural/bureaucratic/abstract consequences
 
    REQUIREMENTS:
    - Base strictly on player's LAST ACTION and story context
-   - parameters must embody the numerical consequences of the player's last action
+   - If last action was mundane (meeting/consultation/study), show DOWNSTREAM EFFECTS:
+     * Meeting → Leaked contents spark protest
+     * Consultation → Rival faction feels excluded, mobilizes
+     * Study → Report reveals shocking truth, triggers crisis
    - Choose contextually-appropriate emoji (vary each turn, avoid repeating)
    - Can show escalating metrics across turns if relevant
+   - MANDATORY: Return EXACTLY 2-3 parameters (never 0, never 1, never 4+)
+
+3. Calculate support shifts based on previous player choices (Day 2+ only)
+   ⚠️ CRITICAL: supportShift "why" explanations must ONLY reference the action the player
+   already took (provided in the user message), NOT the new options you're generating.
+   The player hasn't seen the new options yet - they're future possibilities.
+4. Provide mirror advice (one sentence, 20–25 words, dry wit) that highlights how the player's strongest value(s) collide with or reinforce the dilemma's options—provoke reflection, never dictate a choice.
 
 5. Evaluate corruption of previous action (Day 2+ only)
 
@@ -5569,15 +5694,16 @@ ${buildLightSystemPrompt()}
 
 OUTPUT FORMAT (JSON):
 
-EXAMPLES OF GOOD DESCRIPTION ENDINGS (vary your question format):
-- "As provincial governor, you survey the shoreline while courtiers press conflicting demands about the expelled foreigners' ships. How will you respond?"
-- "As district police chief, you watch riot shields forming a line while protesters chant slogans at the courthouse gates. What will you do?"
-- "As finance minister, you review budget reports showing empty coffers while three faction leaders demand increased spending. Which path will you choose?"
-- "As military commander, intelligence reports suggest an imminent border incursion but your forces are stretched thin. How will you act?"
+EXAMPLES OF GOOD DESCRIPTION (FIRST-PERSON FROM CONFIDANT - vary your question format):
+- "I bring word that courtiers are pressing conflicting demands about the expelled foreigners' ships gathering near the shoreline. How will you respond?"
+- "Reports reach me that protesters have gathered at the courthouse gates, chanting slogans as riot shields form a defensive line. What will you do?"
+- "I've just reviewed the budget reports—the coffers are empty, yet three faction leaders demand increased spending. Which path will you choose?"
+- "Intelligence suggests an imminent border incursion, but I must inform you that our forces are stretched thin. How will you act?"
 
 {
   "title": "Guard the Coastline",
-  "description": "As provincial governor, you survey the shoreline while courtiers press conflicting demands about the expelled foreigners' ships. How will you respond?",
+  "description": "I bring word that courtiers are pressing conflicting demands about the expelled foreigners' ships gathering near the shoreline. How will you respond?",
+  "speaker": "Lysandra",
   "selectedThreadIndex": 1,
   "selectedThreadSummary": "Demonstrations over autonomy boil over, forcing you to confront the governor-versus-activists thread head-on.",${generateActions ? `
   "actions": [
@@ -5874,6 +6000,9 @@ AUTHORITY-AWARE SUPPORT REASONING:
     lines.push(`TASK: Provide a narrative-only collapse sequence. Include title, description (2-3 vivid sentences), supportShift, mirrorAdvice, dynamicParams (may be empty), set "actions": [] and "isGameEnd": true.`);
   } else {
     lines.push(`TASK: Generate the next turn with ALL required data (dilemma + supportShift + mirrorAdvice + dynamicParams).`);
+    if (day > 1) {
+      lines.push(`CRITICAL: Day ${day} MUST include "dynamicParams" array with minimum 2 concrete measurable consequences (e.g., GDP change, casualties, construction projects). DO NOT omit this field.`);
+    }
   }
 
   lines.push(`Return complete JSON as specified in the system prompt.`);

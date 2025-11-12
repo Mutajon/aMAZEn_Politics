@@ -3,8 +3,9 @@
 // Used when clicking on support bars (People/Challenger only)
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, X, Users, Landmark, Scale, Shield, TrendingUp, Gavel, Users2, Globe } from "lucide-react";
 import type { SupportProfile } from "../../data/supportProfiles";
 import { useLang } from "../../i18n/lang";
 
@@ -18,6 +19,26 @@ type Props = {
 
 // Map stance keys to i18n keys
 const STANCE_KEYS = ["governance", "order", "economy", "justice", "culture", "foreign"] as const;
+
+// Map stance keys to icons
+const STANCE_ICONS = {
+  governance: Scale,
+  order: Shield,
+  economy: TrendingUp,
+  justice: Gavel,
+  culture: Users2,
+  foreign: Globe,
+} as const;
+
+// Map stance keys to colored backgrounds
+const STANCE_COLORS = {
+  governance: "bg-indigo-600",
+  order: "bg-cyan-600",
+  economy: "bg-green-600",
+  justice: "bg-purple-600",
+  culture: "bg-pink-600",
+  foreign: "bg-orange-600",
+} as const;
 
 export default function SupportEntityPopover({
   entityType,
@@ -44,107 +65,141 @@ export default function SupportEntityPopover({
     (key) => supportProfile.stances[key] !== undefined
   );
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95, y: -10 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95, y: -10 }}
-      transition={{ duration: 0.2, ease: "easeOut" }}
-      className="
-        absolute left-0 top-full mt-2
-        w-80 rounded-xl
-        border border-white/20
-        bg-slate-900/95 backdrop-blur-sm
-        p-4 text-white shadow-xl
-        z-[100]
-      "
-      onClick={(e) => e.stopPropagation()}
-    >
-      {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
-          <div className="text-xs uppercase tracking-wide text-white/50 mb-1">
-            {entityType === "people"
-              ? lang("SUPPORT_ENTITY_PEOPLE_TITLE")
-              : lang("SUPPORT_ENTITY_CHALLENGER_TITLE")}
-          </div>
-          <div className="text-base font-semibold">{entityName}</div>
-          <div className="text-sm text-white/60 mt-0.5">
-            {lang("SUPPORT_ENTITY_CURRENT_SUPPORT")}: <span className="font-semibold text-white/80">{currentSupport}%</span>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-white/60 hover:text-white text-xl leading-none -mt-1 -mr-1 w-6 h-6 flex items-center justify-center"
-          aria-label="Close"
-        >
-          ×
-        </button>
-      </div>
+  // Determine icon and color based on entity type (matching support list)
+  const Icon = entityType === "people" ? Users : Landmark;
+  const iconColorClass = entityType === "people" ? "bg-emerald-600" : "bg-amber-600";
 
-      {/* Summary */}
-      <div className="mb-3 pb-3 border-b border-white/10">
-        <div className="text-xs uppercase tracking-wide text-white/40 mb-1.5">
-          {lang("SUPPORT_ENTITY_SUMMARY")}
-        </div>
-        <p className="text-sm text-white/80 leading-relaxed">
-          {supportProfile.summary}
-        </p>
-      </div>
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">
+      {/* Backdrop - click outside to close */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+      />
 
-      {/* Expandable Stances */}
-      {availableStances.length > 0 && (
-        <div>
+      {/* Modal content */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="relative w-full max-w-lg mx-4 max-h-[85vh] bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl border border-white/20 shadow-2xl overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="relative px-6 pt-6 pb-4 border-b border-white/10">
+          {/* Close Button */}
           <button
-            type="button"
-            onClick={() => setExpanded(!expanded)}
-            className="
-              w-full flex items-center justify-between
-              text-xs uppercase tracking-wide text-white/60
-              hover:text-white/80 transition-colors
-              mb-2
-            "
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 rounded-lg hover:bg-white/10 transition-colors"
+            aria-label="Close"
           >
-            <span>{expanded ? lang("SUPPORT_ENTITY_HIDE_STANCES") : lang("SUPPORT_ENTITY_SHOW_STANCES")}</span>
-            {expanded ? (
-              <ChevronUp className="w-4 h-4" />
-            ) : (
-              <ChevronDown className="w-4 h-4" />
-            )}
+            <X className="w-5 h-5 text-white/70" />
           </button>
 
-          <AnimatePresence>
-            {expanded && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.25, ease: "easeOut" }}
-                className="overflow-hidden"
-              >
-                <div className="space-y-2.5 pt-1">
-                  {availableStances.map((stanceKey) => {
-                    const stanceValue = supportProfile.stances[stanceKey];
-                    if (!stanceValue) return null;
-
-                    return (
-                      <div key={stanceKey} className="text-sm">
-                        <div className="text-xs font-semibold text-white/70 mb-0.5">
-                          {stanceLabels[stanceKey]}
-                        </div>
-                        <div className="text-white/75 leading-snug">
-                          {stanceValue}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Icon and Title */}
+          <div className="flex items-start gap-4 pr-12">
+            <div className={`rounded-xl p-4 ${iconColorClass} ring-1 ring-white/15 shadow-sm`}>
+              <Icon className="h-8 w-8 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-2xl font-bold text-white mb-1">
+                {entityName}
+              </h2>
+              <p className="text-sm text-white/50">
+                {entityType === "people"
+                  ? lang("SUPPORT_ENTITY_PEOPLE_TITLE")
+                  : lang("SUPPORT_ENTITY_CHALLENGER_TITLE")}
+              </p>
+              <div className="text-sm text-white/60 mt-1">
+                {lang("SUPPORT_ENTITY_CURRENT_SUPPORT")}: <span className="font-semibold text-white/80">{currentSupport}%</span>
+              </div>
+            </div>
+          </div>
         </div>
-      )}
-    </motion.div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+          <div className="space-y-6">
+            {/* Summary */}
+            <div>
+              <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3">
+                {lang("SUPPORT_ENTITY_SUMMARY")}
+              </h3>
+              <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+                <p className="text-white/90 leading-relaxed">
+                  {supportProfile.summary}
+                </p>
+              </div>
+            </div>
+
+            {/* Expandable Stances */}
+            {availableStances.length > 0 && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setExpanded(!expanded)}
+                  className="
+                    w-full flex items-center justify-between
+                    text-sm font-semibold text-white/70 uppercase tracking-wider
+                    hover:text-white/90 transition-colors
+                    mb-3
+                  "
+                >
+                  <span>{expanded ? lang("SUPPORT_ENTITY_HIDE_STANCES") : lang("SUPPORT_ENTITY_SHOW_STANCES")}</span>
+                  {expanded ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </button>
+
+                <AnimatePresence>
+                  {expanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25, ease: "easeOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="space-y-3">
+                        {availableStances.map((stanceKey) => {
+                          const stanceValue = supportProfile.stances[stanceKey];
+                          if (!stanceValue) return null;
+
+                          const StanceIcon = STANCE_ICONS[stanceKey];
+                          const stanceBgColor = STANCE_COLORS[stanceKey];
+
+                          return (
+                            <div key={stanceKey} className="bg-white/5 rounded-xl p-4 border border-white/10">
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className={`rounded-lg p-2 ${stanceBgColor} ring-1 ring-white/15 shadow-sm`}>
+                                  <StanceIcon className="h-4 w-4 text-white" />
+                                </div>
+                                <div className="text-sm font-semibold text-white/80">
+                                  {stanceLabels[stanceKey]}
+                                </div>
+                              </div>
+                              <div className="text-white/75 leading-relaxed">
+                                {stanceValue}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </div>,
+    document.body
   );
 }
