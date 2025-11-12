@@ -130,22 +130,55 @@ router.post('/batch', async (req, res) => {
       });
     }
 
-    // Insert valid logs into MongoDB
+    // Insert valid logs into MongoDB with strong write guarantees
     const collection = await getLogsCollection();
-    const result = await collection.insertMany(validLogs, { ordered: false });
 
-    // Update rate limiting counter
-    if (sessionId) {
-      const currentCount = sessionLogCounts.get(sessionId) || 0;
-      sessionLogCounts.set(sessionId, currentCount + result.insertedCount);
+    try {
+      const result = await collection.insertMany(validLogs, {
+        ordered: false,
+        writeConcern: { w: 'majority', j: true, wtimeout: 10000 }
+      });
+
+      // Verify actual insertions match expected
+      const insertedCount = result.insertedCount || Object.keys(result.insertedIds || {}).length;
+
+      if (insertedCount !== validLogs.length) {
+        console.warn(`[Logging] ⚠️ Partial insert: ${insertedCount}/${validLogs.length} logs inserted`);
+      }
+
+      // Update rate limiting counter
+      if (sessionId) {
+        const currentCount = sessionLogCounts.get(sessionId) || 0;
+        sessionLogCounts.set(sessionId, currentCount + insertedCount);
+      }
+
+      console.log(`[Logging] ✅ Inserted ${insertedCount} log entries (verified)`);
+
+      res.json({
+        success: true,
+        inserted: insertedCount,
+        expected: validLogs.length,
+        allInserted: insertedCount === validLogs.length
+      });
+    } catch (insertError) {
+      // If insert fails, provide detailed error information
+      console.error('[Logging] ❌ Insert failed:', insertError.message);
+
+      // Check if it's a connection error
+      if (insertError.message.includes('connection') ||
+          insertError.message.includes('timeout') ||
+          insertError.message.includes('ECONNREFUSED')) {
+        console.log('[Logging] 🔄 Connection error detected - client should retry');
+        return res.status(503).json({
+          success: false,
+          error: 'Database connection error - please retry',
+          retryable: true,
+          details: insertError.message
+        });
+      }
+
+      throw insertError;
     }
-
-    console.log(`[Logging] ✅ Inserted ${result.insertedCount} log entries`);
-
-    res.json({
-      success: true,
-      inserted: result.insertedCount
-    });
 
   } catch (error) {
     console.error('[Logging] ❌ Batch insert failed:', error);
@@ -209,7 +242,7 @@ router.post('/session/start', async (req, res) => {
     // Initialize rate limiting counter for this session
     sessionLogCounts.set(sessionId, 0);
 
-    // Log session start event
+    // Log session start event with strong write guarantees
     const collection = await getLogsCollection();
     await collection.insertOne({
       timestamp: new Date(),
@@ -220,6 +253,8 @@ router.post('/session/start', async (req, res) => {
       action: 'session_start',
       value: { sessionId },
       comments: 'User started new game session'
+    }, {
+      writeConcern: { w: 'majority', j: true, wtimeout: 10000 }
     });
 
     console.log(`[Logging] ✅ Session started: ${sessionId} (user: ${userId}, treatment: ${finalTreatment})`);
