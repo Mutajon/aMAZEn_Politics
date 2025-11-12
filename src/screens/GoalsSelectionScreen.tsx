@@ -263,7 +263,7 @@ export default function GoalsSelectionScreen({ push }: Props) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <div className="text-white/60 text-sm">{lang("DIFFICULTY_LABEL")}</div>
-              <div className="text-white font-bold">{formatDifficulty(difficulty)}</div>
+              <div className="text-white font-bold">{formatDifficulty(difficulty, lang)}</div>
             </div>
             <div>
               <div className="text-white/60 text-sm">{lang("BUDGET_LABEL")}</div>

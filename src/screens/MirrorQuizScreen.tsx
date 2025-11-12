@@ -320,7 +320,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
                       className="text-[19px] font-semibold italic drop-shadow"
                       style={{ color: T.textColor, fontFamily: T.fontFamily }}
                     >
-                      {translateQuizQuestion(quiz[idx].id, quiz[idx].q, lang)}
+                      {translateQuizQuestion(quiz[idx].id, quiz[idx].q, lang, character?.gender)}
                     </div>
 
                     {/* OPTIONS — mirror bubble style buttons */}
