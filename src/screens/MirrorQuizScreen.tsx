@@ -18,6 +18,7 @@ import MirrorBubbleTyping from "../components/MirrorBubbleTyping";
 import { COMPONENTS, PALETTE } from "../data/compass-data";
 import { useTranslatedConst, createTranslatedConst } from "../i18n/useTranslatedConst";
 import { useLogger } from "../hooks/useLogger";
+import { useTimingLogger } from "../hooks/useTimingLogger";
 import { useLang } from "../i18n/lang";
 import { translateQuizQuestion, translateQuizAnswer } from "../i18n/translateGameData";
 
@@ -74,8 +75,9 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   const { quiz, idx, done, summary, epilogueShown, init, advance, setDone, setSummary, markEpilogueShown } =
     useMirrorQuizStore();
 
-  // Logging hook for data collection
+  // Logging hooks for data collection
   const logger = useLogger();
+  const timingLogger = useTimingLogger();
 
   // Track which questions have been logged to prevent duplicates
   const loggedQuestionsRef = useRef<Set<number>>(new Set());
@@ -85,6 +87,9 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
 
   // Track if we're currently fetching the mirror summary to prevent race condition
   const fetchingSummaryRef = useRef(false);
+
+  // Track timing for each question
+  const questionTimingIdRef = useRef<string | null>(null);
 
   // Only initialize quiz if it hasn't been started yet
   // This allows returning from MirrorScreen without resetting the completed state
@@ -97,7 +102,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only on mount, not on quiz/init/resetCompass changes
 
-  // Log when a new question is presented (system event)
+  // Log when a new question is presented (system event) + start timing
   // Uses ref to prevent duplicate logging when effect dependencies trigger multiple times
   useEffect(() => {
     if (!done && quiz[idx] && !loggedQuestionsRef.current.has(idx)) {
@@ -115,8 +120,14 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
         logValue,
         `System presented mirror question ${questionNum} to player`
       );
+
+      // Start timing for this question
+      questionTimingIdRef.current = timingLogger.start('mirror_question_time', {
+        questionNumber: questionNum,
+        question: question.q
+      });
     }
-  }, [idx, done, quiz, logger]);
+  }, [idx, done, quiz, logger, timingLogger]);
 
   // Log compass pills (value changes) when they appear after player answers
   // Uses ref to prevent duplicate logging
@@ -175,12 +186,27 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   function answer(opt: { a: string; mappings: string[] }, optionIndex: number) {
     if (done || selectedOption !== null) return; // Prevent multiple clicks during animation
 
-    // Log player answer (player event)
     const questionNum = idx + 1;
+
+    // End timing for this question
+    let answerTime: number | null = null;
+    if (questionTimingIdRef.current) {
+      answerTime = timingLogger.end(questionTimingIdRef.current, {
+        questionNumber: questionNum,
+        answer: opt.a
+      });
+      questionTimingIdRef.current = null;
+    }
+
+    // Log player answer (player event) with timing
     logger.log(
       `player_answer_mirror_question_${questionNum}`,
-      opt.a,
-      `Player answered mirror question ${questionNum}: ${opt.a}`
+      {
+        answer: opt.a,
+        answerTime,
+        questionNumber: questionNum
+      },
+      `Player answered mirror question ${questionNum}: ${opt.a} (${answerTime}ms)`
     );
 
     // Trigger shimmer animation
@@ -196,8 +222,21 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
 
       window.setTimeout(() => {
         setSelectedOption(null); // Reset selection
-        if (idx + 1 >= quiz.length) setDone();
-        else advance();
+        if (idx + 1 >= quiz.length) {
+          setDone();
+
+          // Log quiz completion
+          logger.log(
+            'mirror_quiz_completed',
+            {
+              totalQuestions: quiz.length,
+              questionsAnswered: idx + 1
+            },
+            `Player completed mirror quiz (${idx + 1}/${quiz.length} questions)`
+          );
+        } else {
+          advance();
+        }
       }, 580);
     }, 600); // Shimmer duration
   }

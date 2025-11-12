@@ -241,7 +241,7 @@ export function detectSupportCrises(supportValues: SupportValues): SupportCrisis
 }
 
 // Rule #9: Topic Diversity Management
-export function ensureTopicDiversity(recentTopics: string[], topicCounts: Record<string, number>): {
+export function ensureTopicDiversity(recentTopics: string[]): {
   shouldChangeTopic: boolean;
   suggestedTopics: string[];
   avoidTopics: string[];

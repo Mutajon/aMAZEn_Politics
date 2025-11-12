@@ -8,17 +8,18 @@
  * Uses: framer-motion for animations, lucide-react for icons
  */
 
-import React from "react";
+import { useEffect } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { Coins, CheckCircle2 } from "lucide-react";
 import type { ActionCard } from "../../hooks/useActionDeckState";
 import { useAudioManager } from "../../hooks/useAudioManager";
 import { useLogger } from "../../hooks/useLogger";
+import { getTreatmentConfig, type TreatmentType } from "../../data/experimentConfig";
+import { useSettingsStore } from "../../store/settingsStore";
 
 // Visual constants
 const ENTER_STAGGER = 0.12;
 const ENTER_DURATION = 0.36;
-const ENTER_Y = 24;
 
 const CARD_TITLE_CLASS = "text-[14px] font-semibold text-white";
 const CARD_DESC_CLASS = "text-[12.5px] leading-snug text-white/95";
@@ -107,8 +108,23 @@ export default function ActionDeckContent({
   const { playSfx } = useAudioManager();
   const logger = useLogger();
 
+  // Get treatment configuration for conditional rendering
+  const treatment = useSettingsStore((state) => state.treatment) as TreatmentType;
+  const config = getTreatmentConfig(treatment);
+
   const canAffordSuggestion = !showBudget || budget >= Math.abs(suggestCost);
   const suggestTextValid = suggestText.trim().length >= 4;
+
+  // Auto-open suggest modal in full autonomy mode
+  useEffect(() => {
+    if (!config.showAIOptions && config.showCustomAction && !isSuggestOpen && !confirmingId) {
+      // Open modal after brief delay to allow animations to settle
+      const timer = setTimeout(() => {
+        onOpenSuggest();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [config.showAIOptions, config.showCustomAction, isSuggestOpen, confirmingId, onOpenSuggest]);
 
   // Wrapper handlers with click sound + logging
   const handleSelectCard = (id: string) => {
@@ -163,12 +179,8 @@ export default function ActionDeckContent({
 
   const handleConfirmSuggestion = () => {
     playSfx('click-soft');
-    logger.log('custom_action_submitted', {
-      customText: suggestText,
-      textLength: suggestText.length,
-      suggestCost,
-      budgetBefore: budget
-    }, `User submitted custom action: ${suggestText.substring(0, 50)}...`);
+    // Note: Logging moved to useActionDeckState.ts to consolidate with timing data
+    // and prevent duplicate logs (fixes 2x custom action logging bug)
     onConfirmSuggestion();
   };
 
@@ -185,13 +197,14 @@ export default function ActionDeckContent({
           animate="show"
           variants={{ hidden: {}, show: { transition: { staggerChildren: ENTER_STAGGER } } }}
         >
-        {/* Cards row (3 columns) */}
-        <div className="grid grid-cols-3 gap-3">
-          {cards.map((c) => {
-            const isSelected = selectedCard?.id === c.id;
-            const disabled = Boolean(confirmingId) || !c.affordable;
+        {/* Cards row (3 columns) - TREATMENT: semiAutonomy & noAutonomy show AI options */}
+        {config.showAIOptions && cards.length > 0 && (
+          <div className="grid grid-cols-3 gap-3">
+            {cards.map((c) => {
+              const isSelected = selectedCard?.id === c.id;
+              const disabled = Boolean(confirmingId) || !c.affordable;
 
-            return (
+              return (
               <motion.div
                 key={c.id}
                 layout
@@ -264,9 +277,14 @@ export default function ActionDeckContent({
               </motion.div>
             );
           })}
-        </div>
+          </div>
+        )}
 
-        {/* Suggest-your-own pill (part of stagger sequence) */}
+        {/* TREATMENT: fullAutonomy hides AI options - modal opens automatically */}
+        {/* No message needed - modal opens directly */}
+
+        {/* Suggest-your-own pill (part of stagger sequence) - TREATMENT: semiAutonomy shows button, fullAutonomy hides (modal auto-opens) */}
+        {config.showCustomAction && config.showAIOptions && (
         <motion.div className="mt-3 flex justify-center" layout
           variants={{
             hidden: { opacity: 0, scale: 0.85 },
@@ -303,6 +321,8 @@ export default function ActionDeckContent({
           </motion.button>
           </div>
         </motion.div>
+        )}
+        {/* End of showCustomAction conditional */}
         </motion.div>
 
         {/* Expanded overlay */}
@@ -380,7 +400,7 @@ export default function ActionDeckContent({
           {isSuggestOpen && (
             <motion.div
               key="suggest"
-              className="absolute inset-0 z-30 flex items-center justify-center p-3"
+              className="absolute inset-0 z-30 flex items-start justify-center p-3 pt-6"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -409,7 +429,9 @@ export default function ActionDeckContent({
                     autoFocus
                     value={suggestText}
                     onChange={(e) => onSuggestTextChange(e.target.value)}
-                    placeholder="Type your suggestion…"
+                    placeholder={!config.showAIOptions
+                      ? "Type in your desired action"
+                      : "Type your suggestion…"}
                     className="w-full rounded-xl bg-black/35 ring-1 ring-white/25 text-white placeholder-white/70 px-3 py-2 outline-none focus:ring-white/35"
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {

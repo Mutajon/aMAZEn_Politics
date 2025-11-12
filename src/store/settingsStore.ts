@@ -66,10 +66,23 @@ type SettingsState = {
   setSkipPreviousContext: (v: boolean) => void;
   toggleSkipPreviousContext: () => void;
 
-  // --- NEW: Data collection (for research) ---
-  dataCollectionEnabled: boolean;
-  setDataCollectionEnabled: (v: boolean) => void;
-  toggleDataCollectionEnabled: () => void;
+  // --- NEW: Backstage mode (session-only, bypasses email collection) ---
+  backstageMode: boolean;
+  setBackstageMode: (v: boolean) => void;
+
+  // --- NEW: Treatment assignment (for research variants) ---
+  treatment: 'fullAutonomy' | 'semiAutonomy' | 'noAutonomy';
+  setTreatment: (v: 'fullAutonomy' | 'semiAutonomy' | 'noAutonomy') => void;
+
+  // --- NEW: Experiment mode gate ---
+  experimentMode: boolean;
+  setExperimentMode: (v: boolean) => void;
+  toggleExperimentMode: () => void;
+
+  // --- NEW: Corruption tracking (default OFF) ---
+  corruptionTrackingEnabled: boolean;
+  setCorruptionTrackingEnabled: (v: boolean) => void;
+  toggleCorruptionTrackingEnabled: () => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -81,7 +94,7 @@ export const useSettingsStore = create<SettingsState>()(
       toggleGenerateImages: () => set({ generateImages: !get().generateImages }),
 
       // Narration
-      narrationEnabled: false,
+      narrationEnabled: true,
       narrationVoice: null,
       setNarrationEnabled: (v) => set({ narrationEnabled: v }),
       toggleNarrationEnabled: () => set({ narrationEnabled: !get().narrationEnabled }),
@@ -106,7 +119,7 @@ export const useSettingsStore = create<SettingsState>()(
       setDilemmasSubject: (s) => set({ dilemmasSubject: s }),
 
       // NEW: Enable modifiers
-      enableModifiers: true,
+      enableModifiers: false,
       setEnableModifiers: (v) => set({ enableModifiers: v }),
       toggleEnableModifiers: () => set({ enableModifiers: !get().enableModifiers }),
 
@@ -139,20 +152,33 @@ export const useSettingsStore = create<SettingsState>()(
       setSkipPreviousContext: (v) => set({ skipPreviousContext: v }),
       toggleSkipPreviousContext: () => set({ skipPreviousContext: !get().skipPreviousContext }),
 
-      // NEW: Data collection (default OFF - requires consent)
-      dataCollectionEnabled: false,
-      setDataCollectionEnabled: (v) => set({ dataCollectionEnabled: v }),
-      toggleDataCollectionEnabled: () => set({ dataCollectionEnabled: !get().dataCollectionEnabled }),
+      // NEW: Backstage mode (default OFF, session-only - NOT persisted to localStorage)
+      backstageMode: false,
+      setBackstageMode: (v) => set({ backstageMode: v }),
+
+      // NEW: Treatment assignment (default "semiAutonomy" - current balanced behavior)
+      treatment: "semiAutonomy",
+      setTreatment: (v) => set({ treatment: v }),
+
+      // NEW: Experiment mode gate (default ON - for experimental distribution)
+      experimentMode: true,
+      setExperimentMode: (v) => set({ experimentMode: v }),
+      toggleExperimentMode: () => set({ experimentMode: !get().experimentMode }),
+
+      // NEW: Corruption tracking (default OFF)
+      corruptionTrackingEnabled: false,
+      setCorruptionTrackingEnabled: (v) => set({ corruptionTrackingEnabled: v }),
+      toggleCorruptionTrackingEnabled: () => set({ corruptionTrackingEnabled: !get().corruptionTrackingEnabled }),
     }),
     {
       // Bump key so no stale objects hide the new fields
-      name: "settings-v13",
+      name: "settings-v15",
       partialize: (s) => ({
         generateImages: s.generateImages,
         narrationEnabled: s.narrationEnabled,
         narrationVoice: s.narrationVoice,
         showBudget: s.showBudget,
-        debugMode: s.debugMode,
+        // NOTE: debugMode is NOT persisted - session-only (always starts false)
         dilemmasSubjectEnabled: s.dilemmasSubjectEnabled,
         dilemmasSubject: s.dilemmasSubject,
         enableModifiers: s.enableModifiers,
@@ -163,7 +189,10 @@ export const useSettingsStore = create<SettingsState>()(
         sfxEnabled: s.sfxEnabled,
         sfxVolume: s.sfxVolume,
         skipPreviousContext: s.skipPreviousContext,
-        dataCollectionEnabled: s.dataCollectionEnabled,
+        // NOTE: backstageMode is NOT persisted - session-only
+        treatment: s.treatment,
+        // NOTE: experimentMode is NOT persisted - session-only (always starts true)
+        corruptionTrackingEnabled: s.corruptionTrackingEnabled,
       }),
     }
   )

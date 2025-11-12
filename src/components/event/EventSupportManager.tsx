@@ -10,7 +10,6 @@ const clampPercent = (n: number): number =>
   Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
 
 interface EventSupportManagerProps {
-  vals: Trio;
   setVals: (vals: Trio | ((prev: Trio) => Trio)) => void;
   setSupportDeltas: (deltas: SupportDeltas) => void;
   setSupportTrends: (trends: SupportTrends) => void;
@@ -18,7 +17,6 @@ interface EventSupportManagerProps {
 }
 
 export function useEventSupportManager({
-  vals,
   setVals,
   setSupportDeltas,
   setSupportTrends,
@@ -92,7 +90,7 @@ export function useEventSupportManager({
 }
 
 // This is a hook component - it doesn't render anything
-export default function EventSupportManager(props: EventSupportManagerProps) {
+export default function EventSupportManager(_props: EventSupportManagerProps) {
   // This component exists just to organize the support management logic
   // The actual hook is exported above
   return null;

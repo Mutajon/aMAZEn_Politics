@@ -1,7 +1,6 @@
 // src/components/event/DayCounterAnimation.tsx
 // Rotating day counter animation for day progression
 
-import React from "react";
 import { motion } from "framer-motion";
 
 interface DayCounterAnimationProps {

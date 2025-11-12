@@ -37,7 +37,23 @@ type LoggingState = {
   // --- Initialization ---
   isInitialized: boolean;            // Has logging service been initialized?
   setInitialized: (v: boolean) => void;
+
+  // --- Experiment mode progress (sequential role runs) ---
+  experimentProgress: ExperimentProgress;
+  setExperimentActiveRole: (key: string | null) => void;
+  markExperimentRoleCompleted: (key: string) => void;
+  resetExperimentProgress: () => void;
 };
+
+type ExperimentProgress = {
+  completedRoles: Record<string, boolean>;
+  activeRoleKey: string | null;
+};
+
+const defaultExperimentProgress = (): ExperimentProgress => ({
+  completedRoles: {},
+  activeRoleKey: null,
+});
 
 /**
  * Generate a random UUID v4
@@ -53,7 +69,7 @@ function generateUUID(): string {
 
 export const useLoggingStore = create<LoggingState>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       // --- User identification ---
       userId: null,  // Will be generated on first use
       setUserId: (id) => set({ userId: id }),
@@ -77,15 +93,37 @@ export const useLoggingStore = create<LoggingState>()(
       // --- Initialization ---
       isInitialized: false,
       setInitialized: (v) => set({ isInitialized: v }),
+
+      // --- Experiment mode progress ---
+      experimentProgress: defaultExperimentProgress(),
+      setExperimentActiveRole: (key) =>
+        set((state) => ({
+          experimentProgress: {
+            ...state.experimentProgress,
+            activeRoleKey: key,
+          },
+        })),
+      markExperimentRoleCompleted: (key) =>
+        set((state) => ({
+          experimentProgress: {
+            completedRoles: {
+              ...state.experimentProgress.completedRoles,
+              [key]: true,
+            },
+            activeRoleKey: null,
+          },
+        })),
+      resetExperimentProgress: () => set({ experimentProgress: defaultExperimentProgress() }),
     }),
     {
-      name: "logging-v2",  // localStorage key (bumped from v1 to v2)
+      name: "logging-v3",  // bumped from v2 to v3 to include experiment progress
       partialize: (s) => ({
         // Only persist these fields
         userId: s.userId,
         gameVersion: s.gameVersion,
         treatment: s.treatment,
         consented: s.consented,
+        experimentProgress: s.experimentProgress,
         // DON'T persist: sessionId, isInitialized
         // NOTE: 'enabled' removed - now controlled by settingsStore.dataCollectionEnabled
       }),
@@ -122,5 +160,6 @@ export function resetLoggingStore() {
     treatment: 'control',
     consented: false,
     isInitialized: false,
+    experimentProgress: defaultExperimentProgress(),
   });
 }

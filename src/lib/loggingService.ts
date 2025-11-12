@@ -9,8 +9,8 @@
 // - Non-blocking (never blocks UI)
 
 import { useLoggingStore, ensureUserId } from '../store/loggingStore';
-import { useSettingsStore } from '../store/settingsStore';
 import type { LogEntry, BatchLogRequest, SessionStartRequest, LoggingStatusResponse } from '../types/logging';
+import packageJson from '../../package.json';
 
 // Configuration
 const BATCH_SIZE = 50;              // Max logs per batch
@@ -47,7 +47,7 @@ class LoggingService {
 
       if (!status.enabled) {
         console.log('[Logging] Data collection is disabled on backend');
-        useSettingsStore.setState({ dataCollectionEnabled: false });
+        // Note: Frontend always tries to log (unless debug mode), backend controls actual storage
         return;
       }
 
@@ -60,8 +60,8 @@ class LoggingService {
         setTreatment(status.defaultTreatment);
       }
 
-      // Set game version (hardcoded for now, can be fetched from package.json)
-      useLoggingStore.setState({ gameVersion: '0.0.0' });
+      // Set game version from package.json
+      useLoggingStore.setState({ gameVersion: packageJson.version });
 
       // Mark as initialized
       useLoggingStore.setState({ isInitialized: true });
@@ -74,7 +74,7 @@ class LoggingService {
 
     } catch (error) {
       console.error('[Logging] Initialization failed:', error);
-      useSettingsStore.setState({ dataCollectionEnabled: false });
+      // Note: Data collection stays enabled even if init fails (backend may be down temporarily)
     }
   }
 
@@ -83,11 +83,10 @@ class LoggingService {
    * Generates sessionId and logs session start event
    */
   async startSession(): Promise<string | null> {
-    const { dataCollectionEnabled } = useSettingsStore.getState();
     const { userId, gameVersion, treatment } = useLoggingStore.getState();
 
-    if (!dataCollectionEnabled || !userId) {
-      console.log('[Logging] Session start skipped (logging disabled or no userId)');
+    if (!userId) {
+      console.log('[Logging] Session start skipped (no userId)');
       return null;
     }
 
@@ -159,7 +158,7 @@ class LoggingService {
    */
   log(
     action: string,
-    value: string | number | boolean,
+    value: string | number | boolean | Record<string, unknown>,
     comments?: string,
     metadata?: { screen?: string; day?: number; role?: string }
   ): void {
@@ -179,7 +178,7 @@ class LoggingService {
    */
   logSystem(
     action: string,
-    value: string | number | boolean,
+    value: string | number | boolean | Record<string, unknown>,
     comments?: string,
     metadata?: { screen?: string; day?: number; role?: string }
   ): void {
@@ -193,19 +192,23 @@ class LoggingService {
   private _logInternal(
     source: 'player' | 'system',
     action: string,
-    value: string | number | boolean,
+    value: string | number | boolean | Record<string, unknown>,
     comments?: string,
     metadata?: { screen?: string; day?: number; role?: string }
   ): void {
-    const { dataCollectionEnabled } = useSettingsStore.getState();
     const { userId, gameVersion, treatment } = useLoggingStore.getState();
 
-    if (!dataCollectionEnabled || !userId) {
-      // Silently skip if logging is disabled
+    if (!userId) {
+      // Silently skip if no userId (not initialized)
       return;
     }
 
     // Create log entry with flat structure (all fields at top level)
+    const entryValue =
+      typeof value === 'object' && value !== null
+        ? JSON.stringify(value)
+        : value;
+
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       userId,
@@ -213,7 +216,7 @@ class LoggingService {
       treatment,
       source,
       action,
-      value,                          // Simple value (not an object)
+      value: entryValue as LogEntry['value'],                          // Simple value (stringified if object)
       currentScreen: metadata?.screen,
       day: metadata?.day,
       role: metadata?.role,
@@ -249,14 +252,7 @@ class LoggingService {
       return;
     }
 
-    const { dataCollectionEnabled } = useSettingsStore.getState();
     const { sessionId } = useLoggingStore.getState();
-
-    if (!dataCollectionEnabled) {
-      // If logging was disabled, clear queue
-      this.queue = [];
-      return;
-    }
 
     this.isFlushing = true;
 
@@ -336,16 +332,6 @@ class LoggingService {
   }
 
   /**
-   * Stop auto-flush timer
-   */
-  private stopAutoFlush(): void {
-    if (this.flushTimer) {
-      clearInterval(this.flushTimer);
-      this.flushTimer = null;
-    }
-  }
-
-  /**
    * Get current queue (for debugging)
    */
   getQueue(): LogEntry[] {
@@ -377,10 +363,9 @@ export const loggingService = new LoggingService();
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
     // Use sendBeacon for reliable delivery on page unload
-    const { dataCollectionEnabled } = useSettingsStore.getState();
-    const { sessionId, userId, gameVersion, treatment } = useLoggingStore.getState();
+    const { sessionId } = useLoggingStore.getState();
 
-    if (dataCollectionEnabled && loggingService.getQueue().length > 0) {
+    if (loggingService.getQueue().length > 0) {
       const queue = loggingService.getQueue();
 
       // Prepare batch request

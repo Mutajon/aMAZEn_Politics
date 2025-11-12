@@ -73,34 +73,29 @@ export async function connectDB() {
 }
 
 /**
- * Create recommended indexes for gameLogs collection
+ * Create recommended indexes for collections
  * Improves query performance for common operations
  */
 async function createIndexes() {
   try {
-    const collection = db.collection('gameLogs');
+    // gameLogs collection
+    const logsCollection = db.collection('gameLogs');
+    await logsCollection.createIndex({ userId: 1, timestamp: -1 }, { name: 'userId_timestamp', background: true });
+    await logsCollection.createIndex({ treatment: 1 }, { name: 'treatment', background: true });
+    await logsCollection.createIndex({ action: 1 }, { name: 'action', background: true });
 
-    // Index for finding user logs sorted by time
-    await collection.createIndex(
-      { userId: 1, timestamp: -1 },
-      { name: 'userId_timestamp', background: true }
-    );
+    // counters collection
+    const countersCollection = db.collection('counters');
+    await countersCollection.createIndex({ name: 1 }, { name: 'name', unique: true, background: true });
 
-    // Index for filtering by treatment
-    await collection.createIndex(
-      { treatment: 1 },
-      { name: 'treatment', background: true }
-    );
-
-    // Index for filtering by action type
-    await collection.createIndex(
-      { action: 1 },
-      { name: 'action', background: true }
-    );
+    // users collection
+    const usersCollection = db.collection('users');
+    await usersCollection.createIndex({ userId: 1 }, { name: 'userId_unique', unique: true, background: true });
+    await usersCollection.createIndex({ treatment: 1 }, { name: 'treatment', background: true });
+    await usersCollection.createIndex({ createdAt: -1 }, { name: 'createdAt', background: true });
 
     console.log('[MongoDB] ✅ Indexes created/verified');
   } catch (error) {
-    // Indexes are optional - don't fail if they can't be created
     console.warn('[MongoDB] ⚠️ Index creation failed (non-critical):', error.message);
   }
 }
@@ -114,6 +109,49 @@ async function createIndexes() {
 export async function getLogsCollection() {
   const database = await connectDB();
   return database.collection('gameLogs');
+}
+
+/**
+ * Get counters collection
+ * Automatically connects to database if not connected
+ *
+ * @returns {Promise<Collection>} MongoDB collection instance
+ */
+export async function getCountersCollection() {
+  const database = await connectDB();
+  return database.collection('counters');
+}
+
+/**
+ * Get users collection
+ * Automatically connects to database if not connected
+ *
+ * @returns {Promise<Collection>} MongoDB collection instance
+ */
+export async function getUsersCollection() {
+  const database = await connectDB();
+  return database.collection('users');
+}
+
+/**
+ * Atomically increment a named counter by 1
+ *
+ * @param {string} name - The name of the counter to increment
+ * @returns {Promise<number>} The new value of the counter
+ */
+export async function incrementCounter(name) {
+  try {
+    const collection = await getCountersCollection();
+    const result = await collection.findOneAndUpdate(
+      { name },
+      { $inc: { value: 1 } },
+      { returnDocument: 'after', upsert: true }
+    );
+    return result.value;
+  } catch (error) {
+    console.error(`[MongoDB] ❌ Failed to increment counter "${name}":`, error.message);
+    throw error;
+  }
 }
 
 /**

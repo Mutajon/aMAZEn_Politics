@@ -41,7 +41,7 @@ export async function generateMirrorSummary(
   }
 
   // Local playful fallback: keep to 1–2 short sentences
-  return localSummary({ whatTop, whenceTop, overall });
+  return localSummary({ whatTop, whenceTop });
 }
 
 /* ---------------- helpers ---------------- */
@@ -86,7 +86,7 @@ function soften(label: string) {
     .replace(/\bResponsibility\/Duty\b/i, "showing up when it counts");
 }
 
-function localSummary({ whatTop, whenceTop, overall }: { whatTop: TopItem[]; whenceTop: TopItem[]; overall: TopItem[] }) {
+function localSummary({ whatTop, whenceTop }: { whatTop: TopItem[]; whenceTop: TopItem[] }) {
   const w = whatTop[0]?.label ? soften(whatTop[0].label) : null;
   const j = whenceTop[0]?.label ? soften(whenceTop[0].label) : null;
 
@@ -118,8 +118,7 @@ export async function generateMirrorQuizSummary(
 
   // Validate we have at least 2 values in each dimension
   if (whatTop.length < 2 || whenceTop.length < 2) {
-    const l = lang();
-    return l("MIRROR_VALUES_FORMING");
+    return lang("MIRROR_VALUES_FORMING");
   }
 
   if (useAI) {
@@ -145,11 +144,10 @@ export async function generateMirrorQuizSummary(
   }
 
   // Fallback: Simple local summary with Mushu/Genie energy
-  const l = lang();
   const w1Label = whatTop[0]?.label || "mystery";
   const w2Label = whatTop[1]?.label || "enigma";
-  const w1 = translateCompassValue(w1Label, l);
-  const w2 = translateCompassValue(w2Label, l);
-  const template = l("MIRROR_QUIZ_SUMMARY_FALLBACK");
+  const w1 = translateCompassValue(w1Label, lang);
+  const w2 = translateCompassValue(w2Label, lang);
+  const template = lang("MIRROR_QUIZ_SUMMARY_FALLBACK");
   return template.replace("{w1}", w1).replace("{w2}", w2);
 }

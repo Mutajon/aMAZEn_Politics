@@ -1,214 +1,182 @@
 // src/lib/scoring.ts
-// Score calculation formulas, types, and highscore helpers for the final score screen
+// Shared scoring helpers for live UI and final scoring screen.
 //
-// Implements the scoring system defined in CLAUDE.md:
-// - Support: 1800 max (600 per track)
-// - Budget: 500 max
-// - Ideology: 600 max (300 per axis based on aftermath ratings)
-// - Goals: 0-600 (sum of completed goal bonuses, max 2 goals × 300 pts each)
-// - Bonus: 0 (not implemented yet)
-// - Difficulty: ±500 (flat modifiers)
-// - Total: No cap (theoretical max ~3900)
+// Implements the simplified scoring schema:
+// - Three support tracks (People, Power Holders, Personal Anchor)
+//   • Each track: 0‒100% → 0‒500 pts (linear)
+//   • Combined support maximum: 1500 pts
+// - Corruption level: 0‒10 → 0‒500 pts penalty (linear, deducted from total)
+//   • Incoming corruption level may be 0‒10 or 0‒100 (legacy); values >10 are scaled down.
+// - Total maximum: 1500 pts (all support, zero corruption)
 //
-// Connects to:
-// - src/hooks/useScoreCalculation.ts: Uses these formulas to calculate scores
-// - src/screens/FinalScoreScreen.tsx: Displays animated score breakdown
-// - src/store/highscoreStore.ts: Builds entries for Hall of Fame
+// Exports helpers used by:
+// - Event screen resource bar (live score display)
+// - FinalScoreScreen (animated breakdown + highscore submission)
+// - Highscore utilities (formatting and entry creation)
 
 import type { HighscoreEntry } from "../data/highscores-default";
 
-// ========================================================================
+// ===========================================================================
+// CONSTANTS
+// ===========================================================================
+
+export const SUPPORT_TRACK_MAX_POINTS = 500;
+export const SUPPORT_TRACK_COUNT = 3;
+export const SUPPORT_TOTAL_MAX_POINTS =
+  SUPPORT_TRACK_MAX_POINTS * SUPPORT_TRACK_COUNT; // 1500
+
+export const CORRUPTION_MAX_POINTS = 500;
+export const MAX_FINAL_SCORE = SUPPORT_TOTAL_MAX_POINTS; // 1500
+
+// ===========================================================================
 // TYPES
-// ========================================================================
+// ===========================================================================
 
 /**
- * Aftermath rating levels (from AI aftermath analysis)
+ * Aftermath rating levels (from AI aftermath analysis).
+ * Still used for highscore storytelling on the final screen.
  */
 export type AftermathRating = "very-low" | "low" | "medium" | "high" | "very-high";
 
+export type SupportTrackBreakdown = {
+  percent: number; // 0-100 support %
+  points: number; // 0-500 points
+  maxPoints: number; // 500
+};
+
+export type CorruptionBreakdown = {
+  rawLevel: number; // Raw value from store/API (0-10 or 0-100 legacy)
+  normalizedLevel: number; // Coerced 0-10 scale
+  points: number; // 0 to -500 points (higher corruption = larger penalty)
+  maxPoints: number; // 500 (penalty magnitude)
+};
+
 /**
- * Complete score breakdown with all categories
+ * Unified score breakdown returned by live + final scoring flows.
  */
 export type ScoreBreakdown = {
   support: {
-    people: number;      // 0-600 points
-    middle: number;      // 0-600 points
-    mom: number;         // 0-600 points
-    total: number;       // Sum (max 1800)
+    people: SupportTrackBreakdown;
+    middle: SupportTrackBreakdown;
+    mom: SupportTrackBreakdown;
+    total: number; // Sum of track points
+    maxPoints: number; // 1500
   };
-  budget: {
-    budgetAmount: number; // Raw budget value
-    points: number;       // 0-500 points
-  };
-  ideology: {
-    liberalism: {
-      rating: AftermathRating;
-      points: number;     // 0-300 points
-    };
-    autonomy: {
-      rating: AftermathRating;
-      points: number;     // 0-300 points
-    };
-    total: number;        // Sum (max 600)
-  };
-  goals: {
-    completed: number;    // Number of goals completed (0-2)
-    bonusPoints: number;  // Total bonus from completed goals
-    total: number;        // Total goal points (max 600)
-  };
-  bonus: {
-    points: number;       // ±200 points (not implemented)
-  };
-  difficulty: {
-    level: string;        // Difficulty name
-    points: number;       // ±500 points
-  };
-  final: number;          // Total clamped [0, 3500]
+  corruption: CorruptionBreakdown;
+  final: number; // Total score (support.total + corruption.points)
+  maxFinal: number; // 2000
 };
 
-// ========================================================================
-// CORE SCORING FORMULAS
-// ========================================================================
+// ===========================================================================
+// CORE HELPERS
+// ===========================================================================
 
 /**
- * Calculate support score (max 1800)
- * Formula: (value/100) × 600 per track
+ * Clamp a numeric value between min and max.
  */
-export function calculateSupportScore(
-  people: number,
-  middle: number,
-  mom: number
-): ScoreBreakdown["support"] {
-  const peoplePoints = Math.round((people / 100) * 600);
-  const middlePoints = Math.round((middle / 100) * 600);
-  const momPoints = Math.round((mom / 100) * 600);
+function clamp(value: number, min: number, max: number): number {
+  if (Number.isNaN(value)) return min;
+  return Math.min(max, Math.max(min, value));
+}
 
+/**
+ * Convert a support percentage (0-100) to points (0-500).
+ */
+function supportPercentToPoints(percent: number): number {
+  const clamped = clamp(Math.round(percent), 0, 100);
+  return Math.round((clamped / 100) * SUPPORT_TRACK_MAX_POINTS);
+}
+
+/**
+ * Normalize corruption to 0-10 scale (legacy data may be 0-100).
+ */
+export function normalizeCorruptionLevel(rawLevel: number): number {
+  if (!Number.isFinite(rawLevel)) return 0;
+  if (rawLevel <= 10) {
+    return clamp(rawLevel, 0, 10);
+  }
+  // Legacy data used 0-100 scale, so scale down.
+  return clamp(rawLevel / 10, 0, 10);
+}
+
+/**
+ * Convert corruption level (0-10) to penalty points (0 to -500).
+ * Spec: 0 → 0 pts deducted, 10 → -500 pts.
+ */
+function corruptionLevelToPoints(normalizedLevel: number): number {
+  const clamped = clamp(normalizedLevel, 0, 10);
+  return -Math.round((clamped / 10) * CORRUPTION_MAX_POINTS);
+}
+
+// ===========================================================================
+// PUBLIC API
+// ===========================================================================
+
+export function buildSupportTrackBreakdown(percent: number): SupportTrackBreakdown {
   return {
-    people: peoplePoints,
-    middle: middlePoints,
-    mom: momPoints,
-    total: peoplePoints + middlePoints + momPoints,
+    percent: clamp(Math.round(percent), 0, 100),
+    points: supportPercentToPoints(percent),
+    maxPoints: SUPPORT_TRACK_MAX_POINTS,
+  };
+}
+
+export function buildCorruptionBreakdown(rawLevel: number): CorruptionBreakdown {
+  const normalizedLevel = normalizeCorruptionLevel(rawLevel);
+  return {
+    rawLevel,
+    normalizedLevel,
+    points: corruptionLevelToPoints(normalizedLevel),
+    maxPoints: CORRUPTION_MAX_POINTS,
   };
 }
 
 /**
- * Calculate budget score (max 500)
- * Formula: min(500, (budget/1000) × 500)
+ * Main scoring helper used by live resource bar + final screen.
  */
-export function calculateBudgetScore(budget: number): ScoreBreakdown["budget"] {
-  const points = Math.min(500, Math.round((budget / 1000) * 500));
-  return {
-    budgetAmount: budget,
-    points: Math.max(0, points), // Clamp to 0 minimum
-  };
-}
+export function calculateLiveScoreBreakdown({
+  supportPeople,
+  supportMiddle,
+  supportMom,
+  corruptionLevel,
+}: {
+  supportPeople: number;
+  supportMiddle: number;
+  supportMom: number;
+  corruptionLevel: number;
+}): ScoreBreakdown {
+  const people = buildSupportTrackBreakdown(supportPeople);
+  const middle = buildSupportTrackBreakdown(supportMiddle);
+  const mom = buildSupportTrackBreakdown(supportMom);
+  const corruption = buildCorruptionBreakdown(corruptionLevel);
 
-/**
- * Calculate ideology score (max 600)
- * Formula: 300 per axis based on rating
- * Rating → Points: very-low: 60, low: 134, medium: 210, high: 254, very-high: 300
- */
-export function calculateIdeologyScore(
-  liberalismRating: AftermathRating,
-  autonomyRating: AftermathRating
-): ScoreBreakdown["ideology"] {
-  const ratingToPoints = (rating: AftermathRating): number => {
-    switch (rating) {
-      case "very-high": return 300;
-      case "high": return 254;
-      case "medium": return 210;
-      case "low": return 134;
-      case "very-low": return 60;
-      default: return 210; // Default to medium
-    }
-  };
-
-  const liberalismPoints = ratingToPoints(liberalismRating);
-  const autonomyPoints = ratingToPoints(autonomyRating);
+  const supportTotal = people.points + middle.points + mom.points;
+  const final = Math.max(0, supportTotal + corruption.points);
 
   return {
-    liberalism: {
-      rating: liberalismRating,
-      points: liberalismPoints,
+    support: {
+      people,
+      middle,
+      mom,
+      total: supportTotal,
+      maxPoints: SUPPORT_TOTAL_MAX_POINTS,
     },
-    autonomy: {
-      rating: autonomyRating,
-      points: autonomyPoints,
-    },
-    total: liberalismPoints + autonomyPoints,
+    corruption,
+    final,
+    maxFinal: MAX_FINAL_SCORE,
   };
 }
 
 /**
- * Calculate goals score from selected goals
- * Sums bonus points from all completed goals (max 2 goals × 300 pts = 600 max)
- * @param selectedGoals Array of selected goals with status
- * @returns Goals score breakdown
- */
-export function calculateGoalsScore(
-  selectedGoals: Array<{ status: string; scoreBonusOnCompletion: number }> = []
-): ScoreBreakdown["goals"] {
-  const completedGoals = selectedGoals.filter(g => g.status === 'met');
-  const bonusPoints = completedGoals.reduce((sum, g) => sum + g.scoreBonusOnCompletion, 0);
-
-  return {
-    completed: completedGoals.length,
-    bonusPoints,
-    total: bonusPoints, // Total is sum of bonuses (max 600 for 2 goals)
-  };
-}
-
-/**
- * Calculate bonus score (not implemented yet)
- * Placeholder: returns 0
- */
-export function calculateBonusScore(): ScoreBreakdown["bonus"] {
-  return {
-    points: 0, // TODO: Implement bonus conditions
-  };
-}
-
-/**
- * Calculate difficulty score (flat modifiers)
- * baby-boss: -200, freshman: 0, tactician: +200, old-fox: +500
- */
-export function calculateDifficultyScore(
-  difficulty: "baby-boss" | "freshman" | "tactician" | "old-fox" | null
-): ScoreBreakdown["difficulty"] {
-  const modifiers = {
-    "baby-boss": -200,
-    "freshman": 0,
-    "tactician": 200,
-    "old-fox": 500,
-  };
-
-  const points = difficulty ? modifiers[difficulty] : 0;
-  const level = difficulty || "none";
-
-  return {
-    level,
-    points,
-  };
-}
-
-/**
- * Calculate final score (sum all categories, floor at 0, no cap)
+ * Provided for compatibility with previous code paths.
+ * Simply returns `breakdown.final`.
  */
 export function calculateFinalScore(breakdown: ScoreBreakdown): number {
-  const sum =
-    breakdown.support.total +
-    breakdown.budget.points +
-    breakdown.ideology.total +
-    breakdown.goals.total +
-    breakdown.bonus.points +
-    breakdown.difficulty.points;
-
-  return Math.max(0, sum);
+  return clamp(Math.round(breakdown.final), 0, MAX_FINAL_SCORE);
 }
 
-// ========================================================================
-// HELPER FUNCTIONS
-// ========================================================================
+// ===========================================================================
+// HIGH SCORE HELPERS (unchanged)
+// ===========================================================================
 
 /**
  * Format aftermath rating for display

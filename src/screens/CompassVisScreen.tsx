@@ -1,11 +1,8 @@
 // src/screens/CompassVisScreen.tsx
 import { bgStyle } from "../lib/ui";
-import type { PushFn } from "../lib/router";
 import InnerCompass from "../components/InnerCompass";
 
-type Props = { push: PushFn };
-
-export default function CompassVisScreen({ push }: Props) {
+export default function CompassVisScreen() {
   return (
     <div className="min-h-screen w-full text-neutral-100 p-4 sm:p-6" style={bgStyle}>
       <div className="max-w-5xl mx-auto">

@@ -3,7 +3,7 @@ import { useLanguage } from './LanguageContext';
 
 // Global translations store
 let globalTranslations: Record<string, string> = {};
-let currentLanguage: string = 'he';
+let currentLanguage: string = 'en';
 
 // Function to update global translations (called by LanguageProvider)
 export function updateGlobalTranslations(translations: Record<string, string>, language: string) {

@@ -34,64 +34,35 @@ toggleDebug()        # Toggle debug mode
 
 ## Deployment
 
-### Production Build & Deploy
-
-The game is configured for deployment to Render.com (or similar Node.js hosting platforms).
-
-**Prerequisites:**
-- Node.js 20+
-- GitHub repository connected to hosting platform
-- Environment variables configured on hosting platform
-
-**Build Process:**
-```bash
-npm install          # Install dependencies
-npm run build        # Build production frontend (creates dist/)
-npm start            # Start production server (serves static files + API)
-```
+**Platform:** Render.com (Node.js hosting)
 
 **Git Workflow:**
-- `main` branch → Connected to Render (production deployment)
+- `main` branch → Production deployment (auto-deploys on push)
 - `development` branch → Active development work
-- **Deployment:** Merge `development` → `main` → push → auto-deploy
+- **Deploy:** Merge `development` → `main` → push
 
 **Key Files:**
-- `.node-version` - Specifies Node.js v20 for Render
-- `server/index.mjs` - Serves static files from `dist/` when `NODE_ENV=production`
-- `package.json` - Contains `start` script for production
+- `.node-version` - Specifies Node.js v20
+- `server/index.mjs` - Serves static files from `dist/` in production
+- `package.json` - Contains `start` script
 
-**Environment Variables (Required on Render):**
+**Environment Variables:**
 ```bash
 NODE_ENV=production
 OPENAI_API_KEY=your-key
-ANTHROPIC_API_KEY=your-key  # Optional, for Claude support
+ANTHROPIC_API_KEY=your-key  # Optional
 CHAT_MODEL=gpt-5-mini
 MODEL_DILEMMA=gpt-5
 MODEL_MIRROR=gpt-5
 IMAGE_MODEL=gpt-image-1
 TTS_MODEL=tts-1
 TTS_VOICE=alloy
-PORT=3001  # Auto-set by Render, override if needed
 ```
 
-**Render.com Configuration:**
-- **Build Command:** `npm install && npm run build`
-- **Start Command:** `npm start`
-- **Plan:** Starter ($7/month) - No cold starts, instant access
-- **Auto-Deploy:** Enabled on `main` branch pushes
-
-**Deployment Workflow:**
-1. Work on `development` branch
-2. Test locally: `npm run dev`
-3. When ready: merge `development` → `main`
-4. Push `main` to GitHub
-5. Render auto-deploys (2-5 minutes)
-6. Test live URL
-7. Notify testers
-
-**Rollback:**
-- Git: `git revert HEAD && git push`
-- Render Dashboard: Click "Redeploy" on previous deployment
+**Render Configuration:**
+- Build: `npm install && npm run build`
+- Start: `npm start`
+- Auto-deploy enabled on `main` pushes
 
 ## Project Architecture
 
@@ -107,13 +78,13 @@ PORT=3001  # Auto-set by Render, override if needed
 │   └── index.mjs           # Express server with AI endpoints
 ├── src/
 │   ├── components/
-│   │   ├── event/          # EventScreen UI (ActionDeck, DilemmaCard, ResourceBar, etc.)
+│   │   ├── event/          # EventScreen UI components
 │   │   └── [other components]
-│   ├── data/               # Static data (compass definitions, quiz pool, political systems)
-│   ├── hooks/              # Custom hooks for complex logic (event state, narration, data collection)
-│   ├── lib/                # Utilities (router, scoring, dilemma types, compass mapping)
-│   ├── screens/            # Main game screens (EventScreen3, PowerDistributionScreen, etc.)
-│   ├── store/              # Zustand stores (roleStore, compassStore, dilemmaStore, etc.)
+│   ├── data/               # Static data (compass, quiz, political systems, roles)
+│   ├── hooks/              # Custom hooks for complex logic
+│   ├── lib/                # Utilities (router, scoring, types)
+│   ├── screens/            # Main game screens
+│   ├── store/              # Zustand stores
 │   └── theme/              # Styling configurations
 ```
 
@@ -121,175 +92,180 @@ PORT=3001  # Auto-set by Render, override if needed
 
 - **roleStore** - Selected role, political analysis, character data
 - **compassStore** - 4D political compass values (what/whence/how/whither)
-- **dilemmaStore** - Current game state, resources, support levels, subject streak tracking, selected goals, goal tracking state, **gameId** (hosted state conversation identifier)
-- **settingsStore** - User preferences (narration, music, sound effects, debug mode, enableModifiers)
+- **dilemmaStore** - Game state, resources, support, goals, **gameId** (conversation identifier)
+- **settingsStore** - User preferences (narration, music, sound effects, debug, enableModifiers)
 - **mirrorQuizStore** - Compass assessment progress
 - **aftermathStore** - Aftermath data prefetching
 - **dilemmaPrefetchStore** - First dilemma prefetching
 
-**Hosted State Architecture:**
-- `gameId` generated on game start (format: `game-{timestamp}-{random}`)
-- Persisted in localStorage for conversation continuity across page refreshes
-- Conversation lifecycle managed by `dilemmaStore.initializeGame()` and `dilemmaStore.endConversation()`
+### Hosted State Architecture
+
+- **gameId** generated on game start (format: `game-{timestamp}-{random}`)
+- Persisted in localStorage for conversation continuity
 - Backend stores message history in-memory with 24hr TTL
-- Automatic cleanup via periodic task
-
-**Natural Topic Variety (NEW):**
-- AI judges topic repetition using full conversation history (no manual tracking)
-- After 3 consecutive dilemmas on same topic: Summarizes in 1 sentence, transitions naturally
-- Replaces old hard-coded "Day 3 & 5 forbidden topics" system
-- Exception: Urgent follow-ups (vote results, crises) continue even if 3+ same-topic turns
-- Policy domains: Economy, Security, Diplomacy, Rights, Infrastructure, Environment, Health, Education, Justice, Culture, Foreign Relations, Technology
-
-**Dynamic Parameters Generation:**
-- AI generates 1-3 unique measurable consequences per turn (Day 2+ only)
-- Each parameter: 4-6 words max, specific outcome with icon and tone
-- Examples: "GDP growth +2.3%", "800K jobs lost", "Approval rating 68%"
-- Variety enforced: Economic, social, political aspects shown
-- Bug fix (2025-01-27): Prompt now shows 1-3 diverse examples to prevent duplication
+- Lifecycle: `dilemmaStore.initializeGame()` → `dilemmaStore.endConversation()`
 
 ### AI Endpoints
 
-**🎮 HOSTED STATE GAME ENGINE (NEW):**
-- `/api/game-turn` - **Unified endpoint for all event screen data using conversation state**
-  * Replaces: `/api/dilemma-light`, `/api/compass-analyze`, `/api/dynamic-parameters`, `/api/mirror-light`
-  * Benefits: AI maintains full 7-day context, ~50% token savings after Day 1, ~50% faster
-  * Architecture: Uses OpenAI Chat Completions API with persistent message history
-  * Day 1: Sends full game context (role, system, compass, power holders)
-  * Days 2-7: Sends minimal updates (player choice + compass delta)
-  * Returns: Unified JSON with dilemma, support shifts, mirror advice, dynamic params, compass hints
-  * Conversation lifecycle: Created on game start, cleaned up on game end
-  * Storage: In-memory conversation store with 24hr TTL
+**Core Game Engine:**
+- `/api/game-turn` - Unified endpoint for all event screen data using conversation state
+  * Replaces legacy stateless endpoints
+  * Returns: dilemma, support shifts, mirror advice, dynamic params, compass hints
+  * ~50% token savings after Day 1, ~50% faster
 
-**Mirror Dialogue:**
-- `/api/mirror-quiz-light` - Personality summary after quiz (1 sentence, Mushu/Genie personality)
+**Story System:**
+- `/api/narrative-seed` - One-time narrative scaffold generation (2-3 dramatic threads, climax candidates)
+  * Called once in BackgroundIntroScreen after compass assessment
+  * Enables coherent 7-day story arc with escalating stakes
 
-**Other Endpoints:**
-- `/api/validate-role`, `/api/analyze-role` - Role validation and political system analysis
-- `/api/generate-avatar`, `/api/tts` - Avatar and text-to-speech generation
+**Role & Character:**
+- `/api/validate-role`, `/api/analyze-role` - Role validation and E-12 political system analysis
+- `/api/generate-avatar` - AI avatar generation
+
+**Mirror System:**
+- `/api/mirror-quiz-light` - Personality summary after quiz
+
+**End Game:**
 - `/api/aftermath` - Game epilogue generation
-- `/api/news-ticker` - **DISABLED** - Satirical news (code kept for future)
-
-**Legacy Endpoints (Deprecated):**
-- `/api/dilemma-light` - Stateless dilemma generation (replaced by `/api/game-turn`)
-- `/api/compass-analyze` - Standalone compass analysis (now integrated in `/api/game-turn`)
-- `/api/dynamic-parameters` - Standalone dynamic params (now integrated in `/api/game-turn`)
-- `/api/mirror-light` - Standalone mirror advice (now integrated in `/api/game-turn`)
+- `/api/tts` - Text-to-speech narration (when SFX enabled)
 
 **Multi-Provider Support:**
-- Default: OpenAI GPT (requires `OPENAI_API_KEY`)
-- Optional: Anthropic Claude (requires `MODEL_DILEMMA_ANTHROPIC` and `MODEL_MIRROR_ANTHROPIC` in `.env`)
-- Switch via browser console: `switchToClaude()` / `switchToGPT()`
-- Note: Hosted state currently uses OpenAI only (Anthropic support planned)
+- Default: OpenAI GPT
+- Optional: Anthropic Claude (configure in .env)
+- Switch via console: `switchToClaude()` / `switchToGPT()`
 
 ## Game Flow
 
-1. **Role Selection** → Political system analysis (predefined roles skip AI call)
-2. **Character Creation** → Name suggestions + AI avatar (predefined roles use static data)
-3. **Power Distribution** → Define support levels for three factions
-4. **Difficulty Selection** (if `enableModifiers` setting is ON) → Choose difficulty level affecting starting resources
-5. **Goals Selection** (if `enableModifiers` setting is ON) → Choose 2 out of 3 randomly-presented goals to pursue
-6. **Compass Assessment** → Mirror dialogue + quiz to map 4D values
-7. **Background Intro** → Sleep transition with personalized wake-up narrative
-8. **Daily Dilemmas (7 days)** → AI-generated political situations affecting budget, support, compass values
-9. **Aftermath Screen** → AI epilogue with narrative summary, decision breakdown, ratings
-10. **Final Score Screen** → Animated score breakdown with goal bonuses and Hall of Fame integration
-11. **Hall of Fame** → Top 50 highscores with player highlighting
+1. **Role Selection** → Political system analysis (predefined roles skip AI)
+2. **Character Creation** → Name + AI avatar
+3. **Power Distribution** → Define support levels for factions
+4. **Difficulty Selection** (if `enableModifiers` ON) → Affects starting resources
+5. **Goals Selection** (if `enableModifiers` ON) → Choose 2 of 3 goals
+6. **Compass Assessment** → Mirror dialogue + quiz (4D values)
+7. **Background Intro** → Narrative transition + Day 1 prefetch
+8. **Daily Dilemmas (7 days)** → AI-generated political situations
+9. **Aftermath Screen** → AI epilogue with decision breakdown
+10. **Final Score Screen** → Animated score + goal bonuses
+11. **Hall of Fame** → Top 50 highscores
 
-### Key Game Mechanics
+## Key Game Mechanics
 
-**Day 1 Personalization:**
-- First dilemma tailored to player's top 2 "what" compass values (e.g., Liberty + Care)
-- Sent only on Day 1 request (~40 tokens added)
+**Natural Topic Variety:**
+- AI tracks conversation history to avoid repetition
+- After 3 consecutive same-topic dilemmas: transitions naturally
+- Exception: Urgent follow-ups (vote results, crises)
 
-**Thematic Guidance:**
-- **Custom Subject Mode**: User-defined topic (e.g., "Environmental policy")
-- **Default Axes Mode**: Autonomy vs Heteronomy, Liberalism vs Totalism
-- Setting: `dilemmasSubjectEnabled` + `dilemmasSubject` in settingsStore
+**Dynamic Parameters:**
+- AI generates 1-3 measurable consequences per turn (Day 2+)
+- Format: 3-5 words with emoji (e.g., "GDP +2.3%", "47 buildings burned")
+- Variety enforced: economic → social → political → cultural rotation
+- Component: `DynamicParameters.tsx`
 
-**Subject Streak Tracking:**
-- Automatically varies topics after 3+ consecutive same-subject dilemmas
-- Prevents repetitive content
+**Compass Values Integration:**
+- Player's top compass values sent to AI for optional tension-building
+- Soft guidance only - historical authenticity prioritized
+- Injected across narrative seeding and all dilemma prompts
 
-**Vote Outcome Continuity:**
-- If player's previous action involved calling a vote, referendum, or public consultation, the next dilemma MUST present the results
-- Results include: outcome percentage/margin, immediate reactions, and implications
-- New dilemma framed around how player responds to the vote results
-- Applies SYSTEM FEEL: outcomes play differently across political systems (e.g., direct democracies implement immediately, autocracies may face resistance if ignored)
-- Implementation: `server/index.mjs:1469-1473` in CONTINUITY section of `buildLightSystemPrompt()`
+**Dynamic Story Spine:**
+- One-time narrative seeding creates 2-3 dramatic threads
+- AI weaves threads throughout 7-day arc
+- Turn 7: Climax directive brings threads to decisive conclusion
+- Graceful degradation if seeding fails
+
+**Action Continuity System:**
+- **Automatic Detection**: Backend detects votes, referendums, negotiations, consultations via regex
+- **Mandatory Results**: When detected, AI receives explicit directive to show ACTUAL RESULTS, not preparation
+- **Implementation**: `server/index.mjs` lines 4695-4769 in `buildTurnUserPrompt`
+- **Covers**: votes/referendums (show outcome %), negotiations (show what happened in talks), consultations (show input received)
+- **System Feel**: Results play differently across political systems (democracies implement, autocracies may override)
+
+**Faction Identity Mapping:**
+- **Challenge**: AI doesn't inherently know power holder names = faction profiles (e.g., "Coercive Force" = "Challenger")
+- **Solution**: Explicit identity mapping injected in Day 2+ prompts
+- **Implementation**: `server/index.mjs` lines 4569-4580 in `buildTurnUserPrompt`
+- **Effect**: AI understands when player engages respectfully with a power holder, that faction should respond positively
+- **Example**: Athens scenario - negotiating with Spartans makes Coercive Force (the Spartans) respond positively
 
 **Action Confirmation Pipeline:**
-1. Immediate UI: Card animation, coin flight, budget update (synchronous)
+1. Immediate UI: Card animation, coin flight, budget update
 2. Support analysis: Background API call, animated bar updates
-3. Compass analysis: **DEFERRED to next day** (appears as "compass pills", eliminates double-application bug)
+3. Compass analysis: Deferred to next day (appears as "compass pills")
 
 **Prefetching Systems:**
-- **Aftermath Prefetch**: Starts when game ends (Day 8), loads data before player clicks "View Aftermath"
-- **First Dilemma Prefetch**: Starts in BackgroundIntroScreen "ready" phase, loads Day 1 while player reads intro
-- Both use 5-minute freshness check with fallback to normal loading
-
-**Progressive Loading:**
-- Auto-increments 0→99% at 1%/second
-- Server response triggers smooth catchup animation to 100%
-- Single unified overlay for all loading cycles
+- **Aftermath**: Starts Day 8, loads before player clicks
+- **First Dilemma**: Starts during BackgroundIntroScreen "ready" phase
+- 5-minute freshness check with fallback
 
 **Compass Pills:**
-- Visual feedback showing how previous action affected compass values
-- Appears on Day 2+ at presentation Step 4A
-- Auto-collapse after 2s, user-expandable with "+" button
+- Visual feedback showing compass changes from previous action
+- Appears Day 2+ with 2s auto-collapse, expandable via "+" button
 
 **Goals System:**
-- Only enabled when `enableModifiers` setting is ON
-- Player selects 2 out of 3 randomly-presented goals after difficulty selection
-- Goals displayed in ResourceBar (compact pill format, left of avatar picture) during gameplay
-- Three goal categories:
-  - **End-State Goals**: Evaluated only on final day (e.g., "End with 85%+ public support")
-  - **Continuous Goals**: Can permanently fail if threshold violated (e.g., "Never drop below 50% support")
-  - **Behavioral Goals**: Track player actions (e.g., "Never use custom actions")
-- Minimum value tracking: Budget, support levels tracked throughout game for continuous goals
-- Custom action tracking: Incremented when player uses "Suggest Your Own" option
-- Goal evaluation: Runs after each day advancement (in eventDataCleaner.ts)
-- Real-time status updates via GoalsCompact component with status icons (✅/⏳/❌) and hover tooltips
-- Final scoring: Bonus points awarded only for completed goals (0-300 total)
-- Data centralized in `src/data/goals.ts` for easy editing
+- Enabled when `enableModifiers` ON
+- Three types: End-State, Continuous, Behavioral
+- Real-time status: ✅ met / ⏳ in progress / ❌ failed
+- Displayed in ResourceBar during gameplay
+- Data: `src/data/goals.ts`
+
+**Experiment Configuration System:**
+- Centralized configuration for A/B testing and research experiments
+- File: `src/data/experimentConfig.ts`
+- Controls feature availability based on treatment assignment
+
+**Treatment Types:**
+
+| Treatment | AI Options | Custom Action | API Call |
+|-----------|-----------|---------------|----------|
+| **fullAutonomy** | ❌ Hidden | ✅ Only option shown | Skipped (token savings) |
+| **semiAutonomy** | ✅ 3 cards shown | ✅ Button below cards | Called (default) |
+| **noAutonomy** | ✅ 3 cards shown | ❌ Hidden | Called |
+
+**Usage Pattern:**
+```typescript
+import { getTreatmentConfig } from '@/data/experimentConfig';
+import { useSettingsStore } from '@/store/settingsStore';
+
+const treatment = useSettingsStore((state) => state.treatment);
+const config = getTreatmentConfig(treatment);
+
+// Check feature availability
+if (config.generateAIOptions) { /* Call API */ }
+if (config.showCustomAction) { /* Show button */ }
+if (config.inquiryTokensPerDilemma > 0) { /* Future feature */ }
+```
+
+**Token Optimization:**
+When treatment is `fullAutonomy`, the `/api/game-turn` endpoint skips generating AI action options, saving ~40-50% of dilemma generation tokens. The `generateActions` flag is passed from frontend to backend automatically.
+
+**Implementation Points:**
+- **Settings Store** (`settingsStore.ts`): Stores treatment assignment
+- **API Hook** (`useEventDataCollector.ts`): Sends `generateActions` flag to backend
+- **Backend** (`server/index.mjs`): Conditionally generates actions based on flag
+- **UI** (`ActionDeckContent.tsx`): Shows/hides AI cards and custom button
+
+**Adding New Experimental Features:**
+1. Add field to `TreatmentConfig` interface in `experimentConfig.ts`
+2. Set values for each treatment in `EXPERIMENT_CONFIG`
+3. Read config in component/hook and implement conditional logic
+4. Update this documentation
 
 ## Audio System
 
 **Architecture:**
-- Centralized audio management via `audioManager` singleton (`src/lib/audioManager.ts`)
-- React hook wrapper: `useAudioManager()` for component integration
-- Separate volume controls for music and sound effects
-- All audio files preloaded on initialization
+- Singleton: `audioManager` (`src/lib/audioManager.ts`)
+- React hook: `useAudioManager()`
+- Separate controls for music and SFX
 
 **Audio Files:**
-- `tempBKGmusic.mp3` - Background music (loops, 30% volume default)
-- `achievementsChimesShort.mp3` - Compass pills achievement sound
-- `coins.mp3` - Coin animation sound
-- `click soft.mp3` - Button click feedback
-
-**UI Controls:**
-- `AudioControls` component - Vertical stack at top-left
-- Music button (top): Music note icon (amber when enabled, gray when muted)
-- SFX button (bottom): Speaker icon (cyan when enabled, gray when muted)
-- Semi-transparent backdrop, visible on all screens
-
-**Settings Integration:**
-- `musicEnabled` / `sfxEnabled` - Toggle mute state
-- `musicVolume` / `sfxVolume` - Volume levels (0.0 - 1.0)
-- Persisted in localStorage via Zustand (settings-v11)
-
-**Sound Triggers:**
-- **Background Music**: Auto-starts in App.tsx on mount
-- **Achievement Chime**: CompassPillsOverlay when pills appear
-- **Coins**: CoinFlightSystem when animation starts
-- **Click**: ActionDeckContent on button interactions (select, confirm, cancel)
+- `tempBKGmusic.mp3` - Background music (loops, 30% volume)
+- `achievementsChimesShort.mp3` - Compass pills
+- `coins.mp3` - Coin animation
+- `click soft.mp3` - Button clicks
 
 **Narration Integration:**
-- Narration (TTS voiceover) is controlled by SFX toggle
-- When SFX is muted, narration is also disabled (prevents TTS API requests)
-- TTS API requests are automatically prevented when disabled (no token waste)
-- Prevention check occurs in useNarrator.ts:85-92 before fetch to /api/tts
-- Used in EventScreen (dilemma narration) and AftermathScreen (remembrance narration)
+- TTS controlled by SFX toggle
+- When SFX muted, narration disabled (prevents API requests)
+- Used in EventScreen and AftermathScreen
 
 ## Political Compass System
 
@@ -302,434 +278,104 @@ Four dimensions with 10 components each (40 total):
 ## Political System Analysis (E-12 Framework)
 
 **Overview:**
-The power distribution analysis uses the Exception-12 (E-12) framework to classify political systems based on who decides exceptions across 12 critical policy domains. This replaced the previous 25-system taxonomy with a more rigorous 11-polity classification.
+Power distribution analysis using Exception-12 framework - classifies political systems by who decides exceptions across 12 critical policy domains.
 
-**Implementation Date:** 2025-10-22 (Sessions 1-4)
+**11 Polity Types:**
+1. Democracy
+2. Republican Oligarchy
+3. Hard-Power Oligarchy — Plutocracy
+4. Hard-Power Oligarchy — Stratocracy
+5. Mental-Might Oligarchy — Theocracy
+6. Mental-Might Oligarchy — Technocracy
+7. Mental-Might Oligarchy — Telecracy
+8. Autocratizing (Executive)
+9. Autocratizing (Military)
+10. Personalist Monarchy / Autocracy
+11. Theocratic Monarchy
 
-### The 11 Polity Types
+**Exception Domains (3 Tiers):**
+- **Tier I (Existential)**: Security, Civil Liberties, Information Order
+- **Tier II (Constitutive)**: Diplomacy, Justice, Economy, Appointments
+- **Tier III (Contextual)**: Infrastructure, Curricula, Healthcare, Immigration, Environment
 
-Polities are classified based on Author/Eraser control patterns across three tiers of exception domains:
+**Power Holder Classification:**
+- **Author (A)**: Can write/change rules (✍️ blue badge)
+- **Eraser (E)**: Can veto/provide oversight (🛑 red badge)
+- **Subject-Type**: Author, Eraser, Agent, Actor, Acolyte, Dictator
+- **Intensity**: Strong (+), Moderate (•), Weak (-)
 
-1. **Democracy**
-   - Demos (the people) hold decisive authority in core domains through direct mechanisms
-   - Example: Classical Athens, modern referendums
-
-2. **Republican Oligarchy**
-   - Formal offices (Executive, Legislative, Judicial) divide power
-   - No single seat holds both pen and eraser across domains
-   - Examples: US Congress, German Bundestag, EU institutions
-
-3. **Hard-Power Oligarchy — Plutocracy**
-   - Wealth-holders control key exception domains
-   - Economic power translates to political veto
-
-4. **Hard-Power Oligarchy — Stratocracy**
-   - Military/security apparatus holds decisive seats
-   - Coercive force shapes policy exceptions
-   - Examples: Military juntas, praetorian systems
-
-5. **Mental-Might Oligarchy — Theocracy**
-   - Religious authorities control exception domains
-   - Sacred texts/clergy determine legitimacy
-
-6. **Mental-Might Oligarchy — Technocracy**
-   - Technical experts hold decisive authority
-   - Epistemic credentials gate power
-
-7. **Mental-Might Oligarchy — Telecracy**
-   - Media/information controllers shape exceptions
-   - Narrative power translates to political control
-
-8. **Autocratizing (Executive)**
-   - Executive accumulates both pen and eraser across multiple domains
-   - Institutional checks weakening but not yet eliminated
-   - Triggers Stop-rule B
-
-9. **Autocratizing (Military)**
-   - Coercive force launches/escalates conflict without effective checks
-   - Security apparatus expanding exception control
-   - Triggers Stop-rule A
-
-10. **Personalist Monarchy / Autocracy**
-    - Single individual holds decisive authority across domains
-    - Personal loyalty supersedes institutional rules
-
-11. **Theocratic Monarchy**
-    - Monarch derives authority from sacred sources
-    - Religious legitimacy backs personal rule
-
-### E-12 Exception Domains (Three Tiers)
-
-**Tier I: Existential** (typically determines polity type)
-- Security (war/peace declarations)
-- Civil Liberties (speech, assembly, movement)
-- Information Order (media, education content control)
-
-**Tier II: Constitutive** (shapes political order)
-- Diplomacy (foreign relations, treaties)
-- Justice (courts, enforcement, punishment)
-- Economy (fiscal/monetary policy)
-- Appointments (who fills key offices)
-
-**Tier III: Contextual** (refines polity subtype)
-- Infrastructure (roads, utilities, networks)
-- Curricula (what is taught)
-- Healthcare (access, standards)
-- Immigration (borders, citizenship)
-- Environment (pollution, conservation)
-
-### Author/Eraser Roles
-
-Power holders are classified by their relationship to rules and exceptions:
-
-**Author (A)**: Can write or change rules and facts
-- Creates new policies
-- Alters existing frameworks
-- Badge: ✍️ (blue)
-
-**Eraser (E)**: Can credibly veto or provide oversight
-- Blocks proposals
-- Reverses decisions
-- Checks other seats
-- Badge: 🛑 (red)
-
-Many seats have both roles (e.g., Legislature authors laws + erases executive overreach).
-
-### Subject-Type Classifications
-
-Power holders are further classified by their relationship to political authority:
-
-| Type | Description | Intensity |
-|------|-------------|-----------|
-| **Author** | Writes/changes rules across domains | - (weak), • (moderate), + (strong) |
-| **Eraser** | Credible veto/oversight power | - (weak), • (moderate), + (strong) |
-| **Agent** | Executes decisions made elsewhere | - (weak), • (moderate), + (strong) |
-| **Actor** | Autonomous but within constraints | - (weak), • (moderate), + (strong) |
-| **Acolyte** | Follower bound by doctrine/ideology | - (weak), • (moderate), + (strong) |
-| **Dictator** | Unconstrained personal rule | - (weak), • (moderate), + (strong) |
-
-**Visual Indicators:**
-- Strong (+): Purple badge
-- Moderate (•): Indigo badge
-- Weak (-): Gray badge
-
-### Stop Rules
-
-Automatic classification triggers when power concentration reaches critical thresholds:
-
-**Stop-rule A**: Coercive force launches/escalates war at will without effective checks
-→ Classification: **Stratocracy** or **Autocratizing (Military)**
-
-**Stop-rule B**: Executive routinely authors exceptions across multiple domains AND neutralizes erasers
-→ Classification: **Autocratizing (Executive)**
-
-### Grounding Context
-
-Analysis includes historical/fictional grounding:
-
-**Setting Type:**
-- `real`: Historical or current real-world context
-- `fictional`: Fantasy, sci-fi, alternate history
-- `unclear`: Ambiguous or insufficient information
-
-**Era**: Time period description (e.g., "Classical Athens, 5th century BCE")
-
-### API Implementation
-
-**Endpoint**: `/api/analyze-role`
-**File**: `server/index.mjs` (lines 75-563)
-**Model**: `MODEL_ANALYZE` (typically gpt-4o)
-**Temperature**: 0.2 (lowered from 0.4 for consistency)
-
-**Request:**
-```json
-{
-  "role": "Emperor of Tang China"
-}
-```
-
-**Response:**
-```json
-{
-  "systemName": "Theocratic Monarchy",
-  "systemDesc": "Monarch derives authority from sacred Mandate of Heaven...",
-  "flavor": "Absolute power wrapped in celestial legitimacy.",
-  "holders": [
-    {
-      "name": "Emperor",
-      "percent": 70,
-      "icon": "👑",
-      "note": "Holds Mandate of Heaven; ultimate authority",
-      "role": { "A": true, "E": true },
-      "stype": { "t": "Dictator", "i": "+" }
-    }
-    // ... 3-4 more seats
-  ],
-  "playerIndex": 0,
-  "e12": {
-    "tierI": ["Security", "CivilLib", "InfoOrder"],
-    "tierII": ["Diplomacy", "Justice", "Appointments", "Economy"],
-    "tierIII": ["Infrastructure", "Curricula"],
-    "stopA": false,
-    "stopB": false,
-    "decisive": ["Emperor", "Imperial Court"]
-  },
-  "grounding": {
-    "settingType": "real",
-    "era": "Tang Dynasty, 8th century CE"
-  }
-}
-```
-
-### Predefined Role Optimization
-
-**Critical**: Predefined roles bypass the API entirely using hardcoded power distributions. This optimization is preserved to avoid unnecessary API calls.
-
-**Implementation**: `src/data/predefinedRoles.ts` (centralized database)
-
-**Architecture**:
-- All role data (power distributions, characters, images, i18n keys) centralized in single file
-- Role count is dynamic (automatically adjusts to array length)
-- RoleSelectionScreen maps roles from `PREDEFINED_ROLES_ARRAY` with runtime translation via `lang()` function
-- Translation system fully preserved (text stored in `en.json` / `he.json`)
-- Legacy helper functions (`getPredefinedPowerDistribution`, `getPredefinedCharacters`, `getRoleImages`) redirect to new database for backward compatibility
+**API Implementation:**
+- Endpoint: `/api/analyze-role`
+- Model: `MODEL_ANALYZE` (gpt-4o)
+- Temperature: 0.2
 
 **Predefined Roles:**
-1. Athens — The Day Democracy Died (-404) → Hard-Power Oligarchy — Stratocracy
-2. Alexandria — Fire over the Nile (-48) → Autocratizing (Military)
-3. Florence — The Fire and the Faith (1494) → Mental-Might Oligarchy — Theocracy
-4. North America — The First Encounter (1607) → Personalist Monarchy / Autocracy
-5. Japan — The Land at War's End (1600) → Hard-Power Oligarchy — Stratocracy
-6. Haiti — The Island in Revolt (1791) → Hard-Power Oligarchy — Stratocracy
-7. Russia — The Throne Crumbles (1917) → Personalist Monarchy / Autocracy
-8. India — The Midnight of Freedom (1947) → Hard-Power Oligarchy — Stratocracy
-9. South Africa — The End of Apartheid (1990) → Autocratizing (Executive)
-10. Mars Colony — The Red Frontier (2179) → Mental-Might Oligarchy — Technocracy
+10 historical scenarios with hardcoded E-12 data (skip API calls):
+1. Athens (-404) → Stratocracy
+2. Alexandria (-48) → Autocratizing (Military)
+3. Florence (1494) → Theocracy
+4. North America (1607) → Personalist Monarchy
+5. Japan (1600) → Stratocracy
+6. Haiti (1791) → Stratocracy
+7. Russia (1917) → Personalist Monarchy
+8. India (1947) → Stratocracy
+9. South Africa (1990) → Autocratizing (Executive)
+10. Mars Colony (2179) → Technocracy
 
-**Each predefined role includes**:
-- Complete E-12 analysis data (role, stype, e12, grounding fields)
-- Culturally appropriate character names (male/female/any options)
-- Image identifiers (banner and full images)
-- i18n translation key references (titleKey, introKey, youAreKey)
-- Expandable UI cards with historical context, role description, and confirm button
-
-**Adding a new role** (simplified workflow):
-1. Add role object to `PREDEFINED_ROLES_ARRAY` in `src/data/predefinedRoles.ts` (~80 lines)
-2. Add 3 translation keys to `src/i18n/languages/en.json` (ROLE_TITLE, ROLE_INTRO, ROLE_YOU_ARE)
-3. Add 3 translation keys to `src/i18n/languages/he.json` (Hebrew translations)
-4. Add 2 image files to `/assets/images/BKGs/Roles/` (banner and full)
-5. Role automatically appears in UI (no RoleSelectionScreen edits needed)
-
-### Type System
-
-**PowerHolder Type** (`src/store/roleStore.ts`):
-```typescript
-export type PowerHolder = {
-  name: string;
-  percent: number;
-  icon?: string;
-  note?: string;
-  role?: { A: boolean; E: boolean }; // Author/Eraser flags
-  stype?: { // Subject-Type classification
-    t: "Author" | "Eraser" | "Agent" | "Actor" | "Acolyte" | "Dictator";
-    i: "-" | "•" | "+"; // intensity
-  };
-};
-```
-
-**AnalysisResult Type** (`src/store/roleStore.ts`):
-```typescript
-export type AnalysisResult = {
-  systemName: string;
-  systemDesc: string;
-  flavor: string;
-  holders: PowerHolder[];
-  playerIndex: number | null;
-  e12?: { // Exception-12 analysis
-    tierI: string[];
-    tierII: string[];
-    tierIII: string[];
-    stopA: boolean;
-    stopB: boolean;
-    decisive: string[];
-  };
-  grounding?: { // Setting context
-    settingType: "real" | "fictional" | "unclear";
-    era: string;
-  };
-};
-```
-
-### UI Components
-
-**PowerDistributionContent** (`src/components/PowerDistributionContent.tsx`):
-- Displays Author/Eraser badges inline with power holder names
-- Shows Subject-Type indicators with color-coded intensity
-- "View Analysis" button appears when e12Data exists
-
-**E12AnalysisModal** (`src/components/E12AnalysisModal.tsx`):
-- Modal overlay showing full E-12 analysis
-- Sections: Historical grounding, decisive seats, stop rules, tier breakdown
-- Triggered by "View Analysis" button in PowerDistributionContent
-
-**Visual Elements:**
-- Author badge: ✍️ (blue background)
-- Eraser badge: 🛑 (red background)
-- Subject-Type intensity colors: Purple (+), Indigo (•), Gray (-)
-- Political system button with HelpCircle icon
-- E-12 analysis button with Cog icon (purple theme)
-
-### Migration Notes (2025-10-22)
-
-**Changes from Previous System:**
-- Old: 25 political systems with simple classification
-- New: 11 polity types based on E-12 framework
-- Token cost for custom roles: ~2.7x increase (justified by analytical depth)
-- Predefined roles: No change in behavior (still skip API)
-
-**System Name Mappings:**
-- "Direct Democracy" → "Democracy"
-- "Representative Democracy" → "Republican Oligarchy"
-- "Early Republicanism" → "Republican Oligarchy"
-- "Absolute Monarchy" → "Personalist Monarchy / Autocracy"
-- "Military Dictatorship" → "Hard-Power Oligarchy — Stratocracy"
-- "Single-Party State" → "Autocratizing (Executive)"
-- etc.
-
-**Backward Compatibility:**
-- New fields (role, stype, e12, grounding) are optional in types
-- Old saved games without these fields display normally
-- UI components check for field existence before rendering badges
-
-**Files Modified:**
-- `server/index.mjs` - Complete /api/analyze-role rewrite
-- `src/store/roleStore.ts` - Extended PowerHolder and AnalysisResult types
-- `src/data/politicalSystems.ts` - Replaced with 11 polities
-- `src/data/predefinedPowerDistributions.ts` - Enriched all 4 roles with E-12 data
-- `src/components/PowerDistributionContent.tsx` - Added badges and analysis button
-- `src/components/E12AnalysisModal.tsx` - New component for detailed analysis
-- `src/screens/PowerDistributionScreen.tsx` - Pass e12Data and groundingData props
-- `src/screens/RoleSelectionScreen.tsx` - Updated system names
-- `src/data/highscores-default.ts` - Updated all 20 entries with new polity names
-
-**Anti-Jargon Rules:**
-The E-12 prompt enforces plain modern English:
-- Avoid: "ancien régime", "Rechtsstaat", "vanguard party", "corporatism"
-- Use: "old order", "rule of law", "elite party", "state-business alliance"
-- Target: Readable by modern English speakers without specialized knowledge
-
-### Centralized Roles Database Refactor (2025-10-30)
-
-**Change**: Consolidated scattered role data into single centralized database.
-
-**Motivation**:
-- Old system: Role data split across 5 files + 2 translation files
-- Adding/editing a role required changes in multiple locations
-- Difficult to maintain consistency
-
-**New Architecture**:
-- Single source of truth: `src/data/predefinedRoles.ts`
-- Contains all role data: power distributions, characters, images, i18n key references
+**Data Structure:**
+- Centralized in `src/data/predefinedRoles.ts`
+- Includes: power distributions, characters, images, i18n keys
 - Dynamic role count (auto-adjusts to array length)
-- Translation system preserved (text still in language files)
-- Legacy helper functions redirect to new database for backward compatibility
 
-**Files Created**:
-- `src/data/predefinedRoles.ts` - Centralized role database (~850 lines)
+**Adding a New Role:**
+1. Add role object to `PREDEFINED_ROLES_ARRAY`
+2. Add 3 i18n keys to `en.json` / `he.json`
+3. Add 2 images to `/assets/images/BKGs/Roles/`
+4. Role automatically appears in UI
 
-**Files Modified**:
-- `src/screens/RoleSelectionScreen.tsx` - Now dynamically maps from `PREDEFINED_ROLES_ARRAY`
-- `src/data/predefinedPowerDistributions.ts` - Helper functions now redirect to central database
-- `src/data/predefinedCharacters.ts` - Helper functions now redirect to central database
-- `src/data/roleImages.ts` - Helper functions now redirect to central database
-- `src/i18n/languages/he.json` - Added 30 missing role translation keys
-
-**Benefits**:
-- Single-file workflow for adding/editing roles
-- Consistent data structure across all roles
-- Easier to maintain and extend
-- Full i18n support preserved
-- Backward compatible with existing code
+**UI Components:**
+- `PowerDistributionContent` - Displays badges and analysis button
+- `E12AnalysisModal` - Full analysis modal with historical grounding
 
 ## Scoring System
-
-Score calculated in FinalScoreScreen only (stays at 0 during gameplay).
 
 | Category | Max Points | Formula |
 |----------|-----------|---------|
 | **Support** | 1800 | 600 per track: `(value/100) × 600` |
 | **Budget** | 400 | `min(400, (budget/1000) × 400)` |
 | **Ideology** | 600 | 300 per axis (5-tier from Aftermath API) |
-| **Goals** | 0-300 | Sum of completed goal bonuses (max 2 goals × 150 pts each) |
+| **Goals** | 0-300 | Completed goal bonuses (max 2 × 150) |
 | **Difficulty** | ±500 | -200/0/+200/+500 flat modifier |
 | **TOTAL** | ~3600 | No cap (theoretical max ~3600) |
 
-**Ideology Rating → Points:**
-- very-low: 60, low: 134, medium: 210, high: 254, very-high: 300
-
-**Goals System:**
-- Only available when `enableModifiers` setting is ON
-- Players select 2 out of 3 randomly-presented goals after difficulty selection
-- Goal types: End-State (final values), Continuous (never drop below), Behavioral (action tracking)
-- Real-time status tracking (✅ met / ⏳ in progress / ❌ failed) displayed in ResourceBar
-- Bonus points awarded only for completed goals
-- Goal pool contains 12 different goals with bonuses ranging from 100-150 points each
-
 **Hall of Fame Integration:**
-- All players auto-submitted to highscore table after animation
-- Top 20 = celebration banner, others = acknowledgment
-- Highlighting + auto-scroll via URL param: `/highscores?highlight=PlayerName`
+- Auto-submit after score animation
+- Top 50 displayed, top 3 have special colors
+- Highlighting via URL: `/highscores?highlight=PlayerName`
 
-## Meta Screens (Accessible from Splash Screen)
+## Meta Screens
 
 ### Hall of Fame
-**Route**: `/highscores`
-**Access**: "Hall of Fame" button on SplashScreen
-**Features**:
-- Displays top 50 highscores in sorted order
-- Shows leader avatar, name, political system, compass axes, and score
-- Top 3 ranks have special colors (gold, silver, copper)
-- Auto-scroll and highlight support via URL parameter
-- Back button returns to previous screen
+- Route: `/highscores`
+- Top 50 highscores with avatar, name, system, compass, score
+- Auto-scroll and highlight support
 
 ### Book of Achievements
-**Route**: `/achievements`
-**Access**: "Book of Achievements" button on SplashScreen
-**Status**: 🚧 **Under Construction** - Display only, no tracking yet
-
-**Current Implementation** (2025-10-17):
-- Achievement database: `src/data/achievements.ts` (7 achievements defined)
-- Display screen: `src/screens/AchievementsScreen.tsx`
-- Grid layout with animated cards showing icon, title, and description
-- Lock icons on all achievements (placeholder for future functionality)
-- Info banner indicating feature is under construction
-
-**Defined Achievements**:
-- **Dictator's Dilemma**: Complete a full game as a dictator
-- **Role Completionist**: Complete the game with all pre-existing roles
-- **Unicorn Ruler**: Complete a game as the unicorn king
-- **Warmonger**: Trigger a world war during your rule
-- **Revolutionary**: Trigger a political system change in your game
-- **Fallen Leader**: Get assassinated during your rule
-- **Peacemaker**: Sign a peace treaty during your rule
-
-**Future Functionality** (Not Yet Implemented):
-- Achievement tracking store
-- Unlock logic based on game events
-- Locked/unlocked visual states
-- Achievement notifications during gameplay
-- Persistence across sessions
+- Route: `/achievements`
+- Status: 🚧 Under Construction
+- 7 achievements defined in `src/data/achievements.ts`
+- Display only, no tracking yet
 
 ## Code Patterns & Architecture
 
 ### Component Optimization Pattern
-Used in EventScreen3, PowerDistributionScreen, ActionDeck:
-1. **Extract State Hooks** - Manage component state (e.g., `useEventState`, `useActionDeckState`)
-2. **Extract Logic Hooks** - Handle complex operations (e.g., `usePowerDistributionAnalysis`, `useActionSuggestion`)
-3. **Extract Content Components** - Separate UI rendering (e.g., `ActionDeckContent`, `PowerDistributionContent`)
-4. **Extract Specialized Systems** - Isolate complex features (e.g., `CoinFlightSystem`, `CompassPillsOverlay`)
+Applied to EventScreen3, PowerDistributionScreen, ActionDeck:
+1. **Extract State Hooks** - Component state management
+2. **Extract Logic Hooks** - Complex operations
+3. **Extract Content Components** - UI rendering
+4. **Extract Specialized Systems** - Complex features
 
-Benefits: Better React optimizations (memoization, selective re-renders), improved maintainability.
+Benefits: Better React optimizations, improved maintainability
 
 ### Completed Optimizations
 
@@ -740,72 +386,14 @@ Benefits: Better React optimizations (memoization, selective re-renders), improv
 
 **AI Token Optimization:**
 - Compass Analysis: 81% reduction (682 → 133 tokens)
-- API Payload: 43.5% reduction (5,400 → 3,050 tokens/day)
 - Dilemma Generation: 40-50% reduction (~2,000 → ~1,000 tokens)
-- Light Dilemma API: 85%+ reduction + 3-4x faster (60s → 15-20s)
+- Overall: ~50% token savings with hosted state
 
-**Key Optimizations:**
-- Compass values: Top 3 per dimension only (not all 40)
-- Dilemma history: Last 2 days only (not full 7 days)
-- Mirror payload: Minimal context (top 2 values + current dilemma)
-- NewsTicker: Disabled by default (~800 tokens saved)
-
-### Remaining Optimization Opportunities
-
-**Component Refactoring:**
-- RoleSelectionScreen.tsx - Extract role validation and selection logic
-- MirrorDialogueScreen.tsx - Extract mirror conversation handling
-
-**React Performance:**
-- Add `React.memo()` to frequently re-rendering components
-- Implement `useMemo()` for expensive calculations
-- Add `useCallback()` for event handlers
-
-**Code Organization:**
-- Create barrel exports (`index.ts` files)
-- Move components into logical sub-folders
-- Extract shared utilities
-
-**Bundle Optimization:**
-- Implement code splitting for game screens
-- Lazy load heavy components
-
-## Known Issues & Disabled Features
-
-**EventScreen ↔ MirrorScreen Navigation (DISABLED 2025-10-10):**
-- "?" button temporarily removed from MirrorCard
-- Issues: Error on return, narration re-trigger, possible duplicate API request
-- Navigation system exists (`eventScreenSnapshot.ts`) but has timing/effect issues
-- Will be restored after debugging effect dependencies and restoration lifecycle
-
-## Code Cleanup
-
-**Recent Cleanup (2025-10-20):**
-
-Completed major cleanup after first prototype completion:
-
-**Deleted Files:**
-- `src/screens/AftermathScreen.backup.tsx` - Backup file
-- `src/screens/FinalScoreScreen.backup.tsx` - Backup file
-- `src/hooks/useEventEffects.ts` - Replaced by EventScreen3 architecture
-- `src/components/event/EventContent.tsx` - Not imported anywhere
-- `src/components/event/ProgressiveLoadingCard.tsx` - Only used by deleted EventContent
-- `src/hooks/useProgressiveLoading.ts` - Legacy loading system
-- `src/hooks/useDynamicParameters.ts` - Legacy parameters system
-- `src/hooks/useDayProgression.ts` - Legacy progression system
-
-**Removed Server Endpoints:**
-- `/api/dilemma` - Heavy dilemma API (~465 lines)
-- `/api/support-analyze` - Support analysis for heavy API (~98 lines)
-- `/api/mirror-summary` - Old mirror summary with game history (~232 lines)
-- Commented `/api/name-suggestions` code (~28 lines)
-
-**Simplified Code:**
-- `dilemmaStore.ts` - Removed `buildSnapshot()`, `analyzeEnhancedContext()`, `flattenCompass()`, `flattenCompassOptimized()` (~228 lines)
-- `settingsStore.ts` - Removed `useLightDilemma` toggle (light API now only option)
-- `useEventDataCollector.ts` - Removed `fetchSupportAnalysis()`, `fetchNews()`, heavy API branch (~68 lines)
-
-**Total Cleanup:** ~1,100+ lines of dead code removed
+**Key Strategies:**
+- Compass: Top 3 per dimension only
+- History: Last 2 days only
+- Mirror: Minimal context
+- Conversation state: Incremental updates
 
 ## Development Guidelines
 
@@ -814,4 +402,358 @@ Completed major cleanup after first prototype completion:
 - **Use optimization patterns** from EventScreen3, PowerDistributionScreen, ActionDeck as models
 - **Annotate new code** with clear descriptions and file relationships
 - **Update CLAUDE.md** whenever making significant changes
-- **Keep dependencies clean** - Review `useEffect` cleanup functions to prevent memory leaks
+- **Keep dependencies clean** - Review `useEffect` cleanup functions
+- **ALWAYS integrate data logging** (see Data Logging Integration section below)
+
+## Recent Logging System Improvements (Nov 2024)
+
+### Critical Bug Fixes
+
+**1. Debug Mode Logic Inversions (FIXED)**
+- **Files**: `useSessionLogger.ts`, `useStateChangeLogger.ts`
+- **Issue**: Debug mode checks were inverted (`if (!debugMode)` instead of `if (debugMode)`)
+- **Impact**: Logging only worked in debug mode, completely broken in production
+- **Fix**: Inverted logic to skip logging when debugMode is true
+- **Lines**: useSessionLogger.ts (44, 74, 109), useStateChangeLogger.ts (30)
+
+**2. Massive Duplication Bug (FIXED)**
+- **File**: `EventScreen3.tsx` → `useEventDataCollector.ts`
+- **Issue**: AI output logging in EventScreen3 useEffect fired every time collectedData changed
+- **Impact**: 10-30 duplicate logs per dilemma (750 dilemma_generated logs instead of ~21)
+- **Fix**: Moved logging to `useEventDataCollector.ts` collectData() function (logs once at source)
+- **Reduction**: ~90% reduction in AI output logs
+
+**3. Visibility Event Noise (FIXED)**
+- **File**: `useSessionLogger.ts`
+- **Issue**: 4 overlapping events per tab switch (window_blur, window_focus, player_left, player_returned)
+- **Impact**: ~58 noise events per playthrough with low research value
+- **Fix**: Removed entire visibility tracking useEffect (lines 148-217)
+- **Justification**: Events overlapped, provided no gameplay insight
+
+### Feature Improvements
+
+**4. Session Lifecycle (FIXED)**
+- **Files**: `RoleSelectionScreen.tsx`, `AftermathScreen.tsx`, `SplashScreen.tsx`
+- **Changes**:
+  - Session starts when role is confirmed (not on splash screen)
+  - Session ends when aftermath screen loads
+  - Added splash_screen_loaded event
+- **Impact**: More accurate session timing, cleaner event sequence
+
+**5. Compass Logging Enhancement (FIXED)**
+- **File**: `useStateChangeLogger.ts`
+- **Issue**: Logged compass changes as dimension[index] (e.g., "what[6]: +2")
+- **Fix**: Now logs component names from compass-data.ts (e.g., "Care +2")
+- **Impact**: Human-readable compass logs, easier analysis
+
+**6. Support Shift Redundancy (FIXED)**
+- **File**: `useAIOutputLogger.ts`
+- **Issue**: Logged both individual support_shift_generated AND support_shifts_summary
+- **Impact**: 1,540 redundant individual logs + 513 summary logs
+- **Fix**: Removed individual logs, kept only summary with explanations
+- **Reduction**: ~75% reduction in support shift logs
+
+**7. Player Interaction Logging (IMPROVED)**
+- **File**: `CompassPillsOverlay.tsx`
+- **Added**: compass_pills_opened, compass_pills_closed events
+- **Impact**: Track user engagement with compass feedback UI
+
+### Data Quality Improvements Summary
+
+| Issue | Before | After | Reduction |
+|-------|--------|-------|-----------|
+| AI Output Duplicates | ~2,277 logs | ~75 logs | 90% |
+| Visibility Noise | 58 events | 0 events | 100% |
+| Support Redundancy | 2,053 logs | 513 logs | 75% |
+| Debug Mode Bug | Broken in prod | Fixed | N/A |
+| Compass Readability | "what[6]" | "Care" | N/A |
+
+**Total Impact**: ~3,000 fewer logs per playthrough, cleaner data, human-readable output
+
+## Data Logging Integration (MANDATORY)
+
+When adding or modifying ANY feature, ALWAYS integrate logging. The codebase has a comprehensive data logging system for research analysis.
+
+### Logging Architecture
+
+**Core Components:**
+- `src/hooks/useLogger.ts` - Main logging hook (player actions)
+- `src/hooks/useTimingLogger.ts` - Timing measurements (decision time, typing duration)
+- `src/hooks/useAIOutputLogger.ts` - AI-generated content logging
+- `src/hooks/useSessionLogger.ts` - Session lifecycle tracking
+- `src/hooks/useStateChangeLogger.ts` - Automatic state change tracking
+- `src/lib/loggingService.ts` - Core service with queue management, auto-flush, retry logic
+- `src/store/loggingStore.ts` - Zustand store for userId, sessionId, treatment
+- `server/api/logging.mjs` - Backend endpoints with MongoDB storage
+
+**Log Structure:**
+```typescript
+{
+  timestamp: Date,
+  userId: string,          // Anonymous UUID
+  sessionId: string,       // Per-game session
+  gameVersion: string,     // From package.json
+  treatment: string,       // Experiment treatment
+  source: 'player' | 'system',
+  action: string,          // Event name
+  value: string | number | boolean | object,  // Event data
+  currentScreen: string,   // Route
+  day: number,             // Game day
+  role: string,            // Selected role
+  comments: string         // Human-readable description
+}
+```
+
+### User Interactions (Use `useLogger`)
+
+**Required Logging:**
+- All button clicks
+- All text inputs (with character counts)
+- All form submissions (with timing)
+- All modal open/close events
+- All navigation events
+
+**Examples:**
+```typescript
+const logger = useLogger();
+
+// Button click
+logger.log('button_click_start', { buttonId: 'start', screen: '/splash' }, 'User clicked start button');
+
+// Text input submission
+logger.log('custom_action_submitted', {
+  text: customText,
+  charCount: customText.length,
+  typingDuration: duration
+}, `Custom action submitted (${customText.length} chars, ${duration}ms)`);
+
+// Modal opened
+logger.log('inquiry_modal_opened', {
+  remainingCredits,
+  dilemmaTitle
+}, 'User opened inquiry modal');
+```
+
+### System Events (Use `useLogger.logSystem`)
+
+**Required Logging:**
+- All AI-generated content (dilemmas, mirror advice, support shifts, compass hints)
+- All state changes (support, budget, corruption, compass values)
+- All screen transitions
+- All errors and failures
+
+**Examples:**
+```typescript
+const logger = useLogger();
+
+// AI output
+logger.logSystem('dilemma_generated', {
+  title: dilemma.title,
+  description: dilemma.description,
+  actionCount: dilemma.actions.length
+}, `Dilemma generated: ${dilemma.title}`);
+
+// State change
+logger.logSystem('state_support_changed', {
+  from: oldValue,
+  to: newValue,
+  delta: newValue - oldValue
+}, `Support changed: ${oldValue} → ${newValue}`);
+```
+
+### Timing Measurements (Use `useTimingLogger`)
+
+**Required Timing:**
+- Decision time (dilemma presented → action confirmed)
+- Typing duration (input focused → text submitted)
+- Session duration (game start → game end)
+- Screen time (screen entered → screen exited)
+
+**Examples:**
+```typescript
+const timingLogger = useTimingLogger();
+
+// Start timing
+const timingId = timingLogger.start('decision_time', {
+  day,
+  dilemmaTitle
+});
+
+// End timing (automatically logs duration)
+const duration = timingLogger.end(timingId, {
+  actionId: 'a',
+  actionTitle: 'Deploy troops'
+});
+```
+
+### AI Output Logging (Use `useAIOutputLogger`)
+
+**Required AI Logging:**
+- Dilemma generation (title, description, actions, topic, scope)
+- Mirror advice (text, length)
+- Support shifts (deltas, explanations)
+- Compass hints (value changes)
+- Dynamic parameters (consequences)
+- Corruption shifts (delta, reason)
+- Narrative seeds (story threads)
+- Inquiry responses (questions, answers)
+- Custom action validation (approval/rejection)
+
+**Examples:**
+```typescript
+const aiLogger = useAIOutputLogger();
+
+// Log dilemma
+aiLogger.logDilemma(dilemma, {
+  topic: 'economy',
+  scope: 'national',
+  crisisMode: 'people'
+});
+
+// Log mirror advice
+aiLogger.logMirrorAdvice(mirrorText);
+
+// Log support shifts
+aiLogger.logSupportShifts(supportEffects);
+```
+
+### State Change Tracking (Use `useStateChangeLogger`)
+
+**Automatic Tracking:**
+The `useStateChangeLogger` hook automatically subscribes to all Zustand store changes and logs:
+- Support value changes (people, middle, mom)
+- Budget changes
+- Corruption level changes
+- Compass value changes
+- Score changes
+- Day progression
+- Goal status changes
+- Crisis mode changes
+- Treatment changes
+
+**Usage:**
+```typescript
+// In a top-level component (e.g., App.tsx or EventScreen3)
+useStateChangeLogger(); // That's it! No manual logging needed
+```
+
+### Integration Checklist
+
+When adding or modifying features, verify:
+
+- [ ] **User Interactions**: All clicks, inputs, submissions logged
+- [ ] **System Events**: All AI outputs, state changes logged
+- [ ] **Timing**: Decision time, typing duration tracked where applicable
+- [ ] **Character Counts**: All text inputs log character count
+- [ ] **Error Handling**: All errors logged with context
+- [ ] **Navigation**: Screen changes logged with timing
+- [ ] **Treatment Field**: Experiment treatment included in logs
+- [ ] **Comments**: Human-readable descriptions provided
+
+### File-Specific Guidelines
+
+**App.tsx** (`src/App.tsx`):
+- ✅ Wrapped with `ErrorBoundary` for global error catching and logging
+- ✅ Uses `useStateChangeLogger` globally (all Zustand store changes auto-logged)
+- ✅ Uses `useSessionLogger` globally (tab visibility, window blur/focus auto-logged)
+- Pattern: Global hooks run once at app level for comprehensive coverage
+
+**EventScreen3** (`src/screens/EventScreen3.tsx`):
+- ✅ Uses `useTimingLogger` for decision time (start when interacting, end when confirmed)
+- ✅ Uses `useAIOutputLogger` for all AI outputs when collected data arrives
+- ✅ Logs dilemma generation, mirror advice, support shifts, compass hints, dynamic params, corruption
+- Pattern: Start timing when phase becomes 'interacting', end when action confirmed
+
+**InquiringModal** (`src/components/event/InquiringModal.tsx`):
+- ✅ Uses `useTimingLogger` for typing duration
+- ✅ Logs modal open/close, inquiry submission, answer received
+- ✅ Logs character counts for questions
+- Pattern: Start timing on modal open, end on submission
+
+**AftermathScreen** (`src/screens/AftermathScreen.tsx`):
+- ✅ Uses `useSessionLogger.end()` with comprehensive session summary
+- ✅ Logs: session duration, total inquiries, total custom actions, final score, role
+- ✅ Only logs on first visit (not on snapshot restoration)
+- Pattern: Calculate aggregates from stores, log once when data loads
+
+**ErrorBoundary** (`src/components/ErrorBoundary.tsx`):
+- ✅ Catches all uncaught React errors
+- ✅ Logs fatal errors with stack traces, component stacks, metadata
+- ✅ Forces immediate flush (doesn't wait for auto-flush)
+- ✅ Provides user-friendly error UI with retry options
+- Pattern: Class component with componentDidCatch lifecycle
+
+**MirrorQuizScreen** (`src/screens/MirrorQuizScreen.tsx`):
+- ✅ Uses `useTimingLogger` for per-question timing
+- ✅ Logs all quiz questions presented (system events)
+- ✅ Logs all player answers with timing (player events)
+- ✅ Logs compass pills displayed (system events)
+- ✅ Logs AI-generated summary (system event)
+- ✅ Logs quiz completion
+- Pattern: Start timing on question presentation, end on answer selection
+
+**ActionDeck + useActionDeckState** (`src/components/event/`):
+- ✅ Uses `useTimingLogger` for custom action typing duration
+- ✅ Logs custom action modal open/close
+- ✅ Logs custom action submission (text, character count, typing duration)
+- Pattern: Start timing on modal open, end on submission
+
+**CompassPillsOverlay** (`src/components/event/CompassPillsOverlay.tsx`):
+- ✅ Logs compass pills opened/closed (player events)
+- ✅ Logs pill count with each interaction
+- Pattern: onClick handlers for expand/collapse buttons
+
+**SplashScreen** (`src/screens/SplashScreen.tsx`):
+- ✅ Logs splash_screen_loaded (system event)
+- Pattern: useEffect on mount
+
+**RoleSelectionScreen** (`src/screens/RoleSelectionScreen.tsx`):
+- ✅ Starts session when role is confirmed (both predefined and custom roles)
+- ✅ Logs session_start with role metadata
+- Pattern: sessionLogger.start() after role confirmation
+
+**All Other Screens**:
+- TODO: Systematic audit needed (6 screens remaining)
+- Use `useLogger` for all user interactions
+- Use `useSessionLogger.logScreenChange()` for navigation
+- Follow patterns from completed screens above
+
+### Testing Logging
+
+**Verify Logging Works:**
+```bash
+# 1. Enable data collection in .env
+ENABLE_DATA_COLLECTION=true
+
+# 2. Check MongoDB logs collection
+# Logs are stored in MongoDB and can be exported to CSV
+
+# 3. Console logging
+# All log events appear in browser console with [Logging] prefix
+```
+
+**Debug Logging:**
+```javascript
+// Browser console commands
+loggingService.getQueue()     // View queued logs
+loggingService.clearQueue()   // Clear queue
+loggingService.flush()        // Force flush
+```
+
+### Common Mistakes to Avoid
+
+❌ **DON'T:**
+- Skip logging because "it's just a small change"
+- Log only some user interactions in a screen
+- Forget to log character counts for text inputs
+- Forget to track timing for decisions/typing
+- Log state changes manually (use `useStateChangeLogger`)
+- Mix up `logger.log()` (player) and `logger.logSystem()` (system)
+
+✅ **DO:**
+- Log every user interaction, no exceptions
+- Log all AI-generated content
+- Include timing measurements for all decisions
+- Use appropriate hook for the logging type
+- Include descriptive comments in logs
+- Test that logs appear in console during development

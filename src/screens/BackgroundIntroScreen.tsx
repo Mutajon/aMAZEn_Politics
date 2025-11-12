@@ -1,5 +1,5 @@
 // src/screens/BackgroundIntroScreen.tsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PushFn } from "../lib/router";
 import { bgStyleWithRoleImage } from "../lib/ui";
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,13 +8,16 @@ import type { PreparedTTS } from "../hooks/useNarrator";
 import { useSettingsStore } from "../store/settingsStore";
 import { useRoleStore } from "../store/roleStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
+import { useCompassStore } from "../store/compassStore";
 import { useLogger } from "../hooks/useLogger";
 import { useLang } from "../i18n/lang";
+import { COMPONENTS } from "../data/compass-data";
 
 /**
  * Phases:
  *  - "preparingDefault" : fetch & buffer TTS for the default line
  *  - "idle"             : default text visible; Wake up available
+ *  - "waitingForSeed"   : waiting for narrative seeding to complete
  *  - "loading"          : calling OpenAI for paragraph
  *  - "preparingIntro"   : buffering TTS for generated paragraph
  *  - "ready" / "error"  : show paragraph + Begin
@@ -22,7 +25,7 @@ import { useLang } from "../i18n/lang";
  * We start audio exactly on the fade-in animation by using onAnimationStart.
  */
 
-type Phase = "preparingDefault" | "idle" | "loading" | "preparingIntro" | "ready" | "error";
+type Phase = "preparingDefault" | "idle" | "waitingForSeed" | "loading" | "preparingIntro" | "ready" | "error";
 
 export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
   const lang = useLang();
@@ -53,9 +56,11 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
   const preparedDefaultRef = useRef<PreparedTTS | null>(null);
   const preparedIntroRef = useRef<PreparedTTS | null>(null);
   // prevent double-plays & track background readiness
-const defaultPlayedRef = useRef(false);
-const introPlayedRef = useRef(false);
-const bgReadyRef = useRef(false);
+  const defaultPlayedRef = useRef(false);
+  const introPlayedRef = useRef(false);
+  const bgReadyRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const seedPromiseRef = useRef<Promise<void> | null>(null);
   const [defaultNarrationComplete, setDefaultNarrationComplete] = useState(false);
   // Track if we've logged the paragraph to avoid duplicate logs
   const paragraphLoggedRef = useRef(false);
@@ -63,7 +68,24 @@ const bgReadyRef = useRef(false);
   const fetchingIntroRef = useRef(false);
   // Store prefetch AbortController so we can cancel it from onWake
   const prefetchAbortRef = useRef<AbortController | null>(null);
+  const [beginPending, setBeginPending] = useState(false);
 
+  const waitForNarrativeMemory = useCallback(async (timeoutMs = 8000, pollIntervalMs = 100) => {
+    const deadline = Date.now() + timeoutMs;
+    let memory = useDilemmaStore.getState().narrativeMemory;
+    while (!memory && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      memory = useDilemmaStore.getState().narrativeMemory;
+    }
+    return memory;
+  }, []);
+
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // 1) On mount, PREPARE default line audio; show nothing until ready
   useEffect(() => {
@@ -89,75 +111,178 @@ const bgReadyRef = useRef(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [narrationEnabled]);
-// Prefetch the generated paragraph + prepare its TTS AFTER the default narration completes
-useEffect(() => {
-  if (phase !== "idle" || bgReadyRef.current || !defaultNarrationComplete || fetchingIntroRef.current) return;
+  // Prefetch the generated paragraph + prepare its TTS AFTER the default narration completes
+  useEffect(() => {
+    if (phase !== "idle" || bgReadyRef.current || !defaultNarrationComplete || fetchingIntroRef.current) return;
 
-  let cancelled = false;
-  const controller = new AbortController();
-  prefetchAbortRef.current = controller; // Store controller so onWake can cancel it
+    let cancelled = false;
+    const controller = new AbortController();
+    prefetchAbortRef.current = controller; // Store controller so onWake can cancel it
 
-  (async () => {
-    fetchingIntroRef.current = true;
+    (async () => {
+      fetchingIntroRef.current = true;
 
-    // Wrap everything in try-finally to guarantee flag reset
-    try {
+      // Wrap everything in try-finally to guarantee flag reset
       try {
-        const payload = { role: roleText || "Unknown role", gender };
-        const r = await fetch("/api/intro-paragraph", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-        });
-        if (!r.ok) {
-          console.warn(`[BackgroundIntro] Prefetch failed: ${r.status}`);
-          return;
-        }
-        const data = await r.json();
-        const paragraph = (data?.paragraph || "").trim();
-        if (!paragraph) {
-          console.warn("[BackgroundIntro] Prefetch returned empty paragraph");
-          return;
-        }
+        try {
+          const payload = { role: roleText || "Unknown role", gender };
+          const r = await fetch("/api/intro-paragraph", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+          });
+          if (!r.ok) {
+            console.warn(`[BackgroundIntro] Prefetch failed: ${r.status}`);
+            return;
+          }
+          const data = await r.json();
+          const paragraph = (data?.paragraph || "").trim();
+          if (!paragraph) {
+            console.warn("[BackgroundIntro] Prefetch returned empty paragraph");
+            return;
+          }
 
-        if (cancelled) return;
-        setPara(paragraph); // so UI has the text when we transition
+          if (cancelled) return;
+          setPara(paragraph); // so UI has the text when we transition
 
-        // Prepare the TTS for the paragraph ahead of time (only if narration enabled)
-        if (narrationEnabled) {
-          const p = await narrator.prepare(paragraph, { voiceName: "alloy", format: "mp3" });
-          if (cancelled) { p.dispose(); return; }
-          preparedIntroRef.current = p;
+          // Prepare the TTS for the paragraph ahead of time (only if narration enabled)
+          if (narrationEnabled) {
+            const p = await narrator.prepare(paragraph, { voiceName: "alloy", format: "mp3" });
+            if (cancelled) { p.dispose(); return; }
+            preparedIntroRef.current = p;
+          }
+          bgReadyRef.current = true;
+          console.log("[BackgroundIntro] Prefetch succeeded");
+        } catch (e: any) {
+          if (e?.name === "AbortError") {
+            console.log("[BackgroundIntro] Prefetch aborted");
+            return;
+          }
+          console.warn("[BackgroundIntro] Prefetch error:", e.message);
+          // silent fail; foreground flow will handle errors
         }
-        bgReadyRef.current = true;
-        console.log("[BackgroundIntro] Prefetch succeeded");
-      } catch (e: any) {
-        if (e?.name === "AbortError") {
-          console.log("[BackgroundIntro] Prefetch aborted");
-          return;
+      } finally {
+        // ALWAYS reset flag, even if cancelled or error
+        if (!cancelled) {
+          fetchingIntroRef.current = false;
+          console.log("[BackgroundIntro] Prefetch flag reset");
         }
-        console.warn("[BackgroundIntro] Prefetch error:", e.message);
-        // silent fail; foreground flow will handle errors
       }
-    } finally {
-      // ALWAYS reset flag, even if cancelled or error
-      if (!cancelled) {
-        fetchingIntroRef.current = false;
-        console.log("[BackgroundIntro] Prefetch flag reset");
+    })();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      prefetchAbortRef.current = null; // Clear ref on cleanup
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, roleText, gender, defaultNarrationComplete, narrationEnabled]);
+
+// Narrative seeding: Generate story scaffold for 7-day arc
+useEffect(() => {
+  if (!defaultNarrationComplete) return;
+
+  const { initializeGame, setNarrativeMemory } = useDilemmaStore.getState();
+  let gameId = useDilemmaStore.getState().gameId;
+  let narrativeMemory = useDilemmaStore.getState().narrativeMemory;
+
+  if (narrativeMemory) return;
+
+  if (!gameId) {
+    initializeGame();
+    gameId = useDilemmaStore.getState().gameId;
+  }
+
+  if (!gameId) {
+    console.warn("[BackgroundIntro] No gameId available for narrative seeding");
+    return;
+  }
+
+  if (seedPromiseRef.current) {
+    return;
+  }
+
+  const controller = new AbortController();
+  let cancelled = false;
+
+  const run = async () => {
+    try {
+      const roleState = useRoleStore.getState();
+      const compassStore = useCompassStore.getState();
+
+      const getTop2Values = (dimension: 'what' | 'whence' | 'how' | 'whither') => {
+        if (!compassStore.values || !compassStore.values[dimension]) return [];
+        const entries = Object.entries(compassStore.values[dimension])
+          .map(([idx, value]) => ({
+            componentName: COMPONENTS[dimension][parseInt(idx, 10)].short,
+            value,
+            dimension
+          }))
+          .sort((a, b) => b.value - a.value);
+        return entries.slice(0, 2);
+      };
+
+      const topCompassValues = [
+        ...getTop2Values('what'),
+        ...getTop2Values('whence'),
+        ...getTop2Values('how'),
+        ...getTop2Values('whither')
+      ];
+
+      const gameContext = {
+        role: roleState.selectedRole || "Unknown Leader",
+        systemName: roleState.analysis?.systemName || "Unknown System",
+        systemDesc: roleState.analysis?.systemDesc || "",
+        powerHolders: roleState.analysis?.holders || [],
+        challengerSeat: roleState.analysis?.challengerSeat || null,
+        topCompassValues,
+        thematicGuidance: null,
+        supportProfiles: roleState.supportProfiles || roleState.analysis?.supportProfiles || null
+      };
+
+      console.log("[BackgroundIntro] Calling narrative-seed API...");
+
+      const r = await fetch("/api/narrative-seed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId, gameContext }),
+        signal: controller.signal
+      });
+
+      if (!r.ok) {
+        console.warn(`[BackgroundIntro] Narrative seeding failed: ${r.status}`);
+        return;
       }
+
+      const data = await r.json();
+      if (cancelled) return;
+
+      if (data.narrativeMemory) {
+        console.log("[BackgroundIntro] Narrative seeding succeeded:", data.narrativeMemory);
+        setNarrativeMemory(data.narrativeMemory);
+      }
+    } catch (e: any) {
+      if (e?.name === "AbortError") {
+        console.log("[BackgroundIntro] Narrative seeding aborted");
+        return;
+      }
+      console.warn("[BackgroundIntro] Narrative seeding error:", e.message);
     }
-  })();
+  };
+
+  const promise = run().finally(() => {
+    seedPromiseRef.current = null;
+  });
+  seedPromiseRef.current = promise;
 
   return () => {
     cancelled = true;
     controller.abort();
-    prefetchAbortRef.current = null; // Clear ref on cleanup
   };
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, [phase, roleText, gender, defaultNarrationComplete, narrationEnabled]);
+}, [defaultNarrationComplete]);
 
-  // 2) Wake up → fade out, then load paragraph
+  // 2) Wake up → immediately transition to waitingForSeed phase
   const onWake = () => {
     // Log player clicking "Wake up" button
     logger.log('button_click_wake_up', 'Wake up', 'User clicked Wake up button');
@@ -170,14 +295,36 @@ useEffect(() => {
       prefetchAbortRef.current = null;
     }
 
-    // If background prefetch finished, jump straight to ready; else do the normal loading flow
-    if (bgReadyRef.current && preparedIntroRef.current && para.trim()) {
-      setPhase("ready");
-    } else {
-      setPhase("loading");
-    }
+    // Immediately show loading state - the useEffect will handle the wait
+    setPhase("waitingForSeed");
   };
-  
+
+  // 2.5) When in waitingForSeed phase, wait for narrative seeding to complete
+  useEffect(() => {
+    if (phase !== "waitingForSeed") return;
+
+    (async () => {
+      // Wait for narrative seeding if still in flight
+      if (seedPromiseRef.current) {
+        console.log("[BackgroundIntro] Waiting for narrative seed to complete...");
+        try {
+          await seedPromiseRef.current;
+          console.log("[BackgroundIntro] Narrative seed resolved.");
+        } catch (e: any) {
+          console.warn("[BackgroundIntro] Narrative seed wait hit error:", e?.message || e);
+        }
+      }
+
+      // After seed completes, transition to appropriate phase
+      if (bgReadyRef.current && preparedIntroRef.current && para.trim()) {
+        console.log("[BackgroundIntro] Intro paragraph ready from prefetch");
+        setPhase("ready");
+      } else {
+        console.log("[BackgroundIntro] Need to fetch intro paragraph");
+        setPhase("loading");
+      }
+    })();
+  }, [phase, para]);
 
   // 3) When loading, call the server for the paragraph
   useEffect(() => {
@@ -266,6 +413,41 @@ useEffect(() => {
     }
   }, [phase, para, logger]);
 
+  const handleBeginClick = useCallback(async () => {
+    if (beginPending) {
+      return;
+    }
+
+    console.log("[BackgroundIntro] Begin clicked");
+    logger.log('button_click_begin', 'Begin', 'User clicked Begin button to start first day');
+
+    setBeginPending(true);
+    try {
+      let memory = useDilemmaStore.getState().narrativeMemory;
+
+      if (!memory) {
+        console.log("[BackgroundIntro] Waiting for narrative memory before leaving intro screen…");
+        memory = await waitForNarrativeMemory();
+        if (memory) {
+          console.log("[BackgroundIntro] Narrative memory ready; continuing to Day 1.");
+        } else {
+          console.warn("[BackgroundIntro] Narrative memory still missing after wait; proceeding as fallback.");
+        }
+      } else {
+        console.log("[BackgroundIntro] Narrative memory already available; continuing immediately.");
+      }
+
+      useDilemmaStore.getState().clearHistory();
+      console.log("[BackgroundIntro] Dilemma history cleared for new game");
+
+      push("/event");
+    } finally {
+      if (isMountedRef.current) {
+        setBeginPending(false);
+      }
+    }
+  }, [beginPending, logger, push, waitForNarrativeMemory]);
+
   return (
     <div className="min-h-[100dvh] px-5 py-6" style={roleBgStyle}>
       <div className="max-w-2xl mx-auto">
@@ -318,7 +500,31 @@ useEffect(() => {
           )}
         </AnimatePresence>
 
-        {/* Stage B: loading indicator ---------------------------------------------- */}
+        {/* Stage B: waiting for narrative seeding ---------------------------------- */}
+        <AnimatePresence mode="wait">
+          {phase === "waitingForSeed" && (
+            <motion.div
+              key="waitingForSeed"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25 }}
+              className="mt-4"
+            >
+              <h2 className="text-lg font-medium text-white/80">
+                Weaving the narrative…
+              </h2>
+              <div className="mt-4 flex items-center gap-3 text-white/70">
+                <div className="h-5 w-5 rounded-full border-2 border-white/30 border-t-white animate-spin" aria-hidden />
+                <span>
+                  Preparing your story arc…
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Stage C: loading indicator ---------------------------------------------- */}
         <AnimatePresence mode="wait">
           {(phase === "loading" || phase === "preparingIntro") && (
             <motion.div
@@ -344,7 +550,7 @@ useEffect(() => {
           )}
         </AnimatePresence>
 
-        {/* Stage C: result (or error) --------------------------------------------- */}
+        {/* Stage D: result (or error) --------------------------------------------- */}
         {(phase === "ready" || phase === "error") && (
           <motion.div
             key="result"
@@ -371,22 +577,21 @@ useEffect(() => {
 
             <div className="mt-6">
               <button
-                className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
-                onClick={() => {
-                  console.log("[BackgroundIntro] Begin clicked");
-
-                  // Log player clicking "Begin" button
-                  logger.log('button_click_begin', 'Begin', 'User clicked Begin button to start first day');
-
-                  // Clear dilemma history when starting a new game (Day 1)
-                  useDilemmaStore.getState().clearHistory();
-                  console.log("[BackgroundIntro] Dilemma history cleared for new game");
-
-                  // Navigate to event screen
-                  push("/event");
-                }}
+                className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60 disabled:opacity-70 disabled:cursor-wait"
+                onClick={handleBeginClick}
+                disabled={beginPending}
               >
-                {lang("BACKGROUND_INTRO_BEGIN")}
+                {beginPending ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span
+                      className="h-4 w-4 rounded-full border-2 border-[#0b1335]/40 border-t-[#0b1335] animate-spin"
+                      aria-hidden
+                    />
+                    Preparing story…
+                  </span>
+                ) : (
+                  lang("BACKGROUND_INTRO_BEGIN")
+                )}
               </button>
             </div>
           </motion.div>

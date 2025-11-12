@@ -1,0 +1,2136 @@
+diff --git a/server/index.mjs b/server/index.mjs
+index 7aed019..eef1a4e 100644
+--- a/server/index.mjs
++++ b/server/index.mjs
+@@ -528,6 +528,16 @@ function sanitizeSupportProfiles(raw, defaultOrigin = "ai") {
+   };
+ }
+ 
++function sanitizeStoryThemes(value, fallbackThemes = []) {
++  if (!Array.isArray(value)) return fallbackThemes.length ? fallbackThemes : null;
++  const themes = value
++    .map((t) => String(t || "").toLowerCase().replace(/[^a-z0-9_\-\s]/g, "").trim().replace(/\s+/g, "_"))
++    .filter((t) => t.length > 2)
++    .slice(0, 4);
++  if (themes.length === 0) return fallbackThemes.length ? fallbackThemes : null;
++  return themes;
++}
++
+ function summarizeStances(profile) {
+   if (!profile || !profile.stances) return "";
+   const parts = [];
+@@ -605,7 +615,9 @@ app.post("/api/analyze-role", async (req, res) => {
+         decisive: []
+       },
+       grounding: { settingType: "unclear", era: "" },
+-      supportProfiles: null
++      supportProfiles: null,
++      roleScope: "Regional administrator balancing councils and security forces; can issue directives, bargain, and reassign resources, but cannot unilaterally rewrite the constitution.",
++      storyThemes: ["autonomy_vs_heteronomy", "institutional_balance"]
+     };
+ 
+     const system = `${ANTI_JARGON_RULES}
+@@ -628,7 +640,11 @@ You are a polity analyst for a political simulation. Given ROLE (which may inclu
+ 
+ 5) Build the Top-5 Seats (4–5 entries) that actually shape outcomes "next scene," interleaving potent Erasers if they routinely upend Authors. Percents must sum to 100±1. DO NOT include icon field.
+ 
+-6) Locate the polity from the ALLOWED_POLITIES list using spectrum rules:
++6) Distill ROLE SCOPE (≤160 chars): spell out what the player can directly order, what requires negotiation, and what is beyond their authority.
++
++7) List 2–4 STORY THEMES as short snake_case strings capturing enduring tensions for this role (e.g., "autonomy_vs_heteronomy", "justice_vs_amnesty", "resource_scarcity").
++
++8) Locate the polity from the ALLOWED_POLITIES list using spectrum rules:
+    - Democracy: Demos is Top-2 in ≥2/3 of prioritized domains and direct self-determination exists in core areas.
+    - Republican Oligarchy: Executive + Legislative + Judicial are all in Top-5; no single Seat holds pen+eraser across multiple prioritized domains.
+    - Hard-Power Oligarchy: Wealth Top-2 in ≥1/3 of prioritized domains (plutocracy) OR Coercive Force Top-2 (stratocracy).
+@@ -681,7 +697,9 @@ Return STRICT JSON only as:
+       },
+       "origin": "ai|provisional"
+     } | null
+-  }
++  },
++  "roleScope": "<160 chars max>",
++  "storyThemes": ["snake_case", "keywords", "max_four"]
+ }
+ 
+ IMPORTANT:
+@@ -733,6 +751,9 @@ Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setti
+     const originHint = out?.grounding?.settingType === "real" ? "ai" : "provisional";
+     const supportProfiles = sanitizeSupportProfiles(out?.supportProfiles, originHint);
+ 
++    const roleScope = truncateText(out?.roleScope || FALLBACK.roleScope, 200);
++    const storyThemes = sanitizeStoryThemes(out?.storyThemes, FALLBACK.storyThemes);
++
+     const result = {
+       systemName,
+       systemDesc: String(out?.systemDesc || FALLBACK.systemDesc).slice(0, 120),
+@@ -741,6 +762,8 @@ Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setti
+       playerIndex,
+       challengerSeat,  // NEW: Primary institutional opponent
+       supportProfiles,
++      roleScope,
++      storyThemes,
+       e12: {
+         tierI: Array.isArray(out?.e12?.tierI) ? out.e12.tierI : FALLBACK.e12.tierI,
+         tierII: Array.isArray(out?.e12?.tierII) ? out.e12.tierII : FALLBACK.e12.tierII,
+@@ -1732,11 +1755,34 @@ function buildLightUserPrompt({ role, system, day, daysLeft, subjectStreak, prev
+   }
+ 
+   parts.push('');
++  if (daysLeft === 1) {
++    parts.push('FINAL DAY ALERT: Make the description acknowledge this is their last day/defining moment in the first sentence, keep stakes national, and ensure every option feels climactic.');
++  }
+   parts.push('TASK: Write one concrete situation anchored in ROLE+SETTING with three system-appropriate responses.');
+ 
+   return parts.join('\n');
+ }
+ 
++function buildConclusionUserPrompt({ role, system, previous }) {
++  const lines = [
++    `ROLE & SETTING: ${role}`,
++    `SYSTEM: ${system}`,
++    '',
++    'This is the aftermath screen. Do NOT create new choices.',
++  ];
++
++  if (previous && previous.title) {
++    lines.push(`LAST DECISION CONTEXT: "${previous.choiceTitle}" — ${previous.choiceSummary}`);
++  } else {
++    lines.push('LAST DECISION CONTEXT: (missing)');
++  }
++
++  lines.push('');
++  lines.push('TASK: Provide exactly TWO sentences describing the immediate consequences of that decision. Keep it grounded, human, and focused on the next few hours/days—not a grand historical summary.');
++
++  return lines.join('\n');
++}
++
+ /**
+  * Build epic finale section to append to system prompt when daysLeft === 1
+  * Only sent on the final day to avoid wasting tokens
+@@ -1807,6 +1853,90 @@ ${ANTI_JARGON_RULES}
+ `.trim();
+ }
+ 
++function buildGameTurnConclusionSystemPrompt({
++  day,
++  totalDays,
++  roleScope,
++  storyThemes,
++  challengerSeat,
++  supportProfiles
++}) {
++  const safeTotal = Number.isFinite(totalDays) ? totalDays : 7;
++  const lines = [
++    `${buildConclusionSystemPrompt()}`,
++    ``,
++    `CONTEXTUAL REMINDERS:`,
++    `- Day ${day} of ${safeTotal} just concluded; this is the immediate aftermath.`,
++    `- Stay consistent with the role’s authority and previous decisions.`,
++  ];
++
++  if (roleScope) {
++    lines.push(`- ROLE SCOPE: ${roleScope}`);
++  }
++
++  if (Array.isArray(storyThemes) && storyThemes.length > 0) {
++    lines.push(`- THEMES TO PAY OFF: ${storyThemes.join(', ')}`);
++  }
++
++  if (challengerSeat) {
++    lines.push(`- PRIMARY CHALLENGER: ${challengerSeat.name} (${challengerSeat.percent ?? '?'}% power) — mention how they react or position themselves in the aftermath.`);
++  }
++
++  if (supportProfiles) {
++    const reminder = buildSupportProfileReminder(supportProfiles);
++    if (reminder) {
++      lines.push(`- SUPPORT BASELINES: ${reminder.replace(/\n/g, ' ')}`);
++    }
++  }
++
++  lines.push(
++    `ADDITIONAL OUTPUT RULES:`,
++    `- Set "isGameEnd": true.`,
++    `- Leave "actions" as an empty array.`,
++    `- Provide empty arrays for "dynamicParams" and "compassHints" if those fields are present.`,
++    `- Mirror advice can be omitted or kept to one reflective sentence.`
++  );
++
++  return lines.join('\n');
++}
++
++function buildGameTurnConclusionUserPrompt({ role, system, lastChoice, storyThemes, challengerSeat, supportProfiles }) {
++  const lines = [
++    `ROLE & SETTING: ${role}`,
++    `SYSTEM: ${system}`,
++    '',
++    'This is the aftermath screen. DO NOT create new choices.'
++  ];
++
++  if (lastChoice) {
++    lines.push(
++      `LAST DECISION CONTEXT: "${lastChoice.title}" — ${lastChoice.summary || lastChoice.title}`
++    );
++  } else {
++    lines.push('LAST DECISION CONTEXT: (missing)');
++  }
++
++  if (Array.isArray(storyThemes) && storyThemes.length > 0) {
++    lines.push(`ACTIVE THEMES TO RESOLVE: ${storyThemes.join(', ')}`);
++  }
++
++  if (challengerSeat) {
++    lines.push(`CHALLENGER PRESSURE: ${challengerSeat.name} (${challengerSeat.percent ?? '?'}% power)`);
++  }
++
++  if (supportProfiles) {
++    const reminder = buildSupportProfileReminder(supportProfiles);
++    if (reminder) {
++      lines.push(`SUPPORT BASELINES:\n${reminder}`);
++    }
++  }
++
++  lines.push('');
++  lines.push('TASK: Provide exactly TWO sentences describing the immediate consequences of that decision. Include how the challenger and the public respond if relevant. Keep it grounded in immediate hours/days, not a grand historical wrap-up.');
++
++  return lines.join('\n');
++}
++
+ // -------------------- Light Dilemma API Endpoint ---------------------------
+ app.post("/api/dilemma-light", async (req, res) => {
+   try {
+@@ -1888,7 +2018,9 @@ app.post("/api/dilemma-light", async (req, res) => {
+       systemPrompt = buildLightSystemPrompt();
+     }
+ 
+-    const userPrompt = buildLightUserPrompt({ role, system, day, daysLeft, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance, recentTopics, recentDilemmaTitles });
++    const userPrompt = daysLeft === 0
++      ? buildConclusionUserPrompt({ role, system, previous })
++      : buildLightUserPrompt({ role, system, day, daysLeft, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance, recentTopics, recentDilemmaTitles });
+ 
+     // ALWAYS log previous context (critical for debugging continuity and support shifts)
+     if (previous) {
+@@ -2126,7 +2258,17 @@ app.post("/api/dilemma-light", async (req, res) => {
+ // --- Validate "Suggest your own" (relevance to the current dilemma) ---
+ app.post("/api/validate-suggestion", async (req, res) => {
+   try {
+-    const { text, title, description, era, settingType, year } = req.body || {};
++    const {
++      text,
++      title,
++      description,
++      era,
++      settingType,
++      year,
++      roleScope = "",
++      challengerName = "",
++      topHolders = []
++    } = req.body || {};
+     if (typeof text !== "string" || typeof title !== "string" || typeof description !== "string") {
+       return res.status(400).json({ error: "Missing text/title/description" });
+     }
+@@ -2160,10 +2302,38 @@ app.post("/api/validate-suggestion", async (req, res) => {
+       ].join("\n");
+     }
+ 
++    let scopeGuidance = "";
++    if (roleScope) {
++      scopeGuidance = [
++        "",
++        "ROLE SCOPE SAFETY RAILS:",
++        `- The player's capacity: ${roleScope}`,
++        "- REJECT suggestions that demand actions beyond this mandate (e.g., signing treaties, declaring war, firing national cabinet ministers when the role lacks that authority)",
++        "- ACCEPT creative variations that stay inside the mandate (ordering subordinates, appealing to superiors, coordinating with other power holders)",
++        "- If rejecting, reply with a playful reminder of their limits (e.g., 'You don't command the national army—try something your office can actually do.')",
++        ""
++      ].join("\n");
++    }
++
++    let powerContext = "";
++    const holderLines = Array.isArray(topHolders) ? topHolders.filter(Boolean) : [];
++    if (challengerName || holderLines.length) {
++      powerContext = [
++        "",
++        "POWER DYNAMICS TO CONSIDER:",
++        challengerName ? `- Main challenger: ${challengerName}` : null,
++        holderLines.length ? `- Other influential players: ${holderLines.join(', ')}` : null,
++        "- Suggestions may defer to or enlist these actors, but only if such delegation would be plausible for the role",
++        ""
++      ].filter(Boolean).join("\n");
++    }
++
+     const system = [
+       "You are a PERMISSIVE validator for a historical/political strategy game.",
+       "Given a DILEMMA (title + description) and a SUGGESTION from the player, your job is to accept anything that shows reasonable engagement.",
+       historicalContext,
++      scopeGuidance,
++      powerContext,
+       "ACCEPT the suggestion if it:",
+       "- Shows ANY attempt to engage with the dilemma (even if tangentially related)",
+       "- Contains actual words/sentences (not random keyboard mashing)",
+@@ -2175,9 +2345,10 @@ app.post("/api/validate-suggestion", async (req, res) => {
+       "- Pure gibberish (random characters like 'asdfgh', 'xyz123')",
+       "- Completely irrelevant to politics/governance (e.g., 'I like pizza', 'random thoughts')",
+       "- Contains clear, obvious anachronisms (technologies/concepts that definitively didn't exist in the time period)",
++      "- Demands actions plainly outside the role's scope (e.g., a municipal officer ordering airstrikes)",
+       "",
+       "DEFAULT STANCE: If in doubt, ACCEPT the suggestion.",
+-      "For anachronisms: provide a brief, helpful rejection message like 'Cameras didn't exist in 1607. Try period-appropriate actions.'",
++      "For anachronisms or out-of-scope ideas: provide a brief, helpful rejection message like 'Cameras didn't exist in 1607.' or 'You don't control national treaties—try something your office could realistically do.'",
+       "Only return compact JSON: { \"valid\": boolean, \"reason\": string }.",
+     ].join("\n");
+ 
+@@ -2185,6 +2356,10 @@ app.post("/api/validate-suggestion", async (req, res) => {
+       {
+         dilemma: { title, description },
+         suggestion: text,
++        roleScope,
++        challenger: challengerName,
++        powerHolders: Array.isArray(topHolders) ? topHolders : [],
++        timeline: era || year || undefined,
+       },
+       null,
+       2
+@@ -2551,9 +2726,16 @@ app.post("/api/game-turn", async (req, res) => {
+       playerChoice,
+       compassUpdate,
+       gameContext, // Day 1 only: full game initialization data
+-      crisisMode // Optional: crisis mode flag when support < 20%
++      crisisMode, // Optional: crisis mode flag when support < 20%
++      totalDays: totalDaysInput,
++      daysLeft: daysLeftInput
+     } = req.body;
+ 
++    const numericTotalDays = Number(totalDaysInput);
++    const hasTotalDaysFromBody = Number.isFinite(numericTotalDays);
++    const numericDaysLeft = Number(daysLeftInput);
++    const hasDaysLeftFromBody = Number.isFinite(numericDaysLeft);
++
+     // Validate required fields
+     if (!gameId || typeof gameId !== 'string') {
+       return res.status(400).json({ error: "Missing or invalid gameId" });
+@@ -2568,6 +2750,10 @@ app.post("/api/game-turn", async (req, res) => {
+     // Check if we have an existing conversation
+     let conversation = getConversation(gameId);
+     let messages = [];
++    let totalDaysForTurn = hasTotalDaysFromBody ? numericTotalDays : null;
++    let daysLeftForTurn = hasDaysLeftFromBody ? Math.max(numericDaysLeft, 0) : null;
++    let isAftermathTurn = false;
++    let allowEmptyActions = crisisMode === "downfall";
+ 
+     // ============================================================================
+     // DAY 1: Initialize conversation with full game context
+@@ -2581,6 +2767,16 @@ app.post("/api/game-turn", async (req, res) => {
+ 
+       const sanitizedProfiles = sanitizeSupportProfiles(gameContext.supportProfiles, "predefined");
+       const enrichedContext = { ...gameContext, supportProfiles: sanitizedProfiles };
++      const safeTotalDays = Number(enrichedContext.totalDays) || (hasTotalDaysFromBody ? numericTotalDays : 7);
++      enrichedContext.totalDays = safeTotalDays;
++      totalDaysForTurn = safeTotalDays;
++      if (daysLeftForTurn === null) {
++        daysLeftForTurn = Math.max(safeTotalDays - day + 1, 0);
++      }
++      isAftermathTurn = daysLeftForTurn === 0;
++      if (isAftermathTurn) {
++        allowEmptyActions = true;
++      }
+ 
+       // Build comprehensive system prompt for the entire game
+       const systemPrompt = buildGameSystemPrompt(enrichedContext);
+@@ -2598,9 +2794,20 @@ app.post("/api/game-turn", async (req, res) => {
+ 
+       // Store conversation with challenger seat info (messages will be stored after AI response)
+       // challengerSeat stored for crisis mode prompt building on Day 2+
++      const sanitizedThemes = Array.isArray(enrichedContext.storyThemes) && enrichedContext.storyThemes.length > 0
++        ? enrichedContext.storyThemes.map((t) => String(t)).slice(0, 5)
++        : ["autonomy_vs_heteronomy", "liberalism_vs_totalism"];
++      const sanitizedRoleScope = truncateText(enrichedContext.roleScope || "Keep dilemmas at the character's immediate span of control (no empire-wide decrees).", 200);
++
+       const conversationMeta = {
+         challengerSeat: enrichedContext.challengerSeat || null,
+-        supportProfiles: sanitizedProfiles
++        supportProfiles: sanitizedProfiles,
++        roleScope: sanitizedRoleScope,
++        storyThemes: sanitizedThemes,
++        powerHolders: Array.isArray(enrichedContext.powerHolders) ? enrichedContext.powerHolders : [],
++        roleName: enrichedContext.role || "Unknown Leader",
++        systemName: enrichedContext.systemName || "Unknown System",
++        totalDays: safeTotalDays
+       };
+       storeConversation(gameId, "pending", "openai", conversationMeta);
+ 
+@@ -2625,11 +2832,73 @@ app.post("/api/game-turn", async (req, res) => {
+       // Retrieve stored message history
+       messages = conversation.messages || [];
+ 
++      const meta = conversation.meta || {};
++      if (totalDaysForTurn === null) {
++        totalDaysForTurn = Number(meta.totalDays) || 7;
++      }
++      if (daysLeftForTurn === null) {
++        daysLeftForTurn = Math.max(totalDaysForTurn - day + 1, 0);
++      }
++      isAftermathTurn = daysLeftForTurn === 0;
++      if (isAftermathTurn) {
++        allowEmptyActions = true;
++      }
++
++      console.log(`[GAME-TURN] daysLeft=${daysLeftForTurn}, totalDays=${totalDaysForTurn}`);
++
+       // Build user message for this turn (includes crisis mode if applicable)
+       const challengerSeat = conversation.meta?.challengerSeat || null;
+       const supportProfiles = conversation.meta?.supportProfiles || null;
+-      const userMessage = buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode, challengerSeat, supportProfiles);
++      const roleScope = conversation.meta?.roleScope || null;
++      const storyThemes = conversation.meta?.storyThemes || null;
++      const powerHolders = conversation.meta?.powerHolders || null;
++      const roleName = conversation.meta?.roleName || "Unknown Leader";
++      const systemName = conversation.meta?.systemName || "Unknown System";
++      const systemPrompt = isAftermathTurn
++        ? buildGameTurnConclusionSystemPrompt({
++            day,
++            totalDays: totalDaysForTurn,
++            roleScope,
++            storyThemes,
++            challengerSeat,
++            supportProfiles
++          })
++        : buildTurnSystemPrompt({
++            day,
++            totalDays: totalDaysForTurn,
++            daysLeft: daysLeftForTurn,
++            crisisMode,
++            roleScope,
++            storyThemes,
++            challengerSeat,
++            powerHolders,
++            supportProfiles
++          });
++      const userMessage = isAftermathTurn
++        ? buildGameTurnConclusionUserPrompt({
++            role: roleName,
++            system: systemName,
++            lastChoice: playerChoice,
++            storyThemes,
++            challengerSeat,
++            supportProfiles
++          })
++        : buildTurnUserPrompt({
++            day,
++            totalDays: totalDaysForTurn,
++            daysLeft: daysLeftForTurn,
++            playerChoice,
++            compassUpdate,
++            crisisMode,
++            challengerSeat,
++            supportProfiles,
++            roleScope,
++            storyThemes,
++            powerHolders
++          });
+ 
++      // Inject per-turn system prompt so new constraints override the initial system message
++      messages.push({ role: "system", content: systemPrompt });
+       messages.push({ role: "user", content: userMessage });
+ 
+       console.log(`[GAME-TURN] Message history: ${messages.length} messages`);
+@@ -2696,16 +2965,55 @@ app.post("/api/game-turn", async (req, res) => {
+           continue;
+         }
+ 
+-        if (!Array.isArray(turnData.actions) || turnData.actions.length === 0) {
+-          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Invalid or empty 'actions' array`);
++        if (!Array.isArray(turnData.actions)) {
++          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: 'actions' field is not an array`);
+           aiResponse = null;
+           turnData = null;
+           continue;
+         }
+ 
+-        // Success! Exit retry loop
+-        console.log(`[GAME-TURN] ✅ Attempt ${attempt} succeeded - valid response received`);
+-        break;
++        if (turnData.actions.length === 0 && !allowEmptyActions) {
++          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Empty 'actions' array when decisions are required`);
++          aiResponse = null;
++          turnData = null;
++          continue;
++        }
++
++        if (turnData.actions.length > 0 && allowEmptyActions) {
++          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} warning: Received ${turnData.actions.length} actions but this turn should conclude with none. Stripping actions.`);
++          turnData.actions = [];
++        }
++
++        if (allowEmptyActions) {
++          turnData.isGameEnd = true;
++          if (!Array.isArray(turnData.dynamicParams)) {
++            turnData.dynamicParams = [];
++          }
++          if (!Array.isArray(turnData.compassHints)) {
++            turnData.compassHints = [];
++          }
++        if (!turnData.topic) {
++          turnData.topic = "Conclusion";
++        }
++        turnData.actions = [];
++      } else {
++        turnData.actions = sanitizeTurnActions(turnData.actions);
++
++        if (turnData.isGameEnd) {
++          console.warn(`[GAME-TURN] ⚠️ Model flagged isGameEnd=true with daysLeft=${daysLeftForTurn}. Forcing normal dilemma.`);
++          turnData.isGameEnd = false;
++          if (!Array.isArray(turnData.dynamicParams)) {
++            turnData.dynamicParams = [];
++          }
++          if (!Array.isArray(turnData.compassHints)) {
++            turnData.compassHints = [];
++          }
++        }
++      }
++
++      // Success! Exit retry loop
++      console.log(`[GAME-TURN] ✅ Attempt ${attempt} succeeded - valid response received`);
++      break;
+ 
+       } catch (e) {
+         console.error(`[GAME-TURN] ❌ Attempt ${attempt} exception:`, e?.message || e);
+@@ -2730,6 +3038,13 @@ app.post("/api/game-turn", async (req, res) => {
+     // ============================================================================
+     // Update conversation history
+     // ============================================================================
++    if (turnData && (isAftermathTurn || crisisMode === "downfall")) {
++      turnData.isGameEnd = true;
++      if (!Array.isArray(turnData.actions) || turnData.actions.length > 0) {
++        turnData.actions = [];
++      }
++    }
++
+     messages.push({ role: "assistant", content: aiResponse.content });
+ 
+     // Update conversation store
+@@ -2769,7 +3084,7 @@ app.post("/api/game-turn", async (req, res) => {
+       compassHints: Array.isArray(turnData.compassHints) ? turnData.compassHints : [],
+ 
+       // Game end flag
+-      isGameEnd: !!turnData.isGameEnd
++      isGameEnd: isAftermathTurn || !!turnData.isGameEnd
+     };
+ 
+     console.log(`[GAME-TURN] ✅ Returning unified response: ${response.actions.length} actions`);
+@@ -2801,7 +3116,9 @@ function buildGameSystemPrompt(gameContext) {
+     playerCompass,
+     totalDays,
+     thematicGuidance,
+-    supportProfiles
++    supportProfiles,
++    roleScope,
++    storyThemes
+   } = gameContext;
+ 
+   // Format power holders
+@@ -2830,6 +3147,8 @@ TOP PLAYER VALUES:
+   // Include thematic guidance if provided
+   const thematicText = thematicGuidance ? `\n\nTHEMATIC GUIDANCE:\n${thematicGuidance}` : "";
+   const supportBaselineText = formatSupportProfilesForPrompt(supportProfiles);
++  const roleScopeText = roleScope ? truncateText(roleScope, 200) : "Keep dilemmas at the character's immediate span of control (no empire-wide decrees).";
++  const themeList = Array.isArray(storyThemes) && storyThemes.length > 0 ? storyThemes.join(', ') : "autonomy_vs_heteronomy, liberalism_vs_totalism";
+ 
+   return `${ANTI_JARGON_RULES}
+ 
+@@ -2841,8 +3160,24 @@ PLAYER ROLE & CONTEXT:
+ - Political System: ${systemName}
+ - System Description: ${systemDesc}
+ 
+-POWER HOLDERS:
+-${holdersText}${challengerText}${compassText}${thematicText}
++ROLE MANDATE (DO NOT EXCEED):
++- ${roleScopeText}
++
++THEMATIC TRACKS TO WEAVE THROUGH THE WEEK:
++- ${themeList}
++
++ACTION DESIGN RULES:
++- Every option must be achievable through this role's legal authority, leverage, or personal influence.
++- Reference named power holders (especially the challenger) when describing consequences or trade-offs.
++- Whenever plausible, make exactly one option escalate or delegate the problem to a higher authority, allied institution, or organized constituency—only if such delegation would be realistic for the role.
++- If the role lacks power to impose an outcome directly, the option must negotiate, request, or defer rather than magically override institutions.
++
++POWER HOLDERS & DYNAMICS:
++${holdersText}${challengerText}
++- Challenger reactions must surface whenever support shifts or consequences are described.
++- Other high-power seats should pressure the player when their interests are threatened.
++${compassText}
++${thematicText}
+ 
+ SUPPORT BASELINES:
+ ${supportBaselineText}
+@@ -2868,6 +3203,8 @@ YOUR RESPONSIBILITIES:
+    - AVOID: Generating the same parameter multiple times
+ 6. Maintain narrative continuity across all ${totalDays} days
+ 7. Align supportShift reasoning with the baseline attitudes above; explicitly cite how each faction's stance agrees or clashes with the player's previous action.
++8. Keep every situation framed within the player's mandate—if an issue is larger than their authority, focus on the slice they can actually influence.
++9. Surface at least one of the active story themes (e.g., autonomy_vs_heteronomy) in the tension of each turn—mention it implicitly in the stakes or competing voices rather than as a label.
+ 
+ CONTINUITY & MEMORY:
+ - You remember ALL previous dilemmas and player choices
+@@ -2888,18 +3225,23 @@ TOPIC VARIETY (Natural Flow):
+   * Maintain consequence continuity (e.g., "Meanwhile, economic concerns resurface...")
+ - Policy domains: Economy, Security, Diplomacy, Rights, Infrastructure,
+   Environment, Health, Education, Justice, Culture, Foreign Relations, Technology
++- When shifting topics, favor angles that connect to the story themes listed above (${themeList}).
+ - Trust your memory: You can see the full conversation history
+ - Natural variety > forced variety (let political reality breathe)
+ - Exception: If player's previous action created urgent follow-up (vote results, crisis escalation),
+   continue that thread even if 3+ turns on same topic
+ 
+-STYLE:
++STYLE & VOICE (ALWAYS APPLY):
++- Keep language punchy and clear; every sentence should make sense to a bright high-school student without prior context.
++- Anchor descriptions in sights, sounds, or immediate human reactions so the scene feels lived-in.
++- Name the player's role in the first sentence of the description (e.g., "As the district police chief...").
++- Avoid passive policy-speak; prefer vivid verbs over abstract nouns.
+ ${buildLightSystemPrompt()}
+ 
+ OUTPUT FORMAT (JSON):
+ {
+   "title": "<60 chars, punchy situation title>",
+-  "description": "<2-3 sentences, concrete and vivid>",
++  "description": "<2-3 sentences, name the player's role in the opening line, keep it concrete and vivid>",
+   "actions": [
+     {
+       "id": "a",
+@@ -2913,10 +3255,10 @@ OUTPUT FORMAT (JSON):
+   "topic": "<Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture>",
+   "scope": "<Local|National|International>",
+   "supportShift": {  // Day 2+ only, based on previous choice
+-    // WHY must cite alignment or friction with baseline stances above
+-    "people": {"delta": <-20 to +20>, "why": "<short reason>"},
+-    "mom": {"delta": <-20 to +20>, "why": "<short reason>"},
+-    "holders": {"delta": <-20 to +20>, "why": "<short reason>"}
++    // WHY must cite alignment or friction with baseline stances above and name the factions (e.g., challenger, specific holder)
++    "people": {"delta": <-20 to +20>, "why": "<short reason naming stance>"},
++    "mom": {"delta": <-20 to +20>, "why": "<short reason naming stance>"},
++    "holders": {"delta": <-20 to +20>, "why": "<short reason naming stance>"}
+   },
+   "mirrorAdvice": "<1-2 sentences, dramatic sidekick giving advice on current situation>",
+   "dynamicParams": [  // Day 2+ only, 1-3 consequences of previous choice (VARY THE COUNT & CONTENT)
+@@ -2964,8 +3306,84 @@ function buildDay1UserPrompt(gameContext) {
+ /**
+  * Helper: Build turn user prompt (Day 2+)
+  */
+-function buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode = null, challengerSeat = null, supportProfiles = null) {
+-  let prompt = `DAY ${day}\n\n`;
++function buildTurnSystemPrompt({
++  day,
++  totalDays = 7,
++  daysLeft = null,
++  crisisMode = null,
++  roleScope = null,
++  storyThemes = null,
++  challengerSeat = null,
++  powerHolders = null,
++  supportProfiles = null
++}) {
++  const safeTotal = Number.isFinite(totalDays) ? totalDays : 7;
++  const lines = [
++    `${ANTI_JARGON_RULES}`,
++    `You are continuing an in-progress ${safeTotal}-day scenario. Generate the Day ${day} turn.`,
++    `Stay fully consistent with previous narrative beats and the player's most recent decision (details follow in the user message).`,
++    `Every option must be achievable within the player's role, legal authority, and era-specific limitations.`,
++    `Describe consequences using grounded, setting-appropriate detail—no abstract policy-speak.`,
++    `When calculating support shifts, explicitly tie reasoning to faction motivations and the player's recent actions.`
++  ];
++
++  if (roleScope) {
++    lines.push(`ROLE SCOPE GUARDRAIL: ${roleScope}`);
++  }
++
++  if (Array.isArray(storyThemes) && storyThemes.length > 0) {
++    lines.push(`ACTIVE THEMES TO THREAD THROUGHOUT THE ARC: ${storyThemes.join(', ')}`);
++  }
++
++  if (Array.isArray(powerHolders) && powerHolders.length > 0) {
++    const holdersSnippet = powerHolders
++      .slice(0, 4)
++      .map((holder) => `- ${holder.name || 'Unknown'} (${holder.percent ?? '?'}% power)`)
++      .join('\n');
++    lines.push(`TOP POWER HOLDERS TO REFERENCE:\n${holdersSnippet}`);
++  }
++
++  if (challengerSeat) {
++    lines.push(`PRIMARY CHALLENGER: ${challengerSeat.name} (${challengerSeat.percent ?? '?'}% power) — show how they contest or pressure the player in both narrative setup and support reasoning.`);
++  }
++
++  if (supportProfiles) {
++    const reminder = buildSupportProfileReminder(supportProfiles);
++    if (reminder) {
++      lines.push(`SUPPORT BASELINE REMINDER:\n${reminder}`);
++    }
++  }
++
++  if (!crisisMode && daysLeft === 1) {
++    lines.push(`FINAL DAY DIRECTIVE: Acknowledge in tone and stakes that this is the player's final day/defining decision. Resolve or heighten existing conflicts rather than introducing unrelated crises.`);
++  } else if (!crisisMode && Number.isFinite(daysLeft) && daysLeft > 1) {
++    lines.push(`PACE REMINDER: ${daysLeft - 1} day(s) remain afterward—build momentum toward the finale without exhausting every thread.`);
++  }
++
++  if (crisisMode === "downfall") {
++    lines.push(`DOWNFALL MODE: This turn ends the game. Provide narrative-only aftermath (no actions) and set "isGameEnd": true.`);
++  }
++
++  lines.push(`Return JSON with: title, description, three actions (unless explicitly told to skip), supportShift, mirrorAdvice, dynamicParams, compassHints, and isGameEnd flag when appropriate.`);
++
++  return lines.join('\n\n');
++}
++
++function buildTurnUserPrompt({
++  day,
++  totalDays = 7,
++  daysLeft = null,
++  playerChoice,
++  compassUpdate,
++  crisisMode = null,
++  challengerSeat = null,
++  supportProfiles = null,
++  roleScope = null,
++  storyThemes = null,
++  powerHolders = null
++}) {
++  const clampedTotal = Number.isFinite(totalDays) ? totalDays : 7;
++  let prompt = `DAY ${day} of ${clampedTotal}\n\n`;
+ 
+   prompt += `PREVIOUS CHOICE: "${playerChoice.title}"\n`;
+   prompt += `Summary: ${playerChoice.summary || playerChoice.title}\n`;
+@@ -2976,6 +3394,15 @@ function buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode = null
+     prompt += `Player's compass values have been updated based on this choice.\n\n`;
+   }
+ 
++  if (roleScope) {
++    prompt += `ROLE SCOPE REMINDER: ${roleScope}\n\n`;
++  }
++
++  if (Array.isArray(storyThemes) && storyThemes.length > 0) {
++    prompt += `ACTIVE THEMES: ${storyThemes.join(', ')}\n\n`;
++    prompt += `Keep the new situation centered on at least one of these tensions (show it through the stakes, not by naming the theme).\n\n`;
++  }
++
+   if (supportProfiles) {
+     const reminder = buildSupportProfileReminder(supportProfiles);
+     if (reminder) {
+@@ -2983,6 +3410,21 @@ function buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode = null
+     }
+   }
+ 
++  if (Array.isArray(powerHolders) && powerHolders.length > 0) {
++    const holdersLines = powerHolders
++      .slice(0, 4)
++      .map((holder) => `- ${holder.name || 'Unknown'} (${holder.percent ?? '?'}% power)`)
++      .join('\n');
++    prompt += `POWER MAP SNAPSHOT:\n${holdersLines}\n\n`;
++  }
++
++  if (challengerSeat) {
++    prompt += `CHALLENGER FRICTION: ${challengerSeat.name} should be visibly leaning on the player—reflect their demands in the setup and support reasoning.\n\n`;
++  }
++
++  prompt += `REACTION REQUIREMENT: Support reasoning must explicitly describe how the challenger and other top power holders respond to each option.\n\n`;
++  prompt += `DELEGATION OPTION REMINDER: When believable, include one option that hands responsibility to an appropriate institution or ally instead of acting directly.\n\n`;
++
+   // CRISIS MODE: Support level consequences
+   if (crisisMode) {
+     prompt += `🚨 CRISIS MODE: "${crisisMode}"\n`;
+@@ -3017,20 +3459,62 @@ function buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode = null
+     }
+   }
+ 
+-  if (day === 7 && !crisisMode) { // Only show epic finale if not in crisis mode
+-    prompt += `⚠️ DAY 7 - EPIC FINALE\n`;
+-    prompt += `- Create an UNRELATED national crisis (ignore previous story)\n`;
+-    prompt += `- But STILL calculate supportShift from previous choice (factions remember)\n`;
+-    prompt += `- Make it: national scope, defining moment, high stakes, hard choices\n`;
+-    prompt += `- Mention this is the final day or defining moment\n\n`;
++  if (!crisisMode && daysLeft === 1) {
++    prompt += `FINAL DAY DIRECTIVE:\n`;
++    prompt += `- Opening sentence must acknowledge this is the leader's final day or defining last stand.\n`;
++    prompt += `- Pay off existing tensions and consequences from earlier turns—no sudden new arcs.\n`;
++    prompt += `- Stakes should peak but remain within the role's real authority and capabilities.\n`;
++    prompt += `- All options must remain role-plausible; keep the single delegation/offloading option grounded in actual institutions available to them.\n\n`;
++  } else if (!crisisMode && Number.isFinite(daysLeft) && daysLeft > 1) {
++    prompt += `PROGRESSION REMINDER: ${daysLeft - 1} day(s) will remain—let this dilemma escalate toward the finale while staying consistent with prior outcomes.\n\n`;
+   }
+ 
+-  prompt += `TASK: Generate the next turn with ALL required data (dilemma + supportShift + mirrorAdvice + dynamicParams + compassHints).
++  if (crisisMode === "downfall") {
++    prompt += `TASK: Provide a narrative-only collapse sequence. Include title, description (2-3 vivid sentences), supportShift, mirrorAdvice, dynamicParams (may be empty), compassHints (empty), set "actions": [] and "isGameEnd": true.
+ Return complete JSON as specified in system prompt.`;
++  } else {
++    prompt += `TASK: Generate the next turn with ALL required data (dilemma + supportShift + mirrorAdvice + dynamicParams + compassHints).
++Return complete JSON as specified in system prompt.`;
++  }
+ 
+   return prompt;
+ }
+ 
++const ACTION_ID_ORDER = ["a", "b", "c"];
++const ACTION_ICON_HINTS = new Set(["security", "speech", "diplomacy", "money", "tech", "heart", "scale", "build", "nature", "energy", "civic"]);
++
++function sanitizeTurnActions(rawActions) {
++  const actions = Array.isArray(rawActions) ? rawActions.slice(0, 3) : [];
++
++  const snapCost = (value) => {
++    const num = Number(value);
++    if (!Number.isFinite(num)) return 0;
++    const clamped = Math.max(-250, Math.min(250, Math.round(num)));
++    const snapped = Math.round(clamped / 50) * 50;
++    return Math.max(-250, Math.min(250, snapped));
++  };
++
++  for (let i = 0; i < 3; i++) {
++    const existing = actions[i] || {};
++    const title = String(existing.title || `Option ${i + 1}`).slice(0, 80);
++    const summarySource = existing.summary || existing.title || `Fallback option ${i + 1}`;
++    const summary = String(summarySource).slice(0, 200);
++    const cost = snapCost(existing.cost);
++    const iconHintRaw = typeof existing.iconHint === "string" ? existing.iconHint.toLowerCase() : "";
++    const iconHint = ACTION_ICON_HINTS.has(iconHintRaw) ? iconHintRaw : "speech";
++
++    actions[i] = {
++      id: ACTION_ID_ORDER[i],
++      title,
++      summary,
++      cost,
++      iconHint
++    };
++  }
++
++  return actions;
++}
++
+ /**
+  * Helper: Call OpenAI Chat Completions API with message history
+  */
+diff --git a/src/App.tsx b/src/App.tsx
+index 09861c5..6724bed 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -145,7 +145,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: any
+       {route === "/compass-quiz" && <MirrorQuizScreen push={push} />}
+ 
+       {route === "/name" && <NameScreen push={push} />}
+-      {route === "/compass-vis" && <CompassVisScreen push={push} />}
++      {route === "/compass-vis" && <CompassVisScreen />}
+       {route === "/mirror" && <MirrorScreen push={push} />}
+       {route === "/debug-mini" && <MiniCompassDebugScreen push={push} />}
+       {route === "/background-intro" && <BackgroundIntroScreen push={push} />}
+diff --git a/src/components/AudioControls.tsx b/src/components/AudioControls.tsx
+index 0cf05b8..0220fee 100644
+--- a/src/components/AudioControls.tsx
++++ b/src/components/AudioControls.tsx
+@@ -28,11 +28,11 @@ export default function AudioControls() {
+   // Handle music toggle
+   const handleMusicToggle = () => {
+     const newMusicState = !musicEnabled;
+-    logger.log('button_click_music_toggle', {
+-      previousState: musicEnabled,
+-      newState: newMusicState,
+-      action: newMusicState ? 'unmute' : 'mute'
+-    }, `User ${newMusicState ? 'unmuted' : 'muted'} music`);
++    logger.log(
++      'button_click_music_toggle',
++      newMusicState ? 'unmute' : 'mute',
++      `User ${newMusicState ? 'unmuted' : 'muted'} music`
++    );
+ 
+     toggleMusicEnabled();
+   };
+@@ -41,11 +41,11 @@ export default function AudioControls() {
+   const handleSfxToggle = () => {
+     const newSfxState = !sfxEnabled;
+ 
+-    logger.log('button_click_sfx_toggle', {
+-      previousState: sfxEnabled,
+-      newState: newSfxState,
+-      action: newSfxState ? 'unmute' : 'mute'
+-    }, `User ${newSfxState ? 'unmuted' : 'muted'} sound effects`);
++    logger.log(
++      'button_click_sfx_toggle',
++      newSfxState ? 'unmute' : 'mute',
++      `User ${newSfxState ? 'unmuted' : 'muted'} sound effects`
++    );
+ 
+     toggleSfxEnabled();
+ 
+diff --git a/src/components/LoadingOverlay.tsx b/src/components/LoadingOverlay.tsx
+index 94b2acd..879b1db 100644
+--- a/src/components/LoadingOverlay.tsx
++++ b/src/components/LoadingOverlay.tsx
+@@ -1,5 +1,5 @@
+ // src/components/LoadingOverlay.tsx
+-import React, { useEffect, useMemo, useRef, useState } from "react";
++import { useEffect, useRef, useState } from "react";
+ import { AnimatePresence, motion } from "framer-motion";
+ import { useRotatingText } from "../hooks/useRotatingText";
+ 
+diff --git a/src/components/PowerDistributionContent.tsx b/src/components/PowerDistributionContent.tsx
+index 82d0e9b..c72965e 100644
+--- a/src/components/PowerDistributionContent.tsx
++++ b/src/components/PowerDistributionContent.tsx
+@@ -8,7 +8,6 @@
+  * Uses: PowerDistributionIcons.tsx, framer-motion for animations
+  */
+ 
+-import { default as React } from "react";
+ import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
+ import { HelpCircle, Cog } from "lucide-react";
+ import { IconFromKey, getRankColor } from "./PowerDistributionIcons";
+@@ -27,14 +26,6 @@ interface PowerDistributionContentProps {
+   systemDesc: string;
+   systemFlavor: string;
+   showSystemModal: boolean;
+-  e12Data?: {
+-    tierI: string[];
+-    tierII: string[];
+-    tierIII: string[];
+-    stopA: boolean;
+-    stopB: boolean;
+-    decisive: string[];
+-  };
+   groundingData?: {
+     settingType: "real" | "fictional" | "unclear";
+     era: string;
+@@ -60,7 +51,6 @@ export default function PowerDistributionContent({
+   systemDesc,
+   systemFlavor,
+   showSystemModal,
+-  e12Data,
+   groundingData,
+   onRetry,
+   onChangePercent,
+@@ -331,4 +321,4 @@ export default function PowerDistributionContent({
+       </AnimatePresence>
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/components/event/ActionDeck.tsx b/src/components/event/ActionDeck.tsx
+index ee13118..1c9b048 100644
+--- a/src/components/event/ActionDeck.tsx
++++ b/src/components/event/ActionDeck.tsx
+@@ -74,7 +74,6 @@ export default function ActionDeck({
+     closeSuggestModal,
+     startConfirmationFlow,
+     startSuggestConfirmationFlow,
+-    resetState,
+   } = state;
+ 
+   // Coin flight system - use parent's trigger if provided, otherwise use local
+@@ -260,4 +259,4 @@ export default function ActionDeck({
+       />
+     </>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/components/event/ActionDeckContent.tsx b/src/components/event/ActionDeckContent.tsx
+index a74b6aa..6e29a7f 100644
+--- a/src/components/event/ActionDeckContent.tsx
++++ b/src/components/event/ActionDeckContent.tsx
+@@ -8,7 +8,6 @@
+  * Uses: framer-motion for animations, lucide-react for icons
+  */
+ 
+-import React from "react";
+ import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
+ import { Coins, CheckCircle2 } from "lucide-react";
+ import type { ActionCard } from "../../hooks/useActionDeckState";
+@@ -18,7 +17,6 @@ import { useLogger } from "../../hooks/useLogger";
+ // Visual constants
+ const ENTER_STAGGER = 0.12;
+ const ENTER_DURATION = 0.36;
+-const ENTER_Y = 24;
+ 
+ const CARD_TITLE_CLASS = "text-[14px] font-semibold text-white";
+ const CARD_DESC_CLASS = "text-[12.5px] leading-snug text-white/95";
+@@ -450,4 +448,4 @@ export default function ActionDeckContent({
+       </div>
+     </LayoutGroup>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/components/event/CompassPillsOverlay.tsx b/src/components/event/CompassPillsOverlay.tsx
+index 634199b..cb01ecc 100644
+--- a/src/components/event/CompassPillsOverlay.tsx
++++ b/src/components/event/CompassPillsOverlay.tsx
+@@ -1,5 +1,5 @@
+ // src/components/event/CompassPillsOverlay.tsx
+-import React, { useEffect, useMemo, useRef, useState } from "react";
++import { useEffect, useMemo, useRef, useState } from "react";
+ import { motion, AnimatePresence } from "framer-motion";
+ import type { CompassEffectPing } from "../MiniCompass";
+ import { COMPONENTS, PALETTE } from "../../data/compass-data";
+diff --git a/src/components/event/DayCounterAnimation.tsx b/src/components/event/DayCounterAnimation.tsx
+index ae0dcb0..ba9ff7c 100644
+--- a/src/components/event/DayCounterAnimation.tsx
++++ b/src/components/event/DayCounterAnimation.tsx
+@@ -1,7 +1,6 @@
+ // src/components/event/DayCounterAnimation.tsx
+ // Rotating day counter animation for day progression
+ 
+-import React from "react";
+ import { motion } from "framer-motion";
+ 
+ interface DayCounterAnimationProps {
+@@ -91,4 +90,4 @@ export default function DayCounterAnimation({
+       </div>
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/components/event/DilemmaCard.tsx b/src/components/event/DilemmaCard.tsx
+index 568b05f..29f51c6 100644
+--- a/src/components/event/DilemmaCard.tsx
++++ b/src/components/event/DilemmaCard.tsx
+@@ -10,7 +10,6 @@ const DESC_CLASS  = "text-[13px] leading-snug text-white/85";
+ const CARD_PAD    = "px-3 py-3"; // overall padding
+ const CARD_TONE   = "border-slate-700/50 bg-black/60 backdrop-blur-sm ring-1 ring-amber-400/40 rounded-2xl shadow-sm";
+ 
+-import React from "react";
+ import { motion } from "framer-motion";
+ 
+ export type DilemmaProps = {
+diff --git a/src/components/event/EventLoadingOverlay.tsx b/src/components/event/EventLoadingOverlay.tsx
+index c86af16..4ffad5e 100644
+--- a/src/components/event/EventLoadingOverlay.tsx
++++ b/src/components/event/EventLoadingOverlay.tsx
+@@ -2,7 +2,7 @@
+ // Enhanced loading overlay for day progression with multi-phase states.
+ // Shows rotating hourglass, days remaining bar, and analysis progress.
+ 
+-import React, { useMemo } from "react";
++import { useMemo } from "react";
+ import { Hourglass } from "lucide-react";
+ import { motion } from "framer-motion";
+ import { bgStyleWithRoleImage } from "../../lib/ui";
+@@ -13,7 +13,6 @@ type Props = {
+   showDayProgression?: boolean; // when true, shows day progression UI
+   currentDay?: number;
+   totalDays?: number;
+-  isAnimatingCounter?: boolean;
+   analysisComplete?: {
+     support: boolean;
+     compass: boolean;
+@@ -29,7 +28,6 @@ export default function EventLoadingOverlay({
+   showDayProgression = false,
+   currentDay = 1,
+   totalDays = 30,
+-  isAnimatingCounter = false,
+   analysisComplete
+ }: Props) {
+   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
+diff --git a/src/components/event/EventSupportManager.tsx b/src/components/event/EventSupportManager.tsx
+index d682914..0b22e7a 100644
+--- a/src/components/event/EventSupportManager.tsx
++++ b/src/components/event/EventSupportManager.tsx
+@@ -10,7 +10,6 @@ const clampPercent = (n: number): number =>
+   Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
+ 
+ interface EventSupportManagerProps {
+-  vals: Trio;
+   setVals: (vals: Trio | ((prev: Trio) => Trio)) => void;
+   setSupportDeltas: (deltas: SupportDeltas) => void;
+   setSupportTrends: (trends: SupportTrends) => void;
+@@ -18,7 +17,6 @@ interface EventSupportManagerProps {
+ }
+ 
+ export function useEventSupportManager({
+-  vals,
+   setVals,
+   setSupportDeltas,
+   setSupportTrends,
+@@ -92,8 +90,8 @@ export function useEventSupportManager({
+ }
+ 
+ // This is a hook component - it doesn't render anything
+-export default function EventSupportManager(props: EventSupportManagerProps) {
++export default function EventSupportManager(_props: EventSupportManagerProps) {
+   // This component exists just to organize the support management logic
+   // The actual hook is exported above
+   return null;
+-}
+\ No newline at end of file
++}
+diff --git a/src/components/event/SupportList.tsx b/src/components/event/SupportList.tsx
+index 07e4b41..11eb3f1 100644
+--- a/src/components/event/SupportList.tsx
++++ b/src/components/event/SupportList.tsx
+@@ -3,7 +3,7 @@
+ // - Icon badge: per-entity colored background; icon lines (strokes) are white.
+ // - Minimal knobs live at the top (sizes + colors).
+ 
+-import React, { useEffect, useRef, useState } from "react";
++import { useEffect, useRef, useState } from "react";
+ import { motion } from "framer-motion";
+ import { Users, Landmark, Heart, ArrowUp, ArrowDown } from "lucide-react";
+ 
+@@ -21,8 +21,6 @@ const ICON_BADGE_RING = "ring-1 ring-white/15 shadow-sm";
+ 
+ // Icon stroke color (white lines)
+ const ICON_STROKE_CLASS = "text-white";      // lucide uses currentColor for strokes
+-const ARROW_UP_COLOR_CLASS = "text-emerald-300";
+-const ARROW_DOWN_COLOR_CLASS = "text-rose-300";
+ 
+ // Per-entity badge background colors
+ // Change these to whatever palette you like.
+diff --git a/src/data/predefinedRoles.ts b/src/data/predefinedRoles.ts
+index 9644894..4dee9be 100644
+--- a/src/data/predefinedRoles.ts
++++ b/src/data/predefinedRoles.ts
+@@ -4,7 +4,17 @@
+ // This replaces the scattered data across multiple files
+ 
+ import type { AnalysisResult } from "../store/roleStore";
+-import type { RoleCharacters } from "./predefinedCharacters";
++
++export interface RoleCharacter {
++  name: string;
++  prompt: string;
++}
++
++export interface RoleCharacters {
++  male: RoleCharacter;
++  female: RoleCharacter;
++  any: RoleCharacter;
++}
+ import { ROLE_SUPPORT_PROFILES } from "./supportProfiles";
+ 
+ /**
+@@ -19,6 +29,8 @@ export interface PredefinedRoleData {
+   youAreKey: string;                   // i18n key for role description
+   year: string;                        // Year badge display
+   imageId: string;                     // Image identifier for banner/full images
++  roleScope: string;                   // In-world authority / what this role can actually do
++  storyThemes: string[];               // Core thematic axes or domains to explore
+   powerDistribution: AnalysisResult;   // Complete E-12 political system analysis
+   characters: RoleCharacters;          // Character name options (male/female/any)
+ }
+@@ -37,6 +49,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+     youAreKey: "ATHENS_YOU_ARE",
+     year: "-404",
+     imageId: "greece",
++    roleScope: "Acts as a respected citizen on the oligarch-controlled civic council, influencing local decrees and relief efforts but never commanding the Spartan garrison.",
++    storyThemes: ["autonomy_vs_heteronomy", "liberalism_vs_totalism", "reconciliation"],
+     powerDistribution: {
+       systemName: "Hard-Power Oligarchy — Stratocracy",
+       systemDesc: "Military-backed oligarchy: Spartan garrison with local rulers set rules; courts muted, citizens sidelined.",
+@@ -101,7 +115,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+         settingType: "real",
+         era: "404–403 BCE Athens"
+       },
+-      supportProfiles: ROLE_SUPPORT_PROFILES["Athens — The Day Democracy Died (-404)"] ?? null
++      supportProfiles: ROLE_SUPPORT_PROFILES["Athens — The Day Democracy Died (-404)"] ?? null,
++      roleScope: "Acts as a respected citizen on the oligarch-controlled civic council, influencing local decrees and relief efforts but never commanding the Spartan garrison.",
++      storyThemes: ["autonomy_vs_heteronomy", "liberalism_vs_totalism", "reconciliation"]
+     },
+     characters: {
+       male: {
+@@ -128,6 +144,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+     youAreKey: "ALEXANDRIA_YOU_ARE",
+     year: "-48",
+     imageId: "alexandria",
++    roleScope: "Serves as a city scholar-advisor mediating between palace factions and Roman commanders; can sway civic policy, archives, and urban defenses but not direct legions.",
++    storyThemes: ["cultural_survival", "foreign_domination", "knowledge_vs_power"],
+     powerDistribution: {
+       systemName: "Autocratizing (Military)",
+       systemDesc: "Under siege, the foreign general and local army overrule the court; force sets terms, others adapt.",
+@@ -192,7 +210,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+         settingType: "real",
+         era: "48–47 BCE Alexandria"
+       },
+-      supportProfiles: ROLE_SUPPORT_PROFILES["Alexandria — Fire over the Nile (-48)"] ?? null
++      supportProfiles: ROLE_SUPPORT_PROFILES["Alexandria — Fire over the Nile (-48)"] ?? null,
++      roleScope: "Serves as a city scholar-advisor mediating between palace factions and Roman commanders; can sway civic policy, archives, and urban defenses but not direct legions.",
++      storyThemes: ["cultural_survival", "foreign_domination", "knowledge_vs_power"]
+     },
+     characters: {
+       male: {
+@@ -219,6 +239,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+     youAreKey: "FLORENCE_YOU_ARE",
+     year: "1494",
+     imageId: "florence",
++    roleScope: "Sits on Florence's Great Council, balancing guild and patrician interests; can propose civic edicts, policing orders, and cultural protections but cannot command Papal or French armies.",
++    storyThemes: ["faith_vs_freedom", "economic_stability", "civic_identity"],
+     powerDistribution: {
+       systemName: "Mental-Might Oligarchy — Theocracy",
+       systemDesc: "Wide-vote republic led by a strong preacher; laws and diplomacy follow sermons and public piety.",
+@@ -283,7 +305,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+         settingType: "real",
+         era: "Florence 1494–1498 (Savonarola era)"
+       },
+-      supportProfiles: ROLE_SUPPORT_PROFILES["Florence — The Fire and the Faith (1494)"] ?? null
++      supportProfiles: ROLE_SUPPORT_PROFILES["Florence — The Fire and the Faith (1494)"] ?? null,
++      roleScope: "Sits on Florence's Great Council, balancing guild and patrician interests; can propose civic edicts, policing orders, and cultural protections but cannot command Papal or French armies.",
++      storyThemes: ["faith_vs_freedom", "economic_stability", "civic_identity"]
+     },
+     characters: {
+       male: {
+@@ -310,6 +334,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+     youAreKey: "NORTH_AMERICA_YOU_ARE",
+     year: "1607",
+     imageId: "northAmerica",
++    roleScope: "Leads a tribal council overseeing diplomacy, land stewardship, and trade terms; can mobilize scouts and negotiate boundaries but does not unilaterally declare war without consensus.",
++    storyThemes: ["territorial_autonomy", "cultural_preservation", "exchange_vs_exploitation"],
+     powerDistribution: {
+       systemName: "Personalist Monarchy / Autocracy",
+       systemDesc: "Single paramount chief directs war, trade, and justice; councils advise, but his word usually decides.",
+@@ -374,7 +400,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+         settingType: "real",
+         era: "Tidewater Virginia, 1607–1609"
+       },
+-      supportProfiles: ROLE_SUPPORT_PROFILES["North America — The First Encounter (1607)"] ?? null
++      supportProfiles: ROLE_SUPPORT_PROFILES["North America — The First Encounter (1607)"] ?? null,
++      roleScope: "Leads a tribal council overseeing diplomacy, land stewardship, and trade terms; can mobilize scouts and negotiate boundaries but does not unilaterally declare war without consensus.",
++      storyThemes: ["territorial_autonomy", "cultural_preservation", "exchange_vs_exploitation"]
+     },
+     characters: {
+       male: {
+@@ -401,6 +429,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+     youAreKey: "JAPAN_YOU_ARE",
+     year: "1600",
+     imageId: "japan",
++    roleScope: "Heads a mid-level samurai clan caught between warring coalitions; can commit retainers, negotiate allegiances, and manage village protections but cannot dictate national strategy.",
++    storyThemes: ["loyalty_vs_survival", "clan_honor", "centralization"],
+     powerDistribution: {
+       systemName: "Hard-Power Oligarchy — Stratocracy",
+       systemDesc: "Warlord coalitions rule by force; law follows the armies, not councils.",
+@@ -465,7 +495,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+         settingType: "real",
+         era: "Japan, 1600 (late Sengoku)"
+       },
+-      supportProfiles: ROLE_SUPPORT_PROFILES["Japan — The Land at War's End (1600)"] ?? null
++      supportProfiles: ROLE_SUPPORT_PROFILES["Japan — The Land at War's End (1600)"] ?? null,
++      roleScope: "Heads a mid-level samurai clan caught between warring coalitions; can commit retainers, negotiate allegiances, and manage village protections but cannot dictate national strategy.",
++      storyThemes: ["loyalty_vs_survival", "clan_honor", "centralization"]
+     },
+     characters: {
+       male: {
+@@ -492,6 +524,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+     youAreKey: "HAITI_YOU_ARE",
+     year: "1791",
+     imageId: "haiti",
++    roleScope: "Acts as a plantation overseer-turned-liaison among rebel factions; can influence local militia deployments, justice for captives, and resource distribution but cannot dictate colony-wide treaties.",
++    storyThemes: ["emancipation", "justice_vs_vengeance", "unity_vs_fragmentation"],
+     powerDistribution: {
+       systemName: "Hard-Power Oligarchy — Stratocracy",
+       systemDesc: "Warring armed factions decide outcomes; civil authority is weak.",
+@@ -556,7 +590,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+         settingType: "real",
+         era: "Saint-Domingue, 1791"
+       },
+-      supportProfiles: ROLE_SUPPORT_PROFILES["Haiti — The Island in Revolt (1791)"] ?? null
++      supportProfiles: ROLE_SUPPORT_PROFILES["Haiti — The Island in Revolt (1791)"] ?? null,
++      roleScope: "Acts as a plantation overseer-turned-liaison among rebel factions; can influence local militia deployments, justice for captives, and resource distribution but cannot dictate colony-wide treaties.",
++      storyThemes: ["emancipation", "justice_vs_vengeance", "unity_vs_fragmentation"]
+     },
+     characters: {
+       male: {
+@@ -583,6 +619,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+     youAreKey: "RUSSIA_YOU_ARE",
+     year: "1917",
+     imageId: "russia",
++    roleScope: "Embattled Tsar managing imperial decrees, military appointments, and court negotiations; can reshuffle ministers, issue manifestos, or seek truces but cannot personally command every garrison simultaneously.",
++    storyThemes: ["autocracy_vs_revolution", "bread_land_peace", "loyalty_crisis"],
+     powerDistribution: {
+       systemName: "Personalist Monarchy / Autocracy",
+       systemDesc: "Tsar rules personally; army compliance and urban revolt now decide what sticks.",
+@@ -647,7 +685,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+         settingType: "real",
+         era: "Russia, Feb–Mar 1917"
+       },
+-      supportProfiles: ROLE_SUPPORT_PROFILES["Russia — The Throne Crumbles (1917)"] ?? null
++      supportProfiles: ROLE_SUPPORT_PROFILES["Russia — The Throne Crumbles (1917)"] ?? null,
++      roleScope: "Embattled Tsar managing imperial decrees, military appointments, and court negotiations; can reshuffle ministers, issue manifestos, or seek truces but cannot personally command every garrison simultaneously.",
++      storyThemes: ["autocracy_vs_revolution", "bread_land_peace", "loyalty_crisis"]
+     },
+     characters: {
+       male: {
+@@ -674,6 +714,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+     youAreKey: "INDIA_YOU_ARE",
+     year: "1947",
+     imageId: "india",
++    roleScope: "District officer coordinating police, relief, and political liaisons along the partition line; manages curfews, convoys, and investigations but cannot redraw national borders.",
++    storyThemes: ["communal_trust", "order_vs_liberty", "refugee_protection"],
+     powerDistribution: {
+       systemName: "Hard-Power Oligarchy — Stratocracy",
+       systemDesc: "Armed forces and communal leaders shape rules; administrators improvise to contain violence amid state breakdown.",
+@@ -738,7 +780,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+         settingType: "real",
+         era: "India Partition, 1947"
+       },
+-      supportProfiles: ROLE_SUPPORT_PROFILES["India — The Midnight of Freedom (1947)"] ?? null
++      supportProfiles: ROLE_SUPPORT_PROFILES["India — The Midnight of Freedom (1947)"] ?? null,
++      roleScope: "District officer coordinating police, relief, and political liaisons along the partition line; manages curfews, convoys, and investigations but cannot redraw national borders.",
++      storyThemes: ["communal_trust", "order_vs_liberty", "refugee_protection"]
+     },
+     characters: {
+       male: {
+@@ -765,6 +809,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+     youAreKey: "SOUTH_AFRICA_YOU_ARE",
+     year: "1990",
+     imageId: "southAfrica",
++    roleScope: "Senior police commander overseeing citywide operations during the transition; can set deployment protocols, liaise with reform negotiators, and manage crowd-control policy but cannot pass national laws.",
++    storyThemes: ["justice_vs_amnesty", "public_safety", "institutional_trust"],
+     powerDistribution: {
+       systemName: "Autocratizing (Executive)",
+       systemDesc: "Late-apartheid South Africa: executive-led minority rule with strong security forces and rising mass opposition.",
+@@ -829,7 +875,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+         settingType: "real",
+         era: "South Africa, 1990 transition"
+       },
+-      supportProfiles: ROLE_SUPPORT_PROFILES["South Africa — The End of Apartheid (1990)"] ?? null
++      supportProfiles: ROLE_SUPPORT_PROFILES["South Africa — The End of Apartheid (1990)"] ?? null,
++      roleScope: "Senior police commander overseeing citywide operations during the transition; can set deployment protocols, liaise with reform negotiators, and manage crowd-control policy but cannot pass national laws.",
++      storyThemes: ["justice_vs_amnesty", "public_safety", "institutional_trust"]
+     },
+     characters: {
+       male: {
+@@ -856,6 +904,8 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+     youAreKey: "MARS_YOU_ARE",
+     year: "2179",
+     imageId: "mars",
++    roleScope: "Elected Mars colony governor balancing survival systems and autonomy petitions; can adjust habitat policy, rationing, and negotiations with Earth but cannot conjure unlimited supplies.",
++    storyThemes: ["autonomy_vs_dependency", "survival_ethics", "science_vs_populism"],
+     powerDistribution: {
+       systemName: "Mental-Might Oligarchy — Technocracy",
+       systemDesc: "Engineers and safety rules steer decisions; an elected governor balances Earth supply leverage and local freedoms.",
+@@ -920,7 +970,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
+         settingType: "fictional",
+         era: "late 22nd century"
+       },
+-      supportProfiles: ROLE_SUPPORT_PROFILES["Mars Colony — The Red Frontier (2179)"] ?? null
++      supportProfiles: ROLE_SUPPORT_PROFILES["Mars Colony — The Red Frontier (2179)"] ?? null,
++      roleScope: "Elected Mars colony governor balancing survival systems and autonomy petitions; can adjust habitat policy, rationing, and negotiations with Earth but cannot conjure unlimited supplies.",
++      storyThemes: ["autonomy_vs_dependency", "survival_ethics", "science_vs_populism"]
+     },
+     characters: {
+       male: {
+diff --git a/src/hooks/useActionSuggestion.ts b/src/hooks/useActionSuggestion.ts
+index b2b4775..2bc6671 100644
+--- a/src/hooks/useActionSuggestion.ts
++++ b/src/hooks/useActionSuggestion.ts
+@@ -26,12 +26,24 @@ function getDilemmaContext(d?: { title: string; description: string }): { title:
+ }
+ 
+ // Build role context for historical validation
+-function getRoleContext(): { era: string; settingType: string; year: string } {
++function getRoleContext(): {
++  era: string;
++  settingType: string;
++  year: string;
++  roleScope: string;
++  challengerName: string;
++  topHolders: string[];
++} {
+   const roleStore = useRoleStore.getState();
+   const era = roleStore.analysis?.grounding?.era || "";
+   const settingType = roleStore.analysis?.grounding?.settingType || "unclear";
+   const year = roleStore.roleYear || "";
+-  return { era, settingType, year };
++  const roleScope = roleStore.roleScope || roleStore.analysis?.roleScope || "";
++  const challengerName = roleStore.analysis?.challengerSeat?.name || "";
++  const holders = Array.isArray(roleStore.analysis?.holders)
++    ? roleStore.analysis!.holders.slice(0, 4).map((h) => h.name).filter(Boolean)
++    : [];
++  return { era, settingType, year, roleScope, challengerName, topHolders: holders };
+ }
+ 
+ // Gated debug logger (Settings → Debug mode)
+@@ -94,6 +106,7 @@ export function useActionSuggestion({
+         descriptionLen: ctx.description.length,
+         roleEra: roleCtx.era,
+         roleYear: roleCtx.year,
++        roleScopePreview: roleCtx.roleScope.slice(0, 80),
+       });
+ 
+       const result = await validateSuggestionStrict(trimmedText, ctx, roleCtx);
+@@ -138,4 +151,4 @@ export function useActionSuggestion({
+     validateAndConfirmSuggestion,
+     isDisabled,
+   };
+-}
+\ No newline at end of file
++}
+diff --git a/src/hooks/useEventActions.ts b/src/hooks/useEventActions.ts
+index c367662..7648aa3 100644
+--- a/src/hooks/useEventActions.ts
++++ b/src/hooks/useEventActions.ts
+@@ -15,7 +15,6 @@ interface UseEventActionsProps {
+   setSupportDeltas: (deltas: SupportDeltas) => void;
+   setSupportTrends: (trends: SupportTrends) => void;
+   setSupportNotes: (notes: SupportNotes | ((prev: SupportNotes) => SupportNotes)) => void;
+-  budget: number;
+   setBudget: (budget: number | ((prev: number) => number)) => void;
+   updateNewsAfterAction: (actionData: { title: string; summary: string; cost: number }) => void;
+   enableProgressiveLoading?: boolean; // when true, uses new progressive loading flow
+@@ -34,7 +33,6 @@ export function useEventActions({
+   setSupportDeltas,
+   setSupportTrends,
+   setSupportNotes,
+-  budget,
+   setBudget,
+   updateNewsAfterAction,
+   enableProgressiveLoading = true, // Enable new progressive loading flow by default
+@@ -44,7 +42,6 @@ export function useEventActions({
+ 
+   // Support manager hook
+   const { analyzeSupportWrapper, applySupportEffects } = useEventSupportManager({
+-    vals,
+     setVals,
+     setSupportDeltas,
+     setSupportTrends,
+@@ -64,8 +61,9 @@ export function useEventActions({
+ 
+       // 1. Immediate budget update for responsive feedback (this happens during coin animation)
+       if (showBudget && a.cost !== undefined) {
+-        setBudget(prev => prev + a.cost);
+-        console.log(`[useEventActions] Budget updated by ${a.cost}`);
++        const actionCost = a.cost;
++        setBudget(prev => prev + actionCost);
++        console.log(`[useEventActions] Budget updated by ${actionCost}`);
+       }
+ 
+       // 2. Start progressive loading flow (this will handle news, support, etc. sequentially)
+@@ -201,4 +199,4 @@ export function useEventActions({
+     handleConfirm,
+     handleSuggest,
+   };
+-}
+\ No newline at end of file
++}
+diff --git a/src/hooks/useEventDataCollector.ts b/src/hooks/useEventDataCollector.ts
+index 4afd846..a0e02a6 100644
+--- a/src/hooks/useEventDataCollector.ts
++++ b/src/hooks/useEventDataCollector.ts
+@@ -11,13 +11,12 @@
+ // Dependencies: dilemmaStore, roleStore, compassStore
+ 
+ import { useState, useCallback, useRef } from "react";
+-import { useDilemmaStore, buildLightSnapshot } from "../store/dilemmaStore";
+-import type { GoalStatusChange } from "../store/dilemmaStore";
++import { useDilemmaStore } from "../store/dilemmaStore";
+ import { useRoleStore } from "../store/roleStore";
+ import { useCompassStore } from "../store/compassStore";
+ import { useSettingsStore } from "../store/settingsStore";
+ import { COMPONENTS, type PropKey } from "../data/compass-data";
+-import type { Dilemma, DilemmaAction, LightDilemmaResponse } from "../lib/dilemma";
++import type { Dilemma } from "../lib/dilemma";
+ import type { TickerItem } from "../components/event/NewsTicker";
+ import { audioManager } from "../lib/audioManager";
+ 
+@@ -96,37 +95,6 @@ export type CollectedData = Phase1Data & Phase2Data & Phase3Data & {
+  * Example: [8.5, 2.1, 7.2, 1.5, 6.1, 0.5, 3.2, 1.0, 0.8, 0.3]
+  *       → [8.5, 0, 7.2, 0, 6.1, 0, 0, 0, 0, 0]
+  */
+-function getTop3CompassValues(arr: number[] | undefined): number[] {
+-  if (!Array.isArray(arr) || arr.length === 0) return [];
+-
+-  // Create array of [value, originalIndex] pairs
+-  const indexed = arr.map((v, i) => ({ v: Number(v) || 0, i }));
+-
+-  // Sort by value descending, take top 3
+-  const top3 = indexed.sort((a, b) => b.v - a.v).slice(0, 3);
+-
+-  // Build sparse result array - only top 3 values at original indices
+-  const result = new Array(arr.length).fill(0);
+-  top3.forEach(({ v, i }) => { result[i] = v; });
+-
+-  return result;
+-}
+-
+-/**
+- * Build optimized compass payload with top 3 values per dimension
+- * Reduces token usage by ~300 tokens (40 values → 12 values)
+- */
+-function buildOptimizedCompassPayload(compassValues: any): any {
+-  if (!compassValues) return { what: [], whence: [], how: [], whither: [] };
+-
+-  return {
+-    what: getTop3CompassValues(compassValues?.what),
+-    whence: getTop3CompassValues(compassValues?.whence),
+-    how: getTop3CompassValues(compassValues?.how),
+-    whither: getTop3CompassValues(compassValues?.whither)
+-  };
+-}
+-
+ /**
+  * Get top K compass values with names and strengths (not indices)
+  * Returns value names for natural language mirror recommendations
+@@ -150,31 +118,6 @@ function topKWithNames(arr: number[] | undefined, prop: PropKey, k = 3): Array<{
+  * Get top overall values across all compass dimensions
+  * NO threshold filtering - just sort and take top K
+  */
+-function topOverallWithNames(compassValues: any, k = 3): Array<{ name: string; strength: number; dimension: PropKey }> {
+-  const allValues: Array<{ v: number; name: string; dimension: PropKey }> = [];
+-
+-  (["what", "whence", "how", "whither"] as PropKey[]).forEach((prop) => {
+-    const arr = Array.isArray(compassValues?.[prop]) ? compassValues[prop] : [];
+-    arr.forEach((v: number, i: number) => {
+-      allValues.push({
+-        v: Number(v) || 0,
+-        name: COMPONENTS[prop]?.[i]?.short || `${prop} #${i + 1}`,
+-        dimension: prop,
+-      });
+-    });
+-  });
+-
+-  return allValues
+-    // NO threshold filter - just sort by value
+-    .sort((a, b) => b.v - a.v)
+-    .slice(0, k)
+-    .map(x => ({
+-      name: x.name,
+-      strength: Math.round(x.v * 10) / 10,
+-      dimension: x.dimension
+-    }));
+-}
+-
+ /**
+  * UNIFIED GAME TURN API - Fetches ALL data in one call using hosted state
+  *
+@@ -196,6 +139,7 @@ async function fetchGameTurn(): Promise<{
+   const {
+     gameId,
+     day,
++    totalDays,
+     lastChoice,
+     supportPeople,
+     supportMiddle,
+@@ -242,6 +186,8 @@ async function fetchGameTurn(): Promise<{
+       powerHolders: roleState.analysis?.holders || [],
+       challengerSeat: roleState.analysis?.challengerSeat || null,  // NEW: Primary institutional opponent
+       supportProfiles: roleState.supportProfiles || roleState.analysis?.supportProfiles || null,
++      roleScope: roleState.roleScope || roleState.analysis?.roleScope || null,
++      storyThemes: roleState.storyThemes || roleState.analysis?.storyThemes || null,
+       playerCompass: {
+         what: topWhatValues.join(', '),
+         whence: topKWithNames(compassValues?.whence, 'whence', 2).map(v => v.name).join(', '),
+@@ -249,7 +195,8 @@ async function fetchGameTurn(): Promise<{
+         whither: topKWithNames(compassValues?.whither, 'whither', 2).map(v => v.name).join(', ')
+       },
+       topWhatValues,
+-      totalDays: 7,
++      totalDays,
++      daysLeft: totalDays - day + 1,
+       thematicGuidance: dilemmasSubjectEnabled && dilemmasSubject
+         ? `Focus on: ${dilemmasSubject}`
+         : null
+@@ -291,6 +238,9 @@ async function fetchGameTurn(): Promise<{
+     }
+   }
+ 
++  payload.totalDays = totalDays;
++  payload.daysLeft = totalDays - day + 1;
++
+   console.log(`[fetchGameTurn] Calling /api/game-turn for Day ${day}, gameId=${currentGameId}`);
+ 
+   const response = await fetch("/api/game-turn", {
+@@ -312,13 +262,41 @@ async function fetchGameTurn(): Promise<{
+   }
+ 
+   // Allow empty actions array ONLY when isGameEnd is true
+-  if (!data.isGameEnd && data.actions.length !== 3) {
+-    throw new Error("Invalid game turn response: expected 3 actions for normal dilemma");
++  if (!Array.isArray(data.actions)) {
++    data.actions = [];
++  }
++
++  if (!data.isGameEnd) {
++    if (data.actions.length > 3) {
++      console.warn("[fetchGameTurn] ⚠️ Received more than 3 actions. Truncating to 3.");
++      data.actions = data.actions.slice(0, 3);
++    } else if (data.actions.length < 3) {
++      console.warn("[fetchGameTurn] ⚠️ Received fewer than 3 actions. Padding with fallback choices.");
++      const fallbackSource = data.actions[0] || { title: "Fallback Option", summary: "A reasonable alternative.", cost: 0, iconHint: "speech" };
++      while (data.actions.length < 3) {
++        const idx = data.actions.length;
++        data.actions.push({
++          id: ["a", "b", "c"][idx] || `opt${idx}`,
++          title: `${fallbackSource.title} (${idx + 1})`,
++          summary: fallbackSource.summary,
++          cost: Number.isFinite(fallbackSource.cost) ? fallbackSource.cost : 0,
++          iconHint: fallbackSource.iconHint || "speech"
++        });
++      }
++    }
++  } else {
++    if (data.actions.length !== 0) {
++      console.warn("[fetchGameTurn] ⚠️ Game-end response returned actions. Clearing array.");
++      data.actions = [];
++    }
+   }
+ 
+-  // Game end must have empty actions
+-  if (data.isGameEnd && data.actions.length !== 0) {
+-    throw new Error("Invalid game turn response: game end must have empty actions array");
++  // Failsafe: if the server failed to flag game end but daysLeft reached zero, enforce aftermath locally
++  const daysLeft = totalDays - day + 1;
++  if (!data.isGameEnd && (!Array.isArray(data.actions) || data.actions.length !== 3) && daysLeft <= 0) {
++    console.warn("[fetchGameTurn] ⚠️ Server returned unexpected action count on final day — forcing aftermath mode.");
++    data.isGameEnd = true;
++    data.actions = [];
+   }
+ 
+   // Extract dilemma
+diff --git a/src/hooks/useEventNarration.ts b/src/hooks/useEventNarration.ts
+index 98b818d..f654da5 100644
+--- a/src/hooks/useEventNarration.ts
++++ b/src/hooks/useEventNarration.ts
+@@ -14,6 +14,7 @@ export function useEventNarration() {
+ 
+   const preparedDilemmaRef = useRef<PreparedTTSHandle>(null);
+   const dilemmaPlayedRef = useRef(false);
++  const skipNarrationLogRef = useRef(false);
+   const [canShowDilemma, setCanShowDilemma] = useState(false);
+ 
+   // Prepare narration whenever the dilemma changes
+@@ -39,10 +40,14 @@ export function useEventNarration() {
+ 
+         // Skip TTS preparation if narration disabled
+         if (!narrationEnabled) {
+-          console.log("[EventNarration] Skipping TTS preparation (narration disabled)");
++          if (!skipNarrationLogRef.current) {
++            console.log("[EventNarration] Skipping TTS preparation (narration disabled)");
++            skipNarrationLogRef.current = true;
++          }
+           setCanShowDilemma(true);
+           return;
+         }
++        skipNarrationLogRef.current = false;
+ 
+         const p = await narrator.prepare(speech, { voiceName: "alloy", format: "mp3" });
+         if (cancelled) {
+@@ -100,4 +105,4 @@ export function useEventNarration() {
+     narrationEnabled,
+     startNarrationIfReady,
+   };
+-}
+\ No newline at end of file
++}
+diff --git a/src/hooks/useLogger.ts b/src/hooks/useLogger.ts
+index 861a1e4..205a1ea 100644
+--- a/src/hooks/useLogger.ts
++++ b/src/hooks/useLogger.ts
+@@ -8,6 +8,7 @@
+ // Automatically includes metadata (screen, day, role) from application state
+ 
+ import { useCallback, useMemo } from 'react';
++import type { MouseEvent } from 'react';
+ import { useSettingsStore } from '../store/settingsStore';
+ import { useDilemmaStore } from '../store/dilemmaStore';
+ import { useRoleStore } from '../store/roleStore';
+@@ -36,7 +37,7 @@ export function useLogger() {
+    * @param comments - Optional human-readable description
+    */
+   const log = useCallback(
+-    (action: string, value: string | number | boolean, comments?: string) => {
++    (action: string, value: string | number | boolean | Record<string, unknown>, comments?: string) => {
+       if (!enabled) {
+         return;
+       }
+@@ -62,7 +63,7 @@ export function useLogger() {
+    * @param comments - Optional human-readable description
+    */
+   const logSystem = useCallback(
+-    (action: string, value: string | number | boolean, comments?: string) => {
++    (action: string, value: string | number | boolean | Record<string, unknown>, comments?: string) => {
+       if (!enabled) {
+         return;
+       }
+@@ -95,14 +96,14 @@ export function useLogger() {
+  */
+ export function useLoggedClick(
+   action: string,
+-  value: any = {},
++  value: string | number | boolean | Record<string, unknown> = {},
+   comments?: string,
+   onClick?: () => void
+ ) {
+   const logger = useLogger();
+ 
+   return useCallback(
+-    (e?: React.MouseEvent) => {
++    (_e?: MouseEvent) => {
+       logger.log(action, value, comments);
+       if (onClick) {
+         onClick();
+diff --git a/src/hooks/useNarrator.ts b/src/hooks/useNarrator.ts
+index c9cf90e..166aacd 100644
+--- a/src/hooks/useNarrator.ts
++++ b/src/hooks/useNarrator.ts
+@@ -6,7 +6,7 @@
+ // - prime() should be called from a user gesture (Splash "Start!") to unlock mobile audio.
+ // - All requests go to /api/tts on your server; the API key never touches the client.
+ 
+-import { useCallback, useRef, useState } from "react";
++import { useCallback, useState } from "react";
+ import { useSettingsStore } from "../store/settingsStore";
+ 
+ type SpeakOptions = {
+@@ -135,7 +135,7 @@ export function useNarrator() {
+           audio.removeEventListener("error", onErr);
+           resolve();
+         };
+-        const onErr = (e: any) => {
++        const onErr = () => {
+           audio.removeEventListener("canplaythrough", onReady);
+           audio.removeEventListener("error", onErr);
+           reject(new Error("Audio element error"));
+diff --git a/src/hooks/usePowerDistributionAnalysis.ts b/src/hooks/usePowerDistributionAnalysis.ts
+index 02a820c..699696e 100644
+--- a/src/hooks/usePowerDistributionAnalysis.ts
++++ b/src/hooks/usePowerDistributionAnalysis.ts
+@@ -262,6 +262,8 @@ export function usePowerDistributionAnalysis({
+ 
+         const supportProfiles: RoleSupportProfiles | null =
+           base.supportProfiles ?? predefinedProfiles ?? null;
++        const roleScope = base.roleScope ?? null;
++        const storyThemes = base.storyThemes ?? null;
+ 
+         if (supportProfiles && useSettingsStore.getState().debugMode) {
+           console.log("[PowerDistribution][Debug] Support baselines:", {
+@@ -271,6 +273,13 @@ export function usePowerDistributionAnalysis({
+             challenger: supportProfiles.challenger,
+           });
+         }
++        if (useSettingsStore.getState().debugMode) {
++          console.log("[PowerDistribution][Debug] Scope & themes:", {
++            role,
++            roleScope,
++            storyThemes,
++          });
++        }
+ 
+         const finalPlayerIndex = playerHolderId != null
+           ? decorated.findIndex((h) => h._id === playerHolderId)
+@@ -284,10 +293,15 @@ export function usePowerDistributionAnalysis({
+           holders: decorated.map(({ _id, ...rest }) => rest),
+           playerIndex: finalPlayerIndex,
+           supportProfiles,
++          roleScope,
++          storyThemes,
+         };
+ 
+         setAnalysis(analysisResult);
+-        useRoleStore.getState().setSupportProfiles(supportProfiles);
++        const store = useRoleStore.getState();
++        store.setSupportProfiles(supportProfiles);
++        store.setRoleScope(roleScope ?? null);
++        store.setStoryThemes(storyThemes ?? null);
+ 
+         setState("done");
+       } catch (e: any) {
+diff --git a/src/lib/contextualDilemmaAnalysis.ts b/src/lib/contextualDilemmaAnalysis.ts
+index 52e23cf..b02f2a4 100644
+--- a/src/lib/contextualDilemmaAnalysis.ts
++++ b/src/lib/contextualDilemmaAnalysis.ts
+@@ -241,7 +241,7 @@ export function detectSupportCrises(supportValues: SupportValues): SupportCrisis
+ }
+ 
+ // Rule #9: Topic Diversity Management
+-export function ensureTopicDiversity(recentTopics: string[], topicCounts: Record<string, number>): {
++export function ensureTopicDiversity(recentTopics: string[]): {
+   shouldChangeTopic: boolean;
+   suggestedTopics: string[];
+   avoidTopics: string[];
+@@ -313,4 +313,4 @@ export function buildEnhancedContext(
+     recentTopics,
+     topicCounts,
+   };
+-}
+\ No newline at end of file
++}
+diff --git a/src/lib/eventDataCleaner.ts b/src/lib/eventDataCleaner.ts
+index 0ee6e78..5f04a5c 100644
+--- a/src/lib/eventDataCleaner.ts
++++ b/src/lib/eventDataCleaner.ts
+@@ -60,11 +60,13 @@ export async function cleanAndAdvanceDay(
+   const { setLastChoice } = useDilemmaStore.getState();
+ 
+   // Convert ActionCard back to DilemmaAction format for storage
++  const actionCost = selectedAction.cost ?? 0;
++
+   const dilemmaAction = {
+     id: selectedAction.id as 'a' | 'b' | 'c',
+     title: selectedAction.title,
+     summary: selectedAction.summary,
+-    cost: selectedAction.cost
++    cost: actionCost
+   };
+ 
+   setLastChoice(dilemmaAction);
+@@ -78,10 +80,10 @@ export async function cleanAndAdvanceDay(
+ 
+   if (showBudget) {
+     const { budget, setBudget } = useDilemmaStore.getState();
+-    const newBudget = budget + selectedAction.cost;
++    const newBudget = budget + actionCost;
+     setBudget(newBudget);
+ 
+-    const costDisplay = selectedAction.cost >= 0 ? `+${selectedAction.cost}` : `${selectedAction.cost}`;
++    const costDisplay = actionCost >= 0 ? `+${actionCost}` : `${actionCost}`;
+     console.log(`[Cleaner] Budget updated: ${budget} → ${newBudget} (${costDisplay})`);
+   } else {
+     console.log('[Cleaner] Budget system disabled - skipping budget update');
+diff --git a/src/lib/goalHelpers.ts b/src/lib/goalHelpers.ts
+index bbf619f..16bb2c7 100644
+--- a/src/lib/goalHelpers.ts
++++ b/src/lib/goalHelpers.ts
+@@ -58,7 +58,7 @@ export function getStartingSupport(difficulty: string | null): number {
+  * @param difficulty Current difficulty level
+  * @returns Filtered goals
+  */
+-export function filterGoalsByDifficulty(goals: Goal[], difficulty: string | null): Goal[] {
++export function filterGoalsByDifficulty(goals: Goal[], _difficulty: string | null): Goal[] {
+   // For now, all goals are available at all difficulties
+   // Future: Could filter out goals that are impossible/trivial at certain difficulties
+   return goals;
+diff --git a/src/lib/loggingService.ts b/src/lib/loggingService.ts
+index 8051a8c..3ebef27 100644
+--- a/src/lib/loggingService.ts
++++ b/src/lib/loggingService.ts
+@@ -159,7 +159,7 @@ class LoggingService {
+    */
+   log(
+     action: string,
+-    value: string | number | boolean,
++    value: string | number | boolean | Record<string, unknown>,
+     comments?: string,
+     metadata?: { screen?: string; day?: number; role?: string }
+   ): void {
+@@ -179,7 +179,7 @@ class LoggingService {
+    */
+   logSystem(
+     action: string,
+-    value: string | number | boolean,
++    value: string | number | boolean | Record<string, unknown>,
+     comments?: string,
+     metadata?: { screen?: string; day?: number; role?: string }
+   ): void {
+@@ -193,7 +193,7 @@ class LoggingService {
+   private _logInternal(
+     source: 'player' | 'system',
+     action: string,
+-    value: string | number | boolean,
++    value: string | number | boolean | Record<string, unknown>,
+     comments?: string,
+     metadata?: { screen?: string; day?: number; role?: string }
+   ): void {
+@@ -206,6 +206,11 @@ class LoggingService {
+     }
+ 
+     // Create log entry with flat structure (all fields at top level)
++    const entryValue =
++      typeof value === 'object' && value !== null
++        ? JSON.stringify(value)
++        : value;
++
+     const entry: LogEntry = {
+       timestamp: new Date().toISOString(),
+       userId,
+@@ -213,7 +218,7 @@ class LoggingService {
+       treatment,
+       source,
+       action,
+-      value,                          // Simple value (not an object)
++      value: entryValue as LogEntry['value'],                          // Simple value (stringified if object)
+       currentScreen: metadata?.screen,
+       day: metadata?.day,
+       role: metadata?.role,
+@@ -335,16 +340,6 @@ class LoggingService {
+     console.log('[Logging] Auto-flush enabled (every 5s)');
+   }
+ 
+-  /**
+-   * Stop auto-flush timer
+-   */
+-  private stopAutoFlush(): void {
+-    if (this.flushTimer) {
+-      clearInterval(this.flushTimer);
+-      this.flushTimer = null;
+-    }
+-  }
+-
+   /**
+    * Get current queue (for debugging)
+    */
+@@ -378,7 +373,7 @@ if (typeof window !== 'undefined') {
+   window.addEventListener('beforeunload', () => {
+     // Use sendBeacon for reliable delivery on page unload
+     const { dataCollectionEnabled } = useSettingsStore.getState();
+-    const { sessionId, userId, gameVersion, treatment } = useLoggingStore.getState();
++    const { sessionId } = useLoggingStore.getState();
+ 
+     if (dataCollectionEnabled && loggingService.getQueue().length > 0) {
+       const queue = loggingService.getQueue();
+diff --git a/src/lib/mirrorSummary.ts b/src/lib/mirrorSummary.ts
+index 08648b6..cea8271 100644
+--- a/src/lib/mirrorSummary.ts
++++ b/src/lib/mirrorSummary.ts
+@@ -39,7 +39,7 @@ export async function generateMirrorSummary(
+   }
+ 
+   // Local playful fallback: keep to 1–2 short sentences
+-  return localSummary({ whatTop, whenceTop, overall });
++  return localSummary({ whatTop, whenceTop });
+ }
+ 
+ /* ---------------- helpers ---------------- */
+@@ -84,7 +84,7 @@ function soften(label: string) {
+     .replace(/\bResponsibility\/Duty\b/i, "showing up when it counts");
+ }
+ 
+-function localSummary({ whatTop, whenceTop, overall }: { whatTop: TopItem[]; whenceTop: TopItem[]; overall: TopItem[] }) {
++function localSummary({ whatTop, whenceTop }: { whatTop: TopItem[]; whenceTop: TopItem[] }) {
+   const w = whatTop[0]?.label ? soften(whatTop[0].label) : null;
+   const j = whenceTop[0]?.label ? soften(whenceTop[0].label) : null;
+ 
+diff --git a/src/lib/validation.ts b/src/lib/validation.ts
+index 747ecff..3dee937 100644
+--- a/src/lib/validation.ts
++++ b/src/lib/validation.ts
+@@ -58,7 +58,14 @@ export type ValidationResult = {
+ export async function validateSuggestionStrict(
+   text: string,
+   ctx: { title: string; description: string },
+-  roleCtx?: { era: string; settingType: string; year: string }
++  roleCtx?: {
++    era: string;
++    settingType: string;
++    year: string;
++    roleScope?: string;
++    challengerName?: string;
++    topHolders?: string[];
++  }
+ ): Promise<ValidationResult> {
+   const controller = new AbortController();
+   const timeoutId = setTimeout(() => controller.abort(), 15000);
+@@ -73,7 +80,10 @@ export async function validateSuggestionStrict(
+         description: ctx.description,
+         era: roleCtx?.era || "",
+         settingType: roleCtx?.settingType || "",
+-        year: roleCtx?.year || ""
++        year: roleCtx?.year || "",
++        roleScope: roleCtx?.roleScope || "",
++        challengerName: roleCtx?.challengerName || "",
++        topHolders: roleCtx?.topHolders || [],
+       }),
+       signal: controller.signal,
+     });
+diff --git a/src/screens/CompassVisScreen.tsx b/src/screens/CompassVisScreen.tsx
+index 71bf92e..13a4feb 100644
+--- a/src/screens/CompassVisScreen.tsx
++++ b/src/screens/CompassVisScreen.tsx
+@@ -1,11 +1,8 @@
+ // src/screens/CompassVisScreen.tsx
+ import { bgStyle } from "../lib/ui";
+-import type { PushFn } from "../lib/router";
+ import InnerCompass from "../components/InnerCompass";
+ 
+-type Props = { push: PushFn };
+-
+-export default function CompassVisScreen({ push }: Props) {
++export default function CompassVisScreen() {
+   return (
+     <div className="min-h-screen w-full text-neutral-100 p-4 sm:p-6" style={bgStyle}>
+       <div className="max-w-5xl mx-auto">
+diff --git a/src/screens/MiniCompassDebugScreen.tsx b/src/screens/MiniCompassDebugScreen.tsx
+index ee05f20..5a22dd7 100644
+--- a/src/screens/MiniCompassDebugScreen.tsx
++++ b/src/screens/MiniCompassDebugScreen.tsx
+@@ -1,5 +1,4 @@
+ // src/screens/MiniCompassDebugScreen.tsx
+-import { useMemo } from "react";
+ import type { PushFn } from "../lib/router";
+ import { bgStyle } from "../lib/ui";
+ import MiniCompass from "../components/MiniCompass";
+diff --git a/src/screens/PowerDistributionScreen.tsx b/src/screens/PowerDistributionScreen.tsx
+index dac36bc..2290831 100644
+--- a/src/screens/PowerDistributionScreen.tsx
++++ b/src/screens/PowerDistributionScreen.tsx
+@@ -109,7 +109,6 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
+         systemDesc={systemDesc}
+         systemFlavor={systemFlavor}
+         showSystemModal={showSystemModal}
+-        e12Data={analysisStore?.e12}
+         groundingData={analysisStore?.grounding}
+ 
+         // Handlers
+@@ -123,4 +122,4 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
+       />
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/screens/RoleSelectionScreen.tsx b/src/screens/RoleSelectionScreen.tsx
+index d56cc42..06cdad0 100644
+--- a/src/screens/RoleSelectionScreen.tsx
++++ b/src/screens/RoleSelectionScreen.tsx
+@@ -31,6 +31,8 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
+   const setRoleBackgroundImage = useRoleStore(s => s.setRoleBackgroundImage);
+   const setRoleContext = useRoleStore(s => s.setRoleContext);
+   const setSupportProfiles = useRoleStore(s => s.setSupportProfiles);
++  const setRoleScope = useRoleStore(s => s.setRoleScope);
++  const setStoryThemes = useRoleStore(s => s.setStoryThemes);
+   const debugMode = useSettingsStore(s => s.debugMode);
+ 
+   // Generate roles array dynamically from centralized database
+@@ -136,6 +138,8 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
+       // Clear role context (custom roles have no intro/year data)
+       setRoleContext(null, null, null);
+       setSupportProfiles(null);
++      setRoleScope(null);
++      setStoryThemes(null);
+ 
+       push("/name");
+       closeSuggest();
+@@ -162,12 +166,21 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
+       setAnalysis(roleData.powerDistribution);
+       setRoleBackgroundImage(getRoleImagePaths(roleData.imageId).full);
+       setSupportProfiles(roleData.powerDistribution.supportProfiles ?? null);
++      setRoleScope(roleData.roleScope);
++      setStoryThemes(roleData.storyThemes);
+       if (debugMode && roleData.powerDistribution.supportProfiles) {
+         console.log("[RoleSelection][Debug] Support baselines for predefined role:", {
+           role: role.key,
+           profiles: roleData.powerDistribution.supportProfiles,
+         });
+       }
++      if (debugMode) {
++        console.log("[RoleSelection][Debug] Scope & themes:", {
++          role: role.key,
++          roleScope: roleData.roleScope,
++          storyThemes: roleData.storyThemes,
++        });
++      }
+     }
+ 
+     // Save rich role context for AI (title, intro, year) - predefined roles only
+diff --git a/src/store/dilemmaStore.ts b/src/store/dilemmaStore.ts
+index 12b4467..35b0841 100644
+--- a/src/store/dilemmaStore.ts
++++ b/src/store/dilemmaStore.ts
+@@ -1,7 +1,7 @@
+ // src/store/dilemmaStore.ts
+ import { create } from "zustand";
+ import { persist } from "zustand/middleware";
+-import type { Dilemma, DilemmaRequest, DilemmaAction, DilemmaHistoryEntry, SubjectStreak, DilemmaScope, ScopeStreak, LightDilemmaRequest, LightDilemmaResponse } from "../lib/dilemma";
++import type { Dilemma, DilemmaAction, DilemmaHistoryEntry, SubjectStreak, DilemmaScope, ScopeStreak, LightDilemmaRequest, LightDilemmaResponse } from "../lib/dilemma";
+ import type { ScoreBreakdown } from "../lib/scoring";
+ import type { Goal, SelectedGoal } from "../data/goals";
+ import { evaluateAllGoals } from "../lib/goalEvaluation";
+diff --git a/src/store/loggingStore.ts b/src/store/loggingStore.ts
+index e8d21d1..0f066ac 100644
+--- a/src/store/loggingStore.ts
++++ b/src/store/loggingStore.ts
+@@ -53,7 +53,7 @@ function generateUUID(): string {
+ 
+ export const useLoggingStore = create<LoggingState>()(
+   persist(
+-    (set, get) => ({
++    (set, _get) => ({
+       // --- User identification ---
+       userId: null,  // Will be generated on first use
+       setUserId: (id) => set({ userId: id }),
+diff --git a/src/store/roleStore.ts b/src/store/roleStore.ts
+index f465c55..13dc04f 100644
+--- a/src/store/roleStore.ts
++++ b/src/store/roleStore.ts
+@@ -28,6 +28,8 @@ export type AnalysisResult = {
+     index: number | null;
+   };
+   supportProfiles?: RoleSupportProfiles | null;
++  roleScope?: string | null;
++  storyThemes?: string[] | null;
+   e12?: { // NEW: Exception-12 analysis
+     tierI: string[];
+     tierII: string[];
+@@ -71,10 +73,16 @@ type RoleState = {
+   roleYear: string | null;
+   /** Baseline support profiles for People + Challenger (optional) */
+   supportProfiles: RoleSupportProfiles | null;
++  /** Narrative scope for prompts */
++  roleScope: string | null;
++  /** Core story themes to rotate through */
++  storyThemes: string[] | null;
+ 
+   setRole: (r: string | null) => void;
+   setAnalysis: (a: AnalysisResult | null) => void;
+   setSupportProfiles: (profiles: RoleSupportProfiles | null) => void;
++  setRoleScope: (scope: string | null) => void;
++  setStoryThemes: (themes: string[] | null) => void;
+ 
+   /** Replace the whole character object (e.g., from Name screen) */
+   setCharacter: (c: Character | null) => void;
+@@ -102,11 +110,15 @@ export const useRoleStore = create<RoleState>()(
+       roleIntro: null,
+       roleYear: null,
+       supportProfiles: null,
++      roleScope: null,
++      storyThemes: null,
+ 
+       setRole: (r) => set({ selectedRole: r }),
+       setAnalysis: (a) => set((state) => ({
+         analysis: a,
+-        supportProfiles: a?.supportProfiles ?? state.supportProfiles ?? null
++        supportProfiles: a?.supportProfiles ?? state.supportProfiles ?? null,
++        roleScope: a?.roleScope ?? state.roleScope ?? null,
++        storyThemes: a?.storyThemes ?? state.storyThemes ?? null
+       })),
+ 
+       setCharacter: (c) => set({ character: c }),
+@@ -131,6 +143,8 @@ export const useRoleStore = create<RoleState>()(
+         roleYear: year
+       }),
+       setSupportProfiles: (profiles: RoleSupportProfiles | null) => set({ supportProfiles: profiles }),
++      setRoleScope: (scope) => set({ roleScope: scope }),
++      setStoryThemes: (themes) => set({ storyThemes: themes }),
+ 
+       reset: () => set({
+         selectedRole: null,
+@@ -140,7 +154,9 @@ export const useRoleStore = create<RoleState>()(
+         roleTitle: null,
+         roleIntro: null,
+         roleYear: null,
+-        supportProfiles: null
++        supportProfiles: null,
++        roleScope: null,
++        storyThemes: null
+       }),
+     }),
+     {
+diff --git a/src/types/logging.ts b/src/types/logging.ts
+index cd03f97..fdbfd95 100644
+--- a/src/types/logging.ts
++++ b/src/types/logging.ts
+@@ -6,7 +6,7 @@
+  * Sent to backend and stored in MongoDB
+  *
+  * IMPORTANT: All fields are flat/simple for easy CSV export
+- * - value must be string, number, or boolean (NOT an object)
++ * - value must be string, number, or boolean (objects are stringified before enqueue)
+  * - day and role are separate top-level fields
+  */
+ export interface LogEntry {
+@@ -16,7 +16,7 @@ export interface LogEntry {
+   treatment: string;                       // Treatment condition (e.g., "control", "experimental_a")
+   source: 'player' | 'system';             // Who triggered the event
+   action: string;                          // Action name (e.g., "button_click", "role_confirm")
+-  value: string | number | boolean;        // Simple value (e.g., button name, role name, slider value)
++  value: string | number | boolean;        // Simple value (objects are JSON-stringified before enqueue)
+   currentScreen?: string;                  // Where action occurred (e.g., "/role", "/event")
+   day?: number;                            // Game day (if in gameplay)
+   role?: string;                           // Player's selected role (if applicable)

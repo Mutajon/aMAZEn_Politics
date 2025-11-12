@@ -11,15 +11,17 @@
 // Dependencies: dilemmaStore, roleStore, compassStore
 
 import { useState, useCallback, useRef } from "react";
-import { useDilemmaStore, buildLightSnapshot } from "../store/dilemmaStore";
-import type { GoalStatusChange } from "../store/dilemmaStore";
+import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { COMPONENTS, type PropKey } from "../data/compass-data";
-import type { Dilemma, DilemmaAction, LightDilemmaResponse } from "../lib/dilemma";
+import type { Dilemma } from "../lib/dilemma";
 import type { TickerItem } from "../components/event/NewsTicker";
 import { audioManager } from "../lib/audioManager";
+import { calculateLiveScoreBreakdown } from "../lib/scoring";
+import { shouldGenerateAIOptions, type TreatmentType } from "../data/experimentConfig";
+import { useAIOutputLogger } from "./useAIOutputLogger";
 
 // ============================================================================
 // TYPES
@@ -39,9 +41,14 @@ export type CompassPill = {
 
 export type DynamicParam = {
   id: string;
-  icon: string;
-  text: string;
+  icon: string; // Emoji character (e.g., "🎨", "🔥", "💀")
+  text: string; // Narrative text (e.g., "+1,723 artworks preserved")
   tone: "up" | "down" | "neutral";
+};
+
+export type CorruptionShift = {
+  score: number;       // Raw AI judgment (0-10 scale)
+  reason: string;      // AI's explanation
 };
 
 // PHASE 1: Critical data - must load before showing anything
@@ -49,6 +56,7 @@ export type Phase1Data = {
   dilemma: Dilemma;
   supportEffects: SupportEffect[] | null; // Included in dilemma response on Day 2+
   newsItems: TickerItem[]; // Empty array (disabled)
+  corruptionShift: CorruptionShift | null; // Included in dilemma response on Day 2+
 };
 
 // PHASE 2: Secondary data - loads in background while user reads
@@ -96,37 +104,6 @@ export type CollectedData = Phase1Data & Phase2Data & Phase3Data & {
  * Example: [8.5, 2.1, 7.2, 1.5, 6.1, 0.5, 3.2, 1.0, 0.8, 0.3]
  *       → [8.5, 0, 7.2, 0, 6.1, 0, 0, 0, 0, 0]
  */
-function getTop3CompassValues(arr: number[] | undefined): number[] {
-  if (!Array.isArray(arr) || arr.length === 0) return [];
-
-  // Create array of [value, originalIndex] pairs
-  const indexed = arr.map((v, i) => ({ v: Number(v) || 0, i }));
-
-  // Sort by value descending, take top 3
-  const top3 = indexed.sort((a, b) => b.v - a.v).slice(0, 3);
-
-  // Build sparse result array - only top 3 values at original indices
-  const result = new Array(arr.length).fill(0);
-  top3.forEach(({ v, i }) => { result[i] = v; });
-
-  return result;
-}
-
-/**
- * Build optimized compass payload with top 3 values per dimension
- * Reduces token usage by ~300 tokens (40 values → 12 values)
- */
-function buildOptimizedCompassPayload(compassValues: any): any {
-  if (!compassValues) return { what: [], whence: [], how: [], whither: [] };
-
-  return {
-    what: getTop3CompassValues(compassValues?.what),
-    whence: getTop3CompassValues(compassValues?.whence),
-    how: getTop3CompassValues(compassValues?.how),
-    whither: getTop3CompassValues(compassValues?.whither)
-  };
-}
-
 /**
  * Get top K compass values with names and strengths (not indices)
  * Returns value names for natural language mirror recommendations
@@ -150,29 +127,16 @@ function topKWithNames(arr: number[] | undefined, prop: PropKey, k = 3): Array<{
  * Get top overall values across all compass dimensions
  * NO threshold filtering - just sort and take top K
  */
-function topOverallWithNames(compassValues: any, k = 3): Array<{ name: string; strength: number; dimension: PropKey }> {
-  const allValues: Array<{ v: number; name: string; dimension: PropKey }> = [];
+async function waitForNarrativeMemory(timeoutMs = 4000, pollIntervalMs = 75) {
+  const deadline = Date.now() + timeoutMs;
 
-  (["what", "whence", "how", "whither"] as PropKey[]).forEach((prop) => {
-    const arr = Array.isArray(compassValues?.[prop]) ? compassValues[prop] : [];
-    arr.forEach((v: number, i: number) => {
-      allValues.push({
-        v: Number(v) || 0,
-        name: COMPONENTS[prop]?.[i]?.short || `${prop} #${i + 1}`,
-        dimension: prop,
-      });
-    });
-  });
+  let memory = useDilemmaStore.getState().narrativeMemory;
+  while (!memory && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+    memory = useDilemmaStore.getState().narrativeMemory;
+  }
 
-  return allValues
-    // NO threshold filter - just sort by value
-    .sort((a, b) => b.v - a.v)
-    .slice(0, k)
-    .map(x => ({
-      name: x.name,
-      strength: Math.round(x.v * 10) / 10,
-      dimension: x.dimension
-    }));
+  return memory;
 }
 
 /**
@@ -189,6 +153,8 @@ function topOverallWithNames(compassValues: any, k = 3): Array<{ name: string; s
 async function fetchGameTurn(): Promise<{
   dilemma: Dilemma;
   supportEffects: SupportEffect[] | null;
+  newsItems: TickerItem[];
+  corruptionShift: CorruptionShift | null;
   compassPills: CompassPill[] | null;
   dynamicParams: DynamicParam[] | null;
   mirrorText: string;
@@ -196,6 +162,7 @@ async function fetchGameTurn(): Promise<{
   const {
     gameId,
     day,
+    totalDays,
     lastChoice,
     supportPeople,
     supportMiddle,
@@ -231,6 +198,17 @@ async function fetchGameTurn(): Promise<{
     const roleState = useRoleStore.getState();
     const topWhatValues = getTop2WhatValues();
     const { dilemmasSubjectEnabled, dilemmasSubject } = useSettingsStore.getState();
+    let narrativeMemory = useDilemmaStore.getState().narrativeMemory;
+
+    if (!narrativeMemory) {
+      console.log("[fetchGameTurn] Narrative memory missing at Day 1 fetch. Waiting briefly...");
+      narrativeMemory = await waitForNarrativeMemory();
+      if (!narrativeMemory) {
+        console.warn("[fetchGameTurn] Narrative memory still unavailable. Proceeding without seeded thread guidance.");
+      } else {
+        console.log("[fetchGameTurn] Narrative memory acquired before Day 1 generation.");
+      }
+    }
 
     payload.gameContext = {
       role: roleState.selectedRole || "Unicorn King",
@@ -242,6 +220,8 @@ async function fetchGameTurn(): Promise<{
       powerHolders: roleState.analysis?.holders || [],
       challengerSeat: roleState.analysis?.challengerSeat || null,  // NEW: Primary institutional opponent
       supportProfiles: roleState.supportProfiles || roleState.analysis?.supportProfiles || null,
+      roleScope: roleState.roleScope || roleState.analysis?.roleScope || null,
+      storyThemes: roleState.storyThemes || roleState.analysis?.storyThemes || null,
       playerCompass: {
         what: topWhatValues.join(', '),
         whence: topKWithNames(compassValues?.whence, 'whence', 2).map(v => v.name).join(', '),
@@ -249,10 +229,12 @@ async function fetchGameTurn(): Promise<{
         whither: topKWithNames(compassValues?.whither, 'whither', 2).map(v => v.name).join(', ')
       },
       topWhatValues,
-      totalDays: 7,
+      totalDays,
+      daysLeft: totalDays - day + 1,
       thematicGuidance: dilemmasSubjectEnabled && dilemmasSubject
         ? `Focus on: ${dilemmasSubject}`
-        : null
+        : null,
+      narrativeMemory: narrativeMemory || null  // Dynamic Story Spine: Include if available
     };
   }
 
@@ -267,31 +249,103 @@ async function fetchGameTurn(): Promise<{
     payload.compassUpdate = compassValues;
   }
 
-  // CRISIS DETECTION: Check support thresholds (<20% triggers consequences)
-  // Frontend-driven crisis detection sends specialized mode to backend
-  const CRISIS_THRESHOLD = 20;
-  const peopleInCrisis = supportPeople < CRISIS_THRESHOLD;
-  const challengerInCrisis = supportMiddle < CRISIS_THRESHOLD;
-  const caringInCrisis = supportMom < CRISIS_THRESHOLD;
-
-  if (peopleInCrisis || challengerInCrisis || caringInCrisis) {
-    // Determine crisis mode (priority: downfall > people > challenger > caring)
-    if (peopleInCrisis && challengerInCrisis && caringInCrisis) {
-      payload.crisisMode = "downfall"; // All three < 20% → game ends
-      console.log(`[fetchGameTurn] ⚠️ DOWNFALL CRISIS: All support tracks below ${CRISIS_THRESHOLD}%`);
-    } else if (peopleInCrisis) {
-      payload.crisisMode = "people"; // Public < 20% → mass backlash
-      console.log(`[fetchGameTurn] ⚠️ PEOPLE CRISIS: Public support at ${supportPeople}%`);
-    } else if (challengerInCrisis) {
-      payload.crisisMode = "challenger"; // Challenger < 20% → institutional retaliation
-      console.log(`[fetchGameTurn] ⚠️ CHALLENGER CRISIS: Challenger support at ${supportMiddle}%`);
-    } else if (caringInCrisis) {
-      payload.crisisMode = "caring"; // Caring anchor < 20% → personal crisis
-      console.log(`[fetchGameTurn] ⚠️ CARING CRISIS: Caring anchor support at ${supportMom}%`);
-    }
+  // Include reasoning history (for all days, treatment-based feature)
+  const reasoningHistory = useDilemmaStore.getState().reasoningHistory;
+  if (reasoningHistory.length > 0) {
+    // Send reasoning history for AI context
+    // Format: Array of {day, actionTitle, reasoningText} objects
+    payload.reasoningHistory = reasoningHistory.map(entry => ({
+      day: entry.day,
+      actionTitle: entry.actionTitle,
+      reasoningText: entry.reasoningText
+    }));
   }
 
-  console.log(`[fetchGameTurn] Calling /api/game-turn for Day ${day}, gameId=${currentGameId}`);
+  // CRISIS MODE: Use crisis state detected on PREVIOUS turn
+  // (Crisis is detected AFTER support updates, so we use stored state from last turn)
+  const { crisisMode: storedCrisisMode, crisisEntity, previousSupportValues } = useDilemmaStore.getState();
+
+  if (storedCrisisMode) {
+    payload.crisisMode = storedCrisisMode;
+
+    // Build rich crisis context for AI
+    const roleState = useRoleStore.getState();
+
+    payload.crisisContext = {
+      entity: crisisEntity || "Unknown",
+      systemName: roleState.analysis?.systemName || "Unknown System",
+      systemDesc: roleState.analysis?.systemDesc || "",
+      era: roleState.analysis?.grounding?.era || "Unknown era",
+      settingType: roleState.analysis?.grounding?.settingType || "unclear"
+    };
+
+    // Add entity-specific details based on crisis mode
+    if (storedCrisisMode === "people") {
+      // Safely find people profile (check if supportProfiles is an array)
+      const peopleProfile = Array.isArray(roleState.supportProfiles)
+        ? roleState.supportProfiles.find(p => p.name === "The People")
+        : null;
+      payload.crisisContext.entityProfile = peopleProfile?.summary || "The general population";
+      payload.crisisContext.entityStances = peopleProfile?.stances || null;
+      payload.crisisContext.currentSupport = supportPeople;
+      payload.crisisContext.previousSupport = previousSupportValues?.people || supportPeople;
+    } else if (storedCrisisMode === "challenger") {
+      const challengerSeat = roleState.analysis?.challengerSeat;
+      // Safely find challenger profile (check if supportProfiles is an array)
+      const challengerProfile = Array.isArray(roleState.supportProfiles)
+        ? roleState.supportProfiles.find(p =>
+            p.name.toLowerCase().includes(challengerSeat?.name.toLowerCase() || "")
+          )
+        : null;
+      payload.crisisContext.entityProfile = challengerProfile?.summary || "Institutional opposition";
+      payload.crisisContext.entityStances = challengerProfile?.stances || null;
+      payload.crisisContext.currentSupport = supportMiddle;
+      payload.crisisContext.previousSupport = previousSupportValues?.middle || supportMiddle;
+      payload.crisisContext.challengerName = challengerSeat?.name || "Institutional Opposition";
+    } else if (storedCrisisMode === "caring") {
+      // Safely find caring profile (check if supportProfiles is an array)
+      const caringProfile = Array.isArray(roleState.supportProfiles)
+        ? roleState.supportProfiles.find(p =>
+            p.name.toLowerCase().includes("personal") || p.name.toLowerCase().includes("anchor")
+          )
+        : null;
+      payload.crisisContext.entityProfile = caringProfile?.summary || "Personal support anchor";
+      payload.crisisContext.entityStances = caringProfile?.stances || null;
+      payload.crisisContext.currentSupport = supportMom;
+      payload.crisisContext.previousSupport = previousSupportValues?.mom || supportMom;
+    } else if (storedCrisisMode === "downfall") {
+      payload.crisisContext.allSupport = {
+        people: { current: supportPeople, previous: previousSupportValues?.people || supportPeople },
+        middle: { current: supportMiddle, previous: previousSupportValues?.middle || supportMiddle },
+        mom: { current: supportMom, previous: previousSupportValues?.mom || supportMom }
+      };
+    }
+
+    // Add triggering action if available (what caused this crisis)
+    if (lastChoice && day > 1) {
+      payload.crisisContext.triggeringAction = {
+        title: lastChoice.title,
+        summary: lastChoice.summary || lastChoice.title,
+        cost: lastChoice.cost
+      };
+    }
+
+    console.log(`[fetchGameTurn] ⚠️ CRISIS MODE ACTIVE: ${storedCrisisMode} (${crisisEntity})`);
+    console.log('[fetchGameTurn] 📋 Crisis context:', payload.crisisContext);
+  }
+
+  payload.totalDays = totalDays;
+  payload.daysLeft = totalDays - day + 1;
+
+  // Pass debug mode setting to server for verbose logging
+  const debugMode = useSettingsStore.getState().debugMode;
+  payload.debugMode = debugMode;
+
+  // Pass treatment-based AI option generation flag (token optimization)
+  const treatment = useSettingsStore.getState().treatment as TreatmentType;
+  payload.generateActions = shouldGenerateAIOptions(treatment);
+
+  console.log(`[fetchGameTurn] Calling /api/game-turn for Day ${day}, gameId=${currentGameId}, treatment=${treatment}, generateActions=${payload.generateActions}`);
 
   const response = await fetch("/api/game-turn", {
     method: "POST",
@@ -311,14 +365,43 @@ async function fetchGameTurn(): Promise<{
     throw new Error("Invalid game turn response: missing required fields");
   }
 
-  // Allow empty actions array ONLY when isGameEnd is true
-  if (!data.isGameEnd && data.actions.length !== 3) {
-    throw new Error("Invalid game turn response: expected 3 actions for normal dilemma");
+  // Allow empty actions array when: (1) isGameEnd is true, OR (2) generateActions is false (fullAutonomy)
+  if (!Array.isArray(data.actions)) {
+    data.actions = [];
   }
 
-  // Game end must have empty actions
-  if (data.isGameEnd && data.actions.length !== 0) {
-    throw new Error("Invalid game turn response: game end must have empty actions array");
+  if (!data.isGameEnd && payload.generateActions) {
+    // Only validate action count when we actually requested AI to generate them
+    if (data.actions.length > 3) {
+      console.warn("[fetchGameTurn] ⚠️ Received more than 3 actions. Truncating to 3.");
+      data.actions = data.actions.slice(0, 3);
+    } else if (data.actions.length < 3) {
+      console.warn("[fetchGameTurn] ⚠️ Received fewer than 3 actions. Padding with fallback choices.");
+      const fallbackSource = data.actions[0] || { title: "Fallback Option", summary: "A reasonable alternative.", cost: 0, iconHint: "speech" };
+      while (data.actions.length < 3) {
+        const idx = data.actions.length;
+        data.actions.push({
+          id: ["a", "b", "c"][idx] || `opt${idx}`,
+          title: `${fallbackSource.title} (${idx + 1})`,
+          summary: fallbackSource.summary,
+          cost: Number.isFinite(fallbackSource.cost) ? fallbackSource.cost : 0,
+          iconHint: fallbackSource.iconHint || "speech"
+        });
+      }
+    }
+  } else {
+    if (data.actions.length !== 0) {
+      console.warn("[fetchGameTurn] ⚠️ Game-end response returned actions. Clearing array.");
+      data.actions = [];
+    }
+  }
+
+  // Failsafe: if the server failed to flag game end but daysLeft reached zero, enforce aftermath locally
+  const daysLeft = totalDays - day + 1;
+  if (!data.isGameEnd && (!Array.isArray(data.actions) || data.actions.length !== 3) && daysLeft <= 0) {
+    console.warn("[fetchGameTurn] ⚠️ Server returned unexpected action count on final day — forcing aftermath mode.");
+    data.isGameEnd = true;
+    data.actions = [];
   }
 
   // Extract dilemma
@@ -335,20 +418,48 @@ async function fetchGameTurn(): Promise<{
   if (data.supportShift && day > 1) {
     const { people, mom, holders } = data.supportShift;
 
+    // STEP 0: Save previous support values BEFORE updating (for crisis context)
+    const { savePreviousSupport } = useDilemmaStore.getState();
+    savePreviousSupport();
+
+    // STEP 1: Calculate new values
     const newPeople = Math.max(0, Math.min(100, supportPeople + people.delta));
     const newMom = Math.max(0, Math.min(100, supportMom + mom.delta));
     const newMiddle = Math.max(0, Math.min(100, supportMiddle + holders.delta));
 
+    // STEP 2: Apply new support values
     setSupportPeople(newPeople);
     setSupportMom(newMom);
     setSupportMiddle(newMiddle);
 
-    // CRITICAL: Update minimum values for continuous goal tracking
+    console.log('[fetchGameTurn] 📊 Support values updated:', {
+      people: `${supportPeople} → ${newPeople}`,
+      middle: `${supportMiddle} → ${newMiddle}`,
+      mom: `${supportMom} → ${newMom}`
+    });
+
+    // STEP 3: DETECT CRISIS after support updates (NEW TIMING!)
+    // This fixes the one-day lag issue - crisis is detected immediately when drop occurs
+    const { detectAndSetCrisis, clearCrisis } = useDilemmaStore.getState();
+
+    // Clear previous crisis state first
+    clearCrisis();
+
+    // Detect new crisis based on updated values
+    const detectedCrisis = detectAndSetCrisis();
+
+    if (detectedCrisis) {
+      console.log('[fetchGameTurn] 🚨 CRISIS DETECTED:', detectedCrisis);
+    } else {
+      console.log('[fetchGameTurn] ✅ No crisis - all support tracks healthy');
+    }
+
+    // STEP 4: Update minimum values for continuous goal tracking
     const { updateMinimumValues, evaluateGoals } = useDilemmaStore.getState();
     updateMinimumValues();
     console.log('[fetchGameTurn] ✅ Minimum values updated after support shifts');
 
-    // Re-evaluate goals
+    // STEP 5: Re-evaluate goals
     const goalChanges = evaluateGoals();
     console.log('[fetchGameTurn] ✅ Goals re-evaluated after support shifts');
 
@@ -372,38 +483,99 @@ async function fetchGameTurn(): Promise<{
     ];
   }
 
+  // Extract corruption shift (Day 2+ only) - Frontend calculates blended level
+  let corruptionShift: CorruptionShift | null = null;
+  let corruptionDelta = 0;
+  let corruptionNewLevel = 0;
+
+  if (data.corruptionShift && day > 1) {
+    const {
+      savePreviousCorruption,
+      setCorruptionLevel,
+      corruptionLevel: prevLevel,
+      corruptionHistory
+    } = useDilemmaStore.getState();
+
+    // STEP 0: Save previous value (for animation)
+    savePreviousCorruption();
+
+    // STEP 1: Calculate new corruption level using blending formula
+    const rawScore = Math.max(0, Math.min(10, data.corruptionShift.score));
+    const newScoreScaled = rawScore * 10; // 0-10 → 0-100 scale
+    const prevCorruption = typeof prevLevel === 'number' ? prevLevel : 0;
+
+    // Blending formula: 90% previous + 10% new (gradual accumulation)
+    const newLevel = Number((prevCorruption * 0.9 + newScoreScaled * 0.1).toFixed(2));
+    const delta = Number((newLevel - prevCorruption).toFixed(2));
+
+    // Store for logging
+    corruptionDelta = delta;
+    corruptionNewLevel = newLevel;
+
+    // STEP 2: Apply new corruption level
+    setCorruptionLevel(newLevel);
+
+    // STEP 3: Store history entry (raw score + calculated level)
+    useDilemmaStore.setState({
+      corruptionHistory: [
+        ...corruptionHistory,
+        {
+          day,
+          score: rawScore,           // Raw 0-10 AI judgment
+          reason: data.corruptionShift.reason,
+          level: newLevel            // Calculated 0-100 level
+        }
+      ].slice(-3)  // Keep last 3
+    });
+
+    // STEP 4: Prepare for logging
+    corruptionShift = {
+      score: rawScore,
+      reason: String(data.corruptionShift.reason || '').slice(0, 150)
+    };
+
+    // COMPREHENSIVE DEBUG LOGGING
+    console.log('[fetchGameTurn] 🔸 Corruption calculated:');
+    console.log(`   AI judgment: ${rawScore}/10`);
+    console.log(`   Old level: ${prevCorruption.toFixed(2)}`);
+    console.log(`   New level: ${newLevel.toFixed(2)} (${delta >= 0 ? '+' : ''}${delta.toFixed(2)})`);
+    console.log(`   Reason: ${corruptionShift.reason}`);
+
+    if (debugMode) {
+      console.log(`   🐛 [DEBUG] Formula: (${prevCorruption.toFixed(2)} * 0.9) + (${newScoreScaled} * 0.1) = ${newLevel.toFixed(2)}`);
+      console.log(`   🐛 [DEBUG] History: ${JSON.stringify(useDilemmaStore.getState().corruptionHistory)}`);
+    }
+  }
+
+  // Update live score once all resource values have been applied.
+  {
+    const {
+      supportPeople: latestPeople,
+      supportMiddle: latestMiddle,
+      supportMom: latestMom,
+      corruptionLevel: latestCorruption,
+      setScore,
+    } = useDilemmaStore.getState();
+
+    const breakdown = calculateLiveScoreBreakdown({
+      supportPeople: latestPeople,
+      supportMiddle: latestMiddle,
+      supportMom: latestMom,
+      corruptionLevel: latestCorruption,
+    });
+
+    setScore(breakdown.final);
+  }
+
   // Update subject streak
   if (data.topic) {
     updateSubjectStreak(data.topic);
   }
 
-  // Extract compass pills (Day 2+ only)
-  const compassPills: CompassPill[] = Array.isArray(data.compassHints)
-    ? data.compassHints
-        .map((hint: any) => {
-          const prop = hint.prop;
-          const idx = Number(hint.idx);
-          const polarity = String(hint.polarity || "").toLowerCase();
-          const strength = String(hint.strength || "").toLowerCase();
+  // Compass pills fetched asynchronously elsewhere
+  const compassPills: CompassPill[] | null = null;
 
-          if (!["what", "whence", "how", "whither"].includes(prop)) return null;
-          if (!Number.isFinite(idx) || idx < 0 || idx > 9) return null;
-
-          let delta = 0;
-          if (polarity === "positive") {
-            delta = strength === "strong" ? 2 : 1;
-          } else if (polarity === "negative") {
-            delta = strength === "strong" ? -2 : -1;
-          }
-
-          if (delta === 0) return null;
-
-          return { prop: prop as any, idx, delta };
-        })
-        .filter(Boolean) as CompassPill[]
-    : [];
-
-  // Extract dynamic parameters (Day 2+ only)
+// Extract dynamic parameters (Day 2+ only)
   const dynamicParams: DynamicParam[] = Array.isArray(data.dynamicParams)
     ? data.dynamicParams
     : [];
@@ -411,11 +583,13 @@ async function fetchGameTurn(): Promise<{
   // Extract mirror advice
   const mirrorText = String(data.mirrorAdvice || "The mirror squints, light pooling in the glass...");
 
-  console.log(`[fetchGameTurn] ✅ Unified response received: ${data.actions.length} actions, ${compassPills.length} pills, ${dynamicParams.length} params`);
+  console.log(`[fetchGameTurn] ✅ Unified response received: ${data.actions.length} actions, 0 pills (pills fetched separately), ${dynamicParams.length} params`);
 
   return {
     dilemma,
     supportEffects,
+    newsItems: [], // Empty array (disabled)
+    corruptionShift,
     compassPills,
     dynamicParams,
     mirrorText
@@ -436,6 +610,52 @@ function getTop2WhatValues(): string[] {
     .sort((a, b) => b.v - a.v)
     .slice(0, 2)
     .map(x => x.name);
+}
+
+function transformCompassHints(rawHints: any): CompassPill[] {
+  if (!Array.isArray(rawHints)) return [];
+  const validProps = new Set<CompassPill['prop']>(["what", "whence", "how", "whither"]);
+  const pills: CompassPill[] = [];
+
+  for (const hint of rawHints) {
+    const prop = String(hint?.prop || "").toLowerCase() as CompassPill['prop'];
+    if (!validProps.has(prop)) continue;
+
+    const idx = Number(hint?.idx);
+    if (!Number.isFinite(idx) || idx < 0 || idx > 9) continue;
+
+    // Accept numerical polarity directly from API
+    const polarity = Number(hint?.polarity);
+    if (![-2, -1, 1, 2].includes(polarity)) continue;
+
+    pills.push({ prop, idx, delta: polarity });
+  }
+
+  return pills;
+}
+
+export async function fetchCompassHintsForAction(
+  gameId: string,
+  action: { title: string; summary: string }
+): Promise<CompassPill[]> {
+  try {
+    const response = await fetch("/api/compass-hints", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ gameId, action })
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Compass hints API failed (${response.status}): ${text}`);
+    }
+
+    const data = await response.json();
+    return transformCompassHints(data?.compassHints);
+  } catch (error) {
+    console.error("[fetchGameTurn] ⚠️ Compass hints request failed:", error);
+    return [];
+  }
 }
 
 // ============================================================================
@@ -612,6 +832,9 @@ export function useEventDataCollector() {
   // Progress callback - using ref to avoid re-renders
   const onReadyCallbackRef = useRef<(() => void) | null>(null);
 
+  // AI output logger - for logging once at source
+  const aiLogger = useAIOutputLogger();
+
   // Backward compatibility - reconstruct legacy CollectedData format
   const collectedData: CollectedData | null = phase1Data ? {
     ...phase1Data,
@@ -647,15 +870,52 @@ export function useEventDataCollector() {
       const turnData = await fetchGameTurn();
 
       // Extract all data from unified response
-      const { dilemma, supportEffects, compassPills, dynamicParams, mirrorText } = turnData;
+      const {
+        dilemma,
+        supportEffects,
+        dynamicParams,
+        mirrorText,
+        corruptionShift,
+      } = turnData;
 
       console.log(`[Collector] ✅ Unified data received for Day ${day}`);
+
+      // ========================================================================
+      // LOG AI OUTPUTS ONCE AT SOURCE (prevents duplication from reactive effects)
+      // ========================================================================
+      const { crisisMode: storedCrisisMode } = useDilemmaStore.getState();
+
+      // Log dilemma generation
+      aiLogger.logDilemma(dilemma, {
+        crisisMode: storedCrisisMode
+      });
+
+      // Log mirror advice
+      aiLogger.logMirrorAdvice(mirrorText);
+
+      // Log support shifts (Day 2+)
+      if (supportEffects) {
+        aiLogger.logSupportShifts(supportEffects);
+      }
+
+      // Log dynamic parameters
+      if (dynamicParams && dynamicParams.length > 0) {
+        aiLogger.logDynamicParams(dynamicParams);
+      }
+
+      // Log corruption shift (Day 2+)
+      if (corruptionShift) {
+        aiLogger.logCorruptionShift(corruptionShift, corruptionDelta, corruptionNewLevel);
+      }
+
+      console.log(`[Collector] ✅ AI outputs logged for Day ${day}`);
 
       // Build Phase 1 data (critical path)
       const p1: Phase1Data = {
         dilemma,
         supportEffects,
-        newsItems: [] // Disabled
+        newsItems: [], // Disabled
+        corruptionShift: corruptionShift ?? null,
       };
 
       // Set Phase 1 data immediately - triggers UI render!
@@ -663,6 +923,9 @@ export function useEventDataCollector() {
 
       // Update global dilemma store for narration
       useDilemmaStore.setState({ current: dilemma });
+
+      // Reset inquiry credits for new dilemma (treatment-based feature)
+      useDilemmaStore.getState().resetInquiryCredits();
 
       // Mark collecting as done - UI can render!
       setIsCollecting(false);
@@ -672,8 +935,12 @@ export function useEventDataCollector() {
         onReadyCallbackRef.current();
       }
 
-      // Set Phase 2 data (compass pills + dynamic params)
-      setPhase2Data({ compassPills, dynamicParams });
+      // Set Phase 2 data (dynamic params only)
+      // NOTE: Compass pills are NO LONGER fetched here!
+      // They're now fetched and applied in eventDataCleaner.ts (Step 3.5)
+      // IMMEDIATELY after action confirmation, BEFORE day advancement.
+      // This fixes the one-day delay where compass values weren't updated until the next day.
+      setPhase2Data({ compassPills: null, dynamicParams });
 
       // Set Phase 3 data (mirror advice)
       setPhase3Data({ mirrorText });
@@ -719,7 +986,8 @@ export function useEventDataCollector() {
     setPhase1Data({
       dilemma: data.dilemma,
       supportEffects: data.supportEffects,
-      newsItems: data.newsItems || []
+      newsItems: data.newsItems || [],
+      corruptionShift: data.corruptionShift || null
     });
 
     setPhase2Data({

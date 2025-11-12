@@ -6,7 +6,7 @@
  * Sent to backend and stored in MongoDB
  *
  * IMPORTANT: All fields are flat/simple for easy CSV export
- * - value must be string, number, or boolean (NOT an object)
+ * - value must be string, number, or boolean (objects are stringified before enqueue)
  * - day and role are separate top-level fields
  */
 export interface LogEntry {
@@ -16,7 +16,7 @@ export interface LogEntry {
   treatment: string;                       // Treatment condition (e.g., "control", "experimental_a")
   source: 'player' | 'system';             // Who triggered the event
   action: string;                          // Action name (e.g., "button_click", "role_confirm")
-  value: string | number | boolean;        // Simple value (e.g., button name, role name, slider value)
+  value: string | number | boolean;        // Simple value (objects are JSON-stringified before enqueue)
   currentScreen?: string;                  // Where action occurred (e.g., "/role", "/event")
   day?: number;                            // Game day (if in gameplay)
   role?: string;                           // Player's selected role (if applicable)

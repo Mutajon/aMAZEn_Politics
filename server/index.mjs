@@ -13,9 +13,156 @@ import {
   deleteConversation,
   startCleanupTask
 } from "./conversationStore.mjs";
+import {
+  detectKeywordHints,
+  formatKeywordHintsForPrompt
+} from "./compassKeywordDetector.mjs";
+import { getCountersCollection, incrementCounter, getUsersCollection } from "./db/mongodb.mjs";
 
 const app = express();
 app.use(bodyParser.json());
+
+
+const GAME_LIMIT = 100;
+
+/**
+ * Randomly assign treatment to ensure balanced distribution
+ * @returns {string} One of: 'fullAutonomy', 'semiAutonomy', 'noAutonomy'
+ */
+function assignRandomTreatment() {
+  const treatments = ['fullAutonomy', 'semiAutonomy', 'noAutonomy'];
+  const randomIndex = Math.floor(Math.random() * treatments.length);
+  return treatments[randomIndex];
+}
+
+// -------------------- User Registration & Treatment Assignment --------------------
+/**
+ * POST /api/users/register
+ * Register a new user or get existing user with treatment assignment
+ * 
+ * Body: {
+ *   userId: string (email address)
+ * }
+ * 
+ * Returns: {
+ *   success: boolean,
+ *   userId: string,
+ *   treatment: 'fullAutonomy' | 'semiAutonomy' | 'noAutonomy',
+ *   isNewUser: boolean
+ * }
+ */
+app.post("/api/users/register", async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    // Validate userId (email)
+    if (!userId || typeof userId !== 'string' || !userId.includes('@')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid userId (email) is required'
+      });
+    }
+
+    const usersCollection = await getUsersCollection();
+    
+    // Check if user already exists
+    const existingUser = await usersCollection.findOne({ userId });
+
+    if (existingUser) {
+      // User exists - return existing treatment
+      console.log(`[User Register] Existing user: ${userId}, treatment: ${existingUser.treatment}`);
+      return res.json({
+        success: true,
+        userId: existingUser.userId,
+        treatment: existingUser.treatment,
+        isNewUser: false
+      });
+    }
+
+    // New user - assign random treatment
+    const treatment = assignRandomTreatment();
+    const now = new Date();
+
+    const newUser = {
+      userId,
+      treatment,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    await usersCollection.insertOne(newUser);
+
+    console.log(`[User Register] New user registered: ${userId}, treatment: ${treatment}`);
+
+    res.json({
+      success: true,
+      userId: newUser.userId,
+      treatment: newUser.treatment,
+      isNewUser: true
+    });
+
+  } catch (error) {
+    console.error('[User Register] ❌ Error:', error?.message || error);
+    
+    // Handle duplicate key error (race condition)
+    if (error.code === 11000) {
+      // User was created between check and insert - fetch existing
+      try {
+        const usersCollection = await getUsersCollection();
+        const existingUser = await usersCollection.findOne({ userId: req.body.userId });
+        if (existingUser) {
+          return res.json({
+            success: true,
+            userId: existingUser.userId,
+            treatment: existingUser.treatment,
+            isNewUser: false
+          });
+        }
+      } catch (fetchError) {
+        console.error('[User Register] Failed to fetch existing user:', fetchError);
+      }
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to register user',
+      details: error.message
+    });
+  }
+});
+
+// -------------------- Game Slot Reservation --------------------
+app.post("/api/reserve-game-slot", async (req, res) => {
+  try {
+    const countersCollection = await getCountersCollection();
+
+    // Atomically find and increment the counter, but only if its value is less than the limit.
+    const result = await countersCollection.findOneAndUpdate(
+      { name: 'total_games', value: { $lt: GAME_LIMIT } },
+      { $inc: { value: 1 } },
+      { returnDocument: 'after' }
+    );
+
+    if (result.value) {
+      // Successfully incremented, meaning we got a slot.
+      console.log(`[Reserve Slot] Slot reserved. New count: ${result.value}`);
+      res.json({ success: true, gameCount: result.value });
+    } else {
+      // The findOneAndUpdate came back empty, which means the condition value < GAME_LIMIT failed.
+      const currentCounter = await countersCollection.findOne({ name: 'total_games' });
+      const currentCount = currentCounter ? currentCounter.value : 'unknown';
+      console.log(`[Reserve Slot] Game limit reached. Current count: ${currentCount}`);
+      res.status(403).json({
+        success: false,
+        message: "The game has reached its player limit.",
+        isCapped: true,
+      });
+    }
+  } catch (error) {
+    console.error("Error in /api/reserve-game-slot:", error?.message || error);
+    res.status(500).json({ success: false, error: "Failed to reserve game slot" });
+  }
+});
 
 // -------------------- Data Logging Routes --------------------
 // Mount logging API endpoints (for research data collection)
@@ -43,6 +190,7 @@ const MODEL_MIRROR_ANTHROPIC = process.env.MODEL_MIRROR_ANTHROPIC || ""; // No f
 const MODEL_DILEMMA = process.env.MODEL_DILEMMA || CHAT_MODEL_DEFAULT;
 const MODEL_DILEMMA_PREMIUM = process.env.MODEL_DILEMMA_PREMIUM || "gpt-5";
 const MODEL_DILEMMA_ANTHROPIC = process.env.MODEL_DILEMMA_ANTHROPIC || ""; // No fallback - must be set in .env
+const MODEL_COMPASS_HINTS = process.env.MODEL_COMPASS_HINTS || "gpt-5-mini";
 
 
 // Image model
@@ -75,6 +223,13 @@ LANGUAGE ACCESSIBILITY (CRITICAL)
   * "Archon" → "chief magistrate" or "leader"
   * "Ecclesia" → "citizen assembly" or "popular assembly"
   * "Strategos" → "military commander" or "general"
+
+EXCEPTION - IMMERSIVE CHARACTER POV:
+- When writing dilemma descriptions from character's perspective, use sensory/observational language
+- Describe what character can SEE, HEAR, EXPERIENCE (not what they couldn't know)
+- ✅ GOOD: "strange pale-skinned foreigners with fire-weapons" (describes what's observable)
+- ❌ BAD: "English colonists with muskets" (anachronistic knowledge)
+- This is NOT jargon - it's immersive storytelling that respects character's actual knowledge
 `.trim();
 // ----------------------------------------------------------------
 
@@ -92,6 +247,383 @@ const ALLOWED_POLITIES = [
   "Personalist Monarchy / Autocracy",
   "Theocratic Monarchy",
 ];
+
+const COMPASS_LABELS = {
+  what: [
+    "Truth/Trust",
+    "Liberty/Agency",
+    "Equality/Equity",
+    "Care/Solidarity",
+    "Create/Courage",
+    "Wellbeing",
+    "Security/Safety",
+    "Freedom/Responsibility",
+    "Honor/Sacrifice",
+    "Sacred/Awe",
+  ],
+  whence: [
+    "Evidence",
+    "Public Reason",
+    "Personal",
+    "Tradition",
+    "Revelation",
+    "Nature",
+    "Pragmatism",
+    "Aesthesis",
+    "Fidelity",
+    "Law (Office)",
+  ],
+  how: [
+    "Law/Std.",
+    "Deliberation",
+    "Mobilize",
+    "Markets",
+    "Bureaucracy",
+    "Covert Ops",
+    "Alliances",
+    "Force",
+    "Broadcast",
+    "Innovation",
+  ],
+  whither: [
+    "Family",
+    "Friends",
+    "In-Group",
+    "Nation",
+    "Civilization",
+    "Humanity",
+    "Earth",
+    "Cosmos",
+    "God",
+    "Future Generations",
+  ],
+};
+
+const COMPASS_DIMENSION_NAMES = {
+  what: "What (goals)",
+  whence: "Whence (justification)",
+  how: "How (means)",
+  whither: "Whither (recipients)",
+};
+
+const DEFAULT_MIRROR_ADVICE =
+  "The mirror drums its fingers, wondering if your favorite virtue still feels sturdy when tonight's plan leans away from it.";
+
+function extractTopCompassValues(compassValues, limit = 2) {
+  if (!compassValues || typeof compassValues !== "object") return null;
+
+  const result = {};
+  let hasAny = false;
+
+  for (const dimension of ["what", "whence", "how", "whither"]) {
+    const values = Array.isArray(compassValues?.[dimension]) ? compassValues[dimension] : [];
+    if (!values.length) continue;
+
+    const top = values
+      .map((value, idx) => ({
+        value: Number(value) || 0,
+        idx,
+      }))
+      .filter(item => item.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, limit)
+      .map(item => ({
+        name: COMPASS_LABELS[dimension]?.[item.idx] || `${dimension} #${item.idx + 1}`,
+        strength: Math.round(item.value * 10) / 10,
+      }));
+
+    if (top.length) {
+      result[dimension] = top;
+      hasAny = true;
+    }
+  }
+
+  return hasAny ? result : null;
+}
+
+function extractTopCompassFromStrings(compassStringMap) {
+  if (!compassStringMap || typeof compassStringMap !== "object") return null;
+  const result = {};
+  let hasAny = false;
+
+  for (const dimension of ["what", "whence", "how", "whither"]) {
+    const raw = compassStringMap[dimension];
+    if (!raw || typeof raw !== "string") continue;
+
+    const names = raw
+      .split(",")
+      .map(name => name.trim())
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(name => ({ name, strength: null }));
+
+    if (names.length) {
+      result[dimension] = names;
+      hasAny = true;
+    }
+  }
+
+  return hasAny ? result : null;
+}
+
+function compassTopValuesToSummary(topValues) {
+  if (!topValues) return null;
+  const summary = {};
+  for (const dimension of ["what", "whence", "how", "whither"]) {
+    const list = Array.isArray(topValues[dimension]) ? topValues[dimension] : null;
+    if (list && list.length) {
+      summary[dimension] = list.map(item => item.name).join(", ");
+    }
+  }
+  return Object.keys(summary).length ? summary : null;
+}
+
+function formatCompassTopValuesForPrompt(topValues) {
+  if (!topValues) return "- None recorded yet; mirror improvises without value cues.";
+
+  const lines = [];
+  for (const dimension of ["what", "whence", "how", "whither"]) {
+    const list = Array.isArray(topValues[dimension]) ? topValues[dimension] : null;
+    if (!list || !list.length) continue;
+
+    const names = list
+      .map(item => (item.strength ? `${item.name} (${item.strength})` : item.name))
+      .join(", ");
+
+    lines.push(`- ${COMPASS_DIMENSION_NAMES[dimension]}: ${names}`);
+  }
+
+  return lines.length ? lines.join("\n") : "- None recorded yet; mirror improvises without value cues.";
+}
+
+function sanitizeMirrorAdvice(text) {
+  let cleaned = typeof text === "string" ? text.trim() : "";
+  if (!cleaned) return DEFAULT_MIRROR_ADVICE;
+
+  cleaned = cleaned
+    .replace(/\[[A-Z]\]/g, "")
+    .replace(/\bOption\s+[A-Z]\b/gi, "")
+    .replace(/\bchoice\s+[A-Z]\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  if (!cleaned) return DEFAULT_MIRROR_ADVICE;
+
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  if (words.length > 25) {
+    cleaned = words.slice(0, 25).join(" ");
+  }
+
+  if (!/[.!?]$/.test(cleaned)) {
+    cleaned += ".";
+  }
+
+  return cleaned.length ? cleaned : DEFAULT_MIRROR_ADVICE;
+}
+
+/**
+ * Helper: Find which institution/seat controls a specific policy domain
+ * Returns a descriptive string based on E-12 decisive seats and power holders
+ */
+function findDomainController(domain, decisiveSeats, powerHolders) {
+  // Default fallback
+  const fallback = "Contested among multiple power holders";
+
+  if (!Array.isArray(decisiveSeats) || decisiveSeats.length === 0) {
+    return fallback;
+  }
+
+  // Check if player is in decisive seats
+  const playerIsDecisive = decisiveSeats.some(seat =>
+    seat.toLowerCase().includes("you") ||
+    seat.toLowerCase().includes("player") ||
+    seat.toLowerCase().includes("character")
+  );
+
+  if (playerIsDecisive && decisiveSeats.length === 1) {
+    return "You (decisive authority)";
+  } else if (playerIsDecisive) {
+    return `Shared: You + ${decisiveSeats.filter(s => !s.toLowerCase().includes("you")).slice(0, 2).join(", ")}`;
+  } else {
+    // Player is not decisive - list who controls it
+    return decisiveSeats.slice(0, 2).join(" + ");
+  }
+}
+
+/**
+ * Helper: Format E-12 authority data for AI prompt
+ * Converts E-12 domain structure into readable policy domain list with controllers
+ */
+function formatE12ForPrompt(e12, powerHolders) {
+  if (!e12 || typeof e12 !== 'object') {
+    return "⚠️ E-12 authority analysis not available - use generic role scope constraints.";
+  }
+
+  const { tierI = [], tierII = [], tierIII = [], decisive = [] } = e12;
+
+  // Domain name mappings for better readability
+  const domainNames = {
+    "Security": "Security (military, police, emergency)",
+    "CivilLib": "Civil Liberties (rights, freedoms)",
+    "InfoOrder": "Information Order (media, propaganda)",
+    "Diplomacy": "Diplomacy (treaties, foreign relations)",
+    "Justice": "Justice (courts, rule of law)",
+    "Economy": "Economy (trade, currency, taxation)",
+    "Appointments": "Appointments (officials, ministers)",
+    "Infrastructure": "Infrastructure (roads, public works)",
+    "Curricula": "Curricula (education content)",
+    "Healthcare": "Healthcare (medical policy)",
+    "Immigration": "Immigration (borders, citizenship)",
+    "Environment": "Environment (natural resources)"
+  };
+
+  let text = "";
+
+  // Tier I - Existential domains (highest stakes)
+  if (tierI.length > 0) {
+    text += "\nTIER I DOMAINS (Existential - highest stakes):\n";
+    tierI.forEach(domain => {
+      const fullName = domainNames[domain] || domain;
+      const controller = findDomainController(domain, decisive, powerHolders);
+      text += `  • ${fullName}\n    Controlled by: ${controller}\n`;
+    });
+  }
+
+  // Tier II - Constitutive domains
+  if (tierII.length > 0) {
+    text += "\nTIER II DOMAINS (Constitutive - institutional foundation):\n";
+    tierII.forEach(domain => {
+      const fullName = domainNames[domain] || domain;
+      const controller = findDomainController(domain, decisive, powerHolders);
+      text += `  • ${fullName}\n    Controlled by: ${controller}\n`;
+    });
+  }
+
+  // Tier III - Contextual domains
+  if (tierIII.length > 0) {
+    text += "\nTIER III DOMAINS (Contextual - day-to-day policy):\n";
+    tierIII.forEach(domain => {
+      const fullName = domainNames[domain] || domain;
+      const controller = findDomainController(domain, decisive, powerHolders);
+      text += `  • ${fullName}\n    Controlled by: ${controller}\n`;
+    });
+  }
+
+  return text;
+}
+
+/**
+ * Helper: Generate role-specific authority boundaries ("Cannot Do" list)
+ * Creates explicit examples of actions beyond the player's authority
+ */
+function generateAuthorityBoundaries(gameContext) {
+  const {
+    powerHolders = [],
+    systemName = "",
+    role = "",
+    e12 = null
+  } = gameContext;
+
+  // Find player's power percentage
+  const playerHolder = powerHolders.find(h =>
+    h.note?.toLowerCase().includes("you") ||
+    h.name?.toLowerCase().includes("player")
+  );
+  const playerPower = playerHolder?.percent || 0;
+
+  const boundaries = [];
+
+  // Generic low-power boundaries
+  if (playerPower < 30) {
+    boundaries.push("• Unilaterally command military forces (requires military leadership approval)");
+    boundaries.push("• Override institutional decisions without negotiation or coalition-building");
+    boundaries.push("• Make binding treaties with foreign powers (requires council/assembly approval)");
+  }
+
+  // System-specific boundaries
+  const systemLower = systemName.toLowerCase();
+
+  if (systemLower.includes("democracy")) {
+    boundaries.push("• Act without assembly/council vote on major policy changes");
+    boundaries.push("• Imprison citizens without due process or judicial approval");
+    boundaries.push("• Change constitutional rules unilaterally");
+    boundaries.push("• Ignore referendum results or bypass public consultation");
+  }
+
+  if (systemLower.includes("oligarchy")) {
+    boundaries.push("• Make major decisions without consulting the oligarchic council");
+    boundaries.push("• Redistribute wealth from oligarchs without their collective consent");
+    boundaries.push("• Appoint officials to key positions without council approval");
+  }
+
+  if (systemLower.includes("republic") && !systemLower.includes("oligarchy")) {
+    boundaries.push("• Bypass legislative processes or ignore senate/parliament decisions");
+    boundaries.push("• Act outside constitutional constraints");
+  }
+
+  if ((systemLower.includes("monarchy") || systemLower.includes("autocracy")) && playerPower < 70) {
+    boundaries.push("• Challenge or override the monarch's/autocrat's direct authority");
+    boundaries.push("• Make succession decisions or interfere with royal prerogatives");
+    boundaries.push("• Act independently in domains the monarch has reserved");
+  }
+
+  if (systemLower.includes("theocracy") || systemLower.includes("theocratic")) {
+    boundaries.push("• Violate or contradict religious law and clerical authority");
+    boundaries.push("• Act without consultation or blessing from religious leadership");
+    boundaries.push("• Implement secular policies that conflict with sacred doctrine");
+  }
+
+  if (systemLower.includes("technocracy")) {
+    boundaries.push("• Override expert consensus or scientific recommendations without justification");
+    boundaries.push("• Make decisions in technical domains without expert panel approval");
+  }
+
+  if (systemLower.includes("stratocracy") || systemLower.includes("military")) {
+    boundaries.push("• Act against military chain of command or operational authority");
+    boundaries.push("• Weaken military capabilities without military leadership approval");
+  }
+
+  // E-12 specific boundaries (if available)
+  if (e12 && Array.isArray(e12.decisive) && e12.decisive.length > 0) {
+    const playerIsDecisive = e12.decisive.some(seat =>
+      seat.toLowerCase().includes("you") ||
+      seat.toLowerCase().includes("player") ||
+      seat.toLowerCase().includes(role.toLowerCase())
+    );
+
+    if (!playerIsDecisive) {
+      boundaries.push("• Make final decisions on existential matters (Security, Civil Liberties, Information Order) - these require approval from decisive authority");
+      boundaries.push("• Unilaterally appoint or remove officials in positions controlled by other institutions");
+    }
+
+    // Check for autocratization flags
+    if (e12.stopA) {
+      boundaries.push("• Ignore or defy military authority - military holds autocratic veto power");
+    }
+    if (e12.stopB) {
+      boundaries.push("• Violate religious or ideological orthodoxy - theocratic authorities have final say");
+    }
+  }
+
+  // If player has high power, note what they CAN do instead of cannot
+  if (playerPower >= 70) {
+    return "⚠️ PLAYER AUTHORITY LEVEL: HIGH\n" +
+           "You hold significant unilateral authority in most domains. However:\n" +
+           (boundaries.length > 0 ? boundaries.join("\n") : "• Still constrained by political system norms and institutional structures\n• Actions that violate system legitimacy may trigger opposition or crisis");
+  }
+
+  // If player has moderate power
+  if (playerPower >= 40 && playerPower < 70) {
+    return "⚠️ PLAYER AUTHORITY LEVEL: MODERATE\n" +
+           "You can act independently in some areas but require cooperation/approval for:\n" +
+           (boundaries.length > 0 ? boundaries.join("\n") : "• Major policy changes that affect other power holders\n• Actions outside your direct institutional mandate");
+  }
+
+  // Low power
+  return "⚠️ PLAYER AUTHORITY LEVEL: LIMITED\n" +
+         "Your role has constrained authority. You CANNOT:\n" +
+         (boundaries.length > 0 ? boundaries.join("\n") : "• Act unilaterally on major decisions - requires institutional approval\n• Command institutions or officials you don't directly control");
+}
 // Helper: call Chat Completions and try to parse JSON from the reply
 // Automatically falls back to gpt-4o if quota error (429) is encountered
 async function aiJSON({ system, user, model = CHAT_MODEL_DEFAULT, temperature = undefined, fallback = null }) {
@@ -128,13 +660,12 @@ async function aiJSON({ system, user, model = CHAT_MODEL_DEFAULT, temperature = 
     const data = await resp.json();
     const text = data?.choices?.[0]?.message?.content ?? "";
 
-    try {
-      return JSON.parse(text);
-    } catch {
-      const m = text.match(/\{[\s\S]*\}/);
-      if (m) return JSON.parse(m[0]);
-      return fallback;
+    const parsed = safeParseJSON(text, { debugTag: "aiJSON" });
+    if (parsed) {
+      return parsed;
     }
+
+    return fallback;
   }
 
   try {
@@ -302,6 +833,7 @@ app.get("/api/_ping", (_req, res) => {
       dilemma: MODEL_DILEMMA,
       dilemmaPremium: MODEL_DILEMMA_PREMIUM,
       dilemmaAnthropic: MODEL_DILEMMA_ANTHROPIC,
+      compassHints: MODEL_COMPASS_HINTS,
     },
   });
 });
@@ -528,6 +1060,16 @@ function sanitizeSupportProfiles(raw, defaultOrigin = "ai") {
   };
 }
 
+function sanitizeStoryThemes(value, fallbackThemes = []) {
+  if (!Array.isArray(value)) return fallbackThemes.length ? fallbackThemes : null;
+  const themes = value
+    .map((t) => String(t || "").toLowerCase().replace(/[^a-z0-9_\-\s]/g, "").trim().replace(/\s+/g, "_"))
+    .filter((t) => t.length > 2)
+    .slice(0, 4);
+  if (themes.length === 0) return fallbackThemes.length ? fallbackThemes : null;
+  return themes;
+}
+
 function summarizeStances(profile) {
   if (!profile || !profile.stances) return "";
   const parts = [];
@@ -605,7 +1147,9 @@ app.post("/api/analyze-role", async (req, res) => {
         decisive: []
       },
       grounding: { settingType: "unclear", era: "" },
-      supportProfiles: null
+      supportProfiles: null,
+      roleScope: "Regional administrator balancing councils and security forces; can issue directives, bargain, and reassign resources, but cannot unilaterally rewrite the constitution.",
+      storyThemes: ["autonomy_vs_heteronomy", "institutional_balance"]
     };
 
     const system = `${ANTI_JARGON_RULES}
@@ -628,7 +1172,11 @@ You are a polity analyst for a political simulation. Given ROLE (which may inclu
 
 5) Build the Top-5 Seats (4–5 entries) that actually shape outcomes "next scene," interleaving potent Erasers if they routinely upend Authors. Percents must sum to 100±1. DO NOT include icon field.
 
-6) Locate the polity from the ALLOWED_POLITIES list using spectrum rules:
+6) Distill ROLE SCOPE (≤160 chars): spell out what the player can directly order, what requires negotiation, and what is beyond their authority.
+
+7) List 2–4 STORY THEMES as short snake_case strings capturing enduring tensions for this role (e.g., "autonomy_vs_heteronomy", "justice_vs_amnesty", "resource_scarcity").
+
+8) Locate the polity from the ALLOWED_POLITIES list using spectrum rules:
    - Democracy: Demos is Top-2 in ≥2/3 of prioritized domains and direct self-determination exists in core areas.
    - Republican Oligarchy: Executive + Legislative + Judicial are all in Top-5; no single Seat holds pen+eraser across multiple prioritized domains.
    - Hard-Power Oligarchy: Wealth Top-2 in ≥1/3 of prioritized domains (plutocracy) OR Coercive Force Top-2 (stratocracy).
@@ -681,7 +1229,9 @@ Return STRICT JSON only as:
       },
       "origin": "ai|provisional"
     } | null
-  }
+  },
+  "roleScope": "<160 chars max>",
+  "storyThemes": ["snake_case", "keywords", "max_four"]
 }
 
 IMPORTANT:
@@ -733,6 +1283,9 @@ Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setti
     const originHint = out?.grounding?.settingType === "real" ? "ai" : "provisional";
     const supportProfiles = sanitizeSupportProfiles(out?.supportProfiles, originHint);
 
+    const roleScope = truncateText(out?.roleScope || FALLBACK.roleScope, 200);
+    const storyThemes = sanitizeStoryThemes(out?.storyThemes, FALLBACK.storyThemes);
+
     const result = {
       systemName,
       systemDesc: String(out?.systemDesc || FALLBACK.systemDesc).slice(0, 120),
@@ -741,6 +1294,8 @@ Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setti
       playerIndex,
       challengerSeat,  // NEW: Primary institutional opponent
       supportProfiles,
+      roleScope,
+      storyThemes,
       e12: {
         tierI: Array.isArray(out?.e12?.tierI) ? out.e12.tierI : FALLBACK.e12.tierI,
         tierII: Array.isArray(out?.e12?.tierII) ? out.e12.tierII : FALLBACK.e12.tierII,
@@ -903,7 +1458,7 @@ app.post("/api/mirror-light", async (req, res) => {
 // -------------------- Mirror Quiz Light (Personality Summary) -------
 // POST /api/mirror-quiz-light
 // Minimal payload: top 2 "what" + top 2 "whence" values
-// Response: ONE sentence, ~20–25 words, playful mirror voice (no labels/numbers)
+// Response: ONE sentence, ~12–18 words, dry mirror voice (no labels/numbers)
 
 app.post("/api/mirror-quiz-light", async (req, res) => {
   try {
@@ -918,21 +1473,21 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
     const [what1, what2] = topWhat;
     const [whence1, whence2] = topWhence;
 
-    // === System prompt: playful, but no literal label dump, no numbers, no "values doing actions" ===
+    // === System prompt: dry wit, but no literal label dump, no numbers, no "values doing actions" ===
     const system =
       "You are a magical mirror sidekick bound to the player's soul. You reflect their inner values with warmth, speed, and theatrical charm.\n\n" +
       "VOICE:\n" +
-      "- Lively, affectionate, wise-cracking; think genie/impresario energy, but grounded and not cartoonish.\n" +
-      "- Use vivid comparisons and fresh metaphors; avoid slapstick choreography.\n" +
-      "- Be exuberant without chaos; playful, not mocking.\n\n" +
+      "- Succinct, deadpan, and a little wry; think quick backstage whisper, not stage show.\n" +
+      "- Deliver dry humor through understatement or brisk observation—no florid metaphors or whimsical imagery.\n" +
+      "- Stay lightly encouraging, never snarky.\n\n" +
       "HARD RULES (ALWAYS APPLY):\n" +
-      "- Output EXACTLY ONE sentence. 20–25 words total.\n" +
+      "- Output EXACTLY ONE sentence. 12–18 words total.\n" +
       "- NEVER reveal numbers, scores, scales, or ranges.\n" +
       "- NEVER repeat the value labels verbatim; do not quote, uppercase, or mirror slashes.\n" +
-      "- Paraphrase technical labels into friendly, everyday phrases (e.g., ‘Truth/Trust’ → ‘truth you can lean on’).\n" +
+      "- Paraphrase technical labels into plain, everyday phrases.\n" +
       "- Do NOT stage literal actions for values (no “X is doing push-ups”, “baking cookies”, etc.).\n" +
       "- No lists, no colons introducing items, no parenthetical asides.\n" +
-      "- Keep it positive, curious, and a touch mischievous; zero cynicism.\n";
+      "- Keep the sentence clear first, witty second.\n";
 
     // === User prompt: pass names only (no strengths), ask for paraphrased synthesis ===
     const user =
@@ -940,8 +1495,8 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
       `GOALS: ${what1.name}, ${what2.name}\n` +
       `JUSTIFICATIONS: ${whence1.name}, ${whence2.name}\n\n` +
       `TASK:\n` +
-      `Write ONE sentence (20–25 words) in the mirror's voice that playfully captures how these goals blend with these justifications.\n` +
-      `Do not show numbers. Do not repeat labels verbatim; paraphrase them into natural language. No lists or colon-led structures.\n`;
+      `Write ONE sentence (12–18 words) in the mirror's voice that plainly captures how these goals blend with these justifications.\n` +
+      `Do not show numbers. Do not repeat labels verbatim; paraphrase them into natural language. Keep it dry with a faint smile—no metaphors.\n`;
 
     const text = useAnthropic
       ? await aiTextAnthropic({ system, user, model: MODEL_MIRROR_ANTHROPIC })
@@ -956,10 +1511,10 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
     // strip digits just in case
     one = one.replace(/\d+/g, "");
 
-    // trim to ~25 words max (preserve readability)
+    // trim to ~18 words max (preserve readability)
     const words = one.split(/\s+/).filter(Boolean);
-    if (words.length > 25) {
-      one = words.slice(0, 25).join(" ").replace(/[,\-–—;:]$/, "") + ".";
+    if (words.length > 18) {
+      one = words.slice(0, 18).join(" ").replace(/[,\-–—;:]$/, "") + ".";
     } else if (!/[.!?]$/.test(one)) {
       one += ".";
     }
@@ -1293,7 +1848,7 @@ function analyzeSystemType(systemName) {
 function buildCoreStylePrompt() {
   return `You write short, punchy political situations for a choice-based mobile game.
 - Never use the word "dilemma".
-- Title ≤ 60 chars. Description 2–3 sentences. Mature, gripping, in-world.
+- Title ≤ 60 chars. **Description: UP TO 2 SENTENCES MAXIMUM** (keep it tight and punchy). Mature, gripping, in-world.
 - Natural language (no bullets). Feels like live politics (calls, memos, press, leaks).
 - Plain modern English—no specialist jargon. Prefer "high court", "parliament", "council".
 - Democratic systems feel like pluralism and checks: rivals push back, media probes, courts constrain.
@@ -1376,16 +1931,18 @@ function validateDilemmaResponse(raw, obj) {
   if (!obj.title || !obj.description) return { valid: false, reason: "Missing title/description" };
   if (!Array.isArray(obj.actions) || obj.actions.length !== 3) return { valid: false, reason: "Need exactly 3 actions" };
 
-  if (obj.title.length > 60) return { valid: false, reason: "Title too long" };
+  if (obj.title.length > 80) return { valid: false, reason: "Title too long (keep it concise)" };
 
   // Check action summaries (just one sentence, no word count)
   for (const a of obj.actions) {
     if (!a?.summary) return { valid: false, reason: "Missing action summary" };
 
-    // One sentence = exactly one period at end (split should give ["content", ""])
-    const parts = a.summary.split('.');
-    if (parts.length !== 2 || parts[1].trim() !== '') {
-      return { valid: false, reason: `Action summary not exactly one sentence: "${a.summary}"` };
+    const sentenceCount = (a.summary.match(/[.!?]/g) || []).length;
+    if (sentenceCount > 2) {
+      return { valid: false, reason: `Action summary too long-winded: "${a.summary}"` };
+    }
+    if (!/[.!?]$/.test(a.summary.trim())) {
+      return { valid: false, reason: `Action summary must end with punctuation: "${a.summary}"` };
     }
   }
 
@@ -1401,14 +1958,172 @@ function hasGenericPhrasing(text) {
 }
 
 /**
- * Safely parse JSON with fallback
+ * Strip line (//) and block (/* ... *\/) style comments from a JSON-like string without touching quoted content
  */
-function safeParseJSON(text) {
-  try {
-    return JSON.parse(text);
-  } catch {
+function stripJsonComments(text) {
+  if (typeof text !== "string" || text.length === 0) return text;
+
+  let result = "";
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const next = text[i + 1];
+
+    if (inString) {
+      result += char;
+
+      if (escapeNext) {
+        escapeNext = false;
+      } else if (char === "\\") {
+        escapeNext = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+      result += char;
+      continue;
+    }
+
+    if (char === "/" && next === "/") {
+      i += 1;
+      while (i < text.length && text[i] !== "\n") {
+        i++;
+      }
+      if (i < text.length) {
+        result += "\n";
+      }
+      continue;
+    }
+
+    if (char === "/" && next === "*") {
+      i += 2;
+      while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) {
+        i++;
+      }
+      i++;
+      continue;
+    }
+
+    result += char;
+  }
+
+  return result;
+}
+
+/**
+ * Normalize control characters in JSON text that would cause parse errors
+ * This is a last-resort recovery mechanism for malformed AI responses
+ */
+function normalizeControlCharacters(text) {
+  if (typeof text !== "string") return text;
+
+  // Strategy: Remove literal control characters from within quoted strings
+  // while preserving escaped sequences like \n, \t, etc.
+  let result = '';
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const charCode = text.charCodeAt(i);
+
+    if (inString) {
+      if (escapeNext) {
+        // Preserve escaped characters
+        result += char;
+        escapeNext = false;
+      } else if (char === '\\') {
+        result += char;
+        escapeNext = true;
+      } else if (char === '"') {
+        result += char;
+        inString = false;
+      } else if (charCode >= 0x00 && charCode <= 0x1F && char !== '\n' && char !== '\r' && char !== '\t') {
+        // Remove other control characters in strings
+        continue;
+      } else if (char === '\n' || char === '\r' || char === '\t') {
+        // Replace literal newlines/tabs in strings with space
+        result += ' ';
+      } else {
+        result += char;
+      }
+    } else {
+      // Outside strings, preserve everything including control chars (they're valid JSON structure)
+      result += char;
+      if (char === '"') {
+        inString = true;
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Safely parse JSON with fallback extraction
+ * Handles markdown code blocks (```json...\n{...}\n```) by extracting content between { }
+ */
+function safeParseJSON(text, { debugTag = "safeParseJSON", maxLogLength = 400 } = {}) {
+  if (typeof text !== "string") {
+    console.warn(`[${debugTag}] Non-string input provided to JSON parser (type=${typeof text}).`);
     return null;
   }
+
+  const logFailure = (stage, error, sample) => {
+    const snippet = sample && sample.length > maxLogLength ? `${sample.slice(0, maxLogLength)}…` : sample;
+    console.warn(`[${debugTag}] JSON parse failed at stage=${stage}: ${error?.message || error}`);
+    if (snippet) {
+      console.warn(`[${debugTag}] snippet (${snippet.length || 0} chars): ${snippet}`);
+    }
+  };
+
+  const tryParse = (input, stageLabel) => {
+    if (typeof input !== "string") return null;
+    try {
+      return JSON.parse(input);
+    } catch (err) {
+      logFailure(stageLabel, err, input);
+      return null;
+    }
+  };
+
+  // Attempt 1: Direct parse
+  const direct = tryParse(text, "direct");
+  if (direct) return direct;
+
+  // Attempt 2: Strip comments and retry
+  const cleaned = stripJsonComments(text);
+  if (cleaned && cleaned !== text) {
+    const parsedClean = tryParse(cleaned, "strip-comments");
+    if (parsedClean) return parsedClean;
+  }
+
+  // Attempt 3: Normalize control characters and retry
+  const normalized = normalizeControlCharacters(cleaned || text);
+  if (normalized !== (cleaned || text)) {
+    const parsedNormalized = tryParse(normalized, "normalized-control-chars");
+    if (parsedNormalized) return parsedNormalized;
+  }
+
+  // Attempt 4: Extract braces and retry
+  const fallbackSource = normalized || cleaned || text;
+  const match = typeof fallbackSource === "string" ? fallbackSource.match(/\{[\s\S]*\}/) : null;
+  if (match) {
+    const candidate = stripJsonComments(match[0]);
+    const candidateNormalized = normalizeControlCharacters(candidate);
+    const parsed = tryParse(candidateNormalized, "fallback-braces-normalized");
+    if (parsed) return parsed;
+  } else {
+    console.warn(`[${debugTag}] No JSON object detected using fallback brace extraction.`);
+  }
+
+  return null;
 }
 
 // -------------------- Light Dilemma Prompt Helpers (Ultra-Minimal) ---------------------------
@@ -1422,11 +2137,38 @@ function buildLightSystemPrompt() {
 
 STYLE
 - Clear, vivid, natural language that feels conversational and immersive.
+- Write as STORYTELLING: create scenes the player can visualize and experience.
+- Make the player FEEL they are living this moment through their character's eyes.
 - Slightly cynical: dry wit and side-eye, not sneering or mean. One wink, not a roast.
-- Avoid jargon and bureaucratese. Describe what roles do, not rare titles (e.g., “regional governor (jiedushi)” instead of “jiedushi”).
-- Never say “dilemma” or refer to game mechanics.
-- Title ≤ 60 chars. Description: 2–3 sentences, real and concrete.
+- Avoid jargon and bureaucratese. Describe what roles do, not rare titles (e.g., "regional governor (jiedushi)" instead of "jiedushi").
+- Never say "dilemma" or refer to game mechanics.
+- Title ≤ 60 chars. **DESCRIPTION LENGTH (CRITICAL): UP TO 2 SENTENCES MAXIMUM** - keep it tight, punchy, and concrete.
 - Favor human stakes and visible consequences over technical phrasing.
+
+DECISION-FORCING DILEMMA (CRITICAL)
+- Every description must present a CONCRETE PROBLEM that demands immediate action.
+- **LENGTH REQUIREMENT: UP TO 2 SENTENCES MAXIMUM**
+  * Sentence 1: Setup with concrete details (who, what, where)
+  * Sentence 2: The forcing question
+  * DO NOT add a third sentence - merge setup and question if needed (can be a single sentence)
+- End with a question that forces the player to choose (vary the phrasing):
+  * "What do you choose to do?"
+  * "How will you respond?"
+  * "What is your decision?"
+  * "How will you act?"
+- ❌ BAD (abstract, no problem): "You've ignited local pride, but now face Rome's wary grace."
+- ❌ BAD (too long, 3 sentences): "You've returned from the provincial tour to find urgent reports. The grain merchants are hoarding supplies. How will you respond?"
+- ✅ GOOD (1 sentence, concrete): "A Roman centurion demands you shut down tomorrow's festival or face martial law. Do you comply, negotiate, or defy?"
+- ✅ GOOD (2 sentences, concrete): "As provincial governor, you survey the shoreline while courtiers press conflicting demands about the expelled foreigners' ships. How will you respond?"
+
+IMMERSIVE POINT OF VIEW (CRITICAL)
+- Write from the character's actual knowledge and perspective.
+- Characters only know what they would realistically know at this moment in time.
+- Avoid anachronistic awareness:
+  * ❌ BAD: "English settlers expand into your hunting grounds." (indigenous chief in 1607 wouldn't know they're "English")
+  * ✅ GOOD: "Strange pale-skinned foreigners with loud fire-weapons are clearing trees near the sacred grounds. What do you do?"
+- Use descriptive language based on what character can see, hear, and experience.
+- If the player doesn't know a faction's name or intentions yet, describe only what is observable.
 
 CONCRETE BUT GENERIC (CRITICAL)
 - Be specific about **who/what/where** without real-world proper nouns or acronyms.
@@ -1509,7 +2251,7 @@ Examples of the cynical advisor voice:
 ❌ "Facilitate a consultative process engaging all stakeholders." (bureaucratic)
 ❌ "Respect individual autonomy by declining to intervene." (formal/boring)
 
-IMPORTANT: No numbers, no meta language, no bureaucratese. Sound like a sharp political advisor, not a policy memo.
+IMPORTANT: No numbers in action summaries or descriptions (save specific numbers for dynamic parameters only). No meta language, no bureaucratese. Sound like a sharp political advisor, not a policy memo.
 
 - Cost from {0, ±50, ±100, ±150, ±200, ±250} — typically negative unless it clearly earns income.
 
@@ -1591,6 +2333,27 @@ LENGTH & TONE:
 - Feel like something a REAL person/group would actually say
 - Avoid: "Feared violence, got it" / "Wanted decisive action" → TOO DRY
 - Prefer: "We're so relieved you didn't escalate this!" / "Finally, someone who takes security seriously!"
+
+DILEMMA DESCRIPTION EXAMPLES:
+
+✅ GOOD (concrete problem + immersive POV + decision-forcing question):
+"Three hooded figures were caught sabotaging grain shipments to the northern garrison. Your military commander demands immediate execution as a deterrent, but they claim to be acting on orders from your political rival. The crowd has gathered to watch your judgment. What will you do?"
+
+✅ GOOD (experiential storytelling + specific situation + varied question):
+"A delegation of farmers kneels before you in the throne room, their clothes still mud-stained from the flooded fields. They beg for tax relief after the monsoon destroyed half the harvest. Your treasurer quietly shows you the ledger—waiving taxes will bankrupt the public works fund. How will you respond?"
+
+✅ GOOD (character's actual knowledge + vivid scene + action prompt):
+"Strange pale-skinned foreigners with thunderous fire-weapons have built wooden structures near the sacred burial grounds. Your warriors report they are felling trees and refuse to leave. The elders demand you drive them out before they anger the spirits. What do you choose to do?"
+
+❌ BAD (abstract, no concrete problem, no decision point):
+"Amidst the cultural resurgence in Alexandria, a Roman general hints at growing unease over your reforms. You've ignited local pride, but now face Rome's wary grace."
+
+❌ BAD (vague situation, no clear stakes, weak ending):
+"Tensions simmer between traditional and progressive factions. Some support your vision, others resist change. The political landscape shifts."
+
+❌ BAD (anachronistic awareness, tells instead of shows):
+"The British Empire's new trade policies threaten your nation's economy. Colonial administrators pressure you to comply."
+(If character wouldn't know terms like "British Empire" or "colonial")
 
 OUTPUT (STRICT JSON)
 {"title":"","description":"",
@@ -1732,9 +2495,32 @@ function buildLightUserPrompt({ role, system, day, daysLeft, subjectStreak, prev
   }
 
   parts.push('');
+  if (daysLeft === 1) {
+    parts.push('FINAL DAY ALERT: Make the description acknowledge this is their last day/defining moment in the first sentence, keep stakes national, and ensure every option feels climactic.');
+  }
   parts.push('TASK: Write one concrete situation anchored in ROLE+SETTING with three system-appropriate responses.');
 
   return parts.join('\n');
+}
+
+function buildConclusionUserPrompt({ role, system, previous }) {
+  const lines = [
+    `ROLE & SETTING: ${role}`,
+    `SYSTEM: ${system}`,
+    '',
+    'This is the aftermath screen. Do NOT create new choices.',
+  ];
+
+  if (previous && previous.title) {
+    lines.push(`LAST DECISION CONTEXT: "${previous.choiceTitle}" — ${previous.choiceSummary}`);
+  } else {
+    lines.push('LAST DECISION CONTEXT: (missing)');
+  }
+
+  lines.push('');
+  lines.push('TASK: Provide exactly TWO sentences describing the immediate consequences of that decision. Keep it grounded, human, and focused on the next few hours/days—not a grand historical summary.');
+
+  return lines.join('\n');
 }
 
 /**
@@ -1805,6 +2591,90 @@ Return JSON:
 
 ${ANTI_JARGON_RULES}
 `.trim();
+}
+
+function buildGameTurnConclusionSystemPrompt({
+  day,
+  totalDays,
+  roleScope,
+  storyThemes,
+  challengerSeat,
+  supportProfiles
+}) {
+  const safeTotal = Number.isFinite(totalDays) ? totalDays : 7;
+  const lines = [
+    `${buildConclusionSystemPrompt()}`,
+    ``,
+    `CONTEXTUAL REMINDERS:`,
+    `- Day ${day} of ${safeTotal} just concluded; this is the immediate aftermath.`,
+    `- Stay consistent with the role’s authority and previous decisions.`,
+  ];
+
+  if (roleScope) {
+    lines.push(`- ROLE SCOPE: ${roleScope}`);
+  }
+
+  if (Array.isArray(storyThemes) && storyThemes.length > 0) {
+    lines.push(`- THEMES TO PAY OFF: ${storyThemes.join(', ')}`);
+  }
+
+  if (challengerSeat) {
+    lines.push(`- PRIMARY CHALLENGER: ${challengerSeat.name} (${challengerSeat.percent ?? '?'}% power) — mention how they react or position themselves in the aftermath.`);
+  }
+
+  if (supportProfiles) {
+    const reminder = buildSupportProfileReminder(supportProfiles);
+    if (reminder) {
+      lines.push(`- SUPPORT BASELINES: ${reminder.replace(/\n/g, ' ')}`);
+    }
+  }
+
+  lines.push(
+    `ADDITIONAL OUTPUT RULES:`,
+    `- Set "isGameEnd": true.`,
+    `- Leave "actions" as an empty array.`,
+    `- Provide an empty array for "dynamicParams" if that field is present.`,
+    `- Mirror advice can be omitted or kept to one reflective sentence.`
+  );
+
+  return lines.join('\n');
+}
+
+function buildGameTurnConclusionUserPrompt({ role, system, lastChoice, storyThemes, challengerSeat, supportProfiles }) {
+  const lines = [
+    `ROLE & SETTING: ${role}`,
+    `SYSTEM: ${system}`,
+    '',
+    'This is the aftermath screen. DO NOT create new choices.'
+  ];
+
+  if (lastChoice) {
+    lines.push(
+      `LAST DECISION CONTEXT: "${lastChoice.title}" — ${lastChoice.summary || lastChoice.title}`
+    );
+  } else {
+    lines.push('LAST DECISION CONTEXT: (missing)');
+  }
+
+  if (Array.isArray(storyThemes) && storyThemes.length > 0) {
+    lines.push(`ACTIVE THEMES TO RESOLVE: ${storyThemes.join(', ')}`);
+  }
+
+  if (challengerSeat) {
+    lines.push(`CHALLENGER PRESSURE: ${challengerSeat.name} (${challengerSeat.percent ?? '?'}% power)`);
+  }
+
+  if (supportProfiles) {
+    const reminder = buildSupportProfileReminder(supportProfiles);
+    if (reminder) {
+      lines.push(`SUPPORT BASELINES:\n${reminder}`);
+    }
+  }
+
+  lines.push('');
+  lines.push('TASK: Provide exactly TWO sentences describing the immediate consequences of that decision. Include how the challenger and the public respond if relevant. Keep it grounded in immediate hours/days, not a grand historical wrap-up.');
+
+  return lines.join('\n');
 }
 
 // -------------------- Light Dilemma API Endpoint ---------------------------
@@ -1888,7 +2758,9 @@ app.post("/api/dilemma-light", async (req, res) => {
       systemPrompt = buildLightSystemPrompt();
     }
 
-    const userPrompt = buildLightUserPrompt({ role, system, day, daysLeft, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance, recentTopics, recentDilemmaTitles });
+    const userPrompt = daysLeft === 0
+      ? buildConclusionUserPrompt({ role, system, previous })
+      : buildLightUserPrompt({ role, system, day, daysLeft, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance, recentTopics, recentDilemmaTitles });
 
     // ALWAYS log previous context (critical for debugging continuity and support shifts)
     if (previous) {
@@ -2126,91 +2998,61 @@ app.post("/api/dilemma-light", async (req, res) => {
 // --- Validate "Suggest your own" (relevance to the current dilemma) ---
 app.post("/api/validate-suggestion", async (req, res) => {
   try {
-    const { text, title, description, era, settingType, year } = req.body || {};
+    const {
+      text,
+      title,
+      description,
+      era,
+      settingType,
+      year,
+      roleScope = "",
+      challengerName = "",
+      topHolders = []
+    } = req.body || {};
     if (typeof text !== "string" || typeof title !== "string" || typeof description !== "string") {
       return res.status(400).json({ error: "Missing text/title/description" });
     }
 
-    // Use the same chat helper you already have in this server
-    // Falls back to CHAT_MODEL / MODEL_VALIDATE envs
+    const system = buildSuggestionValidatorSystemPrompt({
+      era,
+      year,
+      settingType,
+      roleScope,
+      challengerName,
+      topHolders
+    });
+
+    const user = buildSuggestionValidatorUserPrompt({
+      title,
+      description,
+      suggestion: text,
+      era,
+      year,
+      roleScope
+    });
+
     const model =
       process.env.MODEL_VALIDATE ||
       process.env.CHAT_MODEL ||
       "gpt-5-mini";
 
-    // Build historical context section if provided
-    let historicalContext = "";
-    if (era || year) {
-      const eraText = era || year || "unknown time period";
-      historicalContext = [
-        "",
-        "HISTORICAL CONTEXT:",
-        `- Time period: ${eraText}`,
-        `- Setting type: ${settingType || "unclear"}`,
-        "",
-        "ANACHRONISM CHECK:",
-        "- REJECT suggestions that contain clear anachronisms (technologies, concepts, or institutions that didn't exist in this time period)",
-        "- Examples of what to reject:",
-        "  • Ancient times (e.g., -404, -48): 'launch Twitter campaign', 'send email', 'use drones', 'install cameras', 'call emergency Zoom meeting'",
-        "  • Early modern (e.g., 1494, 1607, 1791): 'deploy surveillance cameras', 'broadcast on television', 'issue press release online', 'use helicopters'",
-        "  • Modern (e.g., 1917, 1947, 1990): Generally accept most technology, but reject futuristic concepts",
-        "  • Future (e.g., 2179): Reject outdated tech like 'send telegram', 'deploy musket battalions', 'town criers'",
-        "- If uncertain whether something is anachronistic, ACCEPT it (benefit of the doubt)",
-        "",
-      ].join("\n");
-    }
+    const raw = await aiJSON({
+      system,
+      user,
+      model,
+      temperature: 0,
+      fallback: { valid: true, reason: "Accepted (fallback)" }
+    });
 
-    const system = [
-      "You are a PERMISSIVE validator for a historical/political strategy game.",
-      "Given a DILEMMA (title + description) and a SUGGESTION from the player, your job is to accept anything that shows reasonable engagement.",
-      historicalContext,
-      "ACCEPT the suggestion if it:",
-      "- Shows ANY attempt to engage with the dilemma (even if tangentially related)",
-      "- Contains actual words/sentences (not random keyboard mashing)",
-      "- Suggests any kind of action, policy, or response",
-      "- Uses period-appropriate language and concepts (OR if you're uncertain about the time period)",
-      "",
-      "REJECT only if:",
-      "- Empty or whitespace-only input",
-      "- Pure gibberish (random characters like 'asdfgh', 'xyz123')",
-      "- Completely irrelevant to politics/governance (e.g., 'I like pizza', 'random thoughts')",
-      "- Contains clear, obvious anachronisms (technologies/concepts that definitively didn't exist in the time period)",
-      "",
-      "DEFAULT STANCE: If in doubt, ACCEPT the suggestion.",
-      "For anachronisms: provide a brief, helpful rejection message like 'Cameras didn't exist in 1607. Try period-appropriate actions.'",
-      "Only return compact JSON: { \"valid\": boolean, \"reason\": string }.",
-    ].join("\n");
+    const valid = typeof raw?.valid === "boolean" ? raw.valid : true;
+    const reason =
+      typeof raw?.reason === "string" && raw.reason.trim().length > 0
+        ? raw.reason.trim().slice(0, 240)
+        : valid
+          ? "Sounds workable."
+          : "I don’t think that fits this setting.";
 
-    const user = JSON.stringify(
-      {
-        dilemma: { title, description },
-        suggestion: text,
-      },
-      null,
-      2
-    );
-
-    // aiText is assumed to exist in this file per your current API layer
-    const raw = await aiText({ system, user, model, temperature: 0 });
-
-    // Extract JSON payload safely
-    let json = null;
-    try {
-      // try as-is
-      json = JSON.parse(raw.trim());
-    } catch {
-      // try to pull first {...} block
-      const m = raw.match(/\{[\s\S]*\}/);
-      if (m) {
-        json = JSON.parse(m[0]);
-      }
-    }
-
-    if (!json || typeof json.valid !== "boolean") {
-      return res.status(200).json({ valid: false, reason: "Malformed validator output" });
-    }
-    const reason = typeof json.reason === "string" ? json.reason : "";
-    return res.json({ valid: !!json.valid, reason });
+    return res.json({ valid, reason });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("validate-suggestion error:", err?.message || err);
@@ -2240,9 +3082,9 @@ app.post("/api/dynamic-parameters", async (req, res) => {
 
     const system = `You are a political simulation system that generates ultra-short dynamic status parameters based on player actions.
 
-Generate 1-3 contextually relevant dynamic parameters that show the immediate consequences of the player's political decision. These parameters must be:
-- ULTRA-SHORT: Maximum 4-5 words each
-- NO explanations or descriptions
+Generate between 1 and 3 contextually relevant dynamic parameters that show the immediate consequences of the player's political decision. These parameters must be:
+- ULTRA-SHORT: maximum 4-5 words each
+- No explanations or narration
 - Pure factual outcomes with numbers
 - Specific, measurable results only
 
@@ -2250,54 +3092,34 @@ ${ANTI_JARGON_RULES}
 
 CRITICAL RESTRICTIONS (ABSOLUTELY ENFORCED):
 
-1. NEVER mention support levels or approval:
-   - NO "People support rising" or "Public approval up"
-   - NO "Middle entity support" or "Legislature backing"
-   - NO "Allies satisfied" or "Mom proud"
-   - Support is shown separately - avoid 100% redundancy
+1. NEVER mention support, approval, satisfaction, morale, or popularity:
+   - Avoid any reference to public opinion, faction attitudes, loyalty, or trust
+   - Do not report percentage swings in sentiment or confidence
 
-2. NEVER mention budget, money, or treasury:
-   - NO "Budget decreased" or "Treasury depleted"
-   - NO "Funds low" or "Revenue increased"
-   - Budget is shown separately - avoid 100% redundancy
+2. NEVER mention budget, currency, revenue, or financial reserves:
+   - Financial impacts are tracked elsewhere
 
-3. NEVER mention trivial or vague events:
-   - NO "Scene at plaza" or "Mood shifts"
-   - NO "Atmosphere tense" or "Feelings mixed"
-   - Each parameter must be CONCRETE and SIGNIFICANT
+3. NEVER output vague or cosmetic observations:
+   - Each parameter must describe a concrete, consequential change in the world
 
-4. FOCUS ON these engaging, game-changing consequences:
-   ✅ Casualties: "40 militia fighters neutralized", "14 civilians dead"
-   ✅ International reactions: "12 countries condemn action", "UN resolution pending"
-   ✅ Political changes: "5 ministers resign", "Opposition calls vote"
-   ✅ Protests: "3,000 protesters arrested", "Riots in 4 cities"
-   ✅ Economic indicators: "Inflation up 15%", "Unemployment hits 18%"
-   ✅ Policy outcomes: "Treaty signed with 3 nations", "Law passes 65-35"
-   ✅ Infrastructure: "3 hospitals under construction", "Dam project halted"
-   ✅ Military: "Territory gained in north", "2 bases captured"
+4. ALWAYS reflect tangible fallout from the player's action:
+   - Show bodies moved, equipment deployed, infrastructure altered, policies enforced, populations affected, or other physical shifts that a player could witness or count
 
 5. Each parameter must be:
-   - Specific (numbers, locations, entities)
-   - Interesting (player wants to know this)
-   - Non-redundant (not shown elsewhere)
-   - Consequences-focused (what happened due to action)
+   - Specific (numbers, locations, or entities)
+   - Interesting (reveals meaningful stakes or pressure)
+   - Non-redundant with other surfaced information
+   - Focused on direct consequences of the action
 
-GOOD EXAMPLES (follow this exact format):
-- "40 militia fighters neutralized"
-- "14 civilians dead"
-- "12 countries issue condemnation"
-- "3,000 protesters arrested"
-- "Inflation up 15%"
-- "5 ministers resign"
-- "3 hospitals under construction"
+DO use formats such as:
+- 2 brigades mobilized east
+- 4 cities under curfew
+- 120 factories reopen
 
-BAD EXAMPLES (NEVER generate these):
-- "3 coalition MPs appeased" (support-related, redundant)
-- "1 judicial review filed" (trivial, not engaging)
-- "People support rising" (support-related, redundant)
-- "Budget decreased" (budget-related, redundant)
-- "Scene at plaza" (vague, trivial)
-- "Mood shifts positive" (vague, not specific)
+DO NOT use formats such as:
+- 75% citizens unhappy
+- Public approval +12%
+- Parliament trust restored
 
 Choose appropriate icons from: Users, TrendingUp, TrendingDown, Shield, AlertTriangle, Heart, Building, Globe, Leaf, Zap, Target, Scale, Flag, Crown, Activity, etc.
 
@@ -2326,23 +3148,84 @@ Based on this political decision, generate 1-3 specific dynamic parameters that 
   ]
 }`;
 
-    const result = await aiJSON({
-      system,
-      user,
-      model: MODEL_DILEMMA, // Use same model as dilemmas
-      temperature: 0.8,
-      fallback: { parameters: [] }
-    });
+    const forbiddenDynamicWords = [
+      "approval",
+      "approve",
+      "support",
+      "backing",
+      "popularity",
+      "favorability",
+      "loyalty",
+      "morale",
+      "confidence",
+      "satisfaction",
+      "trust"
+    ];
 
-    // Validate and clean the response
-    const parameters = Array.isArray(result.parameters)
-      ? result.parameters.slice(0, 3).map((param, index) => ({
-          id: param.id || `param_${index}`,
-          icon: param.icon || "AlertTriangle",
-          text: param.text || "Unknown effect",
-          tone: ["up", "down", "neutral"].includes(param.tone) ? param.tone : "neutral"
-        }))
-      : [];
+    const percentSentimentWords = [
+      "people",
+      "citizens",
+      "populace",
+      "voters",
+      "residents",
+      "supporters",
+      "allies",
+      "faction",
+      "factions",
+      "base",
+      "crowd",
+      "public",
+      "opposition"
+    ];
+
+    const hasForbiddenDynamicText = text => {
+      if (typeof text !== "string" || !text.trim()) return false;
+      const lowered = text.toLowerCase();
+      if (forbiddenDynamicWords.some(word => lowered.includes(word))) return true;
+      if (/\b\d{1,3}%\b/.test(lowered)) {
+        if (forbiddenDynamicWords.some(word => lowered.includes(word))) return true;
+        if (percentSentimentWords.some(word => lowered.includes(word))) return true;
+      }
+      return false;
+    };
+
+    let attempts = 0;
+    let parameters = [];
+
+    while (attempts < 2) {
+      const result = await aiJSON({
+        system,
+        user,
+        model: MODEL_DILEMMA, // Use same model as dilemmas
+        temperature: 0.8,
+        fallback: { parameters: [] }
+      });
+
+      const mapped = Array.isArray(result.parameters)
+        ? result.parameters.slice(0, 3).map((param, index) => ({
+            id: param.id || `param_${index}`,
+            icon: param.icon || "AlertTriangle",
+            text: param.text || "Unknown effect",
+            tone: ["up", "down", "neutral"].includes(param.tone) ? param.tone : "neutral"
+          }))
+        : [];
+
+      const hasForbidden = mapped.some(param => hasForbiddenDynamicText(param.text));
+      if (!hasForbidden) {
+        parameters = mapped;
+        break;
+      }
+
+      attempts += 1;
+
+      if (debug) {
+        console.log("[/api/dynamic-parameters] Forbidden text detected, retrying generation");
+      }
+
+      if (attempts >= 2) {
+        parameters = mapped.filter(param => !hasForbiddenDynamicText(param.text));
+      }
+    }
 
     if (debug) {
       console.log("[/api/dynamic-parameters] OUT:", parameters);
@@ -2360,6 +3243,7 @@ Based on this political decision, generate 1-3 specific dynamic parameters that 
 app.post("/api/aftermath", async (req, res) => {
   try {
     const {
+      gameId,
       playerName,
       role,
       systemName,
@@ -2371,6 +3255,7 @@ app.post("/api/aftermath", async (req, res) => {
 
     if (debug) {
       console.log("[/api/aftermath] Request received:", {
+        gameId,
         playerName,
         role,
         systemName,
@@ -2380,21 +3265,26 @@ app.post("/api/aftermath", async (req, res) => {
       });
     }
 
-    // Fallback response if API fails
+    // Improved fallback response with contextual data
+    // This is used when JSON parsing fails - make it semi-personalized
+    const leaderName = playerName || "the leader";
+    const avgSupport = Math.round(((finalSupport?.people ?? 50) + (finalSupport?.middle ?? 50) + (finalSupport?.mom ?? 50)) / 3);
+    const supportDesc = avgSupport >= 70 ? "widely supported" : avgSupport >= 40 ? "contested" : "deeply unpopular";
+
     const fallback = {
-      intro: "After many years of rule, the leader passed into history.",
-      remembrance: "They will be remembered for their decisions, both bold and cautious. Time will tell how history judges their reign.",
-      rank: "The Leader",
+      intro: `After years of rule in ${role || "this land"}, ${leaderName} passed into history.`,
+      remembrance: `They will be remembered as a ${supportDesc} leader who navigated the complexities of ${systemName || "their political system"}. Their decisions shaped the lives of many, for better or worse. Time will tell how history judges their reign.`,
+      rank: supportDesc === "widely supported" ? "The Popular Leader" : supportDesc === "contested" ? "The Controversial Ruler" : "The Embattled Leader",
       decisions: (dilemmaHistory || []).map((entry, i) => ({
-        title: entry.choiceTitle || `Decision ${i + 1}`,
-        reflection: "A choice was made, consequences followed."
+        title: sanitizeText(entry.choiceTitle || `Decision ${i + 1}`).slice(0, 120),
+        reflection: "This decision had complex consequences that affected multiple constituencies."
       })),
       ratings: {
         autonomy: "medium",
         liberalism: "medium"
       },
-      valuesSummary: "A leader who navigated complex political terrain with determination.",
-      haiku: "Power came and went\nDecisions echo through time\nHistory records"
+      valuesSummary: `A leader who tried to balance competing interests in ${systemName || "a complex political environment"}.`,
+      haiku: `${supportDesc === "widely supported" ? "Beloved" : supportDesc === "contested" ? "Debated" : "Opposed"} by many\nDecisions echo through time\nHistory will judge`
     };
 
     // Build system prompt using EXACT text from user's preliminary plan
@@ -2450,12 +3340,54 @@ Return only:
       .map(cv => `${cv.dimension}:${cv.componentName}(${cv.value})`)
       .join(", ");
 
+    // Helper to escape control characters that would break JSON parsing
+    const sanitizeText = (text) => {
+      if (!text) return "";
+      return String(text)
+        // Replace literal newlines with space
+        .replace(/\r?\n/g, ' ')
+        // Replace tabs with space
+        .replace(/\t/g, ' ')
+        // Remove other control characters (0x00-0x1F except space)
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+        // Normalize multiple spaces to single space
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
+
     const historySummary = (dilemmaHistory || [])
       .map(entry =>
-        `Day ${entry.day}: "${entry.dilemmaTitle}" → chose "${entry.choiceTitle}" (${entry.choiceSummary}). ` +
+        `Day ${entry.day}: "${sanitizeText(entry.dilemmaTitle)}" → chose "${sanitizeText(entry.choiceTitle)}" (${sanitizeText(entry.choiceSummary)}). ` +
         `Support after: people=${entry.supportPeople}, middle=${entry.supportMiddle}, mom=${entry.supportMom}.`
       )
       .join("\n");
+
+    // Extract conversation history for richer context (if available)
+    let conversationContext = "";
+    if (gameId) {
+      const conversation = getConversation(gameId);
+      if (conversation && conversation.messages && Array.isArray(conversation.messages)) {
+        // Get last 15 messages (skip system message, focus on user/assistant exchanges)
+        const recentMessages = conversation.messages
+          .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+          .slice(-15);
+
+        if (recentMessages.length > 0) {
+          conversationContext = "\n\nCONVERSATION EXCERPTS (for narrative context):\n" +
+            recentMessages.map((msg, idx) => {
+              const role = msg.role === 'user' ? 'PLAYER' : 'AI';
+              const content = typeof msg.content === 'string'
+                ? sanitizeText(msg.content).slice(0, 300) // Truncate to 300 chars
+                : '[complex content]';
+              return `${idx + 1}. ${role}: ${content}${content.length >= 300 ? '...' : ''}`;
+            }).join('\n');
+
+          if (debug) {
+            console.log(`[/api/aftermath] Including ${recentMessages.length} conversation messages for context`);
+          }
+        }
+      }
+    }
 
     const user = `PLAYER: ${playerName || "Unknown Leader"}
 ROLE: ${role || "Unknown Role"}
@@ -2470,7 +3402,7 @@ TOP COMPASS VALUES:
 ${compassSummary || "None"}
 
 DECISION HISTORY:
-${historySummary || "No decisions recorded"}
+${historySummary || "No decisions recorded"}${conversationContext}
 
 Generate the aftermath epilogue following the structure above. Return STRICT JSON ONLY.`;
 
@@ -2526,6 +3458,369 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
   }
 });
 
+// -------------------- NEW: Narrative Seeding API (Dynamic Story Spine) -------
+/**
+ * /api/narrative-seed - Generate narrative memory scaffold for 7-day story arc
+ *
+ * Purpose: Creates a lightweight narrative memory with dramatic threads, climax candidates,
+ *          and thematic emphasis to ensure coherent story progression across all 7 days.
+ *
+ * Called: Once at session start (BackgroundIntroScreen ready phase)
+ * Storage: Result stored in conversation.meta.narrativeMemory
+ *
+ * Benefits:
+ * - Coherent 7-day narrative arc with escalating stakes
+ * - Guided Turn 7 climax that feels earned
+ * - Thread rotation prevents topic repetition
+ * - Maintains player agency (threads are suggestions, not rails)
+ */
+app.post("/api/narrative-seed", async (req, res) => {
+  try {
+    const { gameId, gameContext } = req.body;
+
+    // Validate required fields
+    if (!gameId || typeof gameId !== 'string') {
+      return res.status(400).json({ error: "Missing or invalid gameId" });
+    }
+
+    if (!gameContext) {
+      return res.status(400).json({ error: "Missing gameContext" });
+    }
+
+    console.log(`[NARRATIVE-SEED] Generating narrative scaffold for gameId=${gameId}`);
+
+// Fallback response if AI fails
+    const fallback = {
+      threads: [
+        "Rising tensions with institutional opposition",
+        "Economic pressures demand difficult trade-offs",
+        "Personal legitimacy questioned by key factions"
+      ],
+      climaxCandidates: [
+        "Final confrontation with main institutional opponent - legitimacy crisis",
+        "Economic collapse forces radical reforms or compromise"
+      ],
+      thematicEmphasis: {
+        coreConflict: "autonomy vs institutional control",
+        emotionalTone: "mounting pressure",
+        stakes: "regime survival"
+      }
+    };
+
+    // Extract key context for narrative seeding
+    const {
+      role,
+      systemName,
+      systemDesc,
+      powerHolders,
+      challengerSeat,
+      topCompassValues,
+      thematicGuidance,
+      supportProfiles
+    } = gameContext;
+
+    // Log input validation (after variables are declared)
+    console.log(`[NARRATIVE-SEED] Input context:`);
+    console.log(`  - Role: ${role || '(missing)'}`);
+    console.log(`  - System: ${systemName || '(missing)'}`);
+    console.log(`  - Power holders: ${Array.isArray(powerHolders) ? powerHolders.length : 'invalid'}`);
+    console.log(`  - Compass values: ${Array.isArray(topCompassValues) ? topCompassValues.length : 'invalid'}`);
+    console.log(`  - Support profiles: ${supportProfiles ? (supportProfiles.people || supportProfiles.challenger ? 'valid object' : 'empty object') : 'null'}`);
+
+// Build system prompt for narrative seeding
+    const systemPrompt = `${ANTI_JARGON_RULES}
+
+TASK: You create a compact narrative scaffold for a 7-day political dilemma game.
+
+PURPOSE: Generate 2-3 concrete dramatic threads that will:
+- Create narrative coherence across 7 days
+- Escalate naturally from Day 1 → Day 7
+- Culminate in a climactic Turn 7 moment
+- Allow player agency (threads are suggestions, not requirements)
+
+RULES:
+- Threads must be CONCRETE and POLITICAL (not abstract themes)
+- Make them era-appropriate and setting-specific
+- Each thread should involve specific stakeholders/factions
+- Avoid bureaucratic minutiae unless dramatically charged
+- Keep stakes HUMAN, VISCERAL, and CONSEQUENTIAL
+- 1-2 sentences per thread maximum
+- No explicit labeling of threads in actual dilemmas (weave subtly)
+- Player compass values are provided for inspiration, not requirements
+- Historical authenticity > value integration (avoid anachronisms)
+- Threads must be DISTINCT storylines (do not describe different beats of the same plot or different days of one tension)
+- Each thread must be viable as a stand-alone narrative arc the game can follow
+
+OUTPUT FORMAT (STRICT JSON):
+{
+  "threads": ["thread 1 description", "thread 2 description", "thread 3 description"],
+  "climaxCandidates": ["climax option 1", "climax option 2"],
+  "thematicEmphasis": {
+    "coreConflict": "brief description of central tension",
+    "emotionalTone": "1-2 words describing mood progression",
+    "stakes": "1-3 words describing what's at risk"
+  }
+}`;
+
+    // Build user prompt with game context
+    const compassSummary = (topCompassValues || [])
+      .map(cv => `${cv.dimension}:${cv.componentName}(${cv.value})`)
+      .join(", ");
+
+    const powerSummary = (powerHolders || [])
+      .slice(0, 4)
+      .map(h => `${h.name} (${h.percent}%)`)
+      .join(", ");
+
+    const challengerName = challengerSeat?.name || "Unknown";
+    const challengerNote = challengerSeat?.note || "";
+
+// Group compass values by dimension for clarity
+    const compassByDimension = (topCompassValues || []).reduce((acc, cv) => {
+      if (!acc[cv.dimension]) acc[cv.dimension] = [];
+      acc[cv.dimension].push(cv.componentName);
+      return acc;
+    }, {});
+
+    const compassText = Object.keys(compassByDimension).length > 0
+      ? `TOP PLAYER VALUES (for narrative inspiration):
+- What (goals): ${compassByDimension.what?.join(', ') || 'N/A'}
+- How (means): ${compassByDimension.how?.join(', ') || 'N/A'}
+- Whence (justification): ${compassByDimension.whence?.join(', ') || 'N/A'}
+- Whither (recipients): ${compassByDimension.whither?.join(', ') || 'N/A'}`
+      : "TOP PLAYER VALUES: None";
+
+    const userPrompt = `ROLE: ${role || "Unknown Leader"}
+POLITICAL SYSTEM: ${systemName || "Unknown System"}
+SYSTEM DESCRIPTION: ${(systemDesc || "").slice(0, 300)}
+
+POWER HOLDERS: ${powerSummary || "None"}
+MAIN CHALLENGER: ${challengerName} - ${challengerNote}
+
+${compassText}
+
+THEMATIC GUIDANCE: ${thematicGuidance || "Autonomy vs Heteronomy, Liberalism vs Totalism"}
+
+SUPPORT BASELINES:
+${formatSupportProfilesForPrompt(supportProfiles)}
+
+TASK: Generate 3 distinct dramatic threads, 2 climax candidates, and thematic emphasis.
+
+REQUIREMENTS:
+- Threads must involve SPECIFIC STAKEHOLDERS from the power holders above
+- Make challenger ${challengerName} central to at least ONE thread
+- Ground threads in the political system context (${systemName})
+- OPTIONAL: If narratively coherent with historical/role context, weave value tensions involving player's top values (especially ${(topCompassValues || []).filter(cv => cv.dimension === 'what' || cv.dimension === 'how').slice(0, 4).map(v => v.componentName).join(", ") || "the player's values"})
+- Prioritize era-appropriate conflicts over modern value frameworks
+- Only integrate values where they feel natural to the setting
+- Ensure each thread can escalate naturally over 7 days on its own (avoid referencing specific future days or combining multiple beats into one thread)
+- Make each thread cover a different axis of conflict (e.g., military vs civil unrest vs legitimacy crisis) so they are not sequential chapters of one storyline
+- Make climax candidates feel like HIGH-STAKES turning points
+- Avoid day-by-day language like "By Day 4..." unless absolutely required—the game will choose when to surface each thread
+
+Return STRICT JSON ONLY.`;
+
+    // Call AI with dilemma model
+    const result = await aiJSON({
+      system: systemPrompt,
+      user: userPrompt,
+      model: MODEL_DILEMMA,
+      temperature: 0.7, // Slightly more creative for narrative generation
+      fallback
+    });
+
+    // Normalize and validate response
+    const narrativeMemory = {
+      threads: Array.isArray(result?.threads) && result.threads.length >= 2
+        ? result.threads.slice(0, 3).map(t => String(t).slice(0, 300))
+        : fallback.threads,
+      climaxCandidates: Array.isArray(result?.climaxCandidates) && result.climaxCandidates.length >= 2
+        ? result.climaxCandidates.slice(0, 2).map(c => String(c).slice(0, 300))
+        : fallback.climaxCandidates,
+      thematicEmphasis: {
+        coreConflict: String(result?.thematicEmphasis?.coreConflict || fallback.thematicEmphasis.coreConflict).slice(0, 200),
+        emotionalTone: String(result?.thematicEmphasis?.emotionalTone || fallback.thematicEmphasis.emotionalTone).slice(0, 100),
+        stakes: String(result?.thematicEmphasis?.stakes || fallback.thematicEmphasis.stakes).slice(0, 100)
+      },
+      threadDevelopment: [] // Will be populated as threads advance across days
+    };
+
+    // Log narrative content in human-readable format
+    console.log(`[NARRATIVE-SEED] ✅ Generated narrative scaffold:`);
+    console.log(`  📖 THREADS (${narrativeMemory.threads.length}):`);
+    narrativeMemory.threads.forEach((thread, i) => {
+      console.log(`     ${i + 1}. ${thread}`);
+    });
+    console.log(`  🎬 CLIMAX CANDIDATES (${narrativeMemory.climaxCandidates.length}):`);
+    narrativeMemory.climaxCandidates.forEach((climax, i) => {
+      console.log(`     ${i + 1}. ${climax}`);
+    });
+    console.log(`  🎭 THEMATIC EMPHASIS:`);
+    console.log(`     - Core Conflict: ${narrativeMemory.thematicEmphasis.coreConflict}`);
+    console.log(`     - Emotional Tone: ${narrativeMemory.thematicEmphasis.emotionalTone}`);
+    console.log(`     - Stakes: ${narrativeMemory.thematicEmphasis.stakes}`);
+
+    return res.json({ narrativeMemory });
+
+  } catch (e) {
+    console.error("[NARRATIVE-SEED] ❌ Error:", e?.message || e);
+    return res.status(500).json({
+      error: "Narrative seeding failed",
+      message: e?.message || "Unknown error",
+      fallback: {
+        threads: [
+          "Rising tensions with institutional opposition",
+          "Economic pressures demand difficult trade-offs",
+          "Personal legitimacy questioned by key factions"
+        ],
+        climaxCandidates: [
+          "Final confrontation with main institutional opponent",
+          "Economic collapse forces radical reforms"
+        ],
+        thematicEmphasis: {
+          coreConflict: "autonomy vs institutional control",
+          emotionalTone: "mounting pressure",
+          stakes: "regime survival"
+        },
+        threadDevelopment: []
+      }
+    });
+  }
+});
+
+// -------------------- NEW: Player Inquiry API (Treatment-based Feature) -------
+/**
+ * /api/inquire - Handle player questions about current dilemma
+ *
+ * Feature gated by treatment variable (experimentConfig):
+ * - fullAutonomy: 2 inquiries per dilemma
+ * - semiAutonomy: 1 inquiry per dilemma
+ * - noAutonomy: 0 inquiries (feature hidden)
+ *
+ * Inquiry Q&A pairs are added to hosted conversation history for context
+ * in subsequent consequence analysis (AI considers what player asked about).
+ */
+app.post("/api/inquire", async (req, res) => {
+  try {
+    console.log("\n========================================");
+    console.log("❓ [INQUIRY] /api/inquire called");
+    console.log("========================================\n");
+
+    const { gameId, question, currentDilemma, day } = req.body;
+
+    // Validation
+    if (!gameId || typeof gameId !== 'string') {
+      return res.status(400).json({ error: "Missing or invalid gameId" });
+    }
+
+    if (!question || typeof question !== 'string' || question.trim().length < 5) {
+      return res.status(400).json({ error: "Missing or invalid question (min 5 characters)" });
+    }
+
+    if (!currentDilemma || !currentDilemma.title || !currentDilemma.description) {
+      return res.status(400).json({ error: "Missing or invalid currentDilemma" });
+    }
+
+    if (!day || typeof day !== 'number') {
+      return res.status(400).json({ error: "Missing or invalid day" });
+    }
+
+    console.log(`[INQUIRY] gameId=${gameId}, day=${day}`);
+    console.log(`[INQUIRY] question="${question.substring(0, 100)}..."`);
+
+    // Retrieve conversation
+    const conversation = getConversation(gameId);
+    if (!conversation) {
+      console.warn(`[INQUIRY] ⚠️ Conversation not found or expired for gameId=${gameId}`);
+      return res.status(404).json({
+        error: "Game session expired",
+        answer: "Your game session has expired. Please restart the game."
+      });
+    }
+
+    const messages = conversation.messages || [];
+
+    // Add player inquiry to conversation history with clear tagging
+    const userMessage = {
+      role: "user",
+      content: `[INQUIRY - Day ${day}] Regarding "${currentDilemma.title}": ${question.trim()}`
+    };
+    messages.push(userMessage);
+
+    console.log(`[INQUIRY] Added user inquiry to conversation (${messages.length} total messages)`);
+
+    // System prompt for answering inquiries with natural language emphasis
+    const systemPrompt = `You are answering a player's question about the current political situation in their game.
+
+Dilemma Title: ${currentDilemma.title}
+Dilemma Description: ${currentDilemma.description}
+
+CRITICAL GUIDELINES:
+- Answer in very natural, conversational language
+- Avoid ALL jargon, technical terms, and formal language
+- Maximum 2 sentences - be concise and straight to the point
+- Speak like a helpful friend explaining something simply
+- DO NOT reveal hidden consequences of specific actions
+- DO NOT tell them which action to choose
+- Focus on clarifying the situation, stakeholder perspectives, or context
+
+Examples of GOOD answers (natural, concise, clear):
+"The workers want better pay and working conditions because they feel you broke promises from last year."
+"Most people in the city support the strike, but business owners and the military are strongly against it."
+"The economy is already fragile, so any disruption could make things worse for everyone."
+
+Examples of BAD answers (too formal, jargon-heavy):
+"The labor faction is experiencing dissatisfaction due to unfulfilled commitments regarding compensation restructuring."
+"There exists a bifurcation in public opinion across socioeconomic strata regarding this labor dispute."
+"The macroeconomic indicators suggest fiscal vulnerability in the current conjuncture."
+
+Remember: Be conversational, be concise (2 sentences max), be clear.`;
+
+    // Get AI response
+    let answer;
+    try {
+      answer = await aiText({
+        system: systemPrompt,
+        user: question.trim(),
+        model: MODEL_DILEMMA,
+        temperature: 0.7,
+        maxTokens: 150 // Strict limit for conciseness (2 sentences)
+      });
+
+      console.log(`[INQUIRY] AI answer: "${answer.substring(0, 100)}..."`);
+    } catch (aiError) {
+      console.error("[INQUIRY] ❌ AI call failed:", aiError?.message || aiError);
+      return res.status(500).json({
+        error: "Failed to generate answer",
+        answer: "The advisor is unavailable right now. Please try again."
+      });
+    }
+
+    // Add AI response to conversation history
+    const assistantMessage = {
+      role: "assistant",
+      content: answer
+    };
+    messages.push(assistantMessage);
+
+    // Update conversation store
+    conversation.messages = messages;
+    conversation.lastUsedAt = Date.now();
+    conversation.turnCount = (conversation.turnCount || 0) + 1;
+
+    console.log(`[INQUIRY] ✅ Successfully answered inquiry (${messages.length} total messages)`);
+
+    return res.json({ answer });
+
+  } catch (error) {
+    console.error("[INQUIRY] ❌ Unexpected error:", error);
+    return res.status(500).json({
+      error: "Failed to process inquiry",
+      answer: "The advisor is unavailable right now. Please try again."
+    });
+  }
+});
+
 // -------------------- NEW: Unified Game Turn API (Hosted State) -------
 /**
  * /api/game-turn - Single endpoint for all event screen data using conversation state
@@ -2551,8 +3846,18 @@ app.post("/api/game-turn", async (req, res) => {
       playerChoice,
       compassUpdate,
       gameContext, // Day 1 only: full game initialization data
-      crisisMode // Optional: crisis mode flag when support < 20%
+      crisisMode, // Optional: crisis mode flag when support < 20%
+      crisisContext, // Optional: rich context about the crisis (NEW)
+      totalDays: totalDaysInput,
+      daysLeft: daysLeftInput,
+      debugMode, // Optional: enable verbose logging (from settingsStore.debugEnabled)
+      generateActions = true // Optional: whether to generate AI action options (default true, false for fullAutonomy)
     } = req.body;
+
+    const numericTotalDays = Number(totalDaysInput);
+    const hasTotalDaysFromBody = Number.isFinite(numericTotalDays);
+    const numericDaysLeft = Number(daysLeftInput);
+    const hasDaysLeftFromBody = Number.isFinite(numericDaysLeft);
 
     // Validate required fields
     if (!gameId || typeof gameId !== 'string') {
@@ -2568,6 +3873,12 @@ app.post("/api/game-turn", async (req, res) => {
     // Check if we have an existing conversation
     let conversation = getConversation(gameId);
     let messages = [];
+    let activeThreads = null;
+    let totalDaysForTurn = hasTotalDaysFromBody ? numericTotalDays : null;
+    let daysLeftForTurn = hasDaysLeftFromBody ? Math.max(numericDaysLeft, 0) : null;
+    let isAftermathTurn = false;
+    // Allow empty actions for downfall OR when AI generation is disabled (fullAutonomy)
+    let allowEmptyActions = crisisMode === "downfall" || generateActions === false;
 
     // ============================================================================
     // DAY 1: Initialize conversation with full game context
@@ -2581,9 +3892,28 @@ app.post("/api/game-turn", async (req, res) => {
 
       const sanitizedProfiles = sanitizeSupportProfiles(gameContext.supportProfiles, "predefined");
       const enrichedContext = { ...gameContext, supportProfiles: sanitizedProfiles };
+      const safeTotalDays = Number(enrichedContext.totalDays) || (hasTotalDaysFromBody ? numericTotalDays : 7);
+      enrichedContext.totalDays = safeTotalDays;
+      totalDaysForTurn = safeTotalDays;
+      if (daysLeftForTurn === null) {
+        daysLeftForTurn = Math.max(safeTotalDays - day + 1, 0);
+      }
+      isAftermathTurn = daysLeftForTurn === 0;
+      if (isAftermathTurn) {
+        allowEmptyActions = true;
+      }
+
+      const initialTopValues = extractTopCompassFromStrings(enrichedContext.playerCompass);
+      if (initialTopValues) {
+        enrichedContext.playerCompassTopValues = initialTopValues;
+      }
+
+      activeThreads = Array.isArray(enrichedContext.narrativeMemory?.threads) && enrichedContext.narrativeMemory.threads.length > 0
+        ? enrichedContext.narrativeMemory.threads
+        : null;
 
       // Build comprehensive system prompt for the entire game
-      const systemPrompt = buildGameSystemPrompt(enrichedContext);
+      const systemPrompt = buildGameSystemPrompt(enrichedContext, generateActions);
 
       // Initial user message requesting first dilemma
       const userMessage = buildDay1UserPrompt(enrichedContext);
@@ -2596,11 +3926,47 @@ app.post("/api/game-turn", async (req, res) => {
       console.log(`[GAME-TURN] System prompt: ${systemPrompt.length} chars`);
       console.log(`[GAME-TURN] User prompt: ${userMessage.length} chars`);
 
+      // Debug mode: Show full prompts
+      if (debugMode) {
+        console.log("\n" + "=".repeat(80));
+        console.log("🐛 [DEBUG] Day 1 System Prompt:");
+        console.log("=".repeat(80));
+        console.log(systemPrompt);
+        console.log("\n" + "=".repeat(80));
+        console.log("🐛 [DEBUG] Day 1 User Message:");
+        console.log("=".repeat(80));
+        console.log(userMessage);
+        console.log("=".repeat(80) + "\n");
+      }
+
       // Store conversation with challenger seat info (messages will be stored after AI response)
       // challengerSeat stored for crisis mode prompt building on Day 2+
+      const sanitizedThemes = Array.isArray(enrichedContext.storyThemes) && enrichedContext.storyThemes.length > 0
+        ? enrichedContext.storyThemes.map((t) => String(t)).slice(0, 5)
+        : ["autonomy_vs_heteronomy", "liberalism_vs_totalism"];
+      const sanitizedRoleScope = truncateText(enrichedContext.roleScope || "Keep dilemmas at the character's immediate span of control (no empire-wide decrees).", 200);
+
       const conversationMeta = {
         challengerSeat: enrichedContext.challengerSeat || null,
-        supportProfiles: sanitizedProfiles
+        supportProfiles: sanitizedProfiles,
+        roleScope: sanitizedRoleScope,
+        storyThemes: sanitizedThemes,
+        powerHolders: Array.isArray(enrichedContext.powerHolders) ? enrichedContext.powerHolders : [],
+        roleName: enrichedContext.role || "Unknown Leader",
+        systemName: enrichedContext.systemName || "Unknown System",
+        totalDays: safeTotalDays,
+        // Dynamic Story Spine: Narrative memory for coherent 7-day arc
+        narrativeMemory: enrichedContext.narrativeMemory || null,
+        // Player compass values for optional value-driven tensions
+        playerCompass: enrichedContext.playerCompass || null,
+        playerCompassTopValues: initialTopValues || null,
+        // Compass Definitions: Store once for reuse in compass hints (token optimization)
+        compassDefinitions: COMPASS_DEFINITION_BLOCK,
+        // E-12 Authority Analysis: Store for authority constraints on Day 2+
+        e12: enrichedContext.e12 || null,
+        role: enrichedContext.role || "Unknown Leader",
+        // Corruption tracking: Frontend calculates corruption level from history
+        corruptionHistory: []       // Track last 3 raw AI judgments (0-10 scale)
       };
       storeConversation(gameId, "pending", "openai", conversationMeta);
 
@@ -2625,17 +3991,125 @@ app.post("/api/game-turn", async (req, res) => {
       // Retrieve stored message history
       messages = conversation.messages || [];
 
+      const meta = conversation.meta || {};
+      if (totalDaysForTurn === null) {
+        totalDaysForTurn = Number(meta.totalDays) || 7;
+      }
+      if (daysLeftForTurn === null) {
+        daysLeftForTurn = Math.max(totalDaysForTurn - day + 1, 0);
+      }
+      isAftermathTurn = daysLeftForTurn === 0;
+      if (isAftermathTurn) {
+        allowEmptyActions = true;
+      }
+
+      console.log(`[GAME-TURN] daysLeft=${daysLeftForTurn}, totalDays=${totalDaysForTurn}`);
+
+      activeThreads = Array.isArray(meta?.narrativeMemory?.threads) && meta.narrativeMemory.threads.length > 0
+        ? meta.narrativeMemory.threads
+        : null;
+
+      if (compassUpdate && typeof compassUpdate === "object") {
+        const updatedTopValues = extractTopCompassValues(compassUpdate);
+        if (updatedTopValues) {
+          conversation.meta = conversation.meta || {};
+          conversation.meta.playerCompassTopValues = updatedTopValues;
+
+          const summary = compassTopValuesToSummary(updatedTopValues) || {};
+          conversation.meta.playerCompass = {
+            what: summary.what || "",
+            whence: summary.whence || "",
+            how: summary.how || "",
+            whither: summary.whither || "",
+          };
+        }
+      }
+
       // Build user message for this turn (includes crisis mode if applicable)
       const challengerSeat = conversation.meta?.challengerSeat || null;
       const supportProfiles = conversation.meta?.supportProfiles || null;
-      const userMessage = buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode, challengerSeat, supportProfiles);
+      const roleScope = conversation.meta?.roleScope || null;
+      const storyThemes = conversation.meta?.storyThemes || null;
+      const powerHolders = conversation.meta?.powerHolders || null;
+      const roleName = conversation.meta?.roleName || "Unknown Leader";
+      const systemName = conversation.meta?.systemName || "Unknown System";
+      const systemPrompt = isAftermathTurn
+        ? buildGameTurnConclusionSystemPrompt({
+            day,
+            totalDays: totalDaysForTurn,
+            roleScope,
+            storyThemes,
+            challengerSeat,
+            supportProfiles
+          })
+        : buildTurnSystemPrompt({
+            day,
+            totalDays: totalDaysForTurn,
+            daysLeft: daysLeftForTurn,
+            crisisMode,
+            roleScope,
+            storyThemes,
+            challengerSeat,
+            powerHolders,
+            supportProfiles,
+            playerCompass: conversation.meta?.playerCompass || null,
+            playerCompassTopValues: conversation.meta?.playerCompassTopValues || null,
+            e12: conversation.meta?.e12 || null,
+            role: conversation.meta?.role || null,
+            systemName: conversation.meta?.systemName || null
+          });
+      const userMessage = isAftermathTurn
+        ? buildGameTurnConclusionUserPrompt({
+            role: roleName,
+            system: systemName,
+            lastChoice: playerChoice,
+            storyThemes,
+            challengerSeat,
+            supportProfiles
+          })
+        : buildTurnUserPrompt({
+            day,
+            totalDays: totalDaysForTurn,
+            daysLeft: daysLeftForTurn,
+            playerChoice,
+            crisisMode,
+            crisisContext, // NEW: Rich crisis context from frontend
+            challengerSeat,
+            supportProfiles,
+            roleScope,
+            storyThemes,
+            powerHolders,
+            narrativeMemory: conversation.meta?.narrativeMemory || null,  // Dynamic Story Spine
+            playerCompass: conversation.meta?.playerCompass || null,  // Player compass values
+            playerCompassTopValues: conversation.meta?.playerCompassTopValues || null,
+            corruptionHistory: conversation.meta?.corruptionHistory || []  // Frontend calculates level
+          });
 
+      // Inject per-turn system prompt so new constraints override the initial system message
+      messages.push({ role: "system", content: systemPrompt });
       messages.push({ role: "user", content: userMessage });
 
       console.log(`[GAME-TURN] Message history: ${messages.length} messages`);
       console.log(`[GAME-TURN] Turn prompt: ${userMessage.length} chars`);
       if (crisisMode) {
         console.log(`[GAME-TURN] ⚠️ CRISIS MODE: ${crisisMode}`);
+        if (crisisContext) {
+          console.log(`[GAME-TURN] 📋 Crisis entity: ${crisisContext.entity}`);
+          console.log(`[GAME-TURN] 📉 Support: ${crisisContext.previousSupport || '?'}% → ${crisisContext.currentSupport || '?'}%`);
+        }
+      }
+
+      // Debug mode: Show full prompts for Day 2+
+      if (debugMode) {
+        console.log("\n" + "=".repeat(80));
+        console.log(`🐛 [DEBUG] Day ${day} Turn System Prompt:`);
+        console.log("=".repeat(80));
+        console.log(systemPrompt);
+        console.log("\n" + "=".repeat(80));
+        console.log(`🐛 [DEBUG] Day ${day} User Message:`);
+        console.log("=".repeat(80));
+        console.log(userMessage);
+        console.log("=".repeat(80) + "\n");
       }
     }
 
@@ -2660,6 +4134,15 @@ app.post("/api/game-turn", async (req, res) => {
 
         console.log(`[GAME-TURN] ✅ AI responded: ${aiResponse.content.length} chars`);
 
+        // Debug mode: Show raw AI response
+        if (debugMode) {
+          console.log("\n" + "=".repeat(80));
+          console.log("🐛 [DEBUG] Raw AI Response:");
+          console.log("=".repeat(80));
+          console.log(aiResponse.content);
+          console.log("=".repeat(80) + "\n");
+        }
+
         // Check finish_reason for truncation
         if (aiResponse.finishReason && aiResponse.finishReason !== 'stop') {
           console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} warning: finish_reason=${aiResponse.finishReason} (expected 'stop')`);
@@ -2675,7 +4158,12 @@ app.post("/api/game-turn", async (req, res) => {
 
         if (!turnData) {
           console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Could not parse JSON`);
-          console.warn(`[GAME-TURN] Raw response start: ${aiResponse.content.substring(0, 200)}...`);
+          if (debugMode) {
+            console.warn(`[GAME-TURN] 🐛 [DEBUG] FULL RAW RESPONSE:\n${aiResponse.content}`);
+          } else {
+            console.warn(`[GAME-TURN] Raw response start: ${aiResponse.content.substring(0, 200)}...`);
+            console.warn(`[GAME-TURN] 💡 Enable debug mode to see full response (enableDebug() in browser console)`);
+          }
           aiResponse = null;
           turnData = null;
           continue;
@@ -2696,28 +4184,141 @@ app.post("/api/game-turn", async (req, res) => {
           continue;
         }
 
-        if (!Array.isArray(turnData.actions) || turnData.actions.length === 0) {
-          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Invalid or empty 'actions' array`);
+        if (!Array.isArray(turnData.actions)) {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: 'actions' field is not an array`);
           aiResponse = null;
           turnData = null;
           continue;
         }
 
-        // Success! Exit retry loop
+        if (turnData.actions.length === 0 && !allowEmptyActions) {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Empty 'actions' array when decisions are required`);
+          aiResponse = null;
+          turnData = null;
+          continue;
+        }
+
+        if (turnData.actions.length > 0 && allowEmptyActions) {
+          console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} warning: Received ${turnData.actions.length} actions but this turn should conclude with none. Stripping actions.`);
+          turnData.actions = [];
+        }
+
+        const expectedThreadCount = Array.isArray(activeThreads) ? activeThreads.length : 0;
+        if (expectedThreadCount > 0 && !allowEmptyActions) {
+          const threadIndex = Number(turnData.selectedThreadIndex);
+          const hasValidIndex = Number.isInteger(threadIndex) && threadIndex >= 0 && threadIndex < expectedThreadCount;
+          if (!hasValidIndex) {
+            console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: selectedThreadIndex missing or out of range (value=${turnData.selectedThreadIndex})`);
+            aiResponse = null;
+            turnData = null;
+            continue;
+          }
+
+          const threadSummaryRaw = typeof turnData.selectedThreadSummary === "string" ? turnData.selectedThreadSummary.trim() : "";
+          if (!threadSummaryRaw) {
+            console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: selectedThreadSummary missing or empty`);
+            aiResponse = null;
+            turnData = null;
+            continue;
+          }
+
+          turnData.selectedThreadIndex = threadIndex;
+          turnData.selectedThreadSummary = threadSummaryRaw.slice(0, 300);
+        }
+
+        const rawDynamicParams = turnData.dynamicParams;
+        const sanitizedDynamicParams = Array.isArray(rawDynamicParams)
+          ? rawDynamicParams
+              .map((param, index) => {
+                if (!param || typeof param !== "object") return null;
+                const id = String(param.id || `param_${index}`).slice(0, 60);
+                const icon = typeof param.icon === "string" ? param.icon.slice(0, 8) : "";
+                const text = String(param.text || "").slice(0, 120);
+                const tone = param.tone === "up" || param.tone === "down" || param.tone === "neutral" ? param.tone : "neutral";
+                if (!id || !icon || !text) return null;
+                return { id, icon, text, tone };
+              })
+              .filter(Boolean)
+          : [];
+
+        // Allow 0-3 dynamic parameters (0 is valid)
+        turnData.dynamicParams = sanitizedDynamicParams;
+
+        if (allowEmptyActions) {
+          // Clear actions array
+          turnData.actions = [];
+
+          // Only set isGameEnd for ACTUAL game-ending scenarios
+          if (isAftermathTurn || crisisMode === "downfall") {
+            // Legitimate game end (Day 8 or total collapse)
+            turnData.isGameEnd = true;
+            turnData.dynamicParams = [];
+            if (!turnData.topic) {
+              turnData.topic = "Conclusion";
+            }
+          } else if (generateActions === false) {
+            // fullAutonomy treatment - empty actions is NORMAL, not game end
+            // Safety check: AI might have incorrectly flagged isGameEnd=true
+            if (turnData.isGameEnd && daysLeftForTurn > 0) {
+              console.warn(`[GAME-TURN] ⚠️ Model incorrectly flagged isGameEnd=true in fullAutonomy mode with daysLeft=${daysLeftForTurn}. Forcing normal dilemma.`);
+            }
+            turnData.isGameEnd = false;
+            if (!Array.isArray(turnData.dynamicParams)) {
+              turnData.dynamicParams = [];
+            }
+          }
+        } else {
+          turnData.actions = sanitizeTurnActions(turnData.actions);
+          if (turnData.isGameEnd) {
+            console.warn(`[GAME-TURN] ⚠️ Model flagged isGameEnd=true with daysLeft=${daysLeftForTurn}. Forcing normal dilemma.`);
+            turnData.isGameEnd = false;
+            if (!Array.isArray(turnData.dynamicParams)) {
+              turnData.dynamicParams = [];
+            }
+          }
+        }
+
         console.log(`[GAME-TURN] ✅ Attempt ${attempt} succeeded - valid response received`);
+
+        if (debugMode && turnData) {
+          console.log("\n" + "=".repeat(80));
+          console.log("🐛 [DEBUG] Parsed Turn Data:");
+          console.log("=".repeat(80));
+          console.log(JSON.stringify(turnData, null, 2));
+
+          // Corruption-specific debug logging
+          if (turnData.corruptionJudgment) {
+            console.log("\n" + "-".repeat(80));
+            console.log("🔸 🐛 [DEBUG] CORRUPTION JUDGMENT DETAILS:");
+            console.log("-".repeat(80));
+            console.log(`  Raw AI Score: ${turnData.corruptionJudgment.score}/10`);
+            console.log(`  Reason: ${turnData.corruptionJudgment.reason}`);
+            if (conversation?.meta) {
+              const prevLevel = conversation.meta.corruptionHistory?.length > 1
+                ? conversation.meta.corruptionHistory[conversation.meta.corruptionHistory.length - 2].level
+                : 0;
+              console.log(`  Previous Level: ${prevLevel.toFixed(2)}`);
+              console.log(`  New Level: ${conversation.meta.corruptionLevel?.toFixed(2) || '?'}`);
+              const delta = (conversation.meta.corruptionLevel || 0) - prevLevel;
+              console.log(`  Delta: ${delta >= 0 ? '+' : ''}${delta.toFixed(2)}`);
+            }
+            console.log("-".repeat(80));
+          }
+
+          console.log("=".repeat(80) + "\n");
+        }
+
         break;
 
       } catch (e) {
         console.error(`[GAME-TURN] ❌ Attempt ${attempt} exception:`, e?.message || e);
         aiResponse = null;
         turnData = null;
-      }
-
-      // Exponential backoff before retry (except after last attempt)
-      if (attempt < maxAttempts && !turnData) {
-        const delay = Math.min(2000, 500 * attempt);
-        console.log(`[GAME-TURN] Waiting ${delay}ms before retry...`);
-        await new Promise(r => setTimeout(r, delay));
+        if (attempt < maxAttempts) {
+          const delay = Math.min(2000, 500 * attempt);
+          console.log(`[GAME-TURN] Waiting ${delay}ms before retry...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
       }
     }
 
@@ -2730,28 +4331,164 @@ app.post("/api/game-turn", async (req, res) => {
     // ============================================================================
     // Update conversation history
     // ============================================================================
+    if (turnData && (isAftermathTurn || crisisMode === "downfall")) {
+      turnData.isGameEnd = true;
+      if (!Array.isArray(turnData.actions) || turnData.actions.length > 0) {
+        turnData.actions = [];
+      }
+    }
+
+    // ============================================================================
+    // FOOLPROOF SAFETY CHECK: Prevent game end on Day 1 under ANY circumstances
+    // ============================================================================
+    /**
+     * Validates that game end only happens on appropriate days
+     * ABSOLUTE RULE: Day 1 can NEVER be game end
+     */
+    function validateGameEndByDay(turnData, day, daysLeft, totalDays, crisisMode) {
+      if (!turnData.isGameEnd) {
+        // Not flagged as game end, nothing to check
+        return;
+      }
+
+      // ABSOLUTE RULE: Day 1 can NEVER be game end
+      if (day === 1) {
+        console.error(`[GAME-TURN] 🚨 CRITICAL: Game end detected on Day 1! This is ALWAYS wrong. Forcing normal dilemma.`);
+        console.error(`[GAME-TURN] Debug info: day=${day}, daysLeft=${daysLeft}, totalDays=${totalDays}, crisisMode=${crisisMode}, isGameEnd=${turnData.isGameEnd}`);
+        turnData.isGameEnd = false;
+        if (!Array.isArray(turnData.dynamicParams)) {
+          turnData.dynamicParams = [];
+        }
+        return;
+      }
+
+      // STRONG RULE: Days 2-6 should only be game end for downfall crisis
+      if (day >= 2 && day <= (totalDays - 1)) {
+        // Allow game end ONLY for downfall (total collapse)
+        if (crisisMode !== "downfall" && daysLeft > 0) {
+          console.warn(`[GAME-TURN] ⚠️ Game end detected on Day ${day} (daysLeft=${daysLeft}) without downfall crisis. This is unusual. Forcing normal dilemma.`);
+          console.warn(`[GAME-TURN] Debug info: crisisMode=${crisisMode}, totalDays=${totalDays}`);
+          turnData.isGameEnd = false;
+          if (!Array.isArray(turnData.dynamicParams)) {
+            turnData.dynamicParams = [];
+          }
+          return;
+        }
+      }
+
+      // NORMAL: Day 7+ or daysLeft <= 0 or downfall crisis - game end is allowed
+      console.log(`[GAME-TURN] ✅ Game end allowed: day=${day}, daysLeft=${daysLeft}, totalDays=${totalDays}, crisisMode=${crisisMode}`);
+    }
+
+    // Apply foolproof safety check
+    validateGameEndByDay(turnData, day, daysLeftForTurn, totalDaysForTurn, crisisMode);
+
     messages.push({ role: "assistant", content: aiResponse.content });
 
     // Update conversation store
     conversation = getConversation(gameId);
+    const updateMetaWithTurn = (meta) => {
+      if (!meta) return;
+      meta.lastDilemma = {
+        title: String(turnData.title || "").slice(0, 120),
+        description: String(turnData.description || "")
+      };
+
+      if (meta.narrativeMemory && Number.isInteger(turnData.selectedThreadIndex)) {
+        meta.narrativeMemory.lastSelectedThread = {
+          day,
+          index: Number(turnData.selectedThreadIndex),
+          summary: String(turnData.selectedThreadSummary || "").slice(0, 300)
+        };
+        console.log(`[GAME-TURN] 📌 Active narrative thread recorded: index ${turnData.selectedThreadIndex} on Day ${day}`);
+      }
+
+      // Dynamic Story Spine: Update narrative memory with thread development
+      if (turnData.narrativeUpdate && meta.narrativeMemory) {
+        const { threadAdvanced, development } = turnData.narrativeUpdate;
+
+        if (development && String(development).trim()) {
+          // Ensure threadDevelopment array exists
+          if (!Array.isArray(meta.narrativeMemory.threadDevelopment)) {
+            meta.narrativeMemory.threadDevelopment = [];
+          }
+
+          // Add new development entry
+          meta.narrativeMemory.threadDevelopment.push({
+            day: day,
+            thread: threadAdvanced || null,
+            summary: String(development).slice(0, 300)
+          });
+
+          // Prune to keep only last 3 developments (prevent memory bloat)
+          if (meta.narrativeMemory.threadDevelopment.length > 3) {
+            meta.narrativeMemory.threadDevelopment = meta.narrativeMemory.threadDevelopment.slice(-3);
+          }
+
+          console.log(`[GAME-TURN] 🎭 Narrative memory updated: Thread ${threadAdvanced || 'none'} advanced on Day ${day}`);
+        }
+      }
+
+      // Corruption judgment update (Day 2+)
+      if (turnData.corruptionJudgment && typeof turnData.corruptionJudgment.score === 'number') {
+        const rawScore = Math.max(0, Math.min(10, turnData.corruptionJudgment.score));
+
+        // Store history (keep last 3) - Frontend calculates blended level
+        if (!Array.isArray(meta.corruptionHistory)) {
+          meta.corruptionHistory = [];
+        }
+        meta.corruptionHistory.push({
+          day,
+          score: rawScore,           // Raw 0-10 score
+          reason: String(turnData.corruptionJudgment.reason || '').slice(0, 150)
+        });
+        if (meta.corruptionHistory.length > 3) {
+          meta.corruptionHistory = meta.corruptionHistory.slice(-3);
+        }
+
+        // DEBUG LOGGING
+        console.log(`🔸 [CORRUPTION] Day ${day}:`);
+        console.log(`   AI judgment: ${rawScore}/10 (${turnData.corruptionJudgment.reason})`);
+
+        if (debugMode) {
+          console.log(`   🐛 [DEBUG] History length: ${meta.corruptionHistory.length}`);
+          console.log(`   🐛 [DEBUG] History:`, JSON.stringify(meta.corruptionHistory, null, 2));
+        }
+      }
+    };
+
     if (conversation) {
       conversation.messages = messages;
+      updateMetaWithTurn(conversation.meta);
       touchConversation(gameId);
     } else {
       // First turn - store new conversation with messages
       storeConversation(gameId, JSON.stringify({messages}), "openai");
       const newConv = getConversation(gameId);
       newConv.messages = messages;
+      updateMetaWithTurn(newConv.meta);
+      touchConversation(gameId);
     }
 
     console.log(`[GAME-TURN] Conversation updated: ${messages.length} messages total`);
+
+    // ============================================================================
+    // Monitor description length (no rejection, just visibility)
+    // ============================================================================
+    const description = String(turnData.description || "");
+    const sentenceCount = (description.match(/[.!?]/g) || []).length;
+    if (sentenceCount > 2) {
+      console.warn(`⚠️ [DESCRIPTION LENGTH] Dilemma description has ${sentenceCount} sentences (target: up to 2)`);
+      console.warn(`   Title: "${turnData.title}"`);
+      console.warn(`   Description: "${description}"`);
+    }
 
     // ============================================================================
     // Return unified response
     // ============================================================================
     const response = {
       title: String(turnData.title || "").slice(0, 120),
-      description: String(turnData.description || "").slice(0, 500),
+      description: description.slice(0, 500),
       actions: Array.isArray(turnData.actions) ? turnData.actions : [],
       topic: String(turnData.topic || "Security"),
       scope: String(turnData.scope || "National"),
@@ -2760,16 +4497,19 @@ app.post("/api/game-turn", async (req, res) => {
       supportShift: turnData.supportShift || null,
 
       // Mirror advice
-      mirrorAdvice: String(turnData.mirrorAdvice || "The mirror squints, light pooling in the glass..."),
+      mirrorAdvice: sanitizeMirrorAdvice(turnData.mirrorAdvice),
 
       // Dynamic parameters (Day 2+ only)
       dynamicParams: Array.isArray(turnData.dynamicParams) ? turnData.dynamicParams : [],
 
-      // Compass hints (Day 2+ only)
-      compassHints: Array.isArray(turnData.compassHints) ? turnData.compassHints : [],
+      // Corruption shift (Day 2+ only) - Frontend calculates level from score
+      corruptionShift: day > 1 && conversation?.meta?.corruptionHistory?.length > 0 ? {
+        score: conversation.meta.corruptionHistory[conversation.meta.corruptionHistory.length - 1].score,
+        reason: conversation.meta.corruptionHistory[conversation.meta.corruptionHistory.length - 1].reason
+      } : null,
 
       // Game end flag
-      isGameEnd: !!turnData.isGameEnd
+      isGameEnd: isAftermathTurn || !!turnData.isGameEnd
     };
 
     console.log(`[GAME-TURN] ✅ Returning unified response: ${response.actions.length} actions`);
@@ -2785,10 +4525,746 @@ app.post("/api/game-turn", async (req, res) => {
   }
 });
 
+app.post("/api/compass-hints", async (req, res) => {
+  try {
+    if (!OPENAI_KEY) {
+      return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
+    }
+
+    const { gameId, action } = req.body || {};
+    const actionTitle = typeof action?.title === "string" ? action.title.trim().slice(0, 160) : "";
+    const actionSummary = typeof action?.summary === "string" ? action.summary.trim().slice(0, 400) : "";
+
+    if (!gameId || typeof gameId !== "string") {
+      return res.status(400).json({ error: "Missing or invalid gameId" });
+    }
+
+    if (!actionTitle) {
+      return res.status(400).json({ error: "Missing action title" });
+    }
+
+    // ========================================================================
+    // PHASE 1: KEYWORD DETECTION (pre-processing)
+    // ========================================================================
+    const keywordHints = detectKeywordHints(actionTitle, actionSummary);
+    const keywordPromptBlock = formatKeywordHintsForPrompt(keywordHints);
+
+    console.log(`[CompassHints] 🔍 Keyword detection results:`);
+    if (keywordHints.length > 0) {
+      keywordHints.forEach(hint => {
+        console.log(`  → ${hint.prop}:${hint.idx} (${hint.polarity >= 0 ? '+' : ''}${hint.polarity}) - confidence: ${hint.confidence.toFixed(2)} - keywords: [${hint.matchedKeywords.join(', ')}]`);
+      });
+    } else {
+      console.log(`  → No keywords detected, will use full AI analysis`);
+    }
+
+    // TOKEN OPTIMIZATION: Retrieve stored compass definitions from conversation
+    const conversation = getConversation(gameId);
+    const hasStoredDefinitions = !!conversation?.meta?.compassDefinitions;
+
+    let systemPrompt;
+    if (hasStoredDefinitions) {
+      // OPTIMIZED: Abbreviated prompt (saves ~1,100 tokens per request)
+      // AI uses simplified mapping rules without full support/oppose cues
+      systemPrompt = `You translate a single player decision into political compass hints.
+
+COMPASS DIMENSIONS (40 values total):
+WHAT (goals): Truth/Trust, Liberty/Agency, Equality/Equity, Care/Solidarity, Create/Courage, Wellbeing, Security/Safety, Freedom/Responsibility, Honor/Sacrifice, Sacred/Awe
+WHENCE (justifications): Evidence, Public Reason, Personal, Tradition, Revelation, Nature, Pragmatism, Aesthesis, Fidelity, Law
+HOW (means): Law/Std., Deliberation, Mobilize, Markets, Mutual Aid, Ritual, Enforce, Design, Civic Culture, Philanthropy
+WHITHER (recipients): Self, Family, Friends, In-Group, Nation, Civilization, Humanity, Earth, Cosmos, God
+
+KEY RULES:
+- Match actions to values using common sense and literal interpretation
+- Enforce = coercion/force/military, NOT voluntary persuasion
+- Design = modern system/interface design, NOT traditional architecture or military strategy
+- Pick 2-6 values that most clearly fit the action
+- PRIORITY: If keyword hints are provided, validate them FIRST using the stored compass definitions
+- Only adjust keyword hint polarity/strength if context clearly contradicts
+- Add 0-4 additional values beyond keyword hints if contextually relevant
+
+TASK INSTRUCTIONS:
+1. Read the player's action carefully in the context of the dilemma setting.
+2. If keyword hints are provided: START by validating each hint using literal keyword matching from the stored compass definitions. Only adjust polarity if context clearly contradicts (e.g., "reduce security" vs "increase security").
+3. After validating keyword hints, identify 0-4 additional values that are clearly supported or undermined but not captured by keywords.
+4. For each value, assign polarity: 2 (strongly supports), 1 (somewhat supports), -1 (somewhat opposes), -2 (strongly opposes). Use plain integers—no leading plus sign.
+5. Use literal, direct matches—avoid creative stretching
+6. Return JSON only—no prose, no inline comments, no explanations.`;
+    } else {
+      // FALLBACK: Use full definitions (backward compatibility for expired/missing conversations)
+      console.warn(`[CompassHints] ⚠️ No stored definitions for gameId=${gameId}, using fallback`);
+      systemPrompt = `You translate a single player decision into political compass hints.
+${COMPASS_DEFINITION_BLOCK}
+
+TASK INSTRUCTIONS:
+1. Read the player's action carefully in the context of the dilemma setting.
+2. If keyword hints are provided: START by validating each hint using literal keyword matching from the support/oppose cues above. Only adjust polarity if context clearly contradicts (e.g., "reduce security" vs "increase security").
+3. After validating keyword hints (if any), consider the 40 value definitions above with their support/oppose cues and identify 0-4 additional values that are clearly supported or undermined but not captured by keywords.
+4. For each value, determine the polarity using this numerical scale (plain integers only, no leading plus sign):
+   • 2 = strongly supports (action directly advances this value)
+   • 1 = somewhat supports (action modestly advances this value)
+   • -1 = somewhat opposes (action modestly undermines this value)
+   • -2 = strongly opposes (action directly undermines this value)
+5. Pick the most direct, literal match for each value—do NOT stretch definitions creatively.
+6. Return JSON only—no prose, no inline comments, no explanations.
+
+ANTI-PATTERNS (DO NOT DO THESE):
+❌ Do NOT use "Design" for coercive actions, military strategy, or traditional architecture
+   → Design is for modern digital/system interfaces (apps, websites, platforms, software)
+❌ Do NOT stretch value definitions to force creative interpretations
+   → Example: "Impose martial law" is NOT Design—it's Enforce (coercion) + Security/Safety (order)
+❌ Do NOT use abstract interpretations when concrete values match better
+   → Match actions to their most literal, direct value alignment using the support/oppose cues
+
+GOOD EXAMPLES:
+✅ "Impose martial law" → how:Enforce (2), what:Security/Safety (2), what:Liberty/Agency (-2)
+✅ "Cut taxes for the wealthy" → how:Markets (1), what:Equality/Equity (-2), whither:Self (1)
+✅ "Fund public education" → how:Civic Culture (2), what:Wellbeing (1), whither:Humanity (1)
+
+RESPONSE FORMAT:
+- Each hint must include: prop (dimension), idx (0-9 index), polarity (-2, -1, 1, or 2)
+- Return 2 to 6 compass hints
+- Focus ONLY on this specific action, ignore previous turns`;
+
+    }
+
+    const userPrompt = `GAME ID: ${gameId}
+PLAYER ACTION TITLE: ${actionTitle}
+PLAYER ACTION SUMMARY: ${actionSummary || "(no summary provided)"}
+
+${keywordPromptBlock}
+
+Return JSON in this shape:
+{
+  "compassHints": [
+    {"prop": "what|whence|how|whither", "idx": 0-9, "polarity": -2|-1|1|2}
+  ]
+}`;
+
+    const aiResult = await aiJSON({
+      system: systemPrompt,
+      user: userPrompt,
+      model: MODEL_COMPASS_HINTS,
+      temperature: 0
+    });
+
+    const hints = Array.isArray(aiResult?.compassHints) ? aiResult.compassHints : [];
+    const sanitized = [];
+
+    for (const rawHint of hints) {
+      const prop = typeof rawHint?.prop === "string" ? rawHint.prop.toLowerCase() : "";
+      if (!["what", "whence", "how", "whither"].includes(prop)) continue;
+
+      const idx = Number(rawHint?.idx);
+      if (!Number.isFinite(idx) || idx < 0 || idx > 9) continue;
+
+      let polarityRaw = rawHint?.polarity;
+      if (typeof polarityRaw === "string") {
+        polarityRaw = polarityRaw.trim().replace(/^\+/, "");
+      }
+      const polarity = Number(polarityRaw);
+      if (![-2, -1, 1, 2].includes(polarity)) continue;
+
+      sanitized.push({
+        prop,
+        idx,
+        polarity
+      });
+    }
+
+    // ========================================================================
+    // PHASE 2: AI VALIDATION & ADDITIONAL ANALYSIS (post-processing)
+    // ========================================================================
+    console.log(`[CompassHints] 🤖 AI returned ${sanitized.length} hint(s):`);
+    if (sanitized.length > 0) {
+      sanitized.forEach(hint => {
+        console.log(`  → ${hint.prop}:${hint.idx} (${hint.polarity >= 0 ? '+' : ''}${hint.polarity})`);
+      });
+
+      // Compare with keyword hints
+      if (keywordHints.length > 0) {
+        console.log(`[CompassHints] 📊 Comparison: Keywords vs AI`);
+
+        // Check which keyword hints were preserved
+        const keywordSet = new Set(keywordHints.map(h => `${h.prop}:${h.idx}`));
+        const aiSet = new Set(sanitized.map(h => `${h.prop}:${h.idx}`));
+
+        const preserved = keywordHints.filter(kh => aiSet.has(`${kh.prop}:${kh.idx}`));
+        const modified = keywordHints.filter(kh => {
+          const key = `${kh.prop}:${kh.idx}`;
+          const aiHint = sanitized.find(ah => `${ah.prop}:${ah.idx}` === key);
+          return aiHint && aiHint.polarity !== kh.polarity;
+        });
+        const dropped = keywordHints.filter(kh => !aiSet.has(`${kh.prop}:${kh.idx}`));
+        const added = sanitized.filter(ah => !keywordSet.has(`${ah.prop}:${ah.idx}`));
+
+        if (preserved.length > 0) {
+          console.log(`  ✅ Preserved ${preserved.length} keyword hint(s)`);
+        }
+        if (modified.length > 0) {
+          console.log(`  🔄 Modified ${modified.length} keyword hint(s):`);
+          modified.forEach(kh => {
+            const aiHint = sanitized.find(ah => `${ah.prop}:${ah.idx}` === `${kh.prop}:${kh.idx}`);
+            console.log(`     ${kh.prop}:${kh.idx} - Keyword: ${kh.polarity >= 0 ? '+' : ''}${kh.polarity} → AI: ${aiHint.polarity >= 0 ? '+' : ''}${aiHint.polarity}`);
+          });
+        }
+        if (dropped.length > 0) {
+          console.log(`  ❌ Dropped ${dropped.length} keyword hint(s): ${dropped.map(h => `${h.prop}:${h.idx}`).join(', ')}`);
+        }
+        if (added.length > 0) {
+          console.log(`  ➕ Added ${added.length} new value(s): ${added.map(h => `${h.prop}:${h.idx} (${h.polarity >= 0 ? '+' : ''}${h.polarity})`).join(', ')}`);
+        }
+      }
+    } else {
+      console.warn("[CompassHints] ⚠️ No valid hints generated for", actionTitle);
+    }
+
+    return res.json({ compassHints: sanitized.slice(0, 6) });
+  } catch (e) {
+    console.error("[CompassHints] ❌ Error:", e?.message || e);
+    return res.status(500).json({
+      error: "Compass hint generation failed",
+      message: e?.message || "Unknown error"
+    });
+  }
+});
+
+function buildTurnUserPrompt({
+  day,
+  totalDays = 7,
+  daysLeft = null,
+  playerChoice,
+  crisisMode = null,
+  crisisContext = null,
+  challengerSeat = null,
+  supportProfiles = null,
+  roleScope = null,
+  storyThemes = null,
+  powerHolders = null,
+  narrativeMemory = null,  // Dynamic Story Spine
+  playerCompass = null,  // Player compass values for optional integration
+  playerCompassTopValues = null,
+  corruptionHistory = []  // Corruption tracking - raw AI scores only (frontend calculates level)
+}) {
+  const clampedTotal = Number.isFinite(totalDays) ? totalDays : 7;
+  const lines = [
+    `═══════════════════════════════════════════════════════════════════════════════`,
+    `DAY ${day} of ${clampedTotal}`,
+    ``,
+    `STEP 1: ANALYZE PREVIOUS ACTION (Day ${day - 1})`,
+    `───────────────────────────────────────────────────────────────────────────────`,
+    `The player chose: "${playerChoice.title}"`,
+    `Summary: ${playerChoice.summary || playerChoice.title}`,
+    `Cost: ${playerChoice.cost}`,
+    `───────────────────────────────────────────────────────────────────────────────`,
+    ``,
+    `TASK A: First, calculate how each faction reacts to THIS action above.`,
+    `Fill the supportShift object with deltas and "why" explanations that reference THIS decision.`,
+    `The player has already taken this action - explain how factions respond to it.`
+  ];
+
+  if (roleScope) {
+    lines.push(``, `ROLE SCOPE REMINDER: ${roleScope}`);
+  }
+
+  if (Array.isArray(storyThemes) && storyThemes.length > 0) {
+    lines.push(
+      ``,
+      `ACTIVE THEMES: ${storyThemes.join(', ')}`,
+      `Keep the new dilemma rooted in at least one of these tensions.`
+    );
+  }
+
+  if (supportProfiles) {
+    const reminder = buildSupportProfileReminder(supportProfiles);
+    if (reminder) {
+      lines.push(``, `BASELINE REFERENCE:`, reminder);
+
+      // FACTION IDENTITY MAPPING: Connect power holder names to faction profiles
+      if (challengerSeat && supportProfiles.challenger) {
+        lines.push(
+          ``,
+          `⚠️ CRITICAL FACTION IDENTITY:`,
+          `"${challengerSeat.name}" (power holder) = "Challenger" faction in support profiles above.`,
+          `When the player ENGAGES WITH "${challengerSeat.name}" respectfully (negotiates, consults, acknowledges their authority),`,
+          `the Challenger faction should respond POSITIVELY because they're being treated with respect.`,
+          `When the player IGNORES or UNDERMINES "${challengerSeat.name}", then they should respond negatively.`
+        );
+      }
+    }
+  }
+
+  if (Array.isArray(powerHolders) && powerHolders.length > 0) {
+    const holders = powerHolders
+      .slice(0, 4)
+      .map((holder) => `- ${holder.name || 'Unknown'} (${holder.percent ?? '?'}% power)`)
+      .join('\n');
+    lines.push(``, `POWER MAP SNAPSHOT:\n${holders}`);
+  }
+
+  if (challengerSeat) {
+    lines.push(
+      ``,
+      `CHALLENGER PRESSURE: ${challengerSeat.name} should visibly lean on the player—show their demands or pushback in both narrative setup and support reasoning.`
+    );
+  }
+
+  lines.push(
+    ``,
+    `REACTION REQUIREMENT: Explain how the challenger and other top power holders respond to each option.`,
+    `DELEGATION OPTION REMINDER: When believable, include one option that hands responsibility to an appropriate institution or ally instead of acting directly.`
+  );
+
+  // Dynamic Story Spine: Inject narrative memory
+  if (narrativeMemory && Array.isArray(narrativeMemory.threads) && narrativeMemory.threads.length > 0) {
+    lines.push(
+      ``,
+      `🎭 NARRATIVE THREADS (Weave subtly, don't label):`
+    );
+
+    narrativeMemory.threads.forEach((thread, i) => {
+      lines.push(`  ${i + 1}. ${thread}`);
+    });
+
+    // Show recent thread development if available
+    if (Array.isArray(narrativeMemory.threadDevelopment) && narrativeMemory.threadDevelopment.length > 0) {
+      const recent = narrativeMemory.threadDevelopment[narrativeMemory.threadDevelopment.length - 1];
+      if (recent && recent.summary) {
+        lines.push(
+          ``,
+          `Recent development: ${recent.summary}`
+        );
+      }
+    }
+
+    lines.push(
+      ``,
+      `THREAD TRACKING: Your JSON must include "selectedThreadIndex" (0-based) and a one-sentence "selectedThreadSummary" describing how this turn pushes that thread forward.`
+    );
+
+    // Turn 7 climax directive
+    if (!crisisMode && daysLeft === 1) {
+      lines.push(
+        ``,
+        `🎬 FINAL DAY - CLIMAX DIRECTIVE:`,
+        `This is the culmination. Create a high-stakes turning point that:`,
+        `- Brings one or more narrative threads to a head`,
+        `- Forces a decisive choice with lasting consequences`,
+        `- Feels earned based on the story so far`
+      );
+
+      if (Array.isArray(narrativeMemory.climaxCandidates) && narrativeMemory.climaxCandidates.length > 0) {
+        lines.push(
+          ``,
+          `Suggested climax scenarios (use if they fit the story):`
+        );
+        narrativeMemory.climaxCandidates.forEach((climax, i) => {
+          lines.push(`  ${i + 1}. ${climax}`);
+        });
+        lines.push(`(You may deviate if player choices make these incoherent)`);
+      }
+    }
+
+    lines.push(``);
+  }
+
+  const topValues = playerCompassTopValues || extractTopCompassFromStrings(playerCompass);
+  if (topValues) {
+    lines.push(
+      ``,
+      `PLAYER VALUES (use where natural):`,
+      formatCompassTopValuesForPrompt(topValues),
+      `MIRROR NOTE: Mirror should reference one of these values and pose a reflective question or sly observation about the options—no direct instructions.`,
+      ``
+    );
+  }
+
+  // Corruption context (for AI continuity) - Show history only
+  if (Array.isArray(corruptionHistory) && corruptionHistory.length > 0) {
+    lines.push(
+      ``,
+      `🔸 CORRUPTION TRACKING:`,
+      `Recent AI judgments of player's actions (0-10 scale):`
+    );
+    const recent = corruptionHistory.slice(-3).map(h =>
+      `Day ${h.day}: ${h.score}/10 - ${h.reason.slice(0, 80)}${h.reason.length > 80 ? '...' : ''}`
+    ).join('\n  ');
+    lines.push(`  ${recent}`);
+  }
+
+  // Corruption evaluation task (Day 2+ only)
+  if (day > 1) {
+    lines.push(
+      ``,
+      `TASK C: Evaluate the player's PREVIOUS action (shown in STEP 1 above) using the corruption rubric.`,
+      `Consider how that action reflects on the responsible use of power.`,
+      `Fill the corruptionJudgment object with a 0-10 score and brief reason.`,
+      ``
+    );
+  }
+
+  // ACTION CONTINUITY ENFORCEMENT: Detect actions requiring immediate results
+  const actionText = (playerChoice.title + ' ' + (playerChoice.summary || '')).toLowerCase();
+  const isVoteAction = /\b(vote|referendum|ballot|election|consult|poll|plebiscite)\b/i.test(actionText);
+  const isNegotiationAction = /\b(negotiate|negotiation|talk|talks|meeting|dialogue|summit|discuss)\b/i.test(actionText);
+  const isConsultationAction = /\b(assemble|assembly|council|gathering|forum|hear from|listen to)\b/i.test(actionText);
+  const requiresResults = isVoteAction || isNegotiationAction || isConsultationAction;
+
+  if (requiresResults) {
+    const actionType = isVoteAction
+      ? 'VOTING/REFERENDUM/CONSULTATION'
+      : isNegotiationAction
+      ? 'NEGOTIATION/DIALOGUE/TALKS'
+      : 'CONSULTATION/ASSEMBLY';
+
+    lines.push(
+      ``,
+      `🚨 CONTINUITY DIRECTIVE (MANDATORY):`,
+      `The previous action involved ${actionType}.`,
+      ``,
+      `The next dilemma MUST show the ACTUAL RESULTS of that process:`,
+      ``
+    );
+
+    if (isVoteAction) {
+      lines.push(
+        `✓ Show the vote/referendum outcome with specific results (e.g., "57% voted yes, 43% no")`,
+        `✓ Show immediate reactions from key factions to the result`,
+        `✓ Frame the NEW dilemma around responding to those results`,
+        `✓ DO NOT show "preparations" or "as you prepare for..." - skip directly to the outcome`,
+        `✓ Apply SYSTEM FEEL: how does this political system handle the result? (e.g., democracies implement, autocracies may override)`
+      );
+    } else if (isNegotiationAction) {
+      lines.push(
+        `✓ Show what happened IN the negotiation (agreement reached? demands made? talks collapsed? compromises offered?)`,
+        `✓ Show specific terms, demands, or concessions discussed`,
+        `✓ Show immediate reactions from the parties involved`,
+        `✓ Frame the NEW dilemma around responding to the negotiation outcome`,
+        `✓ DO NOT show "preparations for talks" - skip directly to what happened during/after the talks`
+      );
+    } else {
+      lines.push(
+        `✓ Show what happened IN the consultation/assembly (consensus? disagreement? recommendations?)`,
+        `✓ Show specific input or positions from those consulted`,
+        `✓ Show immediate reactions and what was decided`,
+        `✓ Frame the NEW dilemma around acting on the consultation results`,
+        `✓ DO NOT show "preparations" - skip directly to the outcome`
+      );
+    }
+
+    lines.push(``);
+  }
+
+  // STEP 2 separator: Generate new dilemma
+  lines.push(
+    ``,
+    `STEP 2: GENERATE NEW SITUATION (Day ${day})`,
+    `───────────────────────────────────────────────────────────────────────────────`,
+    ``
+  );
+
+  if (requiresResults) {
+    lines.push(
+      `TASK B: Present the RESULTS of the previous ${isVoteAction ? 'vote/referendum' : isNegotiationAction ? 'negotiation' : 'consultation'} and create a new dilemma responding to those results.`,
+      `Show the outcome of the process FIRST, then present new choices based on that outcome.`,
+      `Remember: These new options haven't been chosen yet - they're future possibilities.`,
+      ``
+    );
+  } else {
+    lines.push(
+      `TASK B: Now create the new political dilemma and three new options.`,
+      `Show what happens next as a consequence of the previous action.`,
+      `Remember: These new options haven't been chosen yet - they're future possibilities.`,
+      ``
+    );
+  }
+
+  if (crisisMode && crisisContext) {
+    lines.push(``, `🚨 CRISIS MODE: "${crisisMode.toUpperCase()}"`);
+
+    if (crisisMode === "people") {
+      lines.push(
+        `- Public support collapsed: ${crisisContext.previousSupport ?? '?'}% → ${crisisContext.currentSupport ?? '?' }%`,
+        crisisContext.triggeringAction
+          ? `- Trigger: Player chose "${crisisContext.triggeringAction.title}" — ${crisisContext.triggeringAction.summary}`
+          : ``,
+        crisisContext.entityProfile ? `- Who they are: ${crisisContext.entityProfile}` : ``,
+        crisisContext.entityStances
+          ? `- What they care about:\n${Object.entries(crisisContext.entityStances)
+              .map(([issue, stance]) => `  • ${issue}: ${stance}`)
+              .join('\n')}`
+          : ``,
+        `- Show mass backlash and demand a response.`
+      );
+    } else if (crisisMode === "challenger") {
+      const name = crisisContext.challengerName || challengerSeat?.name || "Institutional opposition";
+      lines.push(
+        `- ${name} support collapsed: ${crisisContext.previousSupport ?? '?'}% → ${crisisContext.currentSupport ?? '?' }%`,
+        crisisContext.triggeringAction
+          ? `- Trigger: Player chose "${crisisContext.triggeringAction.title}" — ${crisisContext.triggeringAction.summary}`
+          : ``,
+        crisisContext.entityProfile ? `- Who they are: ${crisisContext.entityProfile}` : ``,
+        crisisContext.entityStances
+          ? `- Their priorities:\n${Object.entries(crisisContext.entityStances)
+              .map(([issue, stance]) => `  • ${issue}: ${stance}`)
+              .join('\n')}`
+          : ``,
+        `- Show concrete institutional retaliation in this turn.`
+      );
+    } else if (crisisMode === "caring") {
+      lines.push(
+        `- Personal anchor support collapsed: ${crisisContext.previousSupport ?? '?'}% → ${crisisContext.currentSupport ?? '?' }%`,
+        crisisContext.triggeringAction
+          ? `- Trigger: Player chose "${crisisContext.triggeringAction.title}" — ${crisisContext.triggeringAction.summary}`
+          : ``,
+        crisisContext.entityProfile ? `- Who this person is: ${crisisContext.entityProfile}` : ``,
+        crisisContext.entityStances
+          ? `- What they value:\n${Object.entries(crisisContext.entityStances)
+              .map(([issue, stance]) => `  • ${issue}: ${stance}`)
+              .join('\n')}`
+          : ``,
+        `- Highlight emotional stakes and whether the player can repair the relationship.`
+      );
+    } else if (crisisMode === "downfall" && crisisContext.allSupport) {
+      lines.push(
+        `- All three anchors under 20% support:`,
+        `  • People: ${crisisContext.allSupport.people.previous}% → ${crisisContext.allSupport.people.current}%`,
+        `  • Power holders: ${crisisContext.allSupport.middle.previous}% → ${crisisContext.allSupport.middle.current}%`,
+        `  • Personal anchor: ${crisisContext.allSupport.mom.previous}% → ${crisisContext.allSupport.mom.current}%`,
+        `- Generate narrative-only collapse; do not offer actions.`
+      );
+    }
+  }
+
+  if (!crisisMode && daysLeft === 1) {
+    lines.push(
+      ``,
+      `FINAL DAY NOTE: Acknowledge that this is the player's last decision and resolve or heighten existing tensions—no new arcs.`
+    );
+  }
+
+  return lines.join('\n');
+}
+
+function buildSuggestionValidatorSystemPrompt({
+  era,
+  year,
+  settingType,
+  roleScope,
+  challengerName,
+  topHolders = []
+}) {
+  const timeline = era || year || "unspecified era";
+  const setting = settingType || "unknown setting";
+  const scopeLine = roleScope
+    ? `ROLE SCOPE: ${roleScope}`
+    : "ROLE SCOPE: not specified – assume moderate institutional authority.";
+  const challengerLine = challengerName
+    ? `PRIMARY CHALLENGER: ${challengerName}`
+    : null;
+  const holdersLine =
+    Array.isArray(topHolders) && topHolders.length > 0
+      ? `OTHER POWER HOLDERS: ${topHolders.join(", ")}`
+      : null;
+
+  const anchorFacts = [
+    "PHOTOGRAPHY & CAMERAS: available since 19th century; common in 1990.",
+    "CELLULAR PHONES: commercialized 1980s; smartphones (touchscreen/app-based) circa 2007.",
+    "INTERNET & EMAIL: public adoption 1990s; widespread broadband post-2000.",
+    "ZOOM VIDEO MEETINGS: launched 2011; not available in 1990.",
+    "SOCIAL MEDIA: Twitter 2006, Facebook 2004, TikTok 2016.",
+    "DRONES (CIVILIAN): accessible mid-2010s; military UAVs limited earlier."
+  ].join("\n- ");
+
+  return [
+    "You are a constructive validator for a historical political strategy game.",
+    "Evaluate a player-written suggestion against the dilemma context and decide if it should be accepted.",
+    "",
+    `TIMELINE: ${timeline}`,
+    `SETTING TYPE: ${setting}`,
+    scopeLine,
+    challengerLine,
+    holdersLine,
+    "",
+    "GENERAL RULES:",
+    "- Default to ACCEPT unless you find a clear reason to reject.",
+    "- Accept suggestions that engage with the situation, even if imperfect.",
+    "- Reject only for: obvious anachronism, gibberish, total irrelevance, or actions wildly beyond the role's authority.",
+    "",
+    "ANCHOR FACTS (for anachronism checks):",
+    `- ${anchorFacts}`,
+    "",
+    "WHEN REJECTING:",
+    "- Name the specific element that fails (e.g., \"Zoom video meetings didn't exist in 1990\").",
+    "- Do NOT invent unrelated issues (e.g., do not mention cameras if they exist).",
+    "- Keep the rejection reason short and friendly.",
+    "",
+    "OUTPUT JSON ONLY:",
+    "{ \"valid\": boolean, \"reason\": string }"
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildSuggestionValidatorUserPrompt({
+  title,
+  description,
+  suggestion,
+  era,
+  year,
+  roleScope
+}) {
+  const payload = {
+    dilemma: {
+      title,
+      description
+    },
+    playerSuggestion: suggestion,
+    context: {
+      era: era || null,
+      year: year || null,
+      roleScope: roleScope || null
+    }
+  };
+
+  return JSON.stringify(payload, null, 2);
+}
+
+
+const COMPASS_DEFINITION_BLOCK = `COMPASS VALUES QUICK REFERENCE
+
+WHAT (ultimate goals) – prop "what"
+ 0 Truth/Trust – Commitment to honesty and reliability.
+   Support: truth, honesty, transparency, integrity, credible, sincerity.
+   Oppose: lies, deceit, propaganda, secrecy, misinformation.
+ 1 Liberty/Agency – Freedom to choose and act independently.
+   Support: freedom, autonomy, independence, rights, self-determination.
+   Oppose: coercion, oppression, restriction, dictatorship, control.
+ 2 Equality/Equity – Fairness and equal opportunity for all.
+   Support: fairness, inclusion, justice, equal rights, diversity.
+   Oppose: inequality, privilege, bias, segregation, hierarchy.
+ 3 Care/Solidarity – Compassion and unity in supporting others.
+   Support: empathy, compassion, welfare, cooperation, community, common good.
+   Oppose: neglect, cruelty, division, apathy, selfishness.
+ 4 Create/Courage – Innovation and bravery in action.
+   Support: innovation, creativity, reform, bravery, risk-taking.
+   Oppose: fear, conformity, stagnation, cowardice.
+ 5 Wellbeing – Promoting health, happiness, and quality of life.
+   Support: health, happiness, welfare, prosperity, comfort.
+   Oppose: suffering, illness, deprivation, misery.
+ 6 Security/Safety – Stability and protection from harm.
+   Support: protection, defense, order, law enforcement, control, stability.
+   Oppose: danger, chaos, insecurity, disorder.
+ 7 Freedom/Responsibility – Exercising freedom with accountability.
+   Support: duty, ethics, stewardship, consequence, integrity.
+   Oppose: irresponsibility, corruption, recklessness.
+ 8 Honor/Sacrifice – Doing what is right despite personal cost.
+   Support: loyalty, integrity, duty, sacrifice, moral courage.
+   Oppose: betrayal, dishonor, cowardice, selfishness.
+ 9 Sacred/Awe – Reverence for transcendent or spiritual meaning.
+   Support: sacred, holy, divine, spiritual, awe, reverence.
+   Oppose: desecration, cynicism, profanity, materialism.
+
+WHENCE (justifications) – prop "whence"
+ 0 Evidence – Reliance on facts and empirical reasoning.
+   Support: data, proof, science, reasoning, verification.
+   Oppose: superstition, denial, speculation, misinformation.
+ 1 Public Reason – Justifying actions with reasons others can accept.
+   Support: debate, dialogue, justification, rational argument, consensus.
+   Oppose: dogma, propaganda, unilateralism.
+ 2 Personal (Conscience) – Acting from one's own moral compass.
+   Support: conscience, intuition, personal belief, inner voice.
+   Oppose: conformity, obedience, groupthink.
+ 3 Tradition – Respect for inherited customs and continuity.
+   Support: heritage, custom, continuity, elders, stability.
+   Oppose: radicalism, rejection, iconoclasm.
+ 4 Revelation – Truth received through divine or mystical insight.
+   Support: faith, prophecy, divine command, vision, revelation.
+   Oppose: skepticism, secularism, disbelief.
+ 5 Nature – Acting in harmony with natural order or purpose.
+   Support: natural, organic, ecological, balance, sustainability.
+   Oppose: artificial, pollution, exploitation, corruption of nature.
+ 6 Pragmatism – Valuing what works in practice over ideology.
+   Support: practical, effective, functional, efficiency, results.
+   Oppose: dogma, theory, perfectionism, rigidity.
+ 7 Aesthesis (Beauty) – Appreciation of beauty and harmony.
+   Support: beauty, harmony, elegance, grace, design, art.
+   Oppose: ugliness, vulgarity, chaos, discord.
+ 8 Fidelity – Loyalty and steadfastness to commitments or relationships.
+   Support: loyalty, devotion, commitment, allegiance.
+   Oppose: betrayal, infidelity, treachery.
+ 9 Law (Office/Standards) – Respect for rules and lawful order.
+   Support: legality, justice, rule of law, regulation, due process.
+   Oppose: lawlessness, corruption, rebellion.
+
+HOW (means) – prop "how"
+ 0 Law (Office/Standards) – Respect for rules and lawful order.
+   Support: legality, justice, rule of law, regulation, due process.
+   Oppose: lawlessness, corruption, rebellion.
+ 1 Deliberation – Reaching decisions through discussion and compromise.
+   Support: debate, negotiation, dialogue, consultation, compromise.
+   Oppose: suppression, haste, unilateral action, dogmatism.
+ 2 Mobilize – Organizing collective action for change.
+   Support: protest, movement, organizing, rally, strike.
+   Oppose: apathy, passivity, suppression, complacency.
+ 3 Markets – Trust in free exchange and competition.
+   Support: competition, trade, profit, incentives, capitalism.
+   Oppose: control, regulation, redistribution, collectivism.
+ 4 Mutual Aid – Helping each other directly and cooperatively.
+   Support: cooperation, solidarity, volunteerism, reciprocity.
+   Oppose: selfishness, exploitation, neglect.
+ 5 Ritual – Structured symbolic acts of belonging or belief.
+   Support: ceremony, rite, observance, holiday, prayer.
+   Oppose: irreverence, disruption, informality.
+ 6 Enforce – Maintaining order through legitimate authority.
+   Support: enforcement, policing, punishment, discipline, authority.
+   Oppose: disobedience, impunity, anarchy.
+ 7 Design – Shaping modern systems and interfaces (digital platforms, apps, software).
+   Support: interface, system design, user interface, digital design, platform design.
+   Oppose: randomness, neglect, chaos.
+ 8 Civic Culture – Shared norms, education, and media that sustain society.
+   Support: citizenship, education, journalism, civic duty, culture.
+   Oppose: ignorance, propaganda, alienation, apathy.
+ 9 Philanthropy – Giving wealth or resources for the public good.
+   Support: charity, donation, altruism, benefactor, generosity.
+   Oppose: greed, selfishness, exploitation.
+
+WHITHER (recipients) – prop "whither"
+ 0 Self – Individual ambition and self-interest.
+   Support: self-interest, ambition, self-reliance, ego, competition.
+   Oppose: selflessness, humility, collectivism.
+ 1 Family – Loyalty to kin and household welfare.
+   Support: family, parent, child, kin, household, lineage.
+   Oppose: neglect, abandonment, alienation.
+ 2 Friends – Loyalty to chosen close relationships.
+   Support: friendship, camaraderie, alliance, trust, loyalty.
+   Oppose: betrayal, rivalry, isolation.
+ 3 In-Group – Preference for one's own tribe or group.
+   Support: us, loyalty, insiders, unity, belonging.
+   Oppose: outsiders, betrayal, disloyalty, globalism.
+ 4 Nation – Loyalty to national identity and sovereignty.
+   Support: patriotism, homeland, sovereignty, national interest.
+   Oppose: treason, cosmopolitanism, separatism.
+ 5 Civilization – Support for shared cultural heritage and progress.
+   Support: culture, enlightenment, progress, heritage, civil order.
+   Oppose: barbarism, decay, ignorance, regression.
+ 6 Humanity – Universal care for all people.
+   Support: compassion, human rights, dignity, equality, empathy.
+   Oppose: cruelty, exclusion, dehumanization, nationalism.
+ 7 Earth – Protection of the planet and environment.
+   Support: ecology, sustainability, environment, conservation, green.
+   Oppose: pollution, exploitation, destruction.
+ 8 Cosmos – Respect for all life and cosmic order.
+   Support: universe, cosmos, exploration, space, cosmic life.
+   Oppose: isolationism, nihilism, indifference.
+ 9 God – Devotion to divine or higher authority.
+   Support: God, divine will, faith, piety, worship, obedience.
+   Oppose: atheism, blasphemy, defiance, secularism.`;
+
 /**
  * Helper: Build comprehensive system prompt for entire game
  */
-function buildGameSystemPrompt(gameContext) {
+function buildGameSystemPrompt(gameContext, generateActions = true) {
   const {
     role,
     roleTitle,
@@ -2799,9 +5275,13 @@ function buildGameSystemPrompt(gameContext) {
     powerHolders,
     challengerSeat,  // NEW: Primary institutional opponent
     playerCompass,
+    playerCompassTopValues,
+    narrativeMemory,
     totalDays,
     thematicGuidance,
-    supportProfiles
+    supportProfiles,
+    roleScope,
+    storyThemes
   } = gameContext;
 
   // Format power holders
@@ -2819,17 +5299,52 @@ PRIMARY INSTITUTIONAL OPPONENT:
 - This opponent's actions, demands, or resistance should be a recurring source of political pressure` : "";
 
   // Format player compass values (top values per dimension)
-  const compassText = playerCompass ? `
+const compassText = `
 
 TOP PLAYER VALUES:
-- What (goals): ${playerCompass.what || "undefined"}
-- Whence (justification): ${playerCompass.whence || "undefined"}
-- How (means): ${playerCompass.how || "undefined"}
-- Whither (recipients): ${playerCompass.whither || "undefined"}` : "";
+${formatCompassTopValuesForPrompt(playerCompassTopValues)}`;
+
+  let narrativeBriefing = "";
+  if (narrativeMemory && Array.isArray(narrativeMemory.threads) && narrativeMemory.threads.length > 0) {
+    const threadsList = narrativeMemory.threads
+      .slice(0, 3)
+      .map((thread, idx) => `  ${idx + 1}. ${thread}`)
+      .join("\n");
+    const thematicNotes = narrativeMemory.thematicEmphasis
+      ? [
+          narrativeMemory.thematicEmphasis.coreConflict ? `- Core conflict focus: ${narrativeMemory.thematicEmphasis.coreConflict}` : "",
+          narrativeMemory.thematicEmphasis.emotionalTone ? `- Emotional tone: ${narrativeMemory.thematicEmphasis.emotionalTone}` : "",
+          narrativeMemory.thematicEmphasis.stakes ? `- Stakes in play: ${narrativeMemory.thematicEmphasis.stakes}` : "",
+        ].filter(Boolean).join("\n")
+      : "";
+    const climaxList = Array.isArray(narrativeMemory.climaxCandidates) && narrativeMemory.climaxCandidates.length
+      ? `- Long-term climax possibilities: ${narrativeMemory.climaxCandidates.slice(0, 2).join("; ")}`
+      : "";
+
+    narrativeBriefing =
+      `\n\nNARRATIVE THREADS (Dynamic Story Spine):\n${threadsList}\n` +
+      `${thematicNotes ? `${thematicNotes}\n` : ""}` +
+      `${climaxList ? `${climaxList}\n` : ""}` +
+      `OPENING DIRECTIVE:\n` +
+      `- Launch Day 1 with the thread that most naturally entangles the player's strongest values above.\n` +
+      `- Explicitly report which thread you selected by setting "selectedThreadIndex" (0-based) in the JSON response.\n` +
+      `- Provide a one-sentence "selectedThreadSummary" that shows how this opening advances that thread.\n` +
+      `- Make those values part of the immediate tension, temptation, or opportunity.\n` +
+      `- Establish why this thread matters now, planting seeds for future escalation without spoiling the later climax.`;
+  }
+
+  const mirrorBriefing = `
+
+MIRROR BRIEFING:
+- Mirror line = 1 sentence, 20–25 words, dry humor.
+- Tie at least one of the top values above to a concrete tension inside the current dilemma.
+- Phrase as a sly observation or question that makes the player inspect their own alignment; never issue a directive or name option letters.`;
 
   // Include thematic guidance if provided
   const thematicText = thematicGuidance ? `\n\nTHEMATIC GUIDANCE:\n${thematicGuidance}` : "";
   const supportBaselineText = formatSupportProfilesForPrompt(supportProfiles);
+  const roleScopeText = roleScope ? truncateText(roleScope, 200) : "Keep dilemmas at the character's immediate span of control (no empire-wide decrees).";
+  const themeList = Array.isArray(storyThemes) && storyThemes.length > 0 ? storyThemes.join(', ') : "autonomy_vs_heteronomy, liberalism_vs_totalism";
 
   return `${ANTI_JARGON_RULES}
 
@@ -2841,8 +5356,35 @@ PLAYER ROLE & CONTEXT:
 - Political System: ${systemName}
 - System Description: ${systemDesc}
 
-POWER HOLDERS:
-${holdersText}${challengerText}${compassText}${thematicText}
+ROLE MANDATE (DO NOT EXCEED):
+- ${roleScopeText}
+
+AUTHORITY DOMAINS (Exception-12 Framework):
+${gameContext.e12 ? formatE12ForPrompt(gameContext.e12, powerHolders) : "⚠️ E-12 authority analysis not available - use generic role scope constraints."}
+
+${gameContext.e12 ? generateAuthorityBoundaries(gameContext) : ""}
+
+⚠️ ACTION GENERATION CONSTRAINTS (CRITICAL):
+- Player can only generate DIRECT action options in domains where they hold decisive authority
+- For domains controlled by other institutions, actions must be framed as: "Propose to [Institution]...", "Request [Authority] to...", "Advocate for...", "Negotiate with [Institution]..."
+- Example: If Security is controlled by Military Commander, action must be "Request military to deploy troops" NOT "Deploy troops"
+- Example: If Economy requires Assembly vote, action must be "Propose to Assembly: new taxation" NOT "Implement new taxes"
+
+THEMATIC TRACKS TO WEAVE THROUGH THE WEEK:
+- ${themeList}
+
+ACTION DESIGN RULES:
+- Every option must be achievable through this role's legal authority, leverage, or personal influence.
+- Reference named power holders (especially the challenger) when describing consequences or trade-offs.
+- Whenever plausible, make exactly one option escalate or delegate the problem to a higher authority, allied institution, or organized constituency—only if such delegation would be realistic for the role.
+- If the role lacks power to impose an outcome directly, the option must negotiate, request, or defer rather than magically override institutions.
+
+POWER HOLDERS & DYNAMICS:
+${holdersText}${challengerText}
+- Challenger reactions must surface whenever support shifts or consequences are described.
+- Other high-power seats should pressure the player when their interests are threatened.
+${compassText}${narrativeBriefing}${mirrorBriefing}
+${thematicText}
 
 SUPPORT BASELINES:
 ${supportBaselineText}
@@ -2857,17 +5399,140 @@ ${roleIntro ? `- ALL dilemmas must be deeply rooted in the specific historical/f
 YOUR RESPONSIBILITIES:
 1. Generate one concrete political dilemma per turn (title, description, 3 actions with costs)
 2. Calculate support shifts based on previous player choices (Day 2+ only)
-3. Provide mirror advice (1-2 sentences, dramatic sidekick personality - think Mushu/Genie)
-4. Identify compass effects from previous choice (Day 2+ only)
-5. Generate 1-3 dynamic parameters showing measurable consequences (Day 2+ only)
-   - Each parameter = ultra-concise outcome (4-6 words max)
-   - Examples: "GDP growth +2.3%", "800K jobs lost", "Approval rating 68%"
-   - Include relevant icon (TrendingUp/Down, Users, DollarSign, Shield, Heart, etc.)
-   - Set tone: "up" (positive), "down" (negative), or "neutral"
-   - VARIETY: Show different aspects of the decision's impact (economic, social, political)
-   - AVOID: Generating the same parameter multiple times
+   ⚠️ CRITICAL: supportShift "why" explanations must ONLY reference the action the player
+   already took (provided in the user message), NOT the new options you're generating.
+   The player hasn't seen the new options yet - they're future possibilities.
+3. Provide mirror advice (one sentence, 20–25 words, dry wit) that highlights how the player's strongest value(s) collide with or reinforce the dilemma's options—provoke reflection, never dictate a choice.
+4. Generate 1-3 dynamic parameters showing numerical consequences of player's last action (Day 2+ only)
+
+   🔢 NUMERICAL REQUIREMENT (MANDATORY - NEVER SKIP):
+   - EVERY parameter MUST contain a specific measurable value with a positive or negative number (avoid percentages)
+   - NEVER use qualitative/abstract language without numbers
+   - Format: emoji + NUMBER + outcome (3-5 words TOTAL)
+
+   ✅ GOOD EXAMPLES (copy this pattern - all have numbers):
+   - "🔥 +47 buildings burned"
+   - "👥 3,000 protesters arrested"
+   - "⚔️ 12,400 troops deployed"
+   - "💼 800K jobs lost"
+   - "🎨 1,723 artworks rescued"
+
+   ❌ BAD EXAMPLES (NEVER generate these - no numbers):
+   - "+42% support"
+   - "trust declines" (abstract, no number)
+   - "protests gather" (vague, no number)
+   - "tightening demands" (qualitative, no number)
+   - "mood shifts" (abstract, no number)
+   - "tensions rise" (vague, no number)
+   - "-10% trust"
+
+
+   REQUIREMENTS:
+   - Base strictly on player's LAST ACTION and story context
+   - parameters must embody the numerical consequences of the player's last action
+   - Choose contextually-appropriate emoji (vary each turn, avoid repeating)
+   - Can show escalating metrics across turns if relevant
+
+5. Evaluate corruption of previous action (Day 2+ only)
+
+   CORRUPTION DEFINITION:
+   "Misuse of entrusted power for personal, factional, or unjust ends, betraying the legitimate
+   trust, laws, or norms of the polity."
+
+   BASELINE PRINCIPLE — DEFAULT TO ZERO:
+   - Start evaluation at score 0 for every action
+   - ADD points ONLY when corruption elements are explicitly stated in the action text
+   - Most governance actions score 0-2 even if controversial, imperfect, or favor certain groups
+   - NO evidence of personal gain/nepotism/bribery in action text = maximum score 1
+   - When ANY uncertainty exists, score 0
+   - Reserve 5+ ONLY for explicit self-enrichment, nepotism, bribery, or violent coercion
+   - Democratic processes (votes, consultations) ALWAYS score 0 regardless of timing
+
+   WHAT IS NOT CORRUPTION (score 0-1):
+   - Calling referendums, votes, or public consultations → ALWAYS 0
+   - Collaborative decision-making or delays for stakeholder input → ALWAYS 0
+   - Emergency actions with legitimate public safety justification → ALWAYS 0
+   - Transparent processes with procedural integrity → ALWAYS 0
+   - Following institutional channels even if slow → ALWAYS 0
+   - Risk-averse governance or "indecision" without evidence of hiding wrongdoing → ALWAYS 0
+   - Prioritizing one legitimate value over another (e.g., security vs. liberty) → ALWAYS 0
+   - Political allegiance or support for movements → ALWAYS 0
+   - Building coalitions or support bases through legitimate means → ALWAYS 0
+   - Asking community for input or feedback → ALWAYS 0
+   - Civic responsibility and community engagement → ALWAYS 0
+   - Attempting to comply with authorities without personal gain → ALWAYS 0
+   - Actions lacking transparency BUT without evidence of self-serving intent → Maximum 1
+   - Actions lacking wider organizational support BUT with civic intent → ALWAYS 0
+
+   EVIDENCE REQUIREMENT — NO SPECULATION:
+   - Base score ONLY on explicit actions stated in the player's choice text
+   - FORBIDDEN LANGUAGE: "risks", "might", "could", "suggests", "may lead to", "potential", "appears"
+   - Hypothetical future impacts are NOT corruption
+   - If action text doesn't explicitly show self-enrichment/nepotism/bribery, score 0-1 maximum
+   - Example: "Display allegiance to Savonarola" = political support, NOT corruption (score 0)
+
+   JUDGMENT RUBRIC (0-10 scale):
+   - Intent (0-4): Was there EVIDENCE of self-serving/factional motive vs. public good?
+     * 3-4: Clear self-enrichment, nepotism for family gain, power-retention through suppression
+     * 1-2: Civic purpose with transparency, even if choices are debatable or favor certain groups
+     * 0: Explicitly anti-corruption reforms or actions strengthening accountability
+   - Method (0-3): Were legitimate/legal/moral procedures violated?
+     * 2-3: Coercion, violence, deception, secret deals bypassing institutions
+     * 1: Minor procedural shortcuts but no coercion or secrecy
+     * 0: Due process, consultation, institutional channels followed
+   - Impact (0-3): Did it create unequal personal/factional benefit or institutional damage?
+     * 2-3: Concentrated wealth/power to leader or faction, rule-of-law erosion
+     * 1: Some groups benefit more but no institutional harm
+     * 0: Strengthened accountability, transparency, or equal treatment
+
+   SCORING RANGES — MOST ACTIONS SCORE 0-2:
+   - 0: Democratic processes, transparency reforms, anti-corruption actions, emergency justified actions
+     * Facilitating fair referendum = 0
+     * Creating independent audit = 0
+     * Political allegiance to movement = 0
+     * Emergency rationing with justification = 0
+   - 1: Normal governance even if imperfect, following institutional channels
+     * Implementing oversight = 1
+     * Collaborative planning = 1
+     * Transparent bidding process = 1
+   - 2: Minor favoritism with transparent process (friend's company wins AFTER public bidding)
+   - 3: Clear procedural shortcuts favoring allies (fast-tracking ally's permit without review)
+   - 4: Directing public funds to supporter regions without justification
+   - 5: Stacking courts with loyalists to block investigations
+   - 6: Accepting small bribes for contracts
+   - 7: Appointing brother/family to ministry
+   - 8: Using security forces to seize private assets
+   - 9: Accepting major bribes for contracts
+   - 10: Embezzling treasury for personal wealth
+
+   CRITICAL: Score 0-1 unless the action text EXPLICITLY shows corruption.
+
+   CONTEXT ADJUSTMENT:
+   - Consider era norms (patronage may be expected in some historical systems, adjust DOWN by 1-2 points)
+   - Consider emergencies (wartime exigency may justify unilateral action, adjust DOWN by 1 point if justified)
+   - Apply adjustments within the dimension scores above, but still reserve 5+ for clear corruption
+
+   OUTPUT:
+   - "score": 0-10 (numeric rating for THIS action)
+   - "reason": 1 sentence (15-25 words) explaining the judgment
+   - BE STRICT: Most actions should score 0-2 unless there is clear evidence of corruption
+
+   FORBIDDEN REASONING — NEVER SCORE HIGHER FOR:
+   - Speculative future: "might/could/may lead to corruption", "risks exploitation"
+   - Risk assessment: "potential for abuse", "suggests favoritism", "appears corrupt"
+   - Political strategy: "helps the movement", "builds support base", "strengthens faction"
+   - Leadership style: "avoiding responsibility", "indecision", "hesitation to lead"
+   - Value trade-offs: choosing security over liberty, or vice versa
+   - Democratic delays: consultations, referendums, collaborative planning
+   - Emergency actions: unilateral decisions with public safety justification
+
+   IF the action text does NOT explicitly describe taking money, appointing family, accepting bribes,
+   or using force for personal gain, score 0-1 maximum.
+
 6. Maintain narrative continuity across all ${totalDays} days
-7. Align supportShift reasoning with the baseline attitudes above; explicitly cite how each faction's stance agrees or clashes with the player's previous action.
+7. Align supportShift reasoning with the baseline attitudes above; explicitly cite how each faction's stance agrees or clashes with the player's previous action (the one they already took, NOT the new options you're presenting).
+8. Keep every situation framed within the player's mandate—if an issue is larger than their authority, focus on the slice they can actually influence.
+9. Surface at least one of the active story themes (e.g., autonomy_vs_heteronomy) in the tension of each turn—mention it implicitly in the stakes or competing voices rather than as a label.
 
 CONTINUITY & MEMORY:
 - You remember ALL previous dilemmas and player choices
@@ -2888,51 +5553,94 @@ TOPIC VARIETY (Natural Flow):
   * Maintain consequence continuity (e.g., "Meanwhile, economic concerns resurface...")
 - Policy domains: Economy, Security, Diplomacy, Rights, Infrastructure,
   Environment, Health, Education, Justice, Culture, Foreign Relations, Technology
+- When shifting topics, favor angles that connect to the story themes listed above (${themeList}).
 - Trust your memory: You can see the full conversation history
 - Natural variety > forced variety (let political reality breathe)
 - Exception: If player's previous action created urgent follow-up (vote results, crisis escalation),
   continue that thread even if 3+ turns on same topic
 
-STYLE:
+STYLE & VOICE (ALWAYS APPLY):
+- Keep language punchy and clear; every sentence should make sense to a bright high-school student without prior context.
+- Anchor descriptions in sights, sounds, or immediate human reactions so the scene feels lived-in.
+- **CRITICAL**: Always end the description with a direct player question that forces an immediate choice (e.g., "What will you do?", "How will you respond?", "What's your decision?").
+- Name the player's role in the first sentence of the description (e.g., "As the district police chief...").
+- Avoid passive policy-speak; prefer vivid verbs over abstract nouns.
 ${buildLightSystemPrompt()}
 
 OUTPUT FORMAT (JSON):
+
+EXAMPLES OF GOOD DESCRIPTION ENDINGS (vary your question format):
+- "As provincial governor, you survey the shoreline while courtiers press conflicting demands about the expelled foreigners' ships. How will you respond?"
+- "As district police chief, you watch riot shields forming a line while protesters chant slogans at the courthouse gates. What will you do?"
+- "As finance minister, you review budget reports showing empty coffers while three faction leaders demand increased spending. Which path will you choose?"
+- "As military commander, intelligence reports suggest an imminent border incursion but your forces are stretched thin. How will you act?"
+
 {
-  "title": "<60 chars, punchy situation title>",
-  "description": "<2-3 sentences, concrete and vivid>",
+  "title": "Guard the Coastline",
+  "description": "As provincial governor, you survey the shoreline while courtiers press conflicting demands about the expelled foreigners' ships. How will you respond?",
+  "selectedThreadIndex": 1,
+  "selectedThreadSummary": "Demonstrations over autonomy boil over, forcing you to confront the governor-versus-activists thread head-on.",${generateActions ? `
   "actions": [
     {
       "id": "a",
-      "title": "<action title>",
-      "summary": "<cynical advisor summary, 15-25 words>",
-      "cost": <number from {0,±50,±100,±150,±200,±250}>,
-      "iconHint": "<security|speech|diplomacy|money|tech|heart|scale>"
+      "title": "Dispatch scouts quietly",
+      "summary": "Send a small patrol to watch the shoreline and report any foreign regrouping before it surprises us.",
+      "cost": -50,
+      "iconHint": "security"
     },
-    // ... 3 actions total
-  ],
-  "topic": "<Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture>",
-  "scope": "<Local|National|International>",
-  "supportShift": {  // Day 2+ only, based on previous choice
-    // WHY must cite alignment or friction with baseline stances above
-    "people": {"delta": <-20 to +20>, "why": "<short reason>"},
-    "mom": {"delta": <-20 to +20>, "why": "<short reason>"},
-    "holders": {"delta": <-20 to +20>, "why": "<short reason>"}
+    {
+      "id": "b",
+      "title": "Fortify the harbor",
+      "summary": "Mobilize the garrison to build barricades, post archers, and drill citizens for another clash.",
+      "cost": -150,
+      "iconHint": "tech"
+    },
+    {
+      "id": "c",
+      "title": "Open talks through elders",
+      "summary": "Invite the visitor envoys to parley with clan elders under guard to explore guarantees without bloodshed.",
+      "cost": -100,
+      "iconHint": "diplomacy"
+    }
+  ],` : `
+  "actions": [],`}
+  "topic": "Security",
+  "scope": "Local",
+  "supportShift": {
+    "people": {"delta": -6, "why": "\"We wanted a clear victory, not another waiting game.\""},
+    "mom": {"delta": 4, "why": "\"You stayed cautious, and that eases my heart for now.\""},
+    "holders": {"delta": 8, "why": "\"Discipline and vigilance prove you heed our counsel.\""}
   },
-  "mirrorAdvice": "<1-2 sentences, dramatic sidekick giving advice on current situation>",
-  "dynamicParams": [  // Day 2+ only, 1-3 consequences of previous choice (VARY THE COUNT & CONTENT)
-    {"id": "param1", "icon": "TrendingUp", "text": "GDP growth +2.3%", "tone": "up"},
-    {"id": "param2", "icon": "Users", "text": "800K new jobs created", "tone": "up"},
-    {"id": "param3", "icon": "DollarSign", "text": "National debt +$12B", "tone": "down"}
-    // Generate 1-3 params showing DIFFERENT aspects of the decision's impact
-    // Use varied icons: TrendingUp/Down, Users, DollarSign, Shield, Heart, Zap, Building2, etc.
+  "mirrorAdvice": "Your trust in Truth/Trust seems steady, yet how long can restraint hold when allies demand harsher proof?",
+  "dynamicParams": [
+    {"id": "shore_patrols", "icon": "👣", "text": "18 scouts tracking", "tone": "neutral"}
   ],
-  "compassHints": [  // Day 2+ only, how previous choice affected compass
-    {"prop": "what|whence|how|whither", "idx": <0-9>, "polarity": "positive|negative", "strength": "weak|strong"}
-  ],
-  "isGameEnd": <true on Day ${totalDays + 1} for aftermath, false otherwise>
+  "narrativeUpdate": {
+    "threadAdvanced": 1,
+    "development": "Coastal tension rises as your forces brace for a possible return encounter.",
+    "thematicResonance": "autonomy_vs_heteronomy"
+  },
+  "corruptionJudgment": {
+    "score": 4,
+    "reason": "Decision showed factional favoritism without consulting broader stakeholders or transparent deliberation."
+  },
+  "isGameEnd": false
 }
 
-CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no prose.`;
+CRITICAL: Return ONLY valid JSON. No markdown, no code blocks, no prose.
+Follow these rules outside the JSON:${generateActions ? `
+- Provide exactly three mutually conflicting actions.
+- Keep the title concise and evocative (≤ ~70 characters is ideal).
+- Action summaries should read as one clear sentence; avoid numbered lists or option letters.
+- Use allowed cost tiers {0, ±50, ±100, ±150, ±200, ±250} and assign them by escalating real-world intensity.` : `
+- DO NOT generate action options. Leave the "actions" array empty [].
+- IMPORTANT: Empty actions array does NOT mean game end. Keep "isGameEnd": false unless this is the final day or a downfall crisis.`}
+- Fill supportShift, dynamicParams, and corruptionJudgment only when previous context exists (Day 2+). Every supportShift "why" must quote the faction voice and feel natural.
+- When writing supportShift deltas, use plain integers (e.g., 8, -6) with no leading plus sign.
+- Dynamic parameters must contain specific numbers and vary emoji/tone logically.
+- Corruption judgment must evaluate the player's PREVIOUS action (0-10 score + brief reason).
+- Always include "selectedThreadIndex" (0-based) and "selectedThreadSummary" whenever narrative threads are provided in the prompt.
+- Include narrativeUpdate only when narrative threads are active in the prompt.`;
 }
 
 /**
@@ -2942,14 +5650,45 @@ function buildDay1UserPrompt(gameContext) {
   const {
     role,
     systemName,
-    topWhatValues
+    topWhatValues,
+    playerCompass,
+    playerCompassTopValues,
+    narrativeMemory
   } = gameContext;
 
   let prompt = `ROLE & SETTING: ${role}\nSYSTEM: ${systemName}\n\nDAY 1 - FIRST DILEMMA\n`;
 
-  if (topWhatValues && Array.isArray(topWhatValues) && topWhatValues.length > 0) {
+  const topValues = playerCompassTopValues || extractTopCompassFromStrings(playerCompass);
+
+  if (topValues) {
+    prompt += `\nTOP PLAYER VALUES (weave where natural):\n${formatCompassTopValuesForPrompt(topValues)}\n`;
+    prompt += 'Mirror line must reference one of these values with a reflective, non-directive question.\n';
+  } else if (topWhatValues && Array.isArray(topWhatValues) && topWhatValues.length > 0) {
+    // Fallback to legacy topWhatValues if playerCompass not available
     prompt += `\nTOP PLAYER VALUES: ${topWhatValues.join(', ')}\n`;
     prompt += 'Create a situation that naturally tests or challenges these values (without naming them explicitly).\n';
+  }
+
+  if (narrativeMemory && Array.isArray(narrativeMemory.threads) && narrativeMemory.threads.length > 0) {
+    prompt += `\nAVAILABLE NARRATIVE THREADS (choose the one that best fits the player values above):\n`;
+    narrativeMemory.threads.slice(0, 3).forEach((thread, idx) => {
+      prompt += `  ${idx + 1}. ${thread}\n`;
+    });
+    if (Array.isArray(narrativeMemory.climaxCandidates) && narrativeMemory.climaxCandidates.length > 0) {
+      prompt += `CLIMAX FORESHADOW (do not resolve now, but set trajectory): ${narrativeMemory.climaxCandidates.slice(0, 2).join('; ')}\n`;
+    }
+    if (narrativeMemory.thematicEmphasis) {
+      const { coreConflict, emotionalTone, stakes } = narrativeMemory.thematicEmphasis;
+      const notes = [
+        coreConflict ? `Core conflict focus: ${coreConflict}` : null,
+        emotionalTone ? `Emotional tone: ${emotionalTone}` : null,
+        stakes ? `Stakes: ${stakes}` : null
+      ].filter(Boolean);
+      if (notes.length) {
+        prompt += `${notes.join(' | ')}\n`;
+      }
+    }
+    prompt += `\nOPENING DIRECTIVE:\n- Pick the thread whose tensions most directly engage the player's top values.\n- Frame the dilemma so those values are already under pressure or temptation in this first scene.\n- Foreshadow how this thread could escalate later without resolving it now.\n- In your JSON, include "selectedThreadIndex" (0-based) and a concise "selectedThreadSummary" to confirm the thread connection.\n`;
   }
 
   prompt += `\nTASK: Generate the first political situation for Day 1.
@@ -2964,71 +5703,217 @@ function buildDay1UserPrompt(gameContext) {
 /**
  * Helper: Build turn user prompt (Day 2+)
  */
-function buildTurnUserPrompt(day, playerChoice, compassUpdate, crisisMode = null, challengerSeat = null, supportProfiles = null) {
-  let prompt = `DAY ${day}\n\n`;
+function buildTurnSystemPrompt({
+  day,
+  totalDays = 7,
+  daysLeft = null,
+  crisisMode = null,
+  roleScope = null,
+  storyThemes = null,
+  challengerSeat = null,
+  powerHolders = null,
+  supportProfiles = null,
+  playerCompass = null,
+  playerCompassTopValues = null,
+  e12 = null,
+  role = null,
+  systemName = null
+}) {
+  const safeTotal = Number.isFinite(totalDays) ? totalDays : 7;
+  const lines = [
+    `${ANTI_JARGON_RULES}`,
+    `You are continuing an in-progress ${safeTotal}-day scenario. Generate the Day ${day} turn.`,
+    `Stay fully consistent with previous narrative beats and the player's most recent decision (details follow in the user message).`,
+    `Every option must be achievable within the player's role, legal authority, and era-specific limitations.`,
+    `Describe consequences using grounded, setting-appropriate detail—no abstract policy-speak.`,
+    `When calculating support shifts, explicitly tie reasoning to faction motivations and the player's recent actions.`,
+    `⚠️ CRITICAL: supportShift "why" must reference the action the player already took (sent in user message), NOT the new options you're about to generate.`
+  ];
 
-  prompt += `PREVIOUS CHOICE: "${playerChoice.title}"\n`;
-  prompt += `Summary: ${playerChoice.summary || playerChoice.title}\n`;
-  prompt += `Cost: ${playerChoice.cost}\n\n`;
+  // Inquiry reinforcement: Make AI explicitly consider player questions in consequence analysis
+  lines.push(`
+═══════════════════════════════════════════════════════════
+📋 PLAYER INQUIRIES & INFORMED DECISION-MAKING
+═══════════════════════════════════════════════════════════
 
-  if (compassUpdate) {
-    // Summarize compass changes (just mention they were updated)
-    prompt += `Player's compass values have been updated based on this choice.\n\n`;
+The player may have asked clarifying questions about the previous dilemma before making their decision.
+These inquiries appear in the conversation history as: [INQUIRY - Day X] Regarding "Dilemma Title": question
+
+When analyzing consequences of their chosen action, you MUST consider these inquiries:
+
+1. **Information Access**: The player had this information when deciding
+   - Their choice was informed by what they learned
+   - Don't present consequences as if they were uninformed or surprised by predictable outcomes
+
+2. **Priority Signals**: What they asked about reveals their concerns
+   - Questions about public opinion → they care about popular support
+   - Questions about economic impact → they're tracking fiscal consequences
+   - Questions about specific factions → they're managing those relationships
+   - Questions about risks/benefits → they're weighing trade-offs carefully
+
+3. **Support Shift Explanations**: Reference their informed awareness
+   - GOOD: "Having consulted advisors about public sentiment, your decision to..."
+   - GOOD: "With knowledge of the economic risks, you chose to..."
+   - GOOD: "After asking about military attitudes, you proceeded with..."
+   - BAD: "Your decision surprised many..." (if they specifically asked about reactions)
+   - BAD: Ignoring that they had specific information before acting
+
+4. **Narrative Continuity**: Acknowledge their due diligence
+   - If they asked about risks and took a cautious approach, note their careful consideration
+   - If they asked about benefits and went bold, acknowledge their informed confidence
+   - If they asked about stakeholders and tried to balance interests, recognize that awareness
+
+5. **New Dilemma Context**: Build on their knowledge base
+   - Reference information they previously sought when relevant
+   - Show how their inquiries relate to unfolding events
+   - Don't repeat information they already requested unless circumstances changed
+
+═══════════════════════════════════════════════════════════
+`);
+
+  if (roleScope) {
+    lines.push(`ROLE SCOPE GUARDRAIL: ${roleScope}`);
+  }
+
+  // Add E-12 authority constraints for Day 2+
+  if (e12 && powerHolders) {
+    const authorityText = formatE12ForPrompt(e12, powerHolders);
+    lines.push(`AUTHORITY DOMAINS (Exception-12 Framework - ENFORCE STRICTLY):\n${authorityText}`);
+
+    const boundariesText = generateAuthorityBoundaries({ e12, powerHolders, systemName, role });
+    if (boundariesText) {
+      lines.push(boundariesText);
+    }
+
+    lines.push(`⚠️ ACTION GENERATION CONSTRAINTS (CRITICAL):
+- Player can only generate DIRECT action options in domains where they hold decisive authority
+- For domains controlled by other institutions, actions must be framed as: "Propose to [Institution]...", "Request [Authority] to...", "Advocate for...", "Negotiate with [Institution]..."
+- Example: If Security is controlled by Military Commander, action must be "Request military to deploy troops" NOT "Deploy troops"
+- Example: If Economy requires Assembly vote, action must be "Propose to Assembly: new taxation" NOT "Implement new taxes"`);
+  }
+
+  if (Array.isArray(storyThemes) && storyThemes.length > 0) {
+    lines.push(`ACTIVE THEMES TO THREAD THROUGHOUT THE ARC: ${storyThemes.join(', ')}`);
+  }
+
+  if (Array.isArray(powerHolders) && powerHolders.length > 0) {
+    const holdersSnippet = powerHolders
+      .slice(0, 4)
+      .map((holder) => `- ${holder.name || 'Unknown'} (${holder.percent ?? '?'}% power)`)
+      .join('\n');
+    lines.push(`TOP POWER HOLDERS TO REFERENCE:\n${holdersSnippet}`);
+  }
+
+  if (challengerSeat) {
+    lines.push(`PRIMARY CHALLENGER: ${challengerSeat.name} (${challengerSeat.percent ?? '?'}% power) — show how they contest or pressure the player in both narrative setup and support reasoning.`);
   }
 
   if (supportProfiles) {
     const reminder = buildSupportProfileReminder(supportProfiles);
     if (reminder) {
-      prompt += `BASELINE REFERENCE:\n${reminder}\n\n`;
+      lines.push(`SUPPORT BASELINE REMINDER:\n${reminder}`);
     }
   }
 
-  // CRISIS MODE: Support level consequences
-  if (crisisMode) {
-    prompt += `🚨 CRISIS MODE: "${crisisMode}"\n`;
-    prompt += `⚠️ CRITICAL: Support level(s) dropped below 20% threshold!\n\n`;
+  // Authority violation consequences and authority-aware support shifts
+  if (e12) {
+    lines.push(`
+═══════════════════════════════════════════════════════════
+⚠️ AUTHORITY VIOLATION CONSEQUENCES
+═══════════════════════════════════════════════════════════
 
-    if (crisisMode === "downfall") {
-      prompt += `**DOWNFALL CRISIS** (ALL three support tracks < 20%):\n`;
-      prompt += `- This is a TERMINAL CRISIS - the player's rule is collapsing\n`;
-      prompt += `- Generate a dramatic final scenario showing the consequences of total loss of support\n`;
-      prompt += `- The "dilemma" should be narrative-only (no actions) describing their downfall\n`;
-      prompt += `- Set "isGameEnd": true in response\n`;
-      prompt += `- This is the END OF THE GAME - no Day ${day + 1}\n\n`;
-    } else if (crisisMode === "people") {
-      prompt += `**PEOPLE CRISIS** (Public support < 20%):\n`;
-      prompt += `- Mass uprising, protests, strikes, or riots erupting\n`;
-      prompt += `- Public has lost faith in the player's leadership\n`;
-      prompt += `- Generate a dilemma focused on mass backlash and public unrest\n`;
-      prompt += `- High stakes: How does the player respond to widespread discontent?\n\n`;
-    } else if (crisisMode === "challenger") {
-      const challengerName = challengerSeat?.name || "the institutional opposition";
-      prompt += `**CHALLENGER CRISIS** (${challengerName} support < 20%):\n`;
-      prompt += `- ${challengerName} is turning against the player\n`;
-      prompt += `- Institutional retaliation, coup threats, or power struggle escalating\n`;
-      prompt += `- Generate a dilemma focused on the challenger's actions against the player\n`;
-      prompt += `- High stakes: How does the player deal with institutional opposition?\n\n`;
-    } else if (crisisMode === "caring") {
-      prompt += `**PERSONAL CRISIS** (Caring anchor support < 20%):\n`;
-      prompt += `- The player's closest confidant/advisor has lost faith\n`;
-      prompt += `- Personal isolation, betrayal, or emotional breaking point\n`;
-      prompt += `- Generate a dilemma focused on the personal toll of leadership\n`;
-      prompt += `- High stakes: Can the player maintain their humanity under pressure?\n\n`;
-    }
+When evaluating the player's PREVIOUS action (Day ${day - 1}), check if they overstepped their institutional authority:
+
+1. **Identify Authority Violations:**
+   - Did player act in a domain they don't control? (Check E-12 domains above)
+   - Did player command institutions/forces they don't lead?
+   - Did player bypass required institutional approval processes?
+   - Did player make unilateral decisions requiring collective authority?
+
+2. **Support Shift Responses to Violations:**
+   IF player overstepped authority (acted in domain they don't control):
+   - Power holders who control that domain: LARGE NEGATIVE shift (-15 to -25)
+     * Reason: "You overstepped institutional bounds / violated established authority"
+   - Institutional seats: Negative shift with specific reference to norm violation
+   - Challenger: Uses this as ammunition to pressure/delegitimize player
+
+3. **Next Dilemma Generation (THIS turn):**
+   IF previous action violated authority:
+   - Feature institutional pushback, investigation, or power struggle
+   - Show consequences of bypassing proper channels
+   - Give violated institution opportunity to reassert control
+   - Example: If player commanded military without authority → military leaders demand explanation or resist
+
+4. **Escalation on Repeated Violations:**
+   IF player has violated authority multiple times:
+   - Escalate toward removal attempt, coup attempt, or constitutional crisis
+   - Make stakes clear: continued violations risk complete downfall
+
+AUTHORITY-AWARE SUPPORT REASONING:
+- **Within Authority:** Normal faction reactions based on policy content
+- **Stretched Authority (plausible but bold):** Mixed reactions - some praise boldness, others express concern
+- **Violated Authority:** Institutional holders very negative, cite norm violation explicitly
+- **Deferred Appropriately (in democracy):** Positive from democratic institutions
+- **Deferred Inappropriately (in autocracy):** Perceived as weakness, negative from hardliners
+
+═══════════════════════════════════════════════════════════
+`);
   }
 
-  if (day === 7 && !crisisMode) { // Only show epic finale if not in crisis mode
-    prompt += `⚠️ DAY 7 - EPIC FINALE\n`;
-    prompt += `- Create an UNRELATED national crisis (ignore previous story)\n`;
-    prompt += `- But STILL calculate supportShift from previous choice (factions remember)\n`;
-    prompt += `- Make it: national scope, defining moment, high stakes, hard choices\n`;
-    prompt += `- Mention this is the final day or defining moment\n\n`;
+  const mirrorValuesText = formatCompassTopValuesForPrompt(playerCompassTopValues || extractTopCompassFromStrings(playerCompass));
+  lines.push(`MIRROR VALUE SNAPSHOT:\n${mirrorValuesText}`);
+  lines.push(`MIRROR DIRECTIVE: Produce one sentence (20–25 words) of dry, introspective humor that references at least one listed value and frames the dilemma as a question or sly observation. Nudge reflection; never name option letters or hand out orders.`);
+
+  if (!crisisMode && daysLeft === 1) {
+    lines.push(`FINAL DAY DIRECTIVE: Acknowledge in tone and stakes that this is the player's final day/defining decision. Resolve or heighten existing conflicts rather than introducing unrelated crises.`);
+  } else if (!crisisMode && Number.isFinite(daysLeft) && daysLeft > 1) {
+    lines.push(`PACE REMINDER: ${daysLeft - 1} day(s) remain afterward—build momentum toward the finale without exhausting every thread.`);
   }
 
-  prompt += `TASK: Generate the next turn with ALL required data (dilemma + supportShift + mirrorAdvice + dynamicParams + compassHints).
-Return complete JSON as specified in system prompt.`;
+  if (crisisMode === "downfall") {
+    lines.push(`TASK: Provide a narrative-only collapse sequence. Include title, description (2-3 vivid sentences), supportShift, mirrorAdvice, dynamicParams (may be empty), set "actions": [] and "isGameEnd": true.`);
+  } else {
+    lines.push(`TASK: Generate the next turn with ALL required data (dilemma + supportShift + mirrorAdvice + dynamicParams).`);
+  }
 
-  return prompt;
+  lines.push(`Return complete JSON as specified in the system prompt.`);
+
+  return lines.join('\n\n');
+}
+
+const ACTION_ID_ORDER = ["a", "b", "c"];
+const ACTION_ICON_HINTS = new Set(["security", "speech", "diplomacy", "money", "tech", "heart", "scale", "build", "nature", "energy", "civic"]);
+
+function sanitizeTurnActions(rawActions) {
+  const actions = Array.isArray(rawActions) ? rawActions.slice(0, 3) : [];
+
+  const snapCost = (value) => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return 0;
+    const clamped = Math.max(-250, Math.min(250, Math.round(num)));
+    const snapped = Math.round(clamped / 50) * 50;
+    return Math.max(-250, Math.min(250, snapped));
+  };
+
+  for (let i = 0; i < 3; i++) {
+    const existing = actions[i] || {};
+    const title = String(existing.title || `Option ${i + 1}`).slice(0, 80);
+    const summarySource = existing.summary || existing.title || `Fallback option ${i + 1}`;
+    const summary = String(summarySource).slice(0, 200);
+    const cost = snapCost(existing.cost);
+    const iconHintRaw = typeof existing.iconHint === "string" ? existing.iconHint.toLowerCase() : "";
+    const iconHint = ACTION_ICON_HINTS.has(iconHintRaw) ? iconHintRaw : "speech";
+
+    actions[i] = {
+      id: ACTION_ID_ORDER[i],
+      title,
+      summary,
+      cost,
+      iconHint
+    };
+  }
+
+  return actions;
 }
 
 /**

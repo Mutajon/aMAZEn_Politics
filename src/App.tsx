@@ -1,11 +1,17 @@
 // src/App.tsx
 import { useEffect } from "react";
-import { fetchAndStoreGameSettings } from "./lib/gameSettings";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fetchAndStoreGameSettings, loadGameSettingsFromLocalStorage } from "./lib/gameSettings";
+
+// Load game settings from localStorage IMMEDIATELY before any components render
+// This ensures settings are available before Zustand persist loads old values
+loadGameSettingsFromLocalStorage();
 import MiniCompassDebugScreen from "./screens/MiniCompassDebugScreen";
 import { LanguageProvider, useLanguage } from "./i18n/LanguageContext";
 
 import { useHashRoute } from "./lib/router";
 import SplashScreen from "./screens/SplashScreen";
+import BackstageScreen from "./screens/BackstageScreen";
 // import CompassIntro from "./screens/CompassIntro"; // (legacy monolith – no longer used)
 import IntroScreen from "./screens/IntroScreen";
 import RoleSelectionScreen from "./screens/RoleSelectionScreen";
@@ -26,16 +32,37 @@ import AchievementsScreen from "./screens/AchievementsScreen";
 import MirrorScreen from "./screens/MirrorScreen";
 import AftermathScreen from "./screens/AftermathScreen";
 import FinalScoreScreen from "./screens/FinalScoreScreen";
+import DownfallScreen from "./screens/DownfallScreen";
 import AudioControls from "./components/AudioControls";
 import { useAudioManager } from "./hooks/useAudioManager";
 import { useSettingsStore } from "./store/settingsStore";
 import { useLoggingStore } from "./store/loggingStore";
 import { loggingService } from "./lib/loggingService";
-import DataCollectionBanner from "./components/DataCollectionBanner";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { useStateChangeLogger } from "./hooks/useStateChangeLogger";
+import { useSessionLogger } from "./hooks/useSessionLogger";
+import GameCappedScreen from "./screens/GameCappedScreen";
 
 if (import.meta.env.DEV) {
   import("./dev/storesDebug").then(m => m.attachStoresDebug());
 }
+
+
+// Create a QueryClient instance for React Query
+const queryClient = new QueryClient({
+  defaultOptions: {
+    mutations: {
+      // Prevent duplicate mutations
+      retry: false,
+    },
+    queries: {
+      // Prevent duplicate queries
+      retry: false,
+      staleTime: 0,
+      gcTime: 0, // Don't cache mutations
+    },
+  },
+});
 
 // Component to handle RTL direction based on language
 function RTLHandler() {
@@ -71,11 +98,14 @@ function LoadingScreen() {
   );
 }
 
+
+
 export default function App() {
   const { route, push } = useHashRoute();
   const enableModifiers = useSettingsStore((s) => s.enableModifiers);
-  const dataCollectionEnabled = useSettingsStore((s) => s.dataCollectionEnabled);
+  const debugMode = useSettingsStore((s) => s.debugMode);
   const consented = useLoggingStore((s) => s.consented);
+  // const [gameStatus, setGameStatus] = useState<GameStatus>('loading');
 
   console.debug("[App] 📍 Current route:", route);
   console.debug("[App] enableModifiers:", enableModifiers);
@@ -84,54 +114,65 @@ export default function App() {
   // Initialize audio manager hook to sync settings with audio playback
   useAudioManager();
 
+  // Load settings from localStorage immediately (before API call completes)
+  // This ensures settings are available right away, then API will update them if available
   useEffect(() => {
+    loadGameSettingsFromLocalStorage();
+    // Then fetch fresh settings from API (will override localStorage if successful)
     fetchAndStoreGameSettings();
   }, []);
 
-  // Initialize logging service when consented
+  // The game status is now checked on "Start Game" button click.
+
+  // Initialize logging service when consented (unless debug mode)
   useEffect(() => {
-    if (consented && dataCollectionEnabled) {
+    if (consented && !debugMode) {
       loggingService.init();
     }
-  }, [consented, dataCollectionEnabled]);
+  }, [consented, debugMode]);
 
-  // Handle browser close - flush remaining logs
+  // Handle browser close - flush remaining logs (unless debug mode)
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (dataCollectionEnabled) {
+      if (!debugMode) {
         loggingService.flush(true);
       }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [dataCollectionEnabled]);
+  }, [debugMode]);
 
   // Render current screen with global audio controls
   return (
-    <LanguageProvider>
-      {/* RTL direction handler */}
-      <RTLHandler />
-      
-      {/* App content with loading check */}
-      <AppContent route={route} push={push} enableModifiers={enableModifiers} />
-    </LanguageProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <LanguageProvider>
+          {/* RTL direction handler */}
+          <RTLHandler />
+
+          {/* App content with loading check */}
+          <AppContent route={route} push={push} enableModifiers={enableModifiers} />
+        </LanguageProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
 // Separate component to access language context
-function AppContent({ route, push, enableModifiers }: { route: string; push: any; enableModifiers: boolean }) {
+function AppContent({ route, push, enableModifiers }: { route: string; push: (route: string) => void; enableModifiers: boolean }) {
   const { isLoading } = useLanguage();
-  
+
+  // Global logging hooks (run once at app level for comprehensive coverage)
+  useStateChangeLogger(); // Automatically logs all Zustand store changes
+  useSessionLogger();     // Automatically logs tab visibility, window blur/focus
+
   if (isLoading) {
     return <LoadingScreen />;
   }
 
   return (
     <>
-      {/* Data collection consent banner - shows on first visit if backend enabled */}
-      <DataCollectionBanner />
-
       {/* Global audio controls - visible on all screens */}
       <AudioControls />
 
@@ -150,7 +191,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: any
       {route === "/compass-quiz" && <MirrorQuizScreen push={push} />}
 
       {route === "/name" && <NameScreen push={push} />}
-      {route === "/compass-vis" && <CompassVisScreen push={push} />}
+      {route === "/compass-vis" && <CompassVisScreen />}
       {route === "/mirror" && <MirrorScreen push={push} />}
       {route === "/debug-mini" && <MiniCompassDebugScreen push={push} />}
       {route === "/background-intro" && <BackgroundIntroScreen push={push} />}
@@ -159,11 +200,22 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: any
         return <GoalsSelectionScreen push={push} />;
       })()}
       {route === "/event" && <EventScreen3 push={push} />}
+      {route === "/downfall" && <DownfallScreen push={push} />}
       {route.startsWith("/highscores") && <HighscoreScreen />}
       {route === "/achievements" && <AchievementsScreen />}
       {route === "/aftermath" && <AftermathScreen push={push} />}
       {route === "/final-score" && <FinalScoreScreen push={push} />}
+      {route === "/capped" && <GameCappedScreen push={push} />}
 
+
+      {/* Backstage route - Development mode (bypasses experiments) */}
+      {route === "/backstage" && (
+        <BackstageScreen
+          onStart={() => push("/intro")}
+          onHighscores={() => push("/highscores")}
+          onAchievements={() => push("/achievements")}
+        />
+      )}
 
       {/* Default route - SplashScreen */}
       {route === "/" && (
@@ -171,6 +223,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: any
           onStart={() => push("/intro")}
           onHighscores={() => push("/highscores")}
           onAchievements={() => push("/achievements")}
+          push={push}
         />
       )}
     </>

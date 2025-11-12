@@ -11,28 +11,28 @@ import { loggingService } from '../lib/loggingService';
  */
 function enableLogging() {
   const { setConsented } = useLoggingStore.getState();
-  const { setDataCollectionEnabled } = useSettingsStore.getState();
-  setDataCollectionEnabled(true);
+  const { setDebugMode } = useSettingsStore.getState();
+  setDebugMode(false);  // Disable debug mode to enable logging
   setConsented(true);
 
   // Initialize if not already initialized
   loggingService.init();
 
-  console.log('[Logging Debug] ✅ Logging enabled');
+  console.log('[Logging Debug] ✅ Logging enabled (debug mode disabled)');
   console.log('Logging State:', useLoggingStore.getState());
-  console.log('Settings (dataCollectionEnabled):', useSettingsStore.getState().dataCollectionEnabled);
+  console.log('Settings (debugMode):', useSettingsStore.getState().debugMode);
 }
 
 /**
  * Disable logging (for testing)
  */
 function disableLogging() {
-  const { setDataCollectionEnabled } = useSettingsStore.getState();
-  setDataCollectionEnabled(false);
+  const { setDebugMode } = useSettingsStore.getState();
+  setDebugMode(true);  // Enable debug mode to disable logging
 
-  console.log('[Logging Debug] ❌ Logging disabled');
+  console.log('[Logging Debug] ❌ Logging disabled (debug mode enabled)');
   console.log('Logging State:', useLoggingStore.getState());
-  console.log('Settings (dataCollectionEnabled):', useSettingsStore.getState().dataCollectionEnabled);
+  console.log('Settings (debugMode):', useSettingsStore.getState().debugMode);
 }
 
 /**
@@ -103,10 +103,10 @@ function testLog() {
  */
 function showState() {
   const loggingState = useLoggingStore.getState();
-  const { dataCollectionEnabled } = useSettingsStore.getState();
+  const { debugMode } = useSettingsStore.getState();
   console.log('[Logging Debug] 📊 Current state:');
   console.table({
-    dataCollectionEnabled: dataCollectionEnabled,
+    debugMode: debugMode,
     consented: loggingState.consented,
     userId: loggingState.userId,
     sessionId: loggingState.sessionId,
@@ -114,7 +114,7 @@ function showState() {
     treatment: loggingState.treatment,
     isInitialized: loggingState.isInitialized,
   });
-  return { ...loggingState, dataCollectionEnabled };
+  return { ...loggingState, debugMode };
 }
 
 /**
@@ -128,12 +128,30 @@ function resetState() {
 }
 
 /**
- * Set treatment (for testing)
+ * Reset experiment role progress (for testing)
+ * Allows replaying experiment roles without clearing userId or other data
  */
-function setTreatment(treatment: string) {
+function resetExperimentRoles() {
+  const { resetExperimentProgress } = useLoggingStore.getState();
+  resetExperimentProgress();
+  console.log('[Logging Debug] 🔄 Experiment role progress reset');
+  console.log('✅ Completed roles cleared - all experiment roles unlocked');
+  console.log('📊 Current state:', useLoggingStore.getState().experimentProgress);
+}
+
+/**
+ * Set treatment (for testing) - Updates BOTH loggingStore and settingsStore
+ */
+function setTreatment(treatment: 'fullAutonomy' | 'semiAutonomy' | 'noAutonomy') {
+  // Update loggingStore (for backend analytics/logging)
   loggingService.setTreatment(treatment);
-  console.log('[Logging Debug] 🧪 Treatment set to:', treatment);
-  console.log('State:', useLoggingStore.getState());
+
+  // Update settingsStore (for UI/gameplay behavior)
+  useSettingsStore.getState().setTreatment(treatment);
+
+  console.log('[Debug] 🧪 Treatment set to:', treatment);
+  console.log('  📊 Logging Store:', useLoggingStore.getState().treatment);
+  console.log('  ⚙️  Settings Store:', useSettingsStore.getState().treatment);
 }
 
 /**
@@ -186,22 +204,26 @@ export function attachLoggingDebug() {
     (window as any).testLog = testLog;
     (window as any).showState = showState;
     (window as any).resetState = resetState;
+    (window as any).resetExperimentRoles = resetExperimentRoles;
     (window as any).setTreatment = setTreatment;
     (window as any).generateTestSession = generateTestSession;
 
-    console.log('[Logging Debug] 🛠️ Debug tools attached to window');
-    console.log('Available commands:');
-    console.log('  enableLogging()        - Enable data collection');
-    console.log('  disableLogging()       - Disable data collection');
-    console.log('  showLogs()             - Show queued logs');
-    console.log('  flushLogs()            - Force send logs to backend');
-    console.log('  clearQueue()           - Clear local queue');
-    console.log('  startSession()         - Start new session');
-    console.log('  endSession()           - End current session');
-    console.log('  testLog()              - Add a test log entry');
-    console.log('  showState()            - Show current logging state');
-    console.log('  resetState()           - Reset logging state (WARNING: clears userId)');
-    console.log('  setTreatment(name)     - Set treatment condition');
-    console.log('  generateTestSession()  - Generate complete test session with sample data');
+    // HIDDEN FOR EXPERIMENTAL DISTRIBUTION
+    // Debug tools are still available but not advertised to users
+    // console.log('[Logging Debug] 🛠️ Debug tools attached to window');
+    // console.log('Available commands:');
+    // console.log('  enableLogging()        - Enable data collection');
+    // console.log('  disableLogging()       - Disable data collection');
+    // console.log('  showLogs()             - Show queued logs');
+    // console.log('  flushLogs()            - Force send logs to backend');
+    // console.log('  clearQueue()           - Clear local queue');
+    // console.log('  startSession()         - Start new session');
+    // console.log('  endSession()           - End current session');
+    // console.log('  testLog()              - Add a test log entry');
+    // console.log('  showState()            - Show current logging state');
+    // console.log('  resetState()           - Reset logging state (WARNING: clears userId)');
+    // console.log('  resetExperimentRoles() - Reset experiment role tracking (keep userId)');
+    // console.log('  setTreatment(name)     - Set treatment condition (updates both stores)');
+    // console.log('  generateTestSession()  - Generate complete test session with sample data');
   }
 }

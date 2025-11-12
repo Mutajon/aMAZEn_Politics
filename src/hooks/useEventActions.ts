@@ -15,7 +15,6 @@ interface UseEventActionsProps {
   setSupportDeltas: (deltas: SupportDeltas) => void;
   setSupportTrends: (trends: SupportTrends) => void;
   setSupportNotes: (notes: SupportNotes | ((prev: SupportNotes) => SupportNotes)) => void;
-  budget: number;
   setBudget: (budget: number | ((prev: number) => number)) => void;
   updateNewsAfterAction: (actionData: { title: string; summary: string; cost: number }) => void;
   enableProgressiveLoading?: boolean; // when true, uses new progressive loading flow
@@ -34,7 +33,6 @@ export function useEventActions({
   setSupportDeltas,
   setSupportTrends,
   setSupportNotes,
-  budget,
   setBudget,
   updateNewsAfterAction,
   enableProgressiveLoading = true, // Enable new progressive loading flow by default
@@ -44,7 +42,6 @@ export function useEventActions({
 
   // Support manager hook
   const { analyzeSupportWrapper, applySupportEffects } = useEventSupportManager({
-    vals,
     setVals,
     setSupportDeltas,
     setSupportTrends,
@@ -64,8 +61,9 @@ export function useEventActions({
 
       // 1. Immediate budget update for responsive feedback (this happens during coin animation)
       if (showBudget && a.cost !== undefined) {
-        setBudget(prev => prev + a.cost);
-        console.log(`[useEventActions] Budget updated by ${a.cost}`);
+        const actionCost = a.cost;
+        setBudget(prev => prev + actionCost);
+        console.log(`[useEventActions] Budget updated by ${actionCost}`);
       }
 
       // 2. Start progressive loading flow (this will handle news, support, etc. sequentially)

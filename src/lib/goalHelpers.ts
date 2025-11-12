@@ -58,7 +58,7 @@ export function getStartingSupport(difficulty: string | null): number {
  * @param difficulty Current difficulty level
  * @returns Filtered goals
  */
-export function filterGoalsByDifficulty(goals: Goal[], difficulty: string | null): Goal[] {
+export function filterGoalsByDifficulty(goals: Goal[], _difficulty: string | null): Goal[] {
   // For now, all goals are available at all difficulties
   // Future: Could filter out goals that are impossible/trivial at certain difficulties
   return goals;

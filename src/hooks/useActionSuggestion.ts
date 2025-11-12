@@ -26,12 +26,24 @@ function getDilemmaContext(d?: { title: string; description: string }): { title:
 }
 
 // Build role context for historical validation
-function getRoleContext(): { era: string; settingType: string; year: string } {
+function getRoleContext(): {
+  era: string;
+  settingType: string;
+  year: string;
+  roleScope: string;
+  challengerName: string;
+  topHolders: string[];
+} {
   const roleStore = useRoleStore.getState();
   const era = roleStore.analysis?.grounding?.era || "";
   const settingType = roleStore.analysis?.grounding?.settingType || "unclear";
   const year = roleStore.roleYear || "";
-  return { era, settingType, year };
+  const roleScope = roleStore.roleScope || roleStore.analysis?.roleScope || "";
+  const challengerName = roleStore.analysis?.challengerSeat?.name || "";
+  const holders = Array.isArray(roleStore.analysis?.holders)
+    ? roleStore.analysis!.holders.slice(0, 4).map((h) => h.name).filter(Boolean)
+    : [];
+  return { era, settingType, year, roleScope, challengerName, topHolders: holders };
 }
 
 // Gated debug logger (Settings → Debug mode)
@@ -94,6 +106,7 @@ export function useActionSuggestion({
         descriptionLen: ctx.description.length,
         roleEra: roleCtx.era,
         roleYear: roleCtx.year,
+        roleScopePreview: roleCtx.roleScope.slice(0, 80),
       });
 
       const result = await validateSuggestionStrict(trimmedText, ctx, roleCtx);

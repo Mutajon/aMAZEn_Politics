@@ -28,6 +28,8 @@ export type AnalysisResult = {
     index: number | null;
   };
   supportProfiles?: RoleSupportProfiles | null;
+  roleScope?: string | null;
+  storyThemes?: string[] | null;
   e12?: { // NEW: Exception-12 analysis
     tierI: string[];
     tierII: string[];
@@ -69,12 +71,20 @@ type RoleState = {
   roleIntro: string | null;
   /** Year/era of the scenario (e.g., "-404", "1791", "2179") - for predefined roles only */
   roleYear: string | null;
+  /** Role description displayed to player (e.g., "Governor in Florence", "Farmer in Haiti") */
+  roleDescription: string | null;
   /** Baseline support profiles for People + Challenger (optional) */
   supportProfiles: RoleSupportProfiles | null;
+  /** Narrative scope for prompts */
+  roleScope: string | null;
+  /** Core story themes to rotate through */
+  storyThemes: string[] | null;
 
   setRole: (r: string | null) => void;
   setAnalysis: (a: AnalysisResult | null) => void;
   setSupportProfiles: (profiles: RoleSupportProfiles | null) => void;
+  setRoleScope: (scope: string | null) => void;
+  setStoryThemes: (themes: string[] | null) => void;
 
   /** Replace the whole character object (e.g., from Name screen) */
   setCharacter: (c: Character | null) => void;
@@ -87,6 +97,9 @@ type RoleState = {
 
   /** Set role context fields (title, intro, year) - used for predefined roles */
   setRoleContext: (title: string | null, intro: string | null, year: string | null) => void;
+
+  /** Set role description (e.g., "Governor in Florence") */
+  setRoleDescription: (description: string | null) => void;
 
   reset: () => void;
 };
@@ -101,12 +114,17 @@ export const useRoleStore = create<RoleState>()(
       roleTitle: null,
       roleIntro: null,
       roleYear: null,
+      roleDescription: null,
       supportProfiles: null,
+      roleScope: null,
+      storyThemes: null,
 
       setRole: (r) => set({ selectedRole: r }),
       setAnalysis: (a) => set((state) => ({
         analysis: a,
-        supportProfiles: a?.supportProfiles ?? state.supportProfiles ?? null
+        supportProfiles: a?.supportProfiles ?? state.supportProfiles ?? null,
+        roleScope: a?.roleScope ?? state.roleScope ?? null,
+        storyThemes: a?.storyThemes ?? state.storyThemes ?? null
       })),
 
       setCharacter: (c) => set({ character: c }),
@@ -130,7 +148,10 @@ export const useRoleStore = create<RoleState>()(
         roleIntro: intro,
         roleYear: year
       }),
+      setRoleDescription: (description) => set({ roleDescription: description }),
       setSupportProfiles: (profiles: RoleSupportProfiles | null) => set({ supportProfiles: profiles }),
+      setRoleScope: (scope) => set({ roleScope: scope }),
+      setStoryThemes: (themes) => set({ storyThemes: themes }),
 
       reset: () => set({
         selectedRole: null,
@@ -140,7 +161,10 @@ export const useRoleStore = create<RoleState>()(
         roleTitle: null,
         roleIntro: null,
         roleYear: null,
-        supportProfiles: null
+        roleDescription: null,
+        supportProfiles: null,
+        roleScope: null,
+        storyThemes: null
       }),
     }),
     {

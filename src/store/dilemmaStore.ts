@@ -1,14 +1,16 @@
 // src/store/dilemmaStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Dilemma, DilemmaRequest, DilemmaAction, DilemmaHistoryEntry, SubjectStreak, DilemmaScope, ScopeStreak, LightDilemmaRequest, LightDilemmaResponse } from "../lib/dilemma";
+import type { Dilemma, DilemmaAction, DilemmaHistoryEntry, SubjectStreak, DilemmaScope, ScopeStreak, LightDilemmaRequest, LightDilemmaResponse } from "../lib/dilemma";
 import type { ScoreBreakdown } from "../lib/scoring";
 import type { Goal, SelectedGoal } from "../data/goals";
+import type { CompassPill } from "../hooks/useEventDataCollector";
 import { evaluateAllGoals } from "../lib/goalEvaluation";
 import { useSettingsStore } from "./settingsStore";
 import { useRoleStore } from "./roleStore";
 import { useCompassStore } from "./compassStore"; // <-- A) use compass values (0..10)
 import { COMPONENTS } from "../data/compass-data"; // <-- B) component definitions for value names
+import { getTreatmentConfig, type TreatmentType } from "../data/experimentConfig"; // <-- Inquiry system config
 
 // Prevent duplicate fetches (React StrictMode or fast double click)
 let loadNextInFlight = false;
@@ -41,6 +43,34 @@ type DilemmaState = {
   // Hosted state conversation tracking
   gameId: string | null;           // Unique ID for this playthrough (persists conversation)
   conversationActive: boolean;     // True when using hosted state API
+  narrativeMemory: {               // Dynamic Story Spine: Narrative scaffold for 7-day arc
+    threads: string[];
+    climaxCandidates: string[];
+    thematicEmphasis: {
+      coreConflict: string;
+      emotionalTone: string;
+      stakes: string;
+    };
+    threadDevelopment: Array<{
+      day: number;
+      thread: number | null;
+      summary: string;
+    }>;
+  } | null;
+
+  // Inquiry System (Treatment-based feature for player questions about dilemmas)
+  inquiryHistory: Map<number, Array<{ question: string; answer: string; timestamp: number }>>;
+  inquiryCreditsRemaining: number;  // Resets each dilemma based on treatment config
+
+  // Reasoning System (Treatment-based feature for player to explain decisions)
+  reasoningHistory: Array<{
+    day: number;
+    actionId: string;
+    actionTitle: string;
+    actionDescription: string;
+    reasoningText: string;
+    timestamp: number;
+  }>;
 
   current: Dilemma | null;
   history: Dilemma[];
@@ -94,6 +124,28 @@ type DilemmaState = {
   minSupportMiddle: number;
   minSupportMom: number;
 
+  // Crisis state tracking (NEW)
+  crisisMode: "people" | "challenger" | "caring" | "downfall" | null;
+  crisisEntity: string | null; // Name of the entity in crisis
+  previousSupportValues: {
+    people: number;
+    middle: number;
+    mom: number;
+  } | null;
+
+  // Corruption tracking (mirrors crisis pattern)
+  corruptionLevel: number;                    // Current 0-100
+  previousCorruptionValue: number | null;     // For animation
+  corruptionHistory: Array<{
+    day: number;
+    score: number;      // AI's 0-10 judgment
+    reason: string;
+    level: number;      // Resulting 0-100 level
+  }>;
+
+  // Pending compass pills (applied in cleaner phase, displayed in EventScreen)
+  pendingCompassPills: CompassPill[] | null;
+
   loadNext: () => Promise<void>;
   nextDay: () => void;
   setTotalDays: (n: number) => void;
@@ -143,6 +195,32 @@ type DilemmaState = {
   // Hosted state conversation methods
   initializeGame: () => void;      // Generate gameId and prepare for new game
   endConversation: () => void;     // Cleanup after game ends
+  setNarrativeMemory: (memory: DilemmaState['narrativeMemory']) => void; // Store narrative scaffold
+
+  // Inquiry system methods (Treatment-based feature)
+  resetInquiryCredits: () => void;                             // Reset credits for new dilemma
+  addInquiry: (question: string, answer: string) => void;      // Store Q&A pair
+  getInquiriesForCurrentDay: () => Array<{question: string, answer: string, timestamp: number}>;  // Retrieve current day inquiries
+  canInquire: () => boolean;                                   // Check if inquiries are available
+
+  // Reasoning system methods (Treatment-based feature)
+  addReasoningEntry: (entry: {
+    day: number;
+    actionId: string;
+    actionTitle: string;
+    actionDescription: string;
+    reasoningText: string;
+  }) => void;                                                   // Store reasoning entry
+
+  // Crisis detection methods (NEW)
+  detectAndSetCrisis: () => "downfall" | "people" | "challenger" | "caring" | null;  // Detect crisis after support updates, returns crisis mode
+  clearCrisis: () => void;          // Clear crisis state after handling
+  savePreviousSupport: () => void;  // Store support values before updates
+
+  // Corruption tracking methods (mirrors support pattern)
+  setCorruptionLevel: (n: number) => void;
+  savePreviousCorruption: () => void;
+  clearCorruptionHistory: () => void;
 };
 
 // Type for goal status changes (used for audio/visual feedback)
@@ -162,6 +240,14 @@ export const useDilemmaStore = create<DilemmaState>()(
   // Hosted state conversation
   gameId: null,
   conversationActive: false,
+  narrativeMemory: null, // Will be populated during BackgroundIntroScreen
+
+  // Inquiry system (initialized with 0 credits, reset per dilemma based on treatment)
+  inquiryHistory: new Map(),
+  inquiryCreditsRemaining: 0,
+
+  // Reasoning system (initialized empty, populated as player provides reasoning)
+  reasoningHistory: [],
 
   current: null,
   history: [],
@@ -222,6 +308,17 @@ export const useDilemmaStore = create<DilemmaState>()(
   minSupportPeople: 50,
   minSupportMiddle: 50,
   minSupportMom: 50,
+
+  // Crisis state tracking (NEW)
+  crisisMode: null,
+  crisisEntity: null,
+  previousSupportValues: null,
+
+  // Corruption tracking (start clean, increases only with corrupt actions)
+  corruptionLevel: 0,
+  previousCorruptionValue: null,
+  corruptionHistory: [],
+  pendingCompassPills: null,
 
   async loadNext() {
     // If something is already loading, bail early
@@ -313,6 +410,7 @@ export const useDilemmaStore = create<DilemmaState>()(
       error: null,
       lastChoice: null,
       dilemmaHistory: [],
+      reasoningHistory: [],
       dayProgression: {
         isProgressing: false,
         progressingToDay: 1,
@@ -346,6 +444,16 @@ export const useDilemmaStore = create<DilemmaState>()(
       minSupportPeople: 50,
       minSupportMiddle: 50,
       minSupportMom: 50,
+      crisisMode: null,
+      crisisEntity: null,
+      previousSupportValues: null,
+      corruptionLevel: 0,
+      previousCorruptionValue: null,
+      corruptionHistory: [],
+      pendingCompassPills: null,
+      narrativeMemory: null,
+      inquiryHistory: new Map(),
+      inquiryCreditsRemaining: 0,
     });
   },
 
@@ -647,7 +755,11 @@ export const useDilemmaStore = create<DilemmaState>()(
 
     set({
       gameId,
-      conversationActive: true
+      conversationActive: true,
+      // Explicitly reset corruption to ensure clean slate for new game
+      corruptionLevel: 0,
+      corruptionHistory: [],
+      previousCorruptionValue: null
     });
   },
 
@@ -672,6 +784,179 @@ export const useDilemmaStore = create<DilemmaState>()(
       conversationActive: false
     });
   },
+
+  setNarrativeMemory(memory) {
+    dlog("setNarrativeMemory ->", memory);
+    set({ narrativeMemory: memory });
+  },
+
+  // ========================================================================
+  // INQUIRY SYSTEM METHODS
+  // ========================================================================
+
+  resetInquiryCredits() {
+    // Get treatment config from settings store
+    const treatment = useSettingsStore.getState().treatment as TreatmentType;
+    const config = getTreatmentConfig(treatment);
+
+    dlog("resetInquiryCredits ->", config.inquiryTokensPerDilemma);
+
+    set({
+      inquiryCreditsRemaining: config.inquiryTokensPerDilemma
+    });
+  },
+
+  addInquiry(question, answer) {
+    const { day, inquiryHistory, inquiryCreditsRemaining } = get();
+
+    // Get or create array for current day
+    if (!inquiryHistory.has(day)) {
+      inquiryHistory.set(day, []);
+    }
+
+    // Add new inquiry
+    const dayInquiries = inquiryHistory.get(day)!;
+    dayInquiries.push({
+      question,
+      answer,
+      timestamp: Date.now()
+    });
+
+    // Decrement credits
+    const newCredits = Math.max(0, inquiryCreditsRemaining - 1);
+
+    dlog("addInquiry -> day", day, "remaining credits:", newCredits);
+
+    set({
+      inquiryHistory: new Map(inquiryHistory), // Create new Map to trigger reactivity
+      inquiryCreditsRemaining: newCredits
+    });
+  },
+
+  getInquiriesForCurrentDay() {
+    const { day, inquiryHistory } = get();
+    return inquiryHistory.get(day) || [];
+  },
+
+  canInquire() {
+    const { inquiryCreditsRemaining } = get();
+    const treatment = useSettingsStore.getState().treatment as TreatmentType;
+    const config = getTreatmentConfig(treatment);
+
+    // Feature available if treatment allows it AND player has credits
+    return config.inquiryTokensPerDilemma > 0 && inquiryCreditsRemaining > 0;
+  },
+
+  // ========================================================================
+  // REASONING SYSTEM METHODS
+  // ========================================================================
+
+  addReasoningEntry(entry) {
+    const { reasoningHistory } = get();
+
+    // Add timestamp to entry
+    const entryWithTimestamp = {
+      ...entry,
+      timestamp: Date.now()
+    };
+
+    // Append to history
+    const newHistory = [...reasoningHistory, entryWithTimestamp];
+
+    dlog("addReasoningEntry -> day", entry.day, "action:", entry.actionTitle, "length:", entry.reasoningText.length);
+
+    set({ reasoningHistory: newHistory });
+  },
+
+  // ========================================================================
+  // CRISIS DETECTION METHODS
+  // ========================================================================
+
+  savePreviousSupport() {
+    const { supportPeople, supportMiddle, supportMom } = get();
+
+    dlog("savePreviousSupport ->", {
+      people: supportPeople,
+      middle: supportMiddle,
+      mom: supportMom
+    });
+
+    set({
+      previousSupportValues: {
+        people: supportPeople,
+        middle: supportMiddle,
+        mom: supportMom
+      }
+    });
+  },
+
+  detectAndSetCrisis() {
+    const { supportPeople, supportMiddle, supportMom } = get();
+    const CRISIS_THRESHOLD = 20;
+
+    // Check if any track is below threshold
+    const peopleInCrisis = supportPeople < CRISIS_THRESHOLD;
+    const challengerInCrisis = supportMiddle < CRISIS_THRESHOLD;
+    const caringInCrisis = supportMom < CRISIS_THRESHOLD;
+
+    // Determine crisis mode (priority: downfall > people > challenger > caring)
+    let crisisMode: typeof get extends () => infer S ? S extends { crisisMode: infer C } ? C : never : never = null;
+    let crisisEntity: string | null = null;
+
+    if (peopleInCrisis && challengerInCrisis && caringInCrisis) {
+      crisisMode = "downfall";
+      crisisEntity = "ALL";
+      dlog(`detectAndSetCrisis -> DOWNFALL: All three tracks below ${CRISIS_THRESHOLD}%`);
+    } else if (peopleInCrisis) {
+      crisisMode = "people";
+      crisisEntity = "The People";
+      dlog(`detectAndSetCrisis -> PEOPLE CRISIS: ${supportPeople}%`);
+    } else if (challengerInCrisis) {
+      crisisMode = "challenger";
+
+      // Get challenger name from roleStore if available
+      const roleState = useRoleStore.getState();
+      crisisEntity = roleState.analysis?.challengerSeat?.name || "Institutional Opposition";
+      dlog(`detectAndSetCrisis -> CHALLENGER CRISIS: ${supportMiddle}% (${crisisEntity})`);
+    } else if (caringInCrisis) {
+      crisisMode = "caring";
+      crisisEntity = "Personal Anchor";
+      dlog(`detectAndSetCrisis -> CARING CRISIS: ${supportMom}%`);
+    } else {
+      dlog("detectAndSetCrisis -> No crisis detected");
+    }
+
+    set({ crisisMode, crisisEntity });
+
+    return crisisMode;
+  },
+
+  clearCrisis() {
+    dlog("clearCrisis -> Clearing crisis state");
+    set({
+      crisisMode: null,
+      crisisEntity: null,
+      previousSupportValues: null
+    });
+  },
+
+  // Corruption tracking methods (mirror support pattern)
+  setCorruptionLevel(n) {
+    const clamped = Math.max(0, Math.min(100, Number(n) || 50));
+    dlog("setCorruptionLevel:", clamped);
+    set({ corruptionLevel: clamped });
+  },
+
+  savePreviousCorruption() {
+    const { corruptionLevel } = get();
+    dlog("savePreviousCorruption:", corruptionLevel);
+    set({ previousCorruptionValue: corruptionLevel });
+  },
+
+  clearCorruptionHistory() {
+    dlog("clearCorruptionHistory");
+    set({ corruptionHistory: [] });
+  },
     }),
     {
       name: "amaze-politics-game-state-v2", // Updated version to include gameId
@@ -679,9 +964,18 @@ export const useDilemmaStore = create<DilemmaState>()(
         gameId: state.gameId, // Persist gameId for conversation continuity
         conversationActive: state.conversationActive,
         difficulty: state.difficulty,
-        selectedGoals: state.selectedGoals,
-        finalScoreSubmitted: state.finalScoreSubmitted
-      })
+        selectedGoals: state.selectedGoals
+      }),
+      onRehydrateStorage: () => (state) => {
+        // Recalculate corruption level from history on page reload
+        if (state && Array.isArray(state.corruptionHistory) && state.corruptionHistory.length > 0) {
+          const lastEntry = state.corruptionHistory[state.corruptionHistory.length - 1];
+          if (typeof lastEntry.level === 'number') {
+            state.corruptionLevel = lastEntry.level;
+            dlog('Hydrated corruption level from history:', lastEntry.level);
+          }
+        }
+      }
     }
   )
 );

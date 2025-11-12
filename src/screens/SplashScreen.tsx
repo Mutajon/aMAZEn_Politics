@@ -16,6 +16,8 @@ import { useLang } from "../i18n/lang";
 import { useLanguage } from "../i18n/LanguageContext";
 import LanguageSelector from "../components/LanguageSelector";
 import IDCollectionModal from "../components/IDCollectionModal";
+import { useReserveGameSlot } from "../hooks/useReserveGameSlot";
+import { useLogger } from "../hooks/useLogger";
 
 const SUBTITLES = [
   "Choose your path. Discover yourself."
@@ -25,20 +27,22 @@ export default function SplashScreen({
   onStart,
   onHighscores,
   onAchievements,
+  push,
 }: {
   onStart: () => void;
   onHighscores?: () => void; // optional, so we don't break existing callers
   onAchievements?: () => void; // optional, navigates to achievements screen
+  push: (route: string) => void;
 }) {
   const lang = useLang();
   const { language } = useLanguage();
+  const reserveGameSlotMutation = useReserveGameSlot();
+  const logger = useLogger();
 
   const [visibleSubtitles, setVisibleSubtitles] = useState(0);
   const [showButton, setShowButton] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [showIDModal, setShowIDModal] = useState(false);
-  const [isCollectingID, setIsCollectingID] = useState(false);
 
   // Helper function to get correct transform for toggle
   const getToggleTransform = (isEnabled: boolean) => {
@@ -71,53 +75,164 @@ export default function SplashScreen({
   const showBudget = useSettingsStore((s) => s.showBudget);
   const setShowBudget = useSettingsStore((s) => s.setShowBudget);
   // Debug mode
-const debugMode = useSettingsStore((s) => s.debugMode);
-const setDebugMode = useSettingsStore((s) => s.setDebugMode);
+  const debugMode = useSettingsStore((s) => s.debugMode);
+  const setDebugMode = useSettingsStore((s) => s.setDebugMode);
 
-// Dilemmas subject
-const dilemmasSubjectEnabled = useSettingsStore((s) => s.dilemmasSubjectEnabled);
-const setDilemmasSubjectEnabled = useSettingsStore((s) => s.setDilemmasSubjectEnabled);
-const dilemmasSubject = useSettingsStore((s) => s.dilemmasSubject);
-const setDilemmasSubject = useSettingsStore((s) => s.setDilemmasSubject);
+  // Dilemmas subject
+  const dilemmasSubjectEnabled = useSettingsStore((s) => s.dilemmasSubjectEnabled);
+  const setDilemmasSubjectEnabled = useSettingsStore((s) => s.setDilemmasSubjectEnabled);
+  const dilemmasSubject = useSettingsStore((s) => s.dilemmasSubject);
+  const setDilemmasSubject = useSettingsStore((s) => s.setDilemmasSubject);
 
-// Enable modifiers
-const enableModifiers = useSettingsStore((s) => s.enableModifiers);
-const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
+  // Enable modifiers
+  const enableModifiers = useSettingsStore((s) => s.enableModifiers);
+  const setEnableModifiers = useSettingsStore((s) => s.setEnableModifiers);
 
-// Data collection
-const dataCollectionEnabled = useSettingsStore((s) => s.dataCollectionEnabled);
-const setDataCollectionEnabled = useSettingsStore((s) => s.setDataCollectionEnabled);
+  const experimentMode = useSettingsStore((s) => s.experimentMode);
+  const setExperimentMode = useSettingsStore((s) => s.setExperimentMode);
+  
+  // Show ID modal only in experiment mode
+  const [showIDModal, setShowIDModal] = useState(experimentMode);
+  const [isCollectingID] = useState(false);
+
+  // Treatment (experiment configuration)
+  const treatment = useSettingsStore((s) => s.treatment);
+  const setTreatment = useSettingsStore((s) => s.setTreatment);
 
   // -------------------------------------------------------------------------
 
-  // Handle ID submission from modal
-  const handleIDSubmit = async (id: string) => {
-    // Save ID to loggingStore (replaces auto-generated UUID)
-    useLoggingStore.getState().setUserId(id);
+  // Global effect: Enforce semiAutonomy treatment when experiment mode is disabled
+  useEffect(() => {
+    if (!experimentMode && treatment !== 'semiAutonomy') {
+      console.log("[SplashScreen] Experiment mode disabled, forcing semiAutonomy treatment");
+      setTreatment('semiAutonomy');
+      useLoggingStore.getState().setTreatment('semiAutonomy');
+    }
+  }, [experimentMode, treatment, setTreatment]);
 
+  // Update showIDModal when experimentMode changes
+  useEffect(() => {
+    // Only show modal if experiment mode is enabled
+    if (!experimentMode) {
+      setShowIDModal(false);
+    }
+  }, [experimentMode]);
+
+  // Handle ID submission from modal (only called in experiment mode)
+  const handleIDSubmit = async (id: string) => {
     // Close modal
     setShowIDModal(false);
 
-    // Proceed with game start
+    // Proceed with game start - check for available slot only in experiment mode
     setIsLoading(true);
     setShowSettings(false);
 
-    // Start new logging session (will use the ID we just set)
-    await loggingService.startSession();
+    try {
+      // Register user and get treatment assignment
+      const registerResponse = await fetch('/api/users/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: id }),
+      });
 
-    // Reset all game stores for fresh start
-    useCompassStore.getState().reset();
-    useDilemmaStore.getState().reset();
-    useRoleStore.getState().reset();
-    useMirrorQuizStore.getState().resetAll();
-    clearAllSnapshots();
+      if (!registerResponse.ok) {
+        throw new Error('Failed to register user');
+      }
 
-    // Prime narrator and start music (user interaction unlocks browser autoplay)
-    narrator.prime();
-    playMusic('background', true);
+      const registerData = await registerResponse.json();
+      
+      if (!registerData.success) {
+        throw new Error(registerData.error || 'Failed to register user');
+      }
 
-    onStart();
+      // Save ID and treatment to stores
+      useLoggingStore.getState().setUserId(registerData.userId);
+      setTreatment(registerData.treatment as 'fullAutonomy' | 'semiAutonomy' | 'noAutonomy');
+      useLoggingStore.getState().setTreatment(registerData.treatment);
+
+      console.log(`[SplashScreen] User registered: ${registerData.userId}, treatment: ${registerData.treatment}, isNewUser: ${registerData.isNewUser}`);
+
+      // Only check slot reservation if experiment mode is enabled
+      if (experimentMode) {
+        const result = await reserveGameSlotMutation.mutateAsync();
+        
+        if (!result.success) {
+          setIsLoading(false);
+          if (push) {
+            push('/capped');
+          }
+          return;
+        }
+      }
+
+      // Reservation successful (or skipped in non-experiment mode), proceed with game start
+      // Start new logging session (will use the ID we just set)
+      await loggingService.startSession();
+
+      // Reset all game stores for fresh start
+      useCompassStore.getState().reset();
+      useDilemmaStore.getState().reset();
+      useRoleStore.getState().reset();
+      useMirrorQuizStore.getState().resetAll();
+      clearAllSnapshots();
+
+      // Prime narrator and start music (user interaction unlocks browser autoplay)
+      narrator.prime();
+      playMusic('background', true);
+
+      onStart();
+    } catch (error) {
+      console.error('Error in handleIDSubmit:', error);
+      setIsLoading(false);
+      if (push) {
+        push('/capped');
+      }
+      // Optionally, show a generic error message to the user
+      alert('An error occurred while starting the game. Please try again.');
+    }
   };
+
+  // Handle start button click (when not in experiment mode, skip ID modal)
+  const handleStartClick = async () => {
+    if (experimentMode) {
+      // In experiment mode, show ID modal
+      setShowIDModal(true);
+      return;
+    }
+
+    // Not in experiment mode - start game directly
+    setIsLoading(true);
+    setShowSettings(false);
+
+    try {
+      // Start new logging session
+      await loggingService.startSession();
+
+      // Reset all game stores for fresh start
+      useCompassStore.getState().reset();
+      useDilemmaStore.getState().reset();
+      useRoleStore.getState().reset();
+      useMirrorQuizStore.getState().resetAll();
+      clearAllSnapshots();
+
+      // Prime narrator and start music (user interaction unlocks browser autoplay)
+      narrator.prime();
+      playMusic('background', true);
+
+      onStart();
+    } catch (error) {
+      console.error('Error starting game:', error);
+      setIsLoading(false);
+      alert('An error occurred while starting the game. Please try again.');
+    }
+  };
+
+  // Log splash screen loaded (runs once on mount)
+  useEffect(() => {
+    logger.logSystem('splash_screen_loaded', true, 'Splash screen loaded');
+  }, [logger]);
 
   // Simple subtitle reveal: show title, wait 0.5s, fade in all subtitles
   useEffect(() => {
@@ -136,6 +251,11 @@ const setDataCollectionEnabled = useSettingsStore((s) => s.setDataCollectionEnab
       clearTimeout(buttonTimer);
     };
   }, []);
+
+  // Log splash screen loaded (runs once on mount)
+  useEffect(() => {
+    logger.logSystem('splash_screen_loaded', true, 'Splash screen loaded');
+  }, [logger]);
 
   return (
     <div
@@ -368,27 +488,27 @@ const setDataCollectionEnabled = useSettingsStore((s) => s.setDataCollectionEnab
 {/* Divider */}
 <div className="my-4 border-t border-white/10" />
 
-{/* Data collection ------------------------------------------------------------- */}
-<div className="flex items-center justify-between gap-3">
+{/* Experiment mode ------------------------------------------------------------- */}
+<div className="mt-3 flex items-center justify-between gap-3">
   <div>
-    <div className="text-sm font-medium">{lang("DATA_COLLECTION")}</div>
+    <div className="text-sm font-medium">{lang("EXPERIMENT_MODE")}</div>
     <div className="text-xs text-white/60">
-      {lang("DATA_COLLECTION_DESC")}
+      {lang("EXPERIMENT_MODE_DESC")}
     </div>
   </div>
   <button
-    onClick={() => setDataCollectionEnabled(!dataCollectionEnabled)}
+    onClick={() => setExperimentMode(!experimentMode)}
     role="switch"
-    aria-checked={dataCollectionEnabled}
+    aria-checked={experimentMode}
     className={[
       "w-12 h-7 rounded-full p-1 transition-colors",
-      dataCollectionEnabled ? "bg-emerald-500/70" : "bg-white/20",
+      experimentMode ? "bg-emerald-500/70" : "bg-white/20",
     ].join(" ")}
   >
     <span
       className={[
         "block w-5 h-5 rounded-full bg-white transition-transform",
-        getToggleTransform(dataCollectionEnabled),
+        getToggleTransform(experimentMode),
       ].join(" ")}
     />
   </button>
@@ -474,38 +594,8 @@ const setDataCollectionEnabled = useSettingsStore((s) => s.setDataCollectionEnab
       }
     }}
     transition={{ type: "spring", stiffness: 250, damping: 22 }}
-    style={{ visibility: showButton && !isCollectingID ? "visible" : "hidden" }}
-    onClick={async () => {
-      const { dataCollectionEnabled } = useSettingsStore.getState();
-
-      if (dataCollectionEnabled) {
-        // Show ID collection modal
-        setIsCollectingID(true);
-        setShowIDModal(true);
-        setShowSettings(false);
-        // Don't proceed yet - wait for ID submission via handleIDSubmit
-      } else {
-        // Original flow: proceed immediately
-        setIsLoading(true);
-        setShowSettings(false);
-
-        // Start new logging session
-        await loggingService.startSession();
-
-        // Reset all game stores for fresh start
-        useCompassStore.getState().reset();
-        useDilemmaStore.getState().reset();
-        useRoleStore.getState().reset();
-        useMirrorQuizStore.getState().resetAll();
-        clearAllSnapshots();
-
-        // Prime narrator and start music (user interaction unlocks browser autoplay)
-        narrator.prime();
-        playMusic('background', true);
-
-        onStart();
-      }
-    }}
+    style={{ visibility: showButton ? "visible" : "hidden" }}
+    onClick={handleStartClick}
     className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
   >
     {lang("START_BUTTON")}
@@ -555,8 +645,8 @@ const setDataCollectionEnabled = useSettingsStore((s) => s.setDataCollectionEnab
         )}
       </div>
 
-      {/* ID Collection Modal */}
-      <IDCollectionModal isOpen={showIDModal} onSubmit={handleIDSubmit} />
+      {/* ID Collection Modal - only show in experiment mode */}
+      {experimentMode && <IDCollectionModal isOpen={showIDModal} onSubmit={handleIDSubmit} />}
     </div>
   );
 }

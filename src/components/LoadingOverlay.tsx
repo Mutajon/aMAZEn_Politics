@@ -1,5 +1,5 @@
 // src/components/LoadingOverlay.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRotatingText } from "../hooks/useRotatingText";
 

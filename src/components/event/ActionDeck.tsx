@@ -74,7 +74,7 @@ export default function ActionDeck({
     closeSuggestModal,
     startConfirmationFlow,
     startSuggestConfirmationFlow,
-    resetState,
+    logSuggestionSubmitted,
   } = state;
 
   // Coin flight system - use parent's trigger if provided, otherwise use local
@@ -204,6 +204,10 @@ export default function ActionDeck({
   };
 
   const handleConfirmSuggestion = async () => {
+    // Log suggestion submission with typing duration + cost/budget data
+    logSuggestionSubmitted(suggestCost, budget);
+
+    // Validate and confirm
     await suggestion.validateAndConfirmSuggestion(suggestText);
   };
 

@@ -10,10 +10,11 @@ type PreparedTTSHandle = { start: () => Promise<void>; dispose: () => void } | n
 export function useEventNarration() {
   const { current } = useDilemmaStore();
   const narrationEnabled = useSettingsStore((s) => s.narrationEnabled !== false);
-  const narrator = useNarrator();
+  const { prepare: prepareNarration, stop: stopNarration } = useNarrator();
 
   const preparedDilemmaRef = useRef<PreparedTTSHandle>(null);
   const dilemmaPlayedRef = useRef(false);
+  const skipNarrationLogRef = useRef(false);
   const [canShowDilemma, setCanShowDilemma] = useState(false);
 
   // Prepare narration whenever the dilemma changes
@@ -39,12 +40,16 @@ export function useEventNarration() {
 
         // Skip TTS preparation if narration disabled
         if (!narrationEnabled) {
-          console.log("[EventNarration] Skipping TTS preparation (narration disabled)");
+          if (!skipNarrationLogRef.current) {
+            console.log("[EventNarration] Skipping TTS preparation (narration disabled)");
+            skipNarrationLogRef.current = true;
+          }
           setCanShowDilemma(true);
           return;
         }
+        skipNarrationLogRef.current = false;
 
-        const p = await narrator.prepare(speech, { voiceName: "alloy", format: "mp3" });
+        const p = await prepareNarration(speech, { voiceName: "alloy", format: "mp3" });
         if (cancelled) {
           p.dispose();
           return;
@@ -63,7 +68,7 @@ export function useEventNarration() {
       preparedDilemmaRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.title, current?.description, narrationEnabled, narrator]);
+  }, [current?.title, current?.description, narrationEnabled, prepareNarration]);
 
   // Start narration when we reveal the dilemma (once) - controlled by reveal sequence
   const startNarrationIfReady = useCallback((shouldShowDilemma: boolean = true) => {

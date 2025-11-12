@@ -19,21 +19,30 @@ import { presentEventData, buildSupportItems } from "../lib/eventDataPresenter";
 import { cleanAndAdvanceDay } from "../lib/eventDataCleaner";
 import CollectorLoadingOverlay from "../components/event/CollectorLoadingOverlay";
 import DilemmaLoadError from "../components/event/DilemmaLoadError";
-import ResourceBar from "../components/event/ResourceBar";
+import ResourceBar, { type ResourceBarScoreDetails } from "../components/event/ResourceBar";
 import SupportList from "../components/event/SupportList";
-import { NewsTicker, buildDynamicParamsTickerItems } from "../components/event/NewsTicker";
+import { DynamicParameters, buildDynamicParamsItems } from "../components/event/DynamicParameters";
 import DilemmaCard from "../components/event/DilemmaCard";
-import MirrorCard from "../components/event/MirrorCard";
+import MirrorWithAvatar from "../components/event/MirrorWithAvatar";
 import CompassPillsOverlay from "../components/event/CompassPillsOverlay";
+import CorruptionPill from "../components/event/CorruptionPill";
 import ActionDeck, { type ActionCard } from "../components/event/ActionDeck";
+import CrisisWarningBanner, { type CrisisInfo } from "../components/event/CrisisWarningBanner";
 import { actionsToDeckCards } from "../components/event/actionVisuals";
 import { useCoinFlights, CoinFlightOverlay } from "../components/event/CoinFlightSystem";
 import { AnimatePresence } from "framer-motion";
 import { bgStyleWithRoleImage } from "../lib/ui";
+import { calculateLiveScoreBreakdown } from "../lib/scoring";
 import { Building2, Heart, Users } from "lucide-react";
 import type { CompassEffectPing } from "../components/MiniCompass";
 import { loadEventScreenSnapshot, clearEventScreenSnapshot } from "../lib/eventScreenSnapshot";
 import { useLang } from "../i18n/lang";
+import { useRoleProgressStore } from "../store/roleProgressStore";
+import { useTimingLogger } from "../hooks/useTimingLogger";
+import { useAIOutputLogger } from "../hooks/useAIOutputLogger";
+import { useReasoning } from "../hooks/useReasoning";
+import { useLogger } from "../hooks/useLogger";
+import ReasoningModal from "../components/event/ReasoningModal";
 
 type Props = {
   push: (path: string) => void;
@@ -43,13 +52,50 @@ export default function EventScreen3({ push }: Props) {
   const lang = useLang();
 
   // Global state (read only - single source of truth)
-  const { day, totalDays, budget } = useDilemmaStore();
-  const { character, roleBackgroundImage } = useRoleStore();
+  const { day, totalDays, budget, supportPeople, supportMiddle, supportMom, corruptionLevel, score, crisisMode: storedCrisisMode } = useDilemmaStore();
+  const { character, roleBackgroundImage, analysis } = useRoleStore();
+  const selectedRoleKey = useRoleStore((s) => s.selectedRole);
+  const roleProgress = useRoleProgressStore((s) =>
+    selectedRoleKey ? s.goals[selectedRoleKey] ?? null : null
+  );
   const showBudget = useSettingsStore((s) => s.showBudget);
   const debugMode = useSettingsStore((s) => s.debugMode);
 
   // Create role-based background style
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
+
+  // Build crisis information for warning banner
+  const crises = useMemo((): CrisisInfo[] => {
+    const CRISIS_THRESHOLD = 20;
+    const crisisArray: CrisisInfo[] = [];
+
+    if (supportPeople < CRISIS_THRESHOLD) {
+      crisisArray.push({
+        entity: "The People",
+        currentSupport: supportPeople,
+        type: "people"
+      });
+    }
+
+    if (supportMiddle < CRISIS_THRESHOLD) {
+      const challengerName = analysis?.challengerSeat?.name || "Power Holders";
+      crisisArray.push({
+        entity: challengerName,
+        currentSupport: supportMiddle,
+        type: "challenger"
+      });
+    }
+
+    if (supportMom < CRISIS_THRESHOLD) {
+      crisisArray.push({
+        entity: "Personal Anchor",
+        currentSupport: supportMom,
+        type: "caring"
+      });
+    }
+
+    return crisisArray;
+  }, [supportPeople, supportMiddle, supportMom, analysis]);
 
   // Data collection (progressive 3-phase loading)
   const {
@@ -69,7 +115,7 @@ export default function EventScreen3({ push }: Props) {
   const { progress, start: startProgress, reset: resetProgress, notifyReady } = useLoadingProgress();
 
   // Phase tracking
-  const [phase, setPhase] = useState<'collecting' | 'presenting' | 'interacting' | 'cleaning'>('collecting');
+  const [phase, setPhase] = useState<'collecting' | 'presenting' | 'interacting' | 'reasoning' | 'cleaning'>('collecting');
 
   // Presentation step tracking (controls what's visible)
   const [presentationStep, setPresentationStep] = useState<number>(-1);
@@ -85,16 +131,41 @@ export default function EventScreen3({ push }: Props) {
   // Coin flight system (persists across all phases)
   const { flights, triggerCoinFlight, clearFlights } = useCoinFlights();
 
+  // Data logging hooks (Timing, AI outputs)
+  // Note: State change tracking is handled globally in App.tsx via useStateChangeLogger
+  const timingLogger = useTimingLogger();
+  const aiLogger = useAIOutputLogger();
+  const logger = useLogger();
+
+  // Reasoning feature (treatment-based)
+  const reasoning = useReasoning();
+  const [showReasoningModal, setShowReasoningModal] = useState(false);
+  const [reasoningModalAction, setReasoningModalAction] = useState<ActionCard | null>(null);
+  const [isSubmittingReasoning, setIsSubmittingReasoning] = useState(false);
+  const reasoningResolveRef = useRef<(() => void) | null>(null);
+  const addReasoningEntry = useDilemmaStore((s) => s.addReasoningEntry);
+
+  // Timing tracker: time from dilemma presented to action confirmed
+  const decisionTimingIdRef = useRef<string | null>(null);
+
   // Compass pills state (for visual display during Step 4A)
   const [showCompassPills, setShowCompassPills] = useState(false);
+
+  // Corruption pill state (for visual display during Step 4A, Day 2+)
+  const [showCorruptionPill, setShowCorruptionPill] = useState(false);
 
   // Snapshot restoration flag (prevents collection when restored)
   const [restoredFromSnapshot, setRestoredFromSnapshot] = useState(false);
 
-  // Convert collected compassPills to CompassEffectPing format with unique IDs
+  // Read pending compass pills from dilemmaStore (set by cleaner after action confirmation)
+  // NOTE: Pills are now applied in eventDataCleaner.ts BEFORE day advances,
+  // not during next day's presentation. This fixes the one-day delay issue.
+  const pendingCompassPills = useDilemmaStore((s) => s.pendingCompassPills);
+
+  // Convert pending pills to CompassEffectPing format with unique IDs
   const compassPings: CompassEffectPing[] = useMemo(() => {
-    if (!collectedData?.compassPills) return [];
-    const pills = collectedData.compassPills.map((pill, i) => ({
+    if (!pendingCompassPills) return [];
+    const pills = pendingCompassPills.map((pill, i) => ({
       id: `${Date.now()}-${i}`,
       prop: pill.prop,
       idx: pill.idx,
@@ -104,7 +175,72 @@ export default function EventScreen3({ push }: Props) {
       console.log(`[EventScreen3] 💊 CompassPings populated: ${pills.length} pills`, pills);
     }
     return pills;
-  }, [collectedData?.compassPills]);
+  }, [pendingCompassPills]);
+
+  // Extract corruption pill data (Day 2+ only, feature flag gated)
+  const corruptionTrackingEnabled = useSettingsStore((s) => s.corruptionTrackingEnabled);
+  const corruptionPillData = useMemo(() => {
+    if (!corruptionTrackingEnabled) return null;
+    if (!collectedData?.corruptionShift || day === 1) return null;
+    if (Math.abs(collectedData.corruptionShift.delta) < 0.1) return null; // Ignore tiny changes
+
+    console.log(`[EventScreen3] 🔸 Corruption pill data:`, collectedData.corruptionShift);
+    return collectedData.corruptionShift;
+  }, [collectedData?.corruptionShift, day, corruptionTrackingEnabled]);
+
+  const scoreDetails: ResourceBarScoreDetails = useMemo(() => {
+    const breakdown = calculateLiveScoreBreakdown({
+      supportPeople,
+      supportMiddle,
+      supportMom,
+      corruptionLevel,
+    });
+
+    const middleLabel =
+      analysis?.challengerSeat?.name || lang("FINAL_SCORE_POWER_HOLDERS_SUPPORT");
+
+    return {
+      total: breakdown.final,
+      maxTotal: breakdown.maxFinal,
+      components: [
+        {
+          id: "people" as const,
+          label: lang("FINAL_SCORE_PUBLIC_SUPPORT"),
+          valueLabel: `${breakdown.support.people.percent}%`,
+          points: breakdown.support.people.points,
+          maxPoints: breakdown.support.people.maxPoints,
+        },
+        {
+          id: "middle" as const,
+          label: middleLabel,
+          valueLabel: `${breakdown.support.middle.percent}%`,
+          points: breakdown.support.middle.points,
+          maxPoints: breakdown.support.middle.maxPoints,
+        },
+        {
+          id: "mom" as const,
+          label: lang("FINAL_SCORE_MOM_SUPPORT"),
+          valueLabel: `${breakdown.support.mom.percent}%`,
+          points: breakdown.support.mom.points,
+          maxPoints: breakdown.support.mom.maxPoints,
+        },
+        {
+          id: "corruption" as const,
+          label: lang("FINAL_SCORE_CORRUPTION"),
+          valueLabel: `${breakdown.corruption.normalizedLevel.toFixed(1)}/10`,
+          points: breakdown.corruption.points,
+          maxPoints: breakdown.corruption.maxPoints,
+        },
+      ],
+    } as const;
+  }, [
+    supportPeople,
+    supportMiddle,
+    supportMom,
+    corruptionLevel,
+    analysis?.challengerSeat?.name,
+    lang,
+  ]);
 
   // ========================================================================
   // EFFECT 0A: Restore from snapshot if available (runs once on mount)
@@ -196,6 +332,23 @@ export default function EventScreen3({ push }: Props) {
   }, [presentationStep, initialSupportValues]);
 
   // ========================================================================
+  // EFFECT 2A: Log AI outputs when collected data arrives
+  // ========================================================================
+  // REMOVED: Logging moved to useEventDataCollector.ts to prevent duplicates
+  // AI outputs are now logged ONCE at the source when data is fetched
+  //
+  // NOTE: Compass pills are still logged separately in eventDataCleaner.ts
+  // after action confirmation, as they're fetched at a different time
+  useEffect(() => {
+    if (!collectedData) return;
+
+    // Log compass pills if available (these are fetched separately after action)
+    if (collectedData.compassPills) {
+      aiLogger.logCompassHints(collectedData.compassPills);
+    }
+  }, [collectedData, aiLogger]);
+
+  // ========================================================================
   // EFFECT 3: Advance to presenting when data ready
   // ========================================================================
   useEffect(() => {
@@ -221,6 +374,20 @@ export default function EventScreen3({ push }: Props) {
   }, [isReady, canShowDilemma, isCollecting, phase, collectedData, startNarrationIfReady, setPresentationStep, restoredFromSnapshot]);
 
   // ========================================================================
+  // EFFECT 3A: Start timing when entering interacting phase
+  // ========================================================================
+  useEffect(() => {
+    if (phase === 'interacting' && !decisionTimingIdRef.current) {
+      // Start timing decision
+      decisionTimingIdRef.current = timingLogger.start('decision_time', {
+        day,
+        dilemmaTitle: collectedData?.dilemma?.title
+      });
+      console.log('[EventScreen3] ⏱️ Decision timing started');
+    }
+  }, [phase, day, collectedData?.dilemma?.title, timingLogger]);
+
+  // ========================================================================
   // EFFECT 4: Control compass pills visibility (data-based, not step-based)
   // Pills show during interacting phase when they arrive (Phase 2 completes async)
   // ========================================================================
@@ -235,8 +402,109 @@ export default function EventScreen3({ push }: Props) {
   }, [phase, day, compassPings.length, showCompassPills]);
 
   // ========================================================================
+  // EFFECT 4B: Show/hide corruption pill based on phase and data availability
+  // ========================================================================
+  useEffect(() => {
+    // Show corruption pill when interacting AND data exists AND it's Day 2+ AND feature enabled
+    const shouldShow = phase === 'interacting' && corruptionPillData !== null && day > 1 && corruptionTrackingEnabled;
+
+    if (shouldShow !== showCorruptionPill) {
+      console.log(`[EventScreen3] 🔸 Corruption pill visibility: ${shouldShow} (phase: ${phase}, day: ${day}, enabled: ${corruptionTrackingEnabled})`);
+      setShowCorruptionPill(shouldShow);
+    }
+  }, [phase, day, corruptionPillData, corruptionTrackingEnabled, showCorruptionPill]);
+
+  // ========================================================================
+  // EFFECT 5: Redirect to downfall screen when terminal crisis occurs
+  // ========================================================================
+  useEffect(() => {
+    // Check if game ended with downfall crisis (all 3 tracks < 20%)
+    const isGameEnd = collectedData?.dilemma?.isGameEnd;
+
+    if (isGameEnd && storedCrisisMode === "downfall" && phase === 'interacting') {
+      console.log('[EventScreen3] 🚨 DOWNFALL DETECTED - Redirecting to downfall screen');
+      push('/downfall');
+    }
+  }, [collectedData, storedCrisisMode, phase, push]);
+
+  // ========================================================================
   // ACTION HANDLERS
   // ========================================================================
+
+  /**
+   * Show reasoning modal and wait for completion
+   */
+  const showReasoningModalForAction = (actionCard: ActionCard): Promise<void> => {
+    return new Promise((resolve) => {
+      reasoningResolveRef.current = resolve;
+      setReasoningModalAction(actionCard);
+      setShowReasoningModal(true);
+    });
+  };
+
+  /**
+   * Handle reasoning submission
+   */
+  const handleReasoningSubmit = async (reasoningText: string) => {
+    if (!reasoningModalAction) return;
+
+    setIsSubmittingReasoning(true);
+
+    // Store reasoning in dilemmaStore
+    addReasoningEntry({
+      day,
+      actionId: reasoningModalAction.id,
+      actionTitle: reasoningModalAction.title,
+      actionDescription: reasoningModalAction.summary,
+      reasoningText,
+    });
+
+    // Log reasoning stored
+    logger.logSystem(
+      "reasoning_stored",
+      {
+        day,
+        actionId: reasoningModalAction.id,
+        entryCount: useDilemmaStore.getState().reasoningHistory.length,
+        willSendToAI: true,
+      },
+      `Reasoning entry added to history (total: ${useDilemmaStore.getState().reasoningHistory.length})`
+    );
+
+    setIsSubmittingReasoning(false);
+
+    // Close modal and clear action (prevents ghost appearances on subsequent days)
+    setShowReasoningModal(false);
+    setReasoningModalAction(null);
+
+    // Resolve the promise to continue game flow
+    if (reasoningResolveRef.current) {
+      reasoningResolveRef.current();
+      reasoningResolveRef.current = null;
+    }
+  };
+
+  /**
+   * Handle reasoning skip (optional prompts only)
+   */
+  const handleReasoningSkip = () => {
+    setShowReasoningModal(false);
+    setReasoningModalAction(null);
+
+    // Resolve the promise to continue game flow
+    if (reasoningResolveRef.current) {
+      reasoningResolveRef.current();
+      reasoningResolveRef.current = null;
+    }
+  };
+
+  /**
+   * Handle reasoning modal close
+   */
+  const handleReasoningClose = () => {
+    setShowReasoningModal(false);
+    setReasoningModalAction(null);
+  };
 
   /**
    * Handle action confirmation - delegates ALL logic to EventDataCleaner
@@ -251,6 +519,36 @@ export default function EventScreen3({ push }: Props) {
     if (!actionCard) {
       console.error('[EventScreen3] ❌ Action not found:', id);
       return;
+    }
+
+    console.log('[EventScreen3] ✅ Action confirmed:', actionCard.title);
+
+    // End decision timing
+    if (decisionTimingIdRef.current) {
+      const duration = timingLogger.end(decisionTimingIdRef.current, {
+        day,
+        actionId: actionCard.id,
+        actionTitle: actionCard.title,
+        actionCost: actionCard.cost,
+        wasCustomAction: false
+      });
+      console.log(`[EventScreen3] ⏱️ Decision time: ${duration}ms`);
+      decisionTimingIdRef.current = null;
+    }
+
+    // Check if reasoning is required for this day
+    const shouldShowReasoning = reasoning.shouldShowReasoning();
+
+    if (shouldShowReasoning) {
+      console.log('[EventScreen3] 💭 Reasoning required - entering reasoning phase');
+
+      // Enter reasoning phase
+      setPhase('reasoning');
+
+      // Show reasoning modal and wait for completion
+      await showReasoningModalForAction(actionCard);
+
+      console.log('[EventScreen3] ✅ Reasoning complete - continuing to cleaning');
     }
 
     // Advance to cleaning phase
@@ -277,6 +575,19 @@ export default function EventScreen3({ push }: Props) {
 
     console.log('[EventScreen3] 💡 Processing custom suggestion:', text);
 
+    // End decision timing (custom action confirmed)
+    if (decisionTimingIdRef.current) {
+      const duration = timingLogger.end(decisionTimingIdRef.current, {
+        day,
+        actionId: 'suggest',
+        actionTitle: text.trim(),
+        actionLength: text.trim().length,
+        wasCustomAction: true
+      });
+      console.log(`[EventScreen3] ⏱️ Decision time (custom): ${duration}ms`);
+      decisionTimingIdRef.current = null;
+    }
+
     // Track custom action for goals system
     const { incrementCustomActions } = useDilemmaStore.getState();
     incrementCustomActions();
@@ -296,6 +607,21 @@ export default function EventScreen3({ push }: Props) {
       cardGradientClass: ''
     };
 
+    // Check if reasoning is required for this day
+    const shouldShowReasoning = reasoning.shouldShowReasoning();
+
+    if (shouldShowReasoning) {
+      console.log('[EventScreen3] 💭 Reasoning required - entering reasoning phase');
+
+      // Enter reasoning phase
+      setPhase('reasoning');
+
+      // Show reasoning modal and wait for completion
+      await showReasoningModalForAction(suggestionCard);
+
+      console.log('[EventScreen3] ✅ Reasoning complete - continuing to cleaning');
+    }
+
     // Advance to cleaning phase
     setPhase('cleaning');
 
@@ -314,30 +640,38 @@ export default function EventScreen3({ push }: Props) {
    * Useful for testing epic finale and game conclusion
    */
   const jumpToFinalDay = () => {
-    if (!collectedData?.dilemma?.actions || collectedData.dilemma.actions.length === 0) {
-      console.warn('[EventScreen3] Cannot jump - no actions available');
-      return;
+    const actions = collectedData?.dilemma?.actions || [];
+
+    let choiceData;
+    if (actions.length === 0) {
+      // Full autonomy mode or no actions - create mock action
+      console.log('[EventScreen3] 🚀 Jumping to final day (debug mode - mock action)');
+      choiceData = {
+        id: 'debug_mock' as 'a' | 'b' | 'c',
+        title: '[Debug Jump] Custom Action',
+        summary: 'Mock action created by debug tool',
+        cost: 0
+      };
+    } else {
+      // Normal mode - pick random action
+      const randomIndex = Math.floor(Math.random() * actions.length);
+      const randomAction = actions[randomIndex];
+      console.log('[EventScreen3] 🚀 Jumping to final day with random choice:', randomAction.title);
+      choiceData = {
+        id: randomAction.id as 'a' | 'b' | 'c',
+        title: randomAction.title,
+        summary: randomAction.summary,
+        cost: randomAction.cost
+      };
     }
-
-    // Pick random action from current dilemma
-    const actions = collectedData.dilemma.actions;
-    const randomIndex = Math.floor(Math.random() * actions.length);
-    const randomAction = actions[randomIndex];
-
-    console.log('[EventScreen3] 🚀 Jumping to final day with random choice:', randomAction.title);
 
     // Save this as last choice
     const { setLastChoice, setBudget } = useDilemmaStore.getState();
-    setLastChoice({
-      id: randomAction.id as 'a' | 'b' | 'c',
-      title: randomAction.title,
-      summary: randomAction.summary,
-      cost: randomAction.cost
-    });
+    setLastChoice(choiceData);
 
     // Apply budget change immediately (so it's reflected in the context)
     const currentBudget = useDilemmaStore.getState().budget;
-    setBudget(currentBudget + randomAction.cost);
+    setBudget(currentBudget + choiceData.cost);
 
     // Set day to 7 directly (daysLeft will be 1)
     useDilemmaStore.setState({ day: 7 });
@@ -400,14 +734,15 @@ export default function EventScreen3({ push }: Props) {
   }
 
   // ========================================================================
-  // RENDER: Presenting/Interacting/Cleaning Phase
+  // RENDER: Presenting/Interacting/Reasoning/Cleaning Phase
   // ========================================================================
-  if (collectedData && (phase === 'presenting' || phase === 'interacting' || phase === 'cleaning')) {
+  if (collectedData && (phase === 'presenting' || phase === 'interacting' || phase === 'reasoning' || phase === 'cleaning')) {
     // Calculate derived values
     const daysLeft = totalDays - day + 1;
 
-    // Game end detection - empty actions array signals conclusion
-    const isGameEnd = Array.isArray(collectedData.dilemma.actions) && collectedData.dilemma.actions.length === 0;
+    // Game end detection - use backend's isGameEnd flag (not actions length)
+    // Note: Empty actions are normal in fullAutonomy mode, but that doesn't mean game end
+    const isGameEnd = collectedData.dilemma.isGameEnd === true;
 
     // Build support items with deltas and initial values for animation
     const rawSupportItems = buildSupportItems(presentationStep, collectedData, initialSupportValues);
@@ -427,9 +762,9 @@ export default function EventScreen3({ push }: Props) {
       ? actionsToDeckCards(collectedData.dilemma.actions)
       : [];
 
-    // Build ticker items from dynamic parameters
+    // Build parameter items from dynamic parameters
     const isFirstDay = day === 1;
-    const tickerItems = buildDynamicParamsTickerItems(
+    const parameterItems = buildDynamicParamsItems(
       collectedData?.dynamicParams || null,
       isFirstDay
     );
@@ -448,13 +783,16 @@ export default function EventScreen3({ push }: Props) {
         )}
 
         <div className="max-w-3xl mx-auto space-y-3">
-          {/* Step 0+: ResourceBar (always visible) with avatar */}
+          {/* Step 0+: ResourceBar (always visible) */}
           {presentationStep >= 0 && (
             <ResourceBar
               budget={budget}
               daysLeft={daysLeft}
               showBudget={showBudget}
-              avatarSrc={character?.avatarUrl || null}
+              scoreGoal={roleProgress?.goal ?? null}
+              goalStatus={roleProgress?.status ?? "uncompleted"}
+              score={score}
+              scoreDetails={scoreDetails}
             />
           )}
 
@@ -463,9 +801,17 @@ export default function EventScreen3({ push }: Props) {
             <SupportList items={supportItems} />
           )}
 
-          {/* Step 3+: NewsTicker - Shows placeholder "News items incoming..." until dynamicParams ready */}
-          {presentationStep >= 3 && (
-            <NewsTicker items={tickerItems} />
+          {/* Step 3+: DynamicParameters - Shows 1-3 narrative impacts with emoji (Day 2+ only) */}
+          {presentationStep >= 3 && day >= 2 && (
+            <DynamicParameters items={parameterItems} />
+          )}
+
+          {/* Crisis Warning Banner (only during presenting/interacting phases, if any crises exist) */}
+          {(phase === 'presenting' || phase === 'interacting') && crises.length > 0 && presentationStep >= 4 && (
+            <CrisisWarningBanner
+              crises={crises}
+              autoDismiss={true}
+            />
           )}
 
           {/* Step 4+: DilemmaCard OR Aftermath (game ending) */}
@@ -499,11 +845,12 @@ export default function EventScreen3({ push }: Props) {
             </>
           )}
 
-          {/* Step 5+: MirrorCard with Compass Pills Overlay (skip if game end) */}
+          {/* Step 5+: MirrorWithAvatar with Compass Pills Overlay (skip if game end) */}
           {!isGameEnd && presentationStep >= 5 && collectedData && (
             <div className="relative">
-              <MirrorCard
+              <MirrorWithAvatar
                 text={collectedData.mirrorText}
+                avatarSrc={character?.avatarUrl || null}
                 // onExploreClick temporarily removed - navigation bugs prevent safe return to EventScreen
               />
               {/* Compass Pills Overlay - appears at Step 4A (Day 2+) */}
@@ -512,6 +859,14 @@ export default function EventScreen3({ push }: Props) {
                   effectPills={compassPings}
                   loading={false}
                   color="#7de8ff"
+                />
+              )}
+              {/* Corruption Pill - appears at Step 4A (Day 2+, if feature enabled) */}
+              {showCorruptionPill && corruptionPillData && (
+                <CorruptionPill
+                  delta={corruptionPillData.delta}
+                  reason={corruptionPillData.reason}
+                  newLevel={corruptionPillData.newLevel}
                 />
               )}
             </div>
@@ -543,6 +898,21 @@ export default function EventScreen3({ push }: Props) {
             />
           )}
         </AnimatePresence>
+
+        {/* Reasoning Modal - appears after action confirmation (treatment-based) */}
+        {reasoningModalAction && (
+          <ReasoningModal
+            isOpen={showReasoningModal}
+            onClose={handleReasoningClose}
+            onSubmit={handleReasoningSubmit}
+            onSkip={reasoning.isOptional() ? handleReasoningSkip : undefined}
+            actionTitle={reasoningModalAction.title}
+            actionSummary={reasoningModalAction.summary}
+            day={day}
+            isOptional={reasoning.isOptional()}
+            isSubmitting={isSubmittingReasoning}
+          />
+        )}
       </div>
     );
   }
