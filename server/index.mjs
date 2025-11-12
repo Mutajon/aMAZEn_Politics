@@ -26,13 +26,32 @@ app.use(bodyParser.json());
 const GAME_LIMIT = 100;
 
 /**
- * Randomly assign treatment to ensure balanced distribution
- * @returns {string} One of: 'fullAutonomy', 'semiAutonomy', 'noAutonomy'
+ * Adaptively assign treatment to ensure balanced distribution
+ * Selects from treatments with the minimum count, ensuring even distribution
+ * @returns {Promise<string>} One of: 'fullAutonomy', 'semiAutonomy', 'noAutonomy'
  */
-function assignRandomTreatment() {
+async function assignRandomTreatment() {
   const treatments = ['fullAutonomy', 'semiAutonomy', 'noAutonomy'];
-  const randomIndex = Math.floor(Math.random() * treatments.length);
-  return treatments[randomIndex];
+  const countersCollection = await getCountersCollection();
+  
+  // Get current counts for all treatments
+  const counts = {};
+  for (const treatment of treatments) {
+    const counterName = `treatment_${treatment}`;
+    const counter = await countersCollection.findOne({ name: counterName });
+    counts[treatment] = counter?.value || 0;
+  }
+  
+  // Find the minimum count
+  const minCount = Math.min(...Object.values(counts));
+  const underrepresented = treatments.filter(t => counts[t] === minCount);
+  const selected = underrepresented[
+    Math.floor(Math.random() * underrepresented.length)
+  ];
+  
+  await incrementCounter(`treatment_${selected}`);
+  
+  return selected;
 }
 
 // -------------------- User Registration & Treatment Assignment --------------------
@@ -79,8 +98,8 @@ app.post("/api/users/register", async (req, res) => {
       });
     }
 
-    // New user - assign random treatment
-    const treatment = assignRandomTreatment();
+    // New user - assign adaptive treatment
+    const treatment = await assignRandomTreatment();
     const now = new Date();
 
     const newUser = {
