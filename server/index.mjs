@@ -1484,16 +1484,15 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
     const useAnthropic = !!req.body?.useAnthropic;
     const topWhat = Array.isArray(req.body?.topWhat) ? req.body.topWhat.slice(0, 2) : [];
     const topWhence = Array.isArray(req.body?.topWhence) ? req.body.topWhence.slice(0, 2) : [];
+    const systemPrompt = req.body?.systemPrompt; // Get translated system prompt from client
+    const userPrompt = req.body?.userPrompt; // Get translated user prompt from client
 
     if (topWhat.length < 2 || topWhence.length < 2) {
       return res.status(400).json({ error: "Need at least 2 top values for both 'what' and 'whence'" });
     }
 
-    const [what1, what2] = topWhat;
-    const [whence1, whence2] = topWhence;
-
-    // === System prompt: dry wit, but no literal label dump, no numbers, no "values doing actions" ===
-    const system =
+    // Use translated prompts if provided, otherwise fall back to English defaults
+    const system = systemPrompt ||
       "You are a magical mirror sidekick bound to the player's soul. You reflect their inner values with warmth, speed, and theatrical charm.\n\n" +
       "VOICE:\n" +
       "- Succinct, deadpan, and a little wry; think quick backstage whisper, not stage show.\n" +
@@ -1504,12 +1503,15 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
       "- NEVER reveal numbers, scores, scales, or ranges.\n" +
       "- NEVER repeat the value labels verbatim; do not quote, uppercase, or mirror slashes.\n" +
       "- Paraphrase technical labels into plain, everyday phrases.\n" +
-      "- Do NOT stage literal actions for values (no “X is doing push-ups”, “baking cookies”, etc.).\n" +
+      "- Do NOT stage literal actions for values (no "X is doing push-ups", "baking cookies", etc.).\n" +
       "- No lists, no colons introducing items, no parenthetical asides.\n" +
       "- Keep the sentence clear first, witty second.\n";
 
-    // === User prompt: pass names only (no strengths), ask for paraphrased synthesis ===
-    const user =
+    const [what1, what2] = topWhat;
+    const [whence1, whence2] = topWhence;
+
+    // Use translated user prompt if provided, otherwise fall back to English default
+    const user = userPrompt ||
       `PLAYER TOP VALUES (names only):\n` +
       `GOALS: ${what1.name}, ${what2.name}\n` +
       `JUSTIFICATIONS: ${whence1.name}, ${whence2.name}\n\n` +
@@ -1522,7 +1524,11 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
       : await aiText({ system, user, model: MODEL_MIRROR });
 
     // === Last-mile sanitizer: keep one sentence and clamp word count ===
-    const raw = (text || "The mirror squints… then grins mischievously.").trim();
+    // Use appropriate fallback based on language (detect from prompt or default to English)
+    const fallbackText = systemPrompt && systemPrompt.includes("אתה שותף מראה") 
+      ? "המראה מצמצת… ואז מחייכת בערמומיות."
+      : "The mirror squints… then grins mischievously.";
+    const raw = (text || fallbackText).trim();
 
     // take first sentence-ish chunk
     let one = raw.split(/[.!?]+/).map(s => s.trim()).filter(Boolean)[0] || raw;

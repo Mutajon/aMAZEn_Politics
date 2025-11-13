@@ -7,30 +7,30 @@ export const POWER_DISTRIBUTION_TRANSLATIONS: Record<string, {
   flavor: string;
   holders: Record<string, { name: string; note: string }>;
 }> = {
-  "athens_404": {
+  "athens_431": {
     systemName: "ATHENS_SYSTEM_NAME",
     systemDesc: "ATHENS_SYSTEM_DESC",
     flavor: "ATHENS_FLAVOR",
     holders: {
-      "Coercive Force": {
-        name: "ATHENS_HOLDER_COERCIVE_NAME",
-        note: "ATHENS_HOLDER_COERCIVE_NOTE"
+      "Assembly (Ekklesia)": {
+        name: "ATHENS_HOLDER_ASSEMBLY_NAME",
+        note: "ATHENS_HOLDER_ASSEMBLY_NOTE"
       },
-      "Executive": {
-        name: "ATHENS_HOLDER_EXECUTIVE_NAME",
-        note: "ATHENS_HOLDER_EXECUTIVE_NOTE"
+      "Strategos (Generals)": {
+        name: "ATHENS_HOLDER_GENERALS_NAME",
+        note: "ATHENS_HOLDER_GENERALS_NOTE"
       },
-      "Wealth": {
+      "Council of 500 (Boule)": {
+        name: "ATHENS_HOLDER_COUNCIL_NAME",
+        note: "ATHENS_HOLDER_COUNCIL_NOTE"
+      },
+      "Law Courts (Dikasteria)": {
+        name: "ATHENS_HOLDER_COURTS_NAME",
+        note: "ATHENS_HOLDER_COURTS_NOTE"
+      },
+      "Wealthy Elite (Liturgy Payers)": {
         name: "ATHENS_HOLDER_WEALTH_NAME",
         note: "ATHENS_HOLDER_WEALTH_NOTE"
-      },
-      "Bureaucracy": {
-        name: "ATHENS_HOLDER_BUREAUCRACY_NAME",
-        note: "ATHENS_HOLDER_BUREAUCRACY_NOTE"
-      },
-      "Demos": {
-        name: "ATHENS_HOLDER_DEMOS_NAME",
-        note: "ATHENS_HOLDER_DEMOS_NOTE"
       }
     }
   },
