@@ -3,6 +3,7 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import os from "os";
+import { noReloadOnReconnect } from "./vite-plugin-no-reload";
 
 // Narrow the NIC type so TS doesn't infer `never`
 type NIC = { address: string; family: string | number; internal: boolean };
@@ -31,7 +32,7 @@ export default defineConfig(({ mode }) => {
   console.log(`[dev] Open on phone: http://${lan}:5173\n`);
 
   return {
-    plugins: [react()],
+    plugins: [react(), noReloadOnReconnect()],
     server: {
       host: true,     // expose to LAN
       port: 5173,

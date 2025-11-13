@@ -156,7 +156,7 @@ export default function AftermathScreen({ push }: Props) {
         role: selectedRole,
         finalScore: score,
         sessionDuration,
-        hasIdeologyRatings: !!data.ideologyRatings
+        hasIdeologyRatings: !!data.ratings
       },
       `Session reached aftermath: ${totalInquiries} inquiries, ${customActionCount} custom actions, ${day} days completed`
     );
@@ -168,7 +168,7 @@ export default function AftermathScreen({ push }: Props) {
       totalDays: day,
       role: selectedRole,
       finalScore: score,
-      hasIdeologyRatings: !!data.ideologyRatings,
+      hasIdeologyRatings: !!data.ratings,
       completedSuccessfully: true
     });
 
@@ -178,6 +178,19 @@ export default function AftermathScreen({ push }: Props) {
       totalDays: day,
       sessionDuration: sessionDuration ? `${Math.round(sessionDuration / 1000)}s` : 'unknown'
     });
+
+    // Collect and send session summary to MongoDB summary collection
+    (async () => {
+      try {
+        const { collectSessionSummary, sendSessionSummary } = await import('../hooks/useSessionSummary');
+        const summary = collectSessionSummary(data, false); // false = complete session
+        await sendSessionSummary(summary);
+        console.log('[AftermathScreen] ✅ Session summary sent to MongoDB');
+      } catch (error) {
+        console.error('[AftermathScreen] ❌ Failed to send session summary:', error);
+        // Don't throw - logging should never block user experience
+      }
+    })();
   }, [data, isFirstVisit, inquiryHistory, customActionCount, selectedRole, day, score, sessionLogger, logger]);
 
   // ========================================================================

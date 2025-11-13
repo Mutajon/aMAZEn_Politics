@@ -22,12 +22,26 @@ const useStrict = import.meta.env.MODE !== "development";
 
 (window as any).switchToGPT = () => {
   useSettingsStore.getState().setUseLightDilemmaAnthropic(false);
+  useSettingsStore.getState().setUseXAI(false);
   console.log("✅ Switched to GPT (OpenAI)");
-  console.log("📋 Affected: Dilemma generation + Mirror dialogue");
+  console.log("📋 Affected: Dilemma generation + Mirror dialogue + Image generation");
   console.log("🔧 Models configured in .env:");
   console.log("   - MODEL_DILEMMA");
   console.log("   - MODEL_MIRROR");
-  console.log("💡 Next dilemma/mirror will use OpenAI API");
+  console.log("   - IMAGE_MODEL");
+  console.log("💡 Next dilemma/mirror/avatar will use OpenAI API");
+};
+
+(window as any).switchToXAI = () => {
+  useSettingsStore.getState().setUseLightDilemmaAnthropic(false);
+  useSettingsStore.getState().setUseXAI(true);
+  console.log("✅ Switched to XAI (X.AI/Grok)");
+  console.log("📋 Affected: Dilemma generation + Compass pills + Image generation");
+  console.log("🔧 Models configured in .env:");
+  console.log("   - MODEL_DILEMMA_XAI");
+  console.log("   - IMAGE_MODEL_XAI (optional - falls back to OpenAI)");
+  console.log("💡 Next dilemma/compass will use XAI API");
+  console.log("⚠️  Note: XAI doesn't support image generation yet - will fall back to OpenAI");
 };
 
 // Debug mode toggle commands

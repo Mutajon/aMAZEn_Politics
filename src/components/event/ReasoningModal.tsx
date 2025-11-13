@@ -22,6 +22,7 @@ import { useState, useRef, useEffect } from "react";
 import { useTimingLogger } from "../../hooks/useTimingLogger";
 import { useLogger } from "../../hooks/useLogger";
 import { validateReasoningText } from "../../hooks/useReasoning";
+import { useDilemmaStore } from "../../store/dilemmaStore";
 
 // Mirror image constants (matching MirrorCard)
 const MIRROR_IMG_SRC = "/assets/images/mirror.png";
@@ -153,6 +154,10 @@ export default function ReasoningModal({
 
     // Submit reasoning
     await onSubmit(reasoningText);
+
+    // Increment reasoning submission counter for session summary
+    const { incrementReasoningCount } = useDilemmaStore.getState();
+    incrementReasoningCount();
 
     // Show acknowledgment
     setShowAcknowledgment(true);

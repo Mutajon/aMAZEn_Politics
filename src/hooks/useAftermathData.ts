@@ -14,6 +14,7 @@ import { useCompassStore } from "../store/compassStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { COMPONENTS, type PropKey } from "../data/compass-data";
 import type { AftermathRequest, AftermathResponse, TopCompassValue } from "../lib/aftermath";
+import { calculateOverallRatings } from "../lib/aftermath";
 
 /**
  * Extract top 2 compass values per dimension
@@ -92,7 +93,7 @@ export function useAftermathData() {
 
       // Build request
       const request: AftermathRequest = {
-        gameId, // Add gameId to get conversation history from backend
+        gameId: gameId || undefined, // Add gameId to get conversation history from backend (convert null to undefined)
         playerName,
         role,
         systemName,
@@ -121,10 +122,26 @@ export function useAftermathData() {
         throw new Error(`API error: ${response.status} ${response.statusText}`);
       }
 
-      const result: AftermathResponse = await response.json();
+      const apiResult = await response.json();
+
+      // Calculate overall ratings from individual decision ratings (including democracy)
+      const calculatedRatings = calculateOverallRatings(apiResult.decisions || []);
+
+      // Merge calculated ratings into response (ONLY autonomy and liberalism - democracy is hidden)
+      const result: AftermathResponse = {
+        ...apiResult,
+        ratings: {
+          autonomy: calculatedRatings.autonomy,
+          liberalism: calculatedRatings.liberalism
+          // Note: democracy rating is calculated but NOT included in response (hidden from UI)
+        }
+      };
 
       if (debugMode) {
-        console.log("[useAftermathData] Response:", result);
+        console.log("[useAftermathData] API Response (before calculation):", apiResult);
+        console.log("[useAftermathData] Calculated Ratings (ALL):", calculatedRatings);
+        console.log("[useAftermathData] Democracy Rating (HIDDEN):", calculatedRatings.democracy);
+        console.log("[useAftermathData] Final Response (democracy excluded):", result);
       }
 
       setData(result);

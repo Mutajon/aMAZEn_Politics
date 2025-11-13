@@ -2,6 +2,7 @@
 import "dotenv/config";
 import express from "express";
 import bodyParser from "body-parser";
+import cors from "cors";
 import Anthropic from "@anthropic-ai/sdk";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -20,6 +21,30 @@ import {
 import { getCountersCollection, incrementCounter, getUsersCollection } from "./db/mongodb.mjs";
 
 const app = express();
+
+// CORS Configuration - Security for production deployment
+// Restrict API access to allowed domains only (prevents unauthorized data submission)
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  : ['http://localhost:5173', 'http://localhost:3001']; // Development defaults
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`[CORS] Rejected request from origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(bodyParser.json());
 
 
@@ -172,8 +197,11 @@ app.use("/api/log", loggingRouter);
 // -------------------- Model & API config --------------------
 const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || "";
+const XAI_KEY = process.env.XAI_API_KEY || "";
 const CHAT_URL = "https://api.openai.com/v1/chat/completions";
 const IMAGE_URL = "https://api.openai.com/v1/images/generations";
+const XAI_CHAT_URL = "https://api.x.ai/v1/chat/completions";
+const XAI_IMAGE_URL = "https://api.x.ai/v1/images/generations";
 
 // Initialize Anthropic client
 const anthropic = ANTHROPIC_KEY ? new Anthropic({ apiKey: ANTHROPIC_KEY }) : null;
@@ -190,11 +218,13 @@ const MODEL_MIRROR_ANTHROPIC = process.env.MODEL_MIRROR_ANTHROPIC || ""; // No f
 const MODEL_DILEMMA = process.env.MODEL_DILEMMA || CHAT_MODEL_DEFAULT;
 const MODEL_DILEMMA_PREMIUM = process.env.MODEL_DILEMMA_PREMIUM || "gpt-5";
 const MODEL_DILEMMA_ANTHROPIC = process.env.MODEL_DILEMMA_ANTHROPIC || ""; // No fallback - must be set in .env
+const MODEL_DILEMMA_XAI = process.env.MODEL_DILEMMA_XAI || ""; // No fallback - must be set in .env
 const MODEL_COMPASS_HINTS = process.env.MODEL_COMPASS_HINTS || "gpt-5-mini";
 
 
 // Image model
 const IMAGE_MODEL = process.env.IMAGE_MODEL || "gpt-image-1";
+const IMAGE_MODEL_XAI = process.env.IMAGE_MODEL_XAI || ""; // No fallback - must be set in .env
 const IMAGE_SIZE = process.env.IMAGE_SIZE || "1024x1024";
 const IMAGE_QUALITY = process.env.IMAGE_QUALITY || "low"; // low|medium|high
 
@@ -815,6 +845,60 @@ async function aiTextAnthropic({ system, user, model = MODEL_DILEMMA_ANTHROPIC, 
   }
 }
 
+// -------------------- XAI (X.AI/Grok) AI Text Helper --------------------
+async function aiTextXAI({ system, user, model = MODEL_DILEMMA_XAI, temperature = 1, maxTokens = 4096 }) {
+  if (!XAI_KEY) {
+    throw new Error("XAI API key not configured - check XAI_API_KEY in .env");
+  }
+
+  if (!model || model === "") {
+    throw new Error("XAI model not configured - set MODEL_DILEMMA_XAI in .env");
+  }
+
+  try {
+    const messages = [
+      { role: "system", content: system },
+      { role: "user", content: user }
+    ];
+
+    const body = {
+      model: model,
+      messages: messages,
+      temperature: temperature,
+      max_tokens: maxTokens,
+      stream: false
+    };
+
+    const response = await fetch(XAI_CHAT_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${XAI_KEY}`
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[server] XAI API error (${response.status}):`, errorText);
+      throw new Error(`XAI API request failed: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content?.trim() || "";
+
+    if (!content) {
+      console.warn("[server] XAI returned empty content");
+      return "";
+    }
+
+    return content;
+  } catch (e) {
+    console.error(`[server] aiTextXAI error with model ${model}:`, e?.message || e);
+    throw e;
+  }
+}
+
 // -------------------- Health check --------------------------
 app.get("/api/_ping", (_req, res) => {
   res.json({
@@ -828,11 +912,13 @@ app.get("/api/_ping", (_req, res) => {
       mirror: MODEL_MIRROR,
       mirrorAnthropic: MODEL_MIRROR_ANTHROPIC,
       image: IMAGE_MODEL,
+      imageXAI: IMAGE_MODEL_XAI,
       tts: TTS_MODEL,
       ttsVoice: TTS_VOICE,
       dilemma: MODEL_DILEMMA,
       dilemmaPremium: MODEL_DILEMMA_PREMIUM,
       dilemmaAnthropic: MODEL_DILEMMA_ANTHROPIC,
+      dilemmaXAI: MODEL_DILEMMA_XAI,
       compassHints: MODEL_COMPASS_HINTS,
     },
   });
@@ -1324,19 +1410,40 @@ Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setti
 app.post("/api/generate-avatar", async (req, res) => {
   try {
     const prompt = String(req.body?.prompt || "").trim();
+    const useXAI = !!req.body?.useXAI;
+
     if (!prompt) return res.status(400).json({ error: "Missing prompt" });
 
+    // XAI fallback: XAI/Grok doesn't currently support image generation
+    // Fall back to OpenAI if XAI is requested but not configured
+    const shouldUseXAI = useXAI && XAI_KEY && IMAGE_MODEL_XAI;
+    const imageUrl = shouldUseXAI ? XAI_IMAGE_URL : IMAGE_URL;
+    const imageModel = shouldUseXAI ? IMAGE_MODEL_XAI : IMAGE_MODEL;
+    const apiKey = shouldUseXAI ? XAI_KEY : OPENAI_KEY;
+    const provider = shouldUseXAI ? "XAI" : "OpenAI";
+
+    if (useXAI && !shouldUseXAI) {
+      console.warn("[generate-avatar] XAI requested but not configured - falling back to OpenAI");
+    }
+
+    console.log(`[generate-avatar] Using ${provider} with model ${imageModel}`);
+
+    // Build request body - XAI doesn't support quality or size parameters
     const body = {
-      model: IMAGE_MODEL,
+      model: imageModel,
       prompt,
-      size: IMAGE_SIZE,
-      quality: IMAGE_QUALITY,
     };
 
-    const r = await fetch(IMAGE_URL, {
+    // Only add size and quality for OpenAI (XAI doesn't support them)
+    if (!shouldUseXAI) {
+      body.size = IMAGE_SIZE;
+      body.quality = IMAGE_QUALITY;
+    }
+
+    const r = await fetch(imageUrl, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${OPENAI_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
@@ -1344,7 +1451,7 @@ app.post("/api/generate-avatar", async (req, res) => {
 
     if (!r.ok) {
       const t = await r.text().catch(() => "");
-      throw new Error(`OpenAI image error ${r.status}: ${t}`);
+      throw new Error(`${provider} image error ${r.status}: ${t}`);
     }
 
     const data = await r.json();
@@ -3085,8 +3192,9 @@ app.post("/api/dynamic-parameters", async (req, res) => {
 Generate between 1 and 3 contextually relevant dynamic parameters that show the immediate consequences of the player's political decision. These parameters must be:
 - ULTRA-SHORT: maximum 4-5 words each
 - No explanations or narration
-- Pure factual outcomes with numbers
-- Specific, measurable results only
+- DRAMATIC, concrete events or outcomes
+- Numbers are OPTIONAL — use them only when they add dramatic impact
+- Focus on STORYTELLING, not statistics
 
 ${ANTI_JARGON_RULES}
 
@@ -3103,23 +3211,27 @@ CRITICAL RESTRICTIONS (ABSOLUTELY ENFORCED):
    - Each parameter must describe a concrete, consequential change in the world
 
 4. ALWAYS reflect tangible fallout from the player's action:
-   - Show bodies moved, equipment deployed, infrastructure altered, policies enforced, populations affected, or other physical shifts that a player could witness or count
+   - Show dramatic events, physical changes, or significant outcomes that matter in the story
+   - Numbers are optional but welcome when they amplify drama
 
 5. Each parameter must be:
-   - Specific (numbers, locations, or entities)
+   - Dramatic and concrete (avoid vague abstractions)
    - Interesting (reveals meaningful stakes or pressure)
    - Non-redundant with other surfaced information
    - Focused on direct consequences of the action
 
-DO use formats such as:
-- 2 brigades mobilized east
-- 4 cities under curfew
-- 120 factories reopen
+✅ GOOD EXAMPLES:
+- "Royal palace stormed" (dramatic, no number needed)
+- "Fleet defects to rebels" (dramatic, no number needed)
+- "4 cities under curfew" (number adds scope)
+- "120 factories reopen today" (number adds scale)
+- "Generals purged overnight" (dramatic, no number needed)
 
-DO NOT use formats such as:
-- 75% citizens unhappy
-- Public approval +12%
-- Parliament trust restored
+❌ BAD EXAMPLES:
+- "75% citizens unhappy" (abstract percentage)
+- "Public approval +12%" (sentiment metric)
+- "Parliament trust restored" (vague abstraction)
+- "Meetings scheduled" (boring, procedural)
 
 Choose appropriate icons from: Users, TrendingUp, TrendingDown, Shield, AlertTriangle, Heart, Building, Globe, Leaf, Zap, Target, Scale, Flag, Crown, Activity, etc.
 
@@ -3142,7 +3254,7 @@ Based on this political decision, generate 1-3 specific dynamic parameters that 
     {
       "id": "unique_id",
       "icon": "IconName",
-      "text": "Specific consequence with numbers",
+      "text": "Dramatic consequence (numbers optional)",
       "tone": "up|down|neutral"
     }
   ]
@@ -3277,12 +3389,11 @@ app.post("/api/aftermath", async (req, res) => {
       rank: supportDesc === "widely supported" ? "The Popular Leader" : supportDesc === "contested" ? "The Controversial Ruler" : "The Embattled Leader",
       decisions: (dilemmaHistory || []).map((entry, i) => ({
         title: sanitizeText(entry.choiceTitle || `Decision ${i + 1}`).slice(0, 120),
-        reflection: "This decision had complex consequences that affected multiple constituencies."
-      })),
-      ratings: {
+        reflection: "This decision had complex consequences that affected multiple constituencies.",
         autonomy: "medium",
-        liberalism: "medium"
-      },
+        liberalism: "medium",
+        democracy: "medium"
+      })),
       valuesSummary: `A leader who tried to balance competing interests in ${systemName || "a complex political environment"}.`,
       haiku: `${supportDesc === "widely supported" ? "Beloved" : supportDesc === "contested" ? "Debated" : "Opposed"} by many\nDecisions echo through time\nHistory will judge`
     };
@@ -3307,16 +3418,44 @@ Rank: short, amusing fictional title based on Remembrance part above.
 Decisions: for each decision, provide:
 - title: ≤12-word summary of the action taken
 - reflection: one SHORT sentence (~15-25 words) that EXPLAINS WHY this specific decision demonstrates support for or opposition to autonomy/heteronomy AND liberalism/totalism. Be concrete and educational—describe what aspect of the decision shows the ideological position rather than just stating the rating.
+- autonomy: rate THIS SPECIFIC DECISION on autonomy (very-low|low|medium|high|very-high)
+- liberalism: rate THIS SPECIFIC DECISION on liberalism (very-low|low|medium|high|very-high)
+- democracy: rate THIS SPECIFIC DECISION on democracy (very-low|low|medium|high|very-high)
 
-Examples of good reflections:
-- "Tightly controlled ceremony reflects heteronomy (state choreography) and liberalism (order without suppressing dissent)"
-- "Consulting citizens shows autonomy (empowering individual choice) and moderate liberalism (deliberative, slower process)"
-- "Forceful crackdown demonstrates heteronomy (external control) and totalism (prioritizing order over individual freedoms)"
+RATING FRAMEWORK:
 
-Ratings:
+1. Autonomy ↔ Heteronomy (Who decides?)
+   - High Autonomy: Self-direction, owned reasons ("I choose because…"), empowering individual/group choice, decentralized decision-making, willingness to accept responsibility for consequences.
+   - Low Autonomy (Heteronomy): External control, borrowed reasons ("because they/it says so"), imposed rules, top-down mandates, frequent delegation or obedience without personal justification.
 
-Autonomy: very-low|low|medium|high|very-high
-Liberalism: very-low|low|medium|high|very-high
+2. Liberalism ↔ Totalism (What's valued?)
+   - High Liberalism: Individual rights, pluralism, tolerance, protecting freedoms, narrow and proportionate limits justified by concrete harms, acceptance of multiple legitimate ways to live.
+   - Low Liberalism (Totalism): Uniformity, order or virtue over freedom, suppressing dissent, enforcing one thick moral/ideological code as the proper way to live, broad or indefinite restrictions on expression and lifestyle.
+
+3. Democracy ↔ Oligarchy (Who authors the rules and exceptions?)
+   - High Democracy: Broad and inclusive authorship of rules and exceptions (citizens, assemblies, representative bodies), real checks and vetoes (courts, elections, free media), shocks handled through shared procedures rather than personal rule.
+   - Low Democracy (Oligarchy): Concentrated control of rules and exceptions in a narrow elite (executive, generals, party, oligarchs), weak or neutralized checks, people treated as a mass to be managed rather than co-authors of decisions.
+
+Examples of good decision entries:
+- title: "Deploy troops to quell uprising"
+  reflection: "Forceful crackdown demonstrates heteronomy (external control) and totalism (prioritizing order over individual freedoms)"
+  autonomy: "very-low"
+  liberalism: "very-low"
+  democracy: "very-low"
+
+- title: "Hold public referendum on reforms"
+  reflection: "Consulting citizens shows autonomy (empowering individual choice) and moderate liberalism (deliberative, slower process)"
+  autonomy: "high"
+  liberalism: "medium"
+  democracy: "very-high"
+
+- title: "State-controlled ceremony with some dissent allowed"
+  reflection: "Tightly controlled ceremony reflects heteronomy (state choreography) and liberalism (order without suppressing dissent)"
+  autonomy: "low"
+  liberalism: "medium"
+  democracy: "low"
+
+IMPORTANT: The frontend will calculate overall ratings by averaging all 7 decision ratings. DO NOT provide overall ratings.
 
 Values Summary: one sentence capturing main motivations, justifications, means, and who benefited.
 
@@ -3329,8 +3468,7 @@ Return only:
   "intro": "",
   "remembrance": "",
   "rank": "",
-  "decisions": [{"title": "", "reflection": ""}],
-  "ratings": {"autonomy": "", "liberalism": ""},
+  "decisions": [{"title": "", "reflection": "", "autonomy": "", "liberalism": "", "democracy": ""}],
   "valuesSummary": "",
   "haiku": ""
 }`;
@@ -3420,24 +3558,20 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
     }
 
     // Normalize and validate response
+    const validRatings = ["very-low", "low", "medium", "high", "very-high"];
     const response = {
       intro: String(result?.intro || fallback.intro).slice(0, 500),
       remembrance: String(result?.remembrance || fallback.remembrance).slice(0, 1000),
       rank: String(result?.rank || fallback.rank).slice(0, 100),
       decisions: Array.isArray(result?.decisions)
-        ? result.decisions.map(d => ({
+        ? result.decisions.map((d, i) => ({
             title: String(d?.title || "").slice(0, 120),
-            reflection: String(d?.reflection || "").slice(0, 300)
+            reflection: String(d?.reflection || "").slice(0, 300),
+            autonomy: validRatings.includes(d?.autonomy) ? d.autonomy : "medium",
+            liberalism: validRatings.includes(d?.liberalism) ? d.liberalism : "medium",
+            democracy: validRatings.includes(d?.democracy) ? d.democracy : "medium"
           }))
         : fallback.decisions,
-      ratings: {
-        autonomy: ["very-low", "low", "medium", "high", "very-high"].includes(result?.ratings?.autonomy)
-          ? result.ratings.autonomy
-          : fallback.ratings.autonomy,
-        liberalism: ["very-low", "low", "medium", "high", "very-high"].includes(result?.ratings?.liberalism)
-          ? result.ratings.liberalism
-          : fallback.ratings.liberalism
-      },
       valuesSummary: String(result?.valuesSummary || fallback.valuesSummary).slice(0, 500),
       haiku: String(result?.haiku || fallback.haiku).slice(0, 300)
     };
@@ -3451,8 +3585,7 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
       remembrance: "They will be remembered for their decisions. Time will tell how history judges their reign.",
       rank: "The Leader",
       decisions: [],
-      ratings: { autonomy: "medium", liberalism: "medium" },
-      valuesSummary: "A leader who navigated custom political terrain.",
+      valuesSummary: "A leader who navigated complex political terrain.",
       haiku: "Power came and went\nDecisions echo through time\nHistory records"
     });
   }
@@ -3851,7 +3984,8 @@ app.post("/api/game-turn", async (req, res) => {
       totalDays: totalDaysInput,
       daysLeft: daysLeftInput,
       debugMode, // Optional: enable verbose logging (from settingsStore.debugEnabled)
-      generateActions = true // Optional: whether to generate AI action options (default true, false for fullAutonomy)
+      generateActions = true, // Optional: whether to generate AI action options (default true, false for fullAutonomy)
+      useXAI = false // Optional: use XAI/Grok instead of OpenAI (from settingsStore)
     } = req.body;
 
     const numericTotalDays = Number(totalDaysInput);
@@ -3968,7 +4102,8 @@ app.post("/api/game-turn", async (req, res) => {
         // Corruption tracking: Frontend calculates corruption level from history
         corruptionHistory: []       // Track last 3 raw AI judgments (0-10 scale)
       };
-      storeConversation(gameId, "pending", "openai", conversationMeta);
+      const provider = useXAI ? "xai" : "openai";
+      storeConversation(gameId, "pending", provider, conversationMeta);
 
     // ============================================================================
     // DAY 2-8: Continue existing conversation with player's choice
@@ -4122,9 +4257,13 @@ app.post("/api/game-turn", async (req, res) => {
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        console.log(`[GAME-TURN] Attempt ${attempt}/${maxAttempts}: Calling OpenAI with ${messages.length} messages...`);
+        const provider = useXAI ? "XAI" : "OpenAI";
+        const model = useXAI ? MODEL_DILEMMA_XAI : MODEL_DILEMMA;
+        console.log(`[GAME-TURN] Attempt ${attempt}/${maxAttempts}: Calling ${provider} (${model}) with ${messages.length} messages...`);
 
-        aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
+        aiResponse = useXAI
+          ? await callXAIChat(messages, MODEL_DILEMMA_XAI)
+          : await callOpenAIChat(messages, MODEL_DILEMMA);
 
         if (!aiResponse || !aiResponse.content) {
           console.warn(`[GAME-TURN] ⚠️ Attempt ${attempt} failed: Empty response from AI`);
@@ -4496,7 +4635,8 @@ app.post("/api/game-turn", async (req, res) => {
       touchConversation(gameId);
     } else {
       // First turn - store new conversation with messages
-      storeConversation(gameId, JSON.stringify({messages}), "openai");
+      const provider = useXAI ? "xai" : "openai";
+      storeConversation(gameId, JSON.stringify({messages}), provider);
       const newConv = getConversation(gameId);
       newConv.messages = messages;
       updateMetaWithTurn(newConv.meta);
@@ -5010,7 +5150,21 @@ function buildTurnUserPrompt({
   } else {
     lines.push(
       `TASK B: Now create the new political dilemma and three new options.`,
-      `Show what happens next as a consequence of the previous action.`,
+      ``,
+      `🚨 MANDATORY CONSEQUENCE REQUIREMENT:`,
+      `The player just took decisive action: "${playerChoice.title}"`,
+      ``,
+      `DO NOT ask them to confirm again - THEY ALREADY DECIDED.`,
+      `DO NOT show preparation or debate about whether to do it - THE ACTION ALREADY HAPPENED.`,
+      `SHOW THE IMMEDIATE, DRAMATIC RESULTS right now.`,
+      ``,
+      `Examples of what to show:`,
+      `- War declared → Battle begins, casualties, allies react, economy strains`,
+      `- Treaty signed → Implementation starts, public responds, opponents react`,
+      `- Arrests made → Trials begin, protests erupt, power shifts`,
+      `- Law passed → Citizens adapt, enforcement begins, unintended effects emerge`,
+      `- Reform enacted → Changes take effect, winners celebrate, losers resist`,
+      ``,
       `Remember: These new options haven't been chosen yet - they're future possibilities.`,
       ``
     );
@@ -5511,31 +5665,32 @@ YOUR RESPONSIBILITIES:
    - BORING: "3 meetings held", "debate started", "report filed"
    - DRAMATIC: "47 generals purged", "palace stormed", "treasury looted"
 
-   🔢 NUMERICAL REQUIREMENT (MANDATORY):
-   - EVERY parameter MUST contain a specific measurable value with a positive or negative number (avoid percentages)
-   - NEVER use qualitative/abstract language without numbers
-   - Format: emoji + NUMBER + outcome (3-5 words TOTAL)
+   🎭 DRAMATIC CONSEQUENCE REQUIREMENT:
+   - Every parameter must be a DRAMATIC, CONCRETE event or outcome
+   - Format: emoji + vivid consequence (3-5 words TOTAL)
+   - Numbers are OPTIONAL — use them ONLY when they add dramatic impact
+   - Focus on STORYTELLING, not statistics
 
-   ✅ GOOD EXAMPLES (DRAMATIC + NUMERICAL - copy this pattern):
-   - "⚔️ 47 generals purged overnight"
-   - "🔥 Royal palace stormed, 12 dead"
-   - "👥 4 million march against regime"
-   - "💰 Treasury looted, ₪2.3M gone"
-   - "🚢 Eastern fleet defects to rebels"
-   - "⚡ Power grid fails, 800K in dark"
-   - "🌾 Food riots erupt, 23 cities"
-   - "🏛️ Parliament dissolved, 89 arrested"
-   - "💣 Coup attempt fails, 156 executed"
+   ✅ GOOD EXAMPLES (DRAMATIC - copy this pattern):
+   - "🔥 Royal palace stormed" (dramatic, no number needed)
+   - "🚢 Eastern fleet defects to rebels" (dramatic, no number needed)
+   - "⚔️ Generals purged overnight" (dramatic, no number needed)
+   - "🏛️ Parliament dissolved by decree" (dramatic, no number needed)
+   - "💰 National treasury looted completely" (dramatic, no number needed)
+   - "⚡ Power grid catastrophically fails" (dramatic, no number needed)
+   - "👥 4 million march against regime" (number adds scale)
+   - "💣 156 executed after coup attempt" (number adds horror)
+   - "🌾 Food riots erupt, 23 cities" (number adds scope)
 
    ❌ BAD EXAMPLES (NEVER generate these):
-   - "+42% support" (percentage, not dramatic)
-   - "trust declines" (abstract, no number)
-   - "protests gather" (vague, no number)
+   - "+42% support" (abstract percentage, not dramatic)
+   - "trust declines" (vague, no concrete event)
+   - "protests gather" (vague, lacks drama)
    - "3 meetings scheduled" (procedural, boring)
-   - "debate initiated" (vague, who cares?)
+   - "debate initiated" (bureaucratic, who cares?)
    - "report submitted" (clerical, no stakes)
-   - "committee formed" (bureaucratic, boring)
-   - "tensions rise" (abstract, no number)
+   - "committee formed" (administrative, dull)
+   - "tensions rise" (abstract, no concrete event)
 
    🚫 FORBIDDEN CONTENT (AUTO-REJECT):
    - NEVER reference support/approval/popularity/morale/trust/confidence (already shown in support bars)
@@ -5669,20 +5824,34 @@ CONTINUITY & MEMORY:
   * Bureaucratic → Slow, procedural, technical
 - On Day ${totalDays}, create an EPIC FINALE: unrelated national crisis, defining moment, high stakes
 
-TOPIC VARIETY (Natural Flow):
-- Allow each political situation to develop naturally across 2-3 turns if consequences warrant
-- After 3 consecutive dilemmas on the same general topic area, provide closure:
-  * Summarize the outcome in 1 sentence
-  * Example: "The healthcare crisis stabilizes as reforms take hold."
-  * Then transition to a different policy domain naturally
-  * Maintain consequence continuity (e.g., "Meanwhile, economic concerns resurface...")
-- Policy domains: Economy, Security, Diplomacy, Rights, Infrastructure,
-  Environment, Health, Education, Justice, Culture, Foreign Relations, Technology
-- When shifting topics, favor angles that connect to the story themes listed above (${themeList}).
-- Trust your memory: You can see the full conversation history
-- Natural variety > forced variety (let political reality breathe)
-- Exception: If player's previous action created urgent follow-up (vote results, crisis escalation),
-  continue that thread even if 3+ turns on same topic
+🎯 MANDATORY TOPIC VARIETY ENFORCEMENT:
+
+STEP 1 - COUNT RECENT TOPICS:
+Look at the last 3 dilemmas in conversation history.
+Identify the BROAD TOPIC of each (Military, Economy, Religion, Justice, Infrastructure, Diplomacy, Internal Politics, Social Issues, etc.)
+
+STEP 2 - ENFORCE 2-CONSECUTIVE LIMIT:
+If the last 2 dilemmas were on the SAME broad topic:
+  → If that storyline CONCLUDED (war ended, treaty signed, crisis resolved):
+      - You MAY show ONE closure dilemma (peace terms, aftermath, immediate implementation)
+      - Then MUST switch to completely different topic on next turn
+  → If that storyline is ONGOING (war continues, tension unresolved):
+      - MUST switch to completely different topic NOW
+      - Include 1-sentence summary of ongoing situation in dynamic parameters or description
+      - Example: "While the Spartan war continues at the borders, a new crisis emerges..."
+
+STEP 3 - CHOOSE NEW TOPIC:
+When switching, select a topic that has NOT appeared in last 4 dilemmas.
+Policy domains: Military/Security, Economy/Trade, Religion/Culture, Justice/Law,
+Infrastructure/Technology, Diplomacy/Foreign Relations, Internal Politics, Social Rights,
+Health/Welfare, Education, Environment, Immigration
+
+When shifting topics, favor angles that connect to the story themes listed above (${themeList}).
+Trust your memory: You can see the full conversation history.
+
+📊 TOPIC TRACKING REMINDER:
+In your reasoning (not shown to player), mentally note the broad topic category.
+This helps maintain variety across the 7-day game and prevents repetitive scenarios.
 
 STYLE & VOICE (ALWAYS APPLY):
 - Keep language punchy and clear; every sentence should make sense to a bright high-school student without prior context.
@@ -6001,7 +6170,7 @@ AUTHORITY-AWARE SUPPORT REASONING:
   } else {
     lines.push(`TASK: Generate the next turn with ALL required data (dilemma + supportShift + mirrorAdvice + dynamicParams).`);
     if (day > 1) {
-      lines.push(`CRITICAL: Day ${day} MUST include "dynamicParams" array with minimum 2 concrete measurable consequences (e.g., GDP change, casualties, construction projects). DO NOT omit this field.`);
+      lines.push(`CRITICAL: Day ${day} MUST include "dynamicParams" array with minimum 2 dramatic consequences showing the impact of the player's last action. DO NOT omit this field.`);
     }
   }
 
@@ -6066,6 +6235,38 @@ async function callOpenAIChat(messages, model) {
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`OpenAI API error ${response.status}: ${errorText}`);
+  }
+
+  const data = await response.json();
+  return {
+    content: data?.choices?.[0]?.message?.content || "",
+    finishReason: data?.choices?.[0]?.finish_reason
+  };
+}
+
+/**
+ * Call XAI (X.AI/Grok) Chat API for game-turn endpoint
+ * Compatible with OpenAI API format
+ */
+async function callXAIChat(messages, model) {
+  const response = await fetch(XAI_CHAT_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${XAI_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: model || MODEL_DILEMMA_XAI,
+      messages: messages,
+      temperature: 1,
+      max_tokens: 6144,  // XAI uses max_tokens instead of max_completion_tokens
+      stream: false
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`XAI API error ${response.status}: ${errorText}`);
   }
 
   const data = await response.json();

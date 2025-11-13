@@ -1071,3 +1071,10 @@ export function getRoleImagePaths(imageId: string): { banner: string; full: stri
     full: `/assets/images/BKGs/Roles/${imageId}Full.jpg`,
   };
 }
+
+/**
+ * Helper function to get video path for a role
+ */
+export function getRoleVideoPath(imageId: string): string {
+  return `/assets/images/BKGs/Roles/videos/${imageId}Vid.mp4`;
+}

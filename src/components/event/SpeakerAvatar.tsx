@@ -59,19 +59,6 @@ export function SpeakerAvatar({ speakerName, imageId, onClick }: SpeakerAvatarPr
         {/* Subtle overlay on hover to indicate clickability */}
         <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity duration-300" />
       </div>
-
-      {/* Speaker Name Label - positioned to overlap bottom of avatar */}
-      <motion.div
-        className="absolute left-1/2 -translate-x-1/2 px-3 py-1 bg-black/60 backdrop-blur-sm rounded-full border border-slate-700/50"
-        style={{ bottom: "-10px" }} // Overlaps the avatar bottom by 10px
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2, duration: 0.3 }}
-      >
-        <p className="text-xs font-medium text-white/90 whitespace-nowrap">
-          {speakerName}
-        </p>
-      </motion.div>
     </motion.div>
   );
 }

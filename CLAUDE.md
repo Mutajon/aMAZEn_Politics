@@ -150,15 +150,20 @@ TTS_VOICE=alloy
 
 ## Key Game Mechanics
 
-**Natural Topic Variety:**
-- AI tracks conversation history to avoid repetition
-- After 3 consecutive same-topic dilemmas: transitions naturally
-- Exception: Urgent follow-ups (vote results, crises)
+**Strict Topic Variety System:**
+- **MAX 2 consecutive dilemmas** on the same broad topic (Military, Economy, Religion, etc.)
+- **Immediate Consequences**: AI shows dramatic results of player actions, no re-questioning decisions
+- **Closure Allowance**: If storyline concludes (war ends, treaty signed), AI may show 1 closure dilemma before switching
+- **Forced Switching**: After 2 consecutive on same topic, AI MUST switch to different subject area
+- **Implementation**: Lines 5717-5744 in `server/index.mjs` - explicit topic tracking and enforcement
+- **Goal**: Prevent "wobbling" around same decision, ensure varied gameplay experience
 
 **Dynamic Parameters:**
-- AI generates 1-3 measurable consequences per turn (Day 2+)
-- Format: 3-5 words with emoji (e.g., "GDP +2.3%", "47 buildings burned")
-- Variety enforced: economic → social → political → cultural rotation
+- AI generates 2-3 dramatic consequences per turn (Day 2+)
+- Format: emoji + vivid consequence, 3-5 words total
+- Numbers are OPTIONAL — used only when they add dramatic impact
+- Examples: "🔥 Royal palace stormed", "👥 4 million march", "🏛️ Parliament dissolved"
+- Emoji variety suggested (not enforced programmatically)
 - Component: `DynamicParameters.tsx`
 
 **Compass Values Integration:**
@@ -172,11 +177,13 @@ TTS_VOICE=alloy
 - Turn 7: Climax directive brings threads to decisive conclusion
 - Graceful degradation if seeding fails
 
-**Action Continuity System:**
-- **Automatic Detection**: Backend detects votes, referendums, negotiations, consultations via regex
-- **Mandatory Results**: When detected, AI receives explicit directive to show ACTUAL RESULTS, not preparation
-- **Implementation**: `server/index.mjs` lines 4695-4769 in `buildTurnUserPrompt`
-- **Covers**: votes/referendums (show outcome %), negotiations (show what happened in talks), consultations (show input received)
+**Immediate Consequence System:**
+- **Goal**: Show immediate, dramatic results of player actions - no re-questioning or hesitation
+- **ALL Actions Get Consequences**: Every player decision triggers consequence directive (lines 5040-5060)
+- **Explicit Examples**: War declared → battles begin; Treaties signed → implementation starts; Arrests → trials begin
+- **Specialized Detection**: Backend also detects votes, referendums, negotiations via regex for tailored result directives
+- **Implementation**: `server/index.mjs` lines 5040-5060 (general), lines 5033-5039 (vote/negotiation specific)
+- **Directive Language**: "DO NOT ask them to confirm again - THEY ALREADY DECIDED"
 - **System Feel**: Results play differently across political systems (democracies implement, autocracies may override)
 
 **Faction Identity Mapping:**

@@ -11,10 +11,12 @@
 
 import { useMemo } from "react";
 import { Hourglass } from "lucide-react";
-import { bgStyleWithRoleImage } from "../../lib/ui";
 import { useRoleStore } from "../../store/roleStore";
 import { useRotatingLeader } from "../../hooks/useRotatingLeader";
 import LeaderProfileCard from "./LeaderProfileCard";
+import { VideoBackground } from "./VideoBackground";
+import { getRoleVideoPath } from "../../data/predefinedRoles";
+import { motion } from "framer-motion";
 
 type Props = {
   progress: number; // 0-100 real-time progress percentage (REQUIRED)
@@ -27,14 +29,33 @@ export default function CollectorLoadingOverlay({
 }: Props) {
   const { currentLeader, currentRank, fadeState } = useRotatingLeader();
 
-  // Get role background image from store and create background style
+  // Get role background image from store
   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
-  const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
+
+  // Extract imageId from background path to determine video path
+  // Example: "/assets/images/BKGs/Roles/greeceFull.jpg" → "greece"
+  const imageId = useMemo(() => {
+    if (!roleBackgroundImage) return null;
+    const filename = roleBackgroundImage.split('/').pop(); // "greeceFull.jpg"
+    return filename?.replace('Full.jpg', ''); // "greece"
+  }, [roleBackgroundImage]);
+
+  // Get video path based on imageId
+  const videoPath = useMemo(() => {
+    return imageId ? getRoleVideoPath(imageId) : '';
+  }, [imageId]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={roleBgStyle}>
-      {/* Golden frame container wrapping all loading content */}
-      <div className="rounded-2xl border-slate-700/50 bg-black/60 backdrop-blur-sm ring-1 ring-amber-400/40 p-8 shadow-xl max-w-2xl">
+    <motion.div
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.5 }}
+      className="min-h-screen flex items-center justify-center relative"
+    >
+      {/* Video background (with fallback to static image) */}
+      <VideoBackground videoPath={videoPath} imagePath={roleBackgroundImage} />
+      {/* Golden frame container wrapping all loading content - positioned above video */}
+      <div className="rounded-2xl border-slate-700/50 bg-black/60 backdrop-blur-sm ring-1 ring-amber-400/40 p-8 shadow-xl max-w-2xl relative z-10">
         <div className="text-center">
           {/* Spinning Hourglass - Golden Yellow */}
           <div className="flex justify-center mb-6">
@@ -87,6 +108,6 @@ export default function CollectorLoadingOverlay({
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

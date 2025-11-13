@@ -71,6 +71,10 @@ type DilemmaState = {
     reasoningText: string;
     timestamp: number;
   }>;
+  reasoningSubmissionCount: number;  // Track total reasoning submissions for summary
+
+  // Decision timing tracking (for session summary statistics)
+  decisionTimes: number[];  // Array of decision durations in milliseconds
 
   current: Dilemma | null;
   history: Dilemma[];
@@ -211,6 +215,10 @@ type DilemmaState = {
     actionDescription: string;
     reasoningText: string;
   }) => void;                                                   // Store reasoning entry
+  incrementReasoningCount: () => void;                          // Increment reasoning submission counter
+
+  // Decision timing methods (for session summary)
+  addDecisionTime: (duration: number) => void;                  // Store decision duration
 
   // Crisis detection methods (NEW)
   detectAndSetCrisis: () => "downfall" | "people" | "challenger" | "caring" | null;  // Detect crisis after support updates, returns crisis mode
@@ -248,6 +256,10 @@ export const useDilemmaStore = create<DilemmaState>()(
 
   // Reasoning system (initialized empty, populated as player provides reasoning)
   reasoningHistory: [],
+  reasoningSubmissionCount: 0,
+
+  // Decision timing (initialized empty, populated as player makes decisions)
+  decisionTimes: [],
 
   current: null,
   history: [],
@@ -454,6 +466,8 @@ export const useDilemmaStore = create<DilemmaState>()(
       narrativeMemory: null,
       inquiryHistory: new Map(),
       inquiryCreditsRemaining: 0,
+      reasoningSubmissionCount: 0,
+      decisionTimes: [],
     });
   },
 
@@ -866,6 +880,24 @@ export const useDilemmaStore = create<DilemmaState>()(
     dlog("addReasoningEntry -> day", entry.day, "action:", entry.actionTitle, "length:", entry.reasoningText.length);
 
     set({ reasoningHistory: newHistory });
+  },
+
+  incrementReasoningCount() {
+    const { reasoningSubmissionCount } = get();
+    const newCount = reasoningSubmissionCount + 1;
+    dlog("incrementReasoningCount ->", newCount);
+    set({ reasoningSubmissionCount: newCount });
+  },
+
+  // ========================================================================
+  // DECISION TIMING METHODS
+  // ========================================================================
+
+  addDecisionTime(duration) {
+    const { decisionTimes } = get();
+    const newTimes = [...decisionTimes, duration];
+    dlog("addDecisionTime ->", duration, "ms | total decisions:", newTimes.length);
+    set({ decisionTimes: newTimes });
   },
 
   // ========================================================================

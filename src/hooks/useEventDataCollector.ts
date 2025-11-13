@@ -352,7 +352,11 @@ async function fetchGameTurn(): Promise<{
   const treatment = useSettingsStore.getState().treatment as TreatmentType;
   payload.generateActions = shouldGenerateAIOptions(treatment);
 
-  console.log(`[fetchGameTurn] Calling /api/game-turn for Day ${day}, gameId=${currentGameId}, treatment=${treatment}, generateActions=${payload.generateActions}`);
+  // Pass XAI provider flag
+  const useXAI = useSettingsStore.getState().useXAI;
+  payload.useXAI = useXAI;
+
+  console.log(`[fetchGameTurn] Calling /api/game-turn for Day ${day}, gameId=${currentGameId}, treatment=${treatment}, generateActions=${payload.generateActions}, useXAI=${useXAI}`);
 
   const response = await fetch("/api/game-turn", {
     method: "POST",
