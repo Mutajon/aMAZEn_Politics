@@ -68,9 +68,16 @@ export default function DilemmaCard({ title, description, speaker, speakerDescri
 
   // Determine speaker info
   const confidant = selectedRole ? getConfidantByLegacyKey(selectedRole) : undefined;
-  const speakerName = speaker || confidant?.name || "";
-  const speakerDescText = speakerDescription || confidant?.description || "";
-  const speakerImageId = confidant?.imageId;
+
+  // OVERRIDE: Always use "The Gatekeeper" for all roles
+  const speakerName = "The Gatekeeper";
+  const speakerDescText = "A being made of faint, shifting light. He was trapped here because he had once failed his own final test. Every lost soul that arrived, begging for a name they couldn't remember, was a chance for him to pay his endless debt. He gave them new lives—seven-day threads of existence—because only their success could possibly free him from his own long-dead failure.";
+  const speakerImageId = "gatekeeper"; // Use gatekeeper imageId
+
+  // Original implementation (commented out):
+  // const speakerName = speaker || confidant?.name || "";
+  // const speakerDescText = speakerDescription || confidant?.description || "";
+  // const speakerImageId = confidant?.imageId;
 
   // Show speaker avatar only if we have a speaker name
   const showSpeaker = !!speakerName;

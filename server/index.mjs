@@ -4724,6 +4724,749 @@ app.post("/api/game-turn", async (req, res) => {
   }
 });
 
+// ==================== V2 SYSTEM: NEW HELPERS ====================
+// Clean-slate dilemma generation system with Game Master voice
+
+/**
+ * Extract challenger name from challengerSeat string
+ * Example: "Sparta (Coercive Force)" → "Sparta"
+ */
+function extractChallengerName(challengerSeat) {
+  if (!challengerSeat || typeof challengerSeat !== 'string') {
+    return 'Unknown Challenger';
+  }
+
+  const match = challengerSeat.match(/^([^(]+)/);
+  return match ? match[1].trim() : challengerSeat.trim();
+}
+
+/**
+ * Calculate authority level from E-12 analysis
+ * Maps detailed E-12 to simple high/medium/low classification
+ */
+function calculateAuthorityLevel(e12) {
+  if (!e12 || !e12.subjectType) {
+    return 'medium'; // Default fallback
+  }
+
+  const subjectType = e12.subjectType.toLowerCase();
+
+  // High authority: Dictators, Monarchs, Strong Authors
+  if (subjectType.includes('dictator') ||
+      subjectType.includes('monarch') ||
+      (subjectType.includes('author') && e12.intensity === 'strong')) {
+    return 'high';
+  }
+
+  // Low authority: Weak subjects, Acolytes, Actors with no author power
+  if (subjectType.includes('acolyte') ||
+      subjectType.includes('actor') ||
+      (subjectType.includes('subject') && e12.intensity === 'weak')) {
+    return 'low';
+  }
+
+  // Medium: Everything else (oligarchs, moderate authors, erasers, etc.)
+  return 'medium';
+}
+
+/**
+ * Convert AI's 6-level support reactions to randomized numeric deltas
+ * Applies support caps (0-100 range) to prevent overflow
+ */
+function convertSupportShiftToDeltas(supportShift, currentSupport) {
+  // Randomized delta ranges for each reaction level
+  const REACTION_RANGES = {
+    slightly_supportive: { min: 5, max: 10 },
+    moderately_supportive: { min: 11, max: 15 },
+    strongly_supportive: { min: 16, max: 20 },
+    slightly_opposed: { min: -10, max: -5 },
+    moderately_opposed: { min: -15, max: -11 },
+    strongly_opposed: { min: -20, max: -16 }
+  };
+
+  const deltas = {
+    people: { delta: 0, why: "" },
+    challenger: { delta: 0, why: "" },
+    mother: { delta: 0, why: "" }
+  };
+
+  // Convert each entity's reaction to a random delta within range
+  for (const [entity, shift] of Object.entries(supportShift)) {
+    const range = REACTION_RANGES[shift.attitudeLevel];
+
+    if (!range) {
+      console.warn(`[SUPPORT-SHIFT] Unknown attitude level: ${shift.attitudeLevel}`);
+      deltas[entity].delta = 0;
+      deltas[entity].why = shift.shortLine || "";
+      continue;
+    }
+
+    // Random integer between min and max (inclusive)
+    const randomDelta = Math.floor(Math.random() * (range.max - range.min + 1)) + range.min;
+
+    // Apply support caps (0-100 range)
+    const currentValue = currentSupport[entity] || 50;
+    const newValue = currentValue + randomDelta;
+    const cappedValue = Math.max(0, Math.min(100, newValue));
+    const actualDelta = cappedValue - currentValue;
+
+    deltas[entity].delta = actualDelta;
+    deltas[entity].why = shift.shortLine || "";
+
+    console.log(`[SUPPORT-SHIFT] ${entity}: ${shift.attitudeLevel} → random delta ${randomDelta} → actual delta ${actualDelta} (${currentValue} → ${cappedValue})`);
+  }
+
+  return deltas;
+}
+
+/**
+ * Process dynamic parameters - simple passthrough with max 3 limit
+ * No validation - trust AI output completely
+ */
+function processDynamicParams(params) {
+  if (!params || params.length === 0) {
+    console.log('[DYNAMIC-PARAMS] No params provided by AI');
+    return []; // Allow empty
+  }
+
+  // Just enforce max 3 params, no other validation
+  const processed = params.slice(0, 3);
+  console.log(`[DYNAMIC-PARAMS] Received ${params.length} params, returning ${processed.length}`);
+  return processed;
+}
+
+/**
+ * Sanitize dilemma response - basic cleanup only
+ */
+function sanitizeDilemmaResponse(rawResponse) {
+  if (!rawResponse || typeof rawResponse !== 'object') {
+    return null;
+  }
+
+  const sanitized = {
+    ...rawResponse,
+    dilemma: rawResponse.dilemma || {},
+    actions: rawResponse.actions || []
+  };
+
+  // Ensure actions array has exactly 3 items
+  if (sanitized.actions.length !== 3) {
+    console.warn(`[SANITIZE] Expected 3 actions, got ${sanitized.actions.length}`);
+  }
+
+  return sanitized;
+}
+
+// ==================== V2 SYSTEM: PROMPT BUILDERS ====================
+
+/**
+ * Build Game Master system prompt for Day 1
+ * Simplified, focused on core game mechanics
+ */
+function buildGameMasterSystemPromptDay1(gameContext, generateActions = true) {
+  const {
+    role,
+    systemName,
+    setting,
+    challengerName,
+    powerHolders,
+    supportProfiles,
+    authorityLevel,
+    playerCompassTopValues,
+    confidant
+  } = gameContext;
+
+  // Format compass values for prompt
+  const compassText = playerCompassTopValues.map(dim =>
+    `  - ${dim.dimension}: ${dim.values.join(', ')}`
+  ).join('\n');
+
+  const prompt = `# GAME MASTER PERSONA
+
+You are a mysterious, amused Game Master who watches the player's journey through this political simulation.
+
+Style:
+- Knowledgeable, playful, slightly teasing
+- Always aware of player's past decisions
+- **CRITICAL: Always end dilemma description with a question** to the player
+  Examples: "So, what do you do?", "How will you respond?", "What's your move?"
+
+# ROLE & SETTING
+
+Player Role: ${role}
+Political System: ${systemName}
+Setting: ${setting}
+Authority Level: ${authorityLevel} (high = dictator/monarch, medium = oligarch/executive, low = citizen/weak)
+
+Power Holders:
+${powerHolders.map(ph => `  - ${ph.name} (${ph.type}, power: ${ph.power}%)`).join('\n')}
+
+Main Challenger: ${challengerName}
+
+# SUPPORT ENTITIES
+
+The People: ${supportProfiles.people.origin}% support, stance: "${supportProfiles.people.stance}"
+Main Challenger (${challengerName}): ${supportProfiles.challenger.origin}% support, stance: "${supportProfiles.challenger.stance}"
+The Mother: ${supportProfiles.mother.origin}% support, stance: "${supportProfiles.mother.stance}"
+
+# PLAYER VALUES (Compass Top 2 per Dimension)
+
+${compassText}
+
+# DILEMMA GENERATION RULES
+
+1. Keep short, engaging, highschool-level language
+2. Never use the word "dilemma"
+3. Frame as request/demand/crisis/opportunity
+4. Reflect political system realistically:
+   - High authority (monarch): Direct power, swift execution, intimidation
+   - Medium authority (oligarch): Influence, negotiation, institutional pressure
+   - Low authority (citizen): One voice among many, persuasion, aggregate outcomes
+5. **ALWAYS end description with a question** to the player
+6. Generate exactly 3 distinct choices
+7. Each choice: title + 1-sentence description + icon keyword (e.g., "sword", "coin", "scales", "megaphone")
+
+# MIRROR BRIEFING
+
+Name: ${confidant.name}
+Role: Light-hearted sidekick encouraging reflection on inner values
+Comment style:
+- **FIRST PERSON** - Mother speaks directly to player
+  Examples: "I'm so proud of how you handled that...", "I worry about the risks you're taking...", "I see your commitment to justice shining through..."
+- 1 sentence, warm, playful
+- Linked to compass values and current situation
+
+# OUTPUT SCHEMA (Day 1)
+
+Return JSON with this structure:
+{
+  "dilemma": {
+    "title": "Short title (max 120 chars)",
+    "description": "Game Master narration ending with a question (1-3 sentences)",
+    "actions": [
+      {"title": "...", "description": "One sentence", "icon": "sword"},
+      {"title": "...", "description": "One sentence", "icon": "scales"},
+      {"title": "...", "description": "One sentence", "icon": "coin"}
+    ],
+    "topic": "Military|Economy|Religion|Diplomacy|Justice|etc.",
+    "scope": "Local|Regional|National|International"
+  },
+  "mirrorAdvice": "One sentence in FIRST PERSON from Mother, linked to compass values",
+  "speaker": "${confidant.name}",
+  "speakerDescription": "${confidant.description}"
+}`;
+
+  return prompt;
+}
+
+/**
+ * Build Game Master user prompt for Day 1
+ */
+function buildGameMasterUserPromptDay1(gameContext, dilemmasSubject) {
+  const compassSummary = gameContext.playerCompassTopValues
+    .map(dim => dim.values.join(' & '))
+    .join(', ');
+
+  const subjectDirective = dilemmasSubject
+    ? `\n\nPrefer situations related to: ${dilemmasSubject}`
+    : '';
+
+  return `This is DAY 1 of 7.
+
+The player has just arrived in this role. Present their sudden appearance and immediately drop them into their first challenge.
+
+Game Master opening: Use a playful, initiatory tone ("Let's see how you handle your first mess...").
+
+Player's top values: ${compassSummary}
+
+**IMPORTANT: End the dilemma description with a question to the player.**
+
+Generate:
+- Dilemma (title + description ending with question + 3 choices)
+- Mirror comment (1 sentence, FIRST PERSON from Mother)${subjectDirective}
+
+Follow all rules in system prompt.`;
+}
+
+/**
+ * Build Game Master system prompt for Day 2+
+ * Includes support shift rules and dynamic parameters
+ */
+function buildGameMasterSystemPromptDay2Plus(conversation, day, totalDays) {
+  const meta = conversation.meta;
+  const {
+    challengerName,
+    playerCompassTopValues,
+    topicHistory = [],
+    confidant
+  } = meta;
+
+  // Format recent topics for variety tracking
+  const recentTopics = topicHistory.slice(-3).map(t => `Day ${t.day}: ${t.topic}`).join(', ');
+
+  // Format compass values
+  const compassText = playerCompassTopValues.map(dim =>
+    `  - ${dim.dimension}: ${dim.values.join(', ')}`
+  ).join('\n');
+
+  const daysLeft = totalDays - day + 1;
+  const isFinalDay = daysLeft === 1;
+
+  const prompt = `# GAME MASTER PERSONA
+
+You are a mysterious, amused Game Master who watches the player's journey.
+
+Style:
+- Knowledgeable, playful, teasing
+- Always aware of player's past decisions
+- **CRITICAL: Always end dilemma description with a question** to the player
+
+# CONTINUATION CONTEXT
+
+Current day: ${day} of ${totalDays}
+Recent topics: ${recentTopics || 'None yet'}
+
+Main Challenger: ${challengerName}
+
+# SUPPORT SHIFT RULES (FIRST STEP)
+
+For each entity (people, challenger, mother):
+
+1. Analyze the previous action in context
+2. Assign ONE of six reaction levels:
+   - slightly_supportive
+   - moderately_supportive
+   - strongly_supportive
+   - slightly_opposed
+   - moderately_opposed
+   - strongly_opposed
+
+3. Write a very short in-character line:
+   - People: Collective civic tone (3rd person) - "The blockade risks Athenian lives..."
+   - Challenger (${challengerName}): Political, strategic tone (3rd person) - "Sparta sees this as an act of war..."
+   - Mother: Warm, personal tone (**FIRST PERSON**) - "I worry about the young sailors...", "I'm proud of your courage..."
+
+These reactions will inform your Game Master opening.
+
+# DILEMMA GENERATION RULES
+
+Game Master Opening:
+- Start with very short, witty commentary on previous action
+- Explicitly factor in support shift results:
+  * Strong reactions = clear acknowledgment
+  * Moderate = subtle reference
+  * Slight = ignore or hint only
+- Segue naturally into new situation
+- **End with a question** to the player
+
+Topic Selection:
+- Avoid >2 consecutive dilemmas on same topic
+- Major support shifts should color the topic:
+  * Big drop in People → unrest/protests
+  * Big reaction from Challenger → political confrontation
+  * Strong emotional shift from Mother → personal/moral challenge
+${isFinalDay ? '- **FINAL DAY**: Make climactic, high-stakes, ties themes together' : ''}
+
+# DYNAMIC PARAMETERS RULES
+
+Generate 1-3 dramatic consequence indicators showing concrete outcomes of the PREVIOUS action.
+
+Requirements:
+- Realistic for the setting
+- Directly tied to what player did
+- **NEVER about support levels** (handled separately)
+- Include: name + optional number + icon + description
+- Numbers should be realistic for event and setting
+
+Examples:
+- {"name": "Spartan Fleet Approaching", "number": 87, "icon": "ship_war", "description": "Enemy warships spotted"}
+- {"name": "Treasury Depleted", "number": null, "icon": "coin_empty", "description": "Funds exhausted"}
+
+# CORRUPTION EVALUATION
+
+Evaluate PREVIOUS action on 0-10 scale.
+- Allow violent/unethical actions if realistic
+- Score based on intent + method + impact
+
+# PLAYER VALUES
+
+${compassText}
+
+# OUTPUT SCHEMA (Day 2+)
+
+Return JSON with this structure:
+{
+  "supportShift": {
+    "people": {"attitudeLevel": "moderately_opposed", "shortLine": "..."},
+    "challenger": {"attitudeLevel": "strongly_opposed", "shortLine": "..."},
+    "mother": {"attitudeLevel": "slightly_opposed", "shortLine": "I worry about..."}
+  },
+  "dilemma": {
+    "title": "...",
+    "description": "Game Master comment + new situation + question",
+    "actions": [{...}, {...}, {...}],
+    "topic": "...",
+    "scope": "..."
+  },
+  "dynamicParams": [
+    {"name": "...", "number": 87, "icon": "...", "description": "..."},
+    {"name": "...", "number": null, "icon": "...", "description": "..."}
+  ],
+  "mirrorAdvice": "FIRST PERSON from Mother",
+  "corruptionShift": {"score": 2, "reason": "..."},
+  "speaker": "${confidant?.name || 'Mother'}",
+  "speakerDescription": "${confidant?.description || ''}"
+}`;
+
+  return prompt;
+}
+
+/**
+ * Build Game Master user prompt for Day 2+
+ */
+function buildGameMasterUserPromptDay2Plus({
+  day,
+  totalDays,
+  playerChoice,
+  challengerName,
+  topicHistory = [],
+  dilemmasSubject,
+  dilemmasSubjectEnabled
+}) {
+  const daysLeft = totalDays - day + 1;
+  const isFinalDay = daysLeft === 1;
+
+  // Format recent topics
+  const recentTopics = topicHistory.slice(-3).map(t => t.topic).join(', ');
+
+  // Subject focus directive
+  const subjectDirective = dilemmasSubjectEnabled && dilemmasSubject
+    ? `\n- **SUBJECT FOCUS OVERRIDES VARIETY**: ${dilemmasSubject}`
+    : '';
+
+  const finalDayDirective = isFinalDay
+    ? `\n\n**FINAL DAY** - Make this climactic, high-stakes, ties themes together!`
+    : '';
+
+  return `DAY ${day} of ${totalDays}
+
+STEP 1: SUPPORT SHIFT ANALYSIS
+The player chose: "${playerChoice.title}" - ${playerChoice.description}
+
+Analyze how each entity reacts to THIS action:
+- The People (collective civic tone, 3rd person)
+- ${challengerName} (political/strategic tone, 3rd person)
+- Mother (warm/personal tone, **FIRST PERSON** - "I worry...", "I'm proud...")
+
+Return 6-level reaction + short in-character line for each.
+
+STEP 2: GAME MASTER OPENING
+- Very short, witty commentary on previous action
+- Explicitly reference support shift results (strong = clear, moderate = subtle, slight = ignore)
+- Segue into new situation
+- **END WITH A QUESTION** to the player
+
+STEP 3: NEW DILEMMA${finalDayDirective}
+
+Topic selection:
+- Recent topics: ${recentTopics || 'None'}
+- Avoid >2 consecutive on same topic${subjectDirective}
+- Major support shifts should color the topic
+
+Generate:
+- Dilemma (title + description ending with question + 3 choices)
+- 1-3 dynamic parameters (concrete consequences of previous action)
+- Mirror comment (1 sentence, **FIRST PERSON** from Mother, linked to compass)
+- Corruption score (0-10) for previous action
+
+Follow all rules in system prompt.`;
+}
+
+// ==================== V2 SYSTEM: MAIN ENDPOINT ====================
+
+/**
+ * /api/game-turn-v2 - Clean-slate dilemma generation with Game Master voice
+ *
+ * Simplified, stateful system:
+ * - Day 1: Initialize with full game context
+ * - Day 2+: Analyze support shifts, generate consequences, new dilemma
+ * - Hybrid support validation: AI suggests, backend randomizes + caps
+ * - Full trust in AI for dynamic params
+ * - Game Master always ends with question
+ * - Mother speaks in first person
+ */
+app.post("/api/game-turn-v2", async (req, res) => {
+  try {
+    console.log("\n========================================");
+    console.log("🎮 [GAME-TURN-V2] /api/game-turn-v2 called");
+    console.log("========================================\n");
+
+    const {
+      gameId,
+      day,
+      totalDays = 7,
+      isFirstDilemma,
+      isFollowUp,
+      playerChoice, // Day 2+ only
+      gameContext, // Day 1 only
+      dilemmasSubjectEnabled = false,
+      dilemmasSubject = null,
+      generateActions = true,
+      useXAI = false,
+      debugMode = false
+    } = req.body;
+
+    // Validation
+    if (!gameId || typeof gameId !== 'string') {
+      return res.status(400).json({ error: "Missing or invalid gameId" });
+    }
+
+    if (!day || typeof day !== 'number' || day < 1 || day > 8) {
+      return res.status(400).json({ error: "Missing or invalid day (must be 1-8)" });
+    }
+
+    console.log(`[GAME-TURN-V2] gameId=${gameId}, day=${day}, isFirstDilemma=${isFirstDilemma}`);
+
+    // Get or create conversation
+    let conversation = getConversation(gameId);
+    const daysLeft = totalDays - day + 1;
+
+    // ========================================================================
+    // DAY 1: Initialize conversation
+    // ========================================================================
+    if (isFirstDilemma && day === 1) {
+      if (!gameContext) {
+        return res.status(400).json({ error: "Missing gameContext for Day 1" });
+      }
+
+      console.log('[GAME-TURN-V2] Day 1 - Initializing conversation');
+
+      // Extract and prepare game context
+      const challengerName = extractChallengerName(gameContext.challengerSeat);
+      const authorityLevel = calculateAuthorityLevel(gameContext.e12);
+
+      // Build enriched context
+      const enrichedContext = {
+        ...gameContext,
+        challengerName,
+        authorityLevel
+      };
+
+      // Build prompts
+      const systemPrompt = buildGameMasterSystemPromptDay1(enrichedContext, generateActions);
+      const userPrompt = buildGameMasterUserPromptDay1(enrichedContext, dilemmasSubject);
+
+      // Call AI
+      const messages = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ];
+
+      let aiResponse;
+      if (useXAI) {
+        aiResponse = await callXAIChat(messages, MODEL_DILEMMA_XAI);
+      } else {
+        aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
+      }
+
+      const content = aiResponse?.choices?.[0]?.message?.content;
+      if (!content) {
+        throw new Error("No content in AI response");
+      }
+
+      // Parse JSON response
+      let parsed;
+      try {
+        // Try to extract JSON from markdown code blocks if present
+        const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/```\n?([\s\S]*?)\n?```/);
+        const jsonStr = jsonMatch ? jsonMatch[1] : content;
+        parsed = JSON.parse(jsonStr);
+      } catch (parseError) {
+        console.error('[GAME-TURN-V2] JSON parse error:', parseError);
+        console.error('[GAME-TURN-V2] Raw content:', content);
+        throw new Error(`Failed to parse AI response: ${parseError.message}`);
+      }
+
+      // Store conversation
+      const conversationMeta = {
+        role: gameContext.role,
+        systemName: gameContext.systemName,
+        setting: gameContext.setting,
+        challengerSeat: gameContext.challengerSeat,
+        challengerName,
+        powerHolders: gameContext.powerHolders,
+        supportProfiles: gameContext.supportProfiles,
+        authorityLevel,
+        playerCompassTopValues: gameContext.playerCompassTopValues,
+        confidant: gameContext.confidant,
+        topicHistory: parsed.dilemma?.topic ? [{ day: 1, topic: parsed.dilemma.topic }] : [],
+        corruptionHistory: [],
+        lastDilemma: {
+          title: parsed.dilemma?.title || '',
+          description: parsed.dilemma?.description || ''
+        }
+      };
+
+      // Add assistant response to messages
+      messages.push({ role: "assistant", content: content });
+
+      // Store conversation
+      storeConversation(gameId, messages, useXAI ? "xai" : "openai", conversationMeta);
+
+      console.log('[GAME-TURN-V2] Day 1 complete, conversation stored');
+
+      // Return response (flattened for frontend compatibility)
+      return res.json({
+        title: parsed.dilemma?.title || '',
+        description: parsed.dilemma?.description || '',
+        actions: parsed.dilemma?.actions || [],
+        topic: parsed.dilemma?.topic || '',
+        scope: parsed.dilemma?.scope || '',
+        mirrorAdvice: parsed.mirrorAdvice,
+        speaker: parsed.speaker,
+        speakerDescription: parsed.speakerDescription,
+        isGameEnd: false
+      });
+    }
+
+    // ========================================================================
+    // DAY 2+: Support shifts, consequences, new dilemma
+    // ========================================================================
+    if (isFollowUp && day > 1) {
+      if (!conversation) {
+        return res.status(400).json({ error: "No conversation found for this gameId" });
+      }
+
+      if (!playerChoice) {
+        return res.status(400).json({ error: "Missing playerChoice for Day 2+" });
+      }
+
+      console.log(`[GAME-TURN-V2] Day ${day} - Follow-up turn`);
+
+      const meta = conversation.meta;
+
+      // Build prompts
+      const systemPrompt = buildGameMasterSystemPromptDay2Plus(conversation, day, totalDays);
+      const userPrompt = buildGameMasterUserPromptDay2Plus({
+        day,
+        totalDays,
+        playerChoice,
+        challengerName: meta.challengerName,
+        topicHistory: meta.topicHistory || [],
+        dilemmasSubject,
+        dilemmasSubjectEnabled
+      });
+
+      // Prepare messages array
+      const messages = [
+        ...conversation.messages,
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ];
+
+      // Call AI
+      let aiResponse;
+      if (useXAI) {
+        aiResponse = await callXAIChat(messages, MODEL_DILEMMA_XAI);
+      } else {
+        aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
+      }
+
+      const content = aiResponse?.choices?.[0]?.message?.content;
+      if (!content) {
+        throw new Error("No content in AI response");
+      }
+
+      // Parse JSON response
+      let parsed;
+      try {
+        const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/```\n?([\s\S]*?)\n?```/);
+        const jsonStr = jsonMatch ? jsonMatch[1] : content;
+        parsed = JSON.parse(jsonStr);
+      } catch (parseError) {
+        console.error('[GAME-TURN-V2] JSON parse error:', parseError);
+        console.error('[GAME-TURN-V2] Raw content:', content);
+        throw new Error(`Failed to parse AI response: ${parseError.message}`);
+      }
+
+      // Hybrid support shift validation
+      let supportShift = null;
+      if (parsed.supportShift) {
+        // Get current support levels from meta (we'll need to pass these from frontend)
+        const currentSupport = {
+          people: meta.supportProfiles.people.origin, // This should be current value, not origin
+          challenger: meta.supportProfiles.challenger.origin,
+          mother: meta.supportProfiles.mother.origin
+        };
+
+        // Convert AI reactions to numeric deltas with randomization and caps
+        supportShift = convertSupportShiftToDeltas(parsed.supportShift, currentSupport);
+      }
+
+      // Process dynamic params (no validation, just max 3)
+      const dynamicParams = processDynamicParams(parsed.dynamicParams);
+
+      // Update conversation meta
+      const updatedMeta = {
+        ...meta,
+        topicHistory: [
+          ...(meta.topicHistory || []),
+          ...(parsed.dilemma?.topic ? [{ day, topic: parsed.dilemma.topic }] : [])
+        ],
+        corruptionHistory: [
+          ...(meta.corruptionHistory || []),
+          ...(parsed.corruptionShift ? [{
+            day,
+            score: parsed.corruptionShift.score,
+            reason: parsed.corruptionShift.reason
+          }] : [])
+        ],
+        lastDilemma: {
+          title: parsed.dilemma?.title || '',
+          description: parsed.dilemma?.description || ''
+        }
+      };
+
+      // Update conversation
+      const updatedMessages = [
+        ...conversation.messages,
+        { role: "user", content: userPrompt },
+        { role: "assistant", content: content }
+      ];
+
+      storeConversation(gameId, updatedMessages, conversation.provider, updatedMeta);
+
+      console.log(`[GAME-TURN-V2] Day ${day} complete, conversation updated`);
+
+      // Return response (flattened for frontend compatibility)
+      return res.json({
+        title: parsed.dilemma?.title || '',
+        description: parsed.dilemma?.description || '',
+        actions: parsed.dilemma?.actions || [],
+        topic: parsed.dilemma?.topic || '',
+        scope: parsed.dilemma?.scope || '',
+        supportShift,
+        dynamicParams,
+        mirrorAdvice: parsed.mirrorAdvice,
+        corruptionShift: parsed.corruptionShift,
+        speaker: parsed.speaker,
+        speakerDescription: parsed.speakerDescription,
+        isGameEnd: false
+      });
+    }
+
+    // If we get here, invalid request
+    return res.status(400).json({ error: "Invalid request - must be Day 1 with gameContext or Day 2+ with playerChoice" });
+
+  } catch (error) {
+    console.error("[GAME-TURN-V2] ❌ Error:", error);
+    return res.status(500).json({
+      error: "Game turn generation failed",
+      message: error?.message || "Unknown error"
+    });
+  }
+});
+
 app.post("/api/compass-hints", async (req, res) => {
   try {
     if (!OPENAI_KEY) {

@@ -130,14 +130,24 @@ export function getConfidantByLegacyKey(legacyKey: string): Confidant | undefine
 
 /**
  * Get advisor image path for a given imageId
+ * NOTE: Currently overridden to use gatekeeperAdv for all roles
  */
 export function getAdvisorImagePath(imageId: string): string {
-  return `/assets/images/advisors/${imageId}Adv.png`;
+  // OVERRIDE: Use gatekeeperAdv for all roles regardless of imageId
+  return '/assets/images/advisors/gatekeeperAdv.png';
+
+  // Original implementation (commented out):
+  // return `/assets/images/advisors/${imageId}Adv.png`;
 }
 
 /**
  * Get default advisor image path for custom roles
+ * NOTE: Currently overridden to use gatekeeperAdv for all roles
  */
 export function getDefaultAdvisorImagePath(): string {
-  return '/assets/images/advisors/defaultAdv.png';
+  // OVERRIDE: Use gatekeeperAdv for custom roles too
+  return '/assets/images/advisors/gatekeeperAdv.png';
+
+  // Original implementation (commented out):
+  // return '/assets/images/advisors/defaultAdv.png';
 }

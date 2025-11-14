@@ -193,156 +193,76 @@ async function fetchGameTurn(): Promise<{
   // Build request payload
   const payload: any = {
     gameId: currentGameId,
-    day
+    day,
+    totalDays,
+    isFirstDilemma: day === 1,
+    isFollowUp: day > 1
   };
 
   // Day 1: Send full game context
   if (day === 1) {
     const roleState = useRoleStore.getState();
-    const topWhatValues = getTop2WhatValues();
     const { dilemmasSubjectEnabled, dilemmasSubject } = useSettingsStore.getState();
-    let narrativeMemory = useDilemmaStore.getState().narrativeMemory;
-
-    if (!narrativeMemory) {
-      console.log("[fetchGameTurn] Narrative memory missing at Day 1 fetch. Waiting briefly...");
-      narrativeMemory = await waitForNarrativeMemory();
-      if (!narrativeMemory) {
-        console.warn("[fetchGameTurn] Narrative memory still unavailable. Proceeding without seeded thread guidance.");
-      } else {
-        console.log("[fetchGameTurn] Narrative memory acquired before Day 1 generation.");
-      }
-    }
 
     // Get confidant information for predefined roles
     const confidant = roleState.selectedRole ? getConfidantByLegacyKey(roleState.selectedRole) : undefined;
 
+    // Extract setting from roleIntro or build from role + year
+    const setting = roleState.roleIntro
+      ? roleState.roleIntro.split('.')[0] // First sentence of intro
+      : `${roleState.selectedRole || "Unknown role"}, ${roleState.roleYear || "Unknown era"}`;
+
     payload.gameContext = {
       role: roleState.selectedRole || "Unicorn King",
-      roleTitle: roleState.roleTitle || null,          // Scenario title (predefined only)
-      roleIntro: roleState.roleIntro || null,          // Historical context paragraph (predefined only)
-      roleYear: roleState.roleYear || null,            // Year/era (predefined only)
       systemName: roleState.analysis?.systemName || "Divine Right Monarchy",
-      systemDesc: roleState.analysis?.systemDesc || "Power flows from divine mandate",
+      setting,
+      challengerSeat: roleState.analysis?.challengerSeat || "Unknown Opposition (Institutional Power)",
       powerHolders: roleState.analysis?.holders || [],
-      challengerSeat: roleState.analysis?.challengerSeat || null,  // NEW: Primary institutional opponent
-      supportProfiles: roleState.supportProfiles || roleState.analysis?.supportProfiles || null,
-      roleScope: roleState.roleScope || roleState.analysis?.roleScope || null,
-      storyThemes: roleState.storyThemes || roleState.analysis?.storyThemes || null,
-      confidant: confidant ? { name: confidant.name, description: confidant.description, imageId: confidant.imageId } : null, // NEW: Confidant information
-      playerCompass: {
-        what: topWhatValues.join(', '),
-        whence: topKWithNames(compassValues?.whence, 'whence', 2).map(v => v.name).join(', '),
-        how: topKWithNames(compassValues?.how, 'how', 2).map(v => v.name).join(', '),
-        whither: topKWithNames(compassValues?.whither, 'whither', 2).map(v => v.name).join(', ')
+      supportProfiles: {
+        people: {
+          origin: supportPeople,
+          stance: Array.isArray(roleState.supportProfiles) ? roleState.supportProfiles[0]?.stances || "autonomy, equality" : "autonomy, equality"
+        },
+        challenger: {
+          origin: supportMiddle,
+          stance: Array.isArray(roleState.supportProfiles) ? roleState.supportProfiles[1]?.stances || "strength, order" : "strength, order"
+        },
+        mother: {
+          origin: supportMom,
+          stance: Array.isArray(roleState.supportProfiles) ? roleState.supportProfiles[2]?.stances || "care, peace" : "care, peace"
+        }
       },
-      topWhatValues,
-      totalDays,
-      daysLeft: totalDays - day + 1,
-      thematicGuidance: dilemmasSubjectEnabled && dilemmasSubject
-        ? `Focus on: ${dilemmasSubject}`
-        : null,
-      narrativeMemory: narrativeMemory || null  // Dynamic Story Spine: Include if available
+      authorityLevel: "medium", // Will be calculated from e12 in backend
+      playerCompassTopValues: [
+        { dimension: "what", values: topKWithNames(compassValues?.what, 'what', 2).map(v => v.name) },
+        { dimension: "whence", values: topKWithNames(compassValues?.whence, 'whence', 2).map(v => v.name) },
+        { dimension: "how", values: topKWithNames(compassValues?.how, 'how', 2).map(v => v.name) },
+        { dimension: "whither", values: topKWithNames(compassValues?.whither, 'whither', 2).map(v => v.name) }
+      ],
+      confidant: confidant ? { name: confidant.name, description: confidant.description, imageId: confidant.imageId } : null,
+      e12: roleState.analysis?.e12 || null
     };
+
+    // Subject focus (outside gameContext for v2)
+    payload.dilemmasSubjectEnabled = dilemmasSubjectEnabled || false;
+    payload.dilemmasSubject = dilemmasSubject || null;
   }
 
-  // Day 2+: Send player choice and compass update
+  // Day 2+: Send player choice
   if (day > 1 && lastChoice) {
+    const { dilemmasSubjectEnabled, dilemmasSubject } = useSettingsStore.getState();
+
     payload.playerChoice = {
       title: lastChoice.title,
-      summary: lastChoice.summary || lastChoice.title,
-      cost: lastChoice.cost
+      description: lastChoice.summary || lastChoice.title,
+      cost: lastChoice.cost,
+      iconHint: lastChoice.iconHint || "speech"
     };
 
-    payload.compassUpdate = compassValues;
+    // Subject focus for Day 2+
+    payload.dilemmasSubjectEnabled = dilemmasSubjectEnabled || false;
+    payload.dilemmasSubject = dilemmasSubject || null;
   }
-
-  // Include reasoning history (for all days, treatment-based feature)
-  const reasoningHistory = useDilemmaStore.getState().reasoningHistory;
-  if (reasoningHistory.length > 0) {
-    // Send reasoning history for AI context
-    // Format: Array of {day, actionTitle, reasoningText} objects
-    payload.reasoningHistory = reasoningHistory.map(entry => ({
-      day: entry.day,
-      actionTitle: entry.actionTitle,
-      reasoningText: entry.reasoningText
-    }));
-  }
-
-  // CRISIS MODE: Use crisis state detected on PREVIOUS turn
-  // (Crisis is detected AFTER support updates, so we use stored state from last turn)
-  const { crisisMode: storedCrisisMode, crisisEntity, previousSupportValues } = useDilemmaStore.getState();
-
-  if (storedCrisisMode) {
-    payload.crisisMode = storedCrisisMode;
-
-    // Build rich crisis context for AI
-    const roleState = useRoleStore.getState();
-
-    payload.crisisContext = {
-      entity: crisisEntity || "Unknown",
-      systemName: roleState.analysis?.systemName || "Unknown System",
-      systemDesc: roleState.analysis?.systemDesc || "",
-      era: roleState.analysis?.grounding?.era || "Unknown era",
-      settingType: roleState.analysis?.grounding?.settingType || "unclear"
-    };
-
-    // Add entity-specific details based on crisis mode
-    if (storedCrisisMode === "people") {
-      // Safely find people profile (check if supportProfiles is an array)
-      const peopleProfile = Array.isArray(roleState.supportProfiles)
-        ? roleState.supportProfiles.find(p => p.name === "The People")
-        : null;
-      payload.crisisContext.entityProfile = peopleProfile?.summary || "The general population";
-      payload.crisisContext.entityStances = peopleProfile?.stances || null;
-      payload.crisisContext.currentSupport = supportPeople;
-      payload.crisisContext.previousSupport = previousSupportValues?.people || supportPeople;
-    } else if (storedCrisisMode === "challenger") {
-      const challengerSeat = roleState.analysis?.challengerSeat;
-      // Safely find challenger profile (check if supportProfiles is an array)
-      const challengerProfile = Array.isArray(roleState.supportProfiles)
-        ? roleState.supportProfiles.find(p =>
-            p.name.toLowerCase().includes(challengerSeat?.name.toLowerCase() || "")
-          )
-        : null;
-      payload.crisisContext.entityProfile = challengerProfile?.summary || "Institutional opposition";
-      payload.crisisContext.entityStances = challengerProfile?.stances || null;
-      payload.crisisContext.currentSupport = supportMiddle;
-      payload.crisisContext.previousSupport = previousSupportValues?.middle || supportMiddle;
-      payload.crisisContext.challengerName = challengerSeat?.name || "Institutional Opposition";
-    } else if (storedCrisisMode === "caring") {
-      // Safely find caring profile (check if supportProfiles is an array)
-      const caringProfile = Array.isArray(roleState.supportProfiles)
-        ? roleState.supportProfiles.find(p =>
-            p.name.toLowerCase().includes("personal") || p.name.toLowerCase().includes("anchor")
-          )
-        : null;
-      payload.crisisContext.entityProfile = caringProfile?.summary || "Personal support anchor";
-      payload.crisisContext.entityStances = caringProfile?.stances || null;
-      payload.crisisContext.currentSupport = supportMom;
-      payload.crisisContext.previousSupport = previousSupportValues?.mom || supportMom;
-    } else if (storedCrisisMode === "downfall") {
-      payload.crisisContext.allSupport = {
-        people: { current: supportPeople, previous: previousSupportValues?.people || supportPeople },
-        middle: { current: supportMiddle, previous: previousSupportValues?.middle || supportMiddle },
-        mom: { current: supportMom, previous: previousSupportValues?.mom || supportMom }
-      };
-    }
-
-    // Add triggering action if available (what caused this crisis)
-    if (lastChoice && day > 1) {
-      payload.crisisContext.triggeringAction = {
-        title: lastChoice.title,
-        summary: lastChoice.summary || lastChoice.title,
-        cost: lastChoice.cost
-      };
-    }
-
-    console.log(`[fetchGameTurn] ⚠️ CRISIS MODE ACTIVE: ${storedCrisisMode} (${crisisEntity})`);
-    console.log('[fetchGameTurn] 📋 Crisis context:', payload.crisisContext);
-  }
-
-  payload.totalDays = totalDays;
-  payload.daysLeft = totalDays - day + 1;
 
   // Pass debug mode setting to server for verbose logging
   const debugMode = useSettingsStore.getState().debugMode;
@@ -356,9 +276,9 @@ async function fetchGameTurn(): Promise<{
   const useXAI = useSettingsStore.getState().useXAI;
   payload.useXAI = useXAI;
 
-  console.log(`[fetchGameTurn] Calling /api/game-turn for Day ${day}, gameId=${currentGameId}, treatment=${treatment}, generateActions=${payload.generateActions}, useXAI=${useXAI}`);
+  console.log(`[fetchGameTurn] Calling /api/game-turn-v2 for Day ${day}, gameId=${currentGameId}, treatment=${treatment}, generateActions=${payload.generateActions}, useXAI=${useXAI}`);
 
-  const response = await fetch("/api/game-turn", {
+  const response = await fetch("/api/game-turn-v2", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
