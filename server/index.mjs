@@ -3377,6 +3377,21 @@ app.post("/api/aftermath", async (req, res) => {
       });
     }
 
+    // Helper to escape control characters that would break JSON parsing
+    const sanitizeText = (text) => {
+      if (!text) return "";
+      return String(text)
+        // Replace literal newlines with space
+        .replace(/\r?\n/g, ' ')
+        // Replace tabs with space
+        .replace(/\t/g, ' ')
+        // Remove other control characters (0x00-0x1F except space)
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+        // Normalize multiple spaces to single space
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
+
     // Improved fallback response with contextual data
     // This is used when JSON parsing fails - make it semi-personalized
     const leaderName = playerName || "the leader";
@@ -3489,21 +3504,6 @@ Return only:
     const compassSummary = (topCompassValues || [])
       .map(cv => `${cv.dimension}:${cv.componentName}(${cv.value})`)
       .join(", ");
-
-    // Helper to escape control characters that would break JSON parsing
-    const sanitizeText = (text) => {
-      if (!text) return "";
-      return String(text)
-        // Replace literal newlines with space
-        .replace(/\r?\n/g, ' ')
-        // Replace tabs with space
-        .replace(/\t/g, ' ')
-        // Remove other control characters (0x00-0x1F except space)
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
-        // Normalize multiple spaces to single space
-        .replace(/\s+/g, ' ')
-        .trim();
-    };
 
     const historySummary = (dilemmaHistory || [])
       .map(entry =>
