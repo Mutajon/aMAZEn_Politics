@@ -39,7 +39,6 @@ import { loadEventScreenSnapshot, clearEventScreenSnapshot } from "../lib/eventS
 import { useLang } from "../i18n/lang";
 import { useRoleProgressStore } from "../store/roleProgressStore";
 import { useTimingLogger } from "../hooks/useTimingLogger";
-import { useAIOutputLogger } from "../hooks/useAIOutputLogger";
 import { useReasoning } from "../hooks/useReasoning";
 import { useLogger } from "../hooks/useLogger";
 import ReasoningModal from "../components/event/ReasoningModal";
@@ -136,10 +135,10 @@ export default function EventScreen3({ push }: Props) {
   // Coin flight system (persists across all phases)
   const { flights, triggerCoinFlight, clearFlights } = useCoinFlights();
 
-  // Data logging hooks (Timing, AI outputs)
+  // Data logging hooks (Timing, Player actions)
   // Note: State change tracking is handled globally in App.tsx via useStateChangeLogger
+  // Note: AI output logging is handled in useEventDataCollector.ts at the source
   const timingLogger = useTimingLogger();
-  const aiLogger = useAIOutputLogger();
   const logger = useLogger();
 
   // Reasoning feature (treatment-based)
@@ -342,16 +341,7 @@ export default function EventScreen3({ push }: Props) {
   // REMOVED: Logging moved to useEventDataCollector.ts to prevent duplicates
   // AI outputs are now logged ONCE at the source when data is fetched
   //
-  // NOTE: Compass pills are still logged separately in eventDataCleaner.ts
-  // after action confirmation, as they're fetched at a different time
-  useEffect(() => {
-    if (!collectedData) return;
-
-    // Log compass pills if available (these are fetched separately after action)
-    if (collectedData.compassPills) {
-      aiLogger.logCompassHints(collectedData.compassPills);
-    }
-  }, [collectedData, aiLogger]);
+  // NOTE: Compass pills logging removed - no longer tracking compass pill events
 
   // ========================================================================
   // EFFECT 3: Advance to presenting when data ready

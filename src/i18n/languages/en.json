@@ -720,5 +720,11 @@
   "SUPPORT_ENTITY_STANCE_ECONOMY": "Economy",
   "SUPPORT_ENTITY_STANCE_JUSTICE": "Justice",
   "SUPPORT_ENTITY_STANCE_CULTURE": "Culture & Society",
-  "SUPPORT_ENTITY_STANCE_FOREIGN": "Foreign Policy"
+  "SUPPORT_ENTITY_STANCE_FOREIGN": "Foreign Policy",
+  "SNAPSHOT_OF_YOUR_TIME": "Snapshot of Your Time",
+  "FINAL_RATINGS": "Final Ratings",
+  "DECISIONS_BREAKDOWN": "Decisions Breakdown",
+  "DEMOCRACY": "Democracy",
+  "DAY": "Day",
+  "DECISIONS": "decisions"
 }

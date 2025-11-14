@@ -163,22 +163,8 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   useEffect(() => {
     if (pings.length > 0 && !done && !loggedPillsRef.current.has(idx)) {
       loggedPillsRef.current.add(idx);
-
-      const questionNum = idx + 1;
-
-      // Format pills: "+2 Equality, -2 Freedom"
-      const pillsText = pings.map(p => {
-        const label = COMPONENTS[p.prop][p.idx]?.short ?? "";
-        return `${p.delta > 0 ? "+" : ""}${p.delta} ${label}`;
-      }).join(", ");
-
-      logger.logSystem(
-        `compass_pills_shown_question_${questionNum}`,
-        pillsText,
-        `System presented compass value changes for question ${questionNum}`
-      );
     }
-  }, [pings, idx, done, logger]);
+  }, [pings, idx, done]);
 
   // once done, fetch a one-shot summary (Mirror Quiz Light API - Mushu/Genie personality)
   useEffect(() => {

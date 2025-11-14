@@ -715,5 +715,11 @@
   "SUPPORT_ENTITY_STANCE_ECONOMY": "כלכלה",
   "SUPPORT_ENTITY_STANCE_JUSTICE": "משפט",
   "SUPPORT_ENTITY_STANCE_CULTURE": "תרבות וחברה",
-  "SUPPORT_ENTITY_STANCE_FOREIGN": "מדיניות חוץ"
+  "SUPPORT_ENTITY_STANCE_FOREIGN": "מדיניות חוץ",
+  "SNAPSHOT_OF_YOUR_TIME": "תמונת מצב של שלטונך",
+  "FINAL_RATINGS": "דירוגים סופיים",
+  "DECISIONS_BREAKDOWN": "פירוט ההחלטות",
+  "DEMOCRACY": "דמוקרטיה",
+  "DAY": "יום",
+  "DECISIONS": "החלטות"
 }

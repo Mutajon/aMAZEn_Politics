@@ -28,6 +28,9 @@ export function VideoBackground({ videoPath, imagePath }: VideoBackgroundProps) 
 
     // Attempt to play the video when mounted
     if (videoRef.current) {
+      // Set playback speed to half (0.5x)
+      videoRef.current.playbackRate = 0.5;
+
       videoRef.current.play().catch(() => {
         // If autoplay fails (e.g., browser policy), try muted playback
         if (videoRef.current) {

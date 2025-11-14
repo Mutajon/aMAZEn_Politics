@@ -486,7 +486,7 @@ useEffect(() => {
                 Night Falls
               </h1>
 
-              <p className="mt-3 text-white/80">{DEFAULT_LINE}</p>
+              <p className="mt-3 text-white/80 bg-black/60 border border-amber-500/30 rounded-xl p-4">{DEFAULT_LINE}</p>
 
               <div className="mt-6">
                 <button
@@ -573,7 +573,7 @@ useEffect(() => {
               {lang("BACKGROUND_INTRO_TITLE")}
             </h1>
 
-            <p className="mt-3 text-white/80 whitespace-pre-wrap">{para}</p>
+            <p className="mt-3 text-white/80 whitespace-pre-wrap bg-black/60 border border-amber-500/30 rounded-xl p-4">{para}</p>
 
             <div className="mt-6">
               <button

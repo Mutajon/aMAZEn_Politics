@@ -117,6 +117,32 @@ const useStrict = import.meta.env.MODE !== "development";
   }
 };
 
+// Democracy rating access (hidden axis for analysis)
+(window as any).showDemocracy = () => {
+  const democracyRating = (window as any).__democracyRating;
+  const allRatings = (window as any).__allRatings;
+
+  if (!democracyRating) {
+    console.log('❌ No democracy rating available yet.');
+    console.log('💡 Play through to the Aftermath screen first.');
+    return;
+  }
+
+  console.log('📊 HIDDEN DEMOCRACY RATING (not shown in UI):');
+  console.log(`   Democracy: ${democracyRating}`);
+  console.log('');
+  console.log('📋 All calculated ratings:');
+  console.log(`   Autonomy: ${allRatings.autonomy}`);
+  console.log(`   Liberalism: ${allRatings.liberalism}`);
+  console.log(`   Democracy: ${allRatings.democracy} (hidden)`);
+  console.log('');
+  console.log('ℹ️  Democracy measures: "Who authors the rules and exceptions?"');
+  console.log('   - High: Broad/inclusive authorship, real checks/vetoes');
+  console.log('   - Low: Concentrated elite control, weak checks');
+};
+
+(window as any).getDemocracy = (window as any).showDemocracy; // Alias for convenience
+
 // HIDDEN FOR EXPERIMENTAL DISTRIBUTION
 // Console commands are still available but not advertised to users
 // Log available commands

@@ -845,6 +845,9 @@ export function useEventDataCollector() {
   // Progress callback - using ref to avoid re-renders
   const onReadyCallbackRef = useRef<(() => void) | null>(null);
 
+  // Track logged dilemmas to prevent duplicates (e.g., during hot reload)
+  const loggedDilemmasRef = useRef<Set<string>>(new Set());
+
   // AI output logger - for logging once at source
   const aiLogger = useAIOutputLogger();
 
@@ -900,22 +903,18 @@ export function useEventDataCollector() {
       // ========================================================================
       const { crisisMode: storedCrisisMode } = useDilemmaStore.getState();
 
-      // Log dilemma generation
-      aiLogger.logDilemma(dilemma, {
-        crisisMode: storedCrisisMode
-      });
-
-      // Log mirror advice
-      aiLogger.logMirrorAdvice(mirrorText);
+      // Log dilemma generation (with deduplication to prevent hot reload duplicates)
+      const dilemmaKey = `${day}-${dilemma.title}`;
+      if (!loggedDilemmasRef.current.has(dilemmaKey)) {
+        loggedDilemmasRef.current.add(dilemmaKey);
+        aiLogger.logDilemma(dilemma, {
+          crisisMode: storedCrisisMode
+        });
+      }
 
       // Log support shifts (Day 2+)
       if (supportEffects) {
         aiLogger.logSupportShifts(supportEffects);
-      }
-
-      // Log dynamic parameters
-      if (dynamicParams && dynamicParams.length > 0) {
-        aiLogger.logDynamicParams(dynamicParams);
       }
 
       // Log corruption shift (Day 2+)

@@ -26,7 +26,7 @@ export const CONFIDANTS: Record<string, Confidant> = {
     name: 'Demetrios',
     description:
       "A librarian of the Mouseion. An observant scholar with contacts among scholars, soldiers, and royal advisors. He's loyal to truth and knowledge, not politics, which makes him a credible, emotionally steady narrator of chaos.",
-    imageId: 'egypt',
+    imageId: 'Alexandria',
   },
 
   // Florence — The Fire and the Faith
@@ -34,7 +34,7 @@ export const CONFIDANTS: Record<string, Confidant> = {
     name: 'Giulia di Rossi',
     description:
       "An artist's apprentice. Once an assistant in a sculptor's workshop, now forced to hide her art under the new religious regime. She moves between studios and sermons — her eyes and ears capture both sides of Florence's struggle.",
-    imageId: 'italy',
+    imageId: 'florence',
   },
 
   // North America — The First Encounter (1607)

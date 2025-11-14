@@ -35,25 +35,34 @@ export type AftermathRequest = {
 /** Rating level for autonomy and liberalism */
 export type RatingLevel = "very-low" | "low" | "medium" | "high" | "very-high";
 
+/** Snapshot event showing extreme consequences of player's decisions */
+export type SnapshotEvent = {
+  type: "positive" | "negative";
+  icon: string; // emoji (e.g., ⚔️ 🏥 💀 🏛️)
+  text: string; // 3-7 words, dramatic and concise
+  estimate?: number; // optional numeric estimate (deaths, people affected, etc.)
+  context: string; // which decision/day caused this
+};
+
 /** Individual decision analysis from AI */
 export type DecisionAnalysis = {
   title: string; // ≤12 words
   reflection: string; // short explanatory sentence (~15-25 words) explaining WHY the decision demonstrates autonomy/heteronomy and liberalism/totalism
   autonomy: RatingLevel; // AI rating for this specific decision
   liberalism: RatingLevel; // AI rating for this specific decision
-  democracy: RatingLevel; // AI rating for this specific decision (HIDDEN from UI - for internal analysis only)
+  democracy: RatingLevel; // AI rating for this specific decision (NOW VISIBLE in UI)
 };
 
 /** Response from /api/aftermath */
 export type AftermathResponse = {
   intro: string; // "After X years, [leader] died of Z."
-  remembrance: string; // 3-4 sentences on legacy
-  rank: string; // fictional title like "The Gentle Iron Fist"
+  snapshot: SnapshotEvent[]; // 6-10 extreme events (both positive and negative)
   decisions: DecisionAnalysis[]; // one per day (7 decisions with per-decision ratings)
   ratings: {
     // FRONTEND-CALCULATED: Averaged from per-decision ratings (not from AI)
     autonomy: RatingLevel;
     liberalism: RatingLevel;
+    democracy: RatingLevel; // NOW INCLUDED (was hidden before)
   };
   valuesSummary: string; // one sentence summary
   haiku: string; // 3-line poetic summary

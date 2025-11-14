@@ -1,18 +1,17 @@
 // src/screens/AftermathScreen.tsx
-// Aftermath screen showing game epilogue after final day with sequential presentation
+// Aftermath screen showing game epilogue after final day
 //
-// Shows (in sequence):
-// - Typewriter intro
-// - Remembrance section with narration
-// - Decision breakdown (one by one)
-// - Final ratings pills
+// Shows:
+// - Title
+// - Snapshot section (avatar + death text + event pills)
+// - Final ratings (democracy/autonomy/liberalism)
+// - Decision breakdown (collapsible)
 // - Reflection (mirror-styled)
 // - Tombstone with haiku
 // - "Reveal Final Score" button
 //
 // Connects to:
 // - src/hooks/useAftermathData.ts: fetches data from API
-// - src/hooks/useAftermathSequence.ts: orchestrates presentation
 // - src/components/aftermath/AftermathContent.tsx: main content renderer
 // - server/index.mjs: POST /api/aftermath
 
@@ -30,7 +29,6 @@ import {
   saveAftermathScreenSnapshot,
   clearAftermathScreenSnapshot
 } from "../lib/eventScreenSnapshot";
-import { useAftermathSequence } from "../hooks/useAftermathSequence";
 import AftermathContent from "../components/aftermath/AftermathContent";
 import { useLang } from "../i18n/lang";
 import { useLoggingStore } from "../store/loggingStore";
@@ -85,9 +83,6 @@ export default function AftermathScreen({ push }: Props) {
   const isFirstVisit = !initializedFromSnapshot;
 
   console.log('[AftermathScreen] isFirstVisit:', isFirstVisit, 'initializedFromSnapshot:', initializedFromSnapshot);
-
-  // Initialize sequence orchestration
-  const sequence = useAftermathSequence(data, isFirstVisit);
 
   // ========================================================================
   // EFFECT: FETCH DATA (only if not restored from snapshot)
@@ -241,15 +236,6 @@ export default function AftermathScreen({ push }: Props) {
         data={data}
         avatarUrl={character?.avatarUrl}
         top3ByDimension={top3ByDimension}
-        counter={sequence.counter}
-        steps={sequence.steps}
-        isSkipped={sequence.isSkipped}
-        hasReached={sequence.hasReached}
-        isAtStep={sequence.isAtStep}
-        advanceToNext={sequence.advanceToNext}
-        skipToEnd={sequence.skipToEnd}
-        showSkipButton={sequence.showSkipButton}
-        registerRef={sequence.registerRef}
         onExploreClick={() => {
           // Save snapshot before navigating
           if (data) {

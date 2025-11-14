@@ -257,11 +257,6 @@ export default function SplashScreen({
     };
   }, []);
 
-  // Log splash screen loaded (runs once on mount)
-  useEffect(() => {
-    logger.logSystem('splash_screen_loaded', true, 'Splash screen loaded');
-  }, [logger]);
-
   return (
     <div
       className="relative min-h-[100dvh] flex items-center justify-center px-5"

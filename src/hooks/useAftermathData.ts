@@ -127,13 +127,17 @@ export function useAftermathData() {
       // Calculate overall ratings from individual decision ratings (including democracy)
       const calculatedRatings = calculateOverallRatings(apiResult.decisions || []);
 
-      // Merge calculated ratings into response (ONLY autonomy and liberalism - democracy is hidden)
+      // Store democracy rating globally for console access
+      (window as any).__democracyRating = calculatedRatings.democracy;
+      (window as any).__allRatings = calculatedRatings;
+
+      // Merge calculated ratings into response (including democracy - now visible in UI)
       const result: AftermathResponse = {
         ...apiResult,
         ratings: {
+          democracy: calculatedRatings.democracy,
           autonomy: calculatedRatings.autonomy,
           liberalism: calculatedRatings.liberalism
-          // Note: democracy rating is calculated but NOT included in response (hidden from UI)
         }
       };
 

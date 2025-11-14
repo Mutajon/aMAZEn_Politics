@@ -17,14 +17,11 @@
 //     topic: "economy",
 //     scope: "district"
 //   });
-//
-//   // Log mirror advice
-//   aiLogger.logMirrorAdvice("Mirror's advice text");
 
 import { useCallback } from 'react';
 import { useLogger } from './useLogger';
 import type { Dilemma } from '../lib/dilemma';
-import type { SupportEffect, CompassPill, DynamicParam, CorruptionShift } from './useEventDataCollector';
+import type { SupportEffect, CorruptionShift } from './useEventDataCollector';
 
 export function useAIOutputLogger() {
   const logger = useLogger();
@@ -66,27 +63,6 @@ export function useAIOutputLogger() {
   );
 
   /**
-   * Log mirror advice generation
-   *
-   * @param mirrorText - Mirror's advice text
-   * @param metadata - Additional context
-   */
-  const logMirrorAdvice = useCallback(
-    (mirrorText: string, metadata?: Record<string, unknown>) => {
-      logger.logSystem(
-        'mirror_advice_generated',
-        {
-          text: mirrorText,
-          textLength: mirrorText.length,
-          ...metadata
-        },
-        `Mirror advice generated (${mirrorText.length} chars)`
-      );
-    },
-    [logger]
-  );
-
-  /**
    * Log support shift analysis
    * Records AI's explanation for support changes
    *
@@ -107,55 +83,6 @@ export function useAIOutputLogger() {
           }))
         },
         `Support shifts generated for ${supportEffects.length} tracks`
-      );
-    },
-    [logger]
-  );
-
-  /**
-   * Log compass hints generation
-   * Records AI's analysis of action's compass implications
-   *
-   * @param compassPills - Array of compass pills (value changes)
-   */
-  const logCompassHints = useCallback(
-    (compassPills: CompassPill[]) => {
-      logger.logSystem(
-        'compass_hints_generated',
-        {
-          pillCount: compassPills.length,
-          pills: compassPills.map(pill => ({
-            dimension: pill.prop,
-            index: pill.idx,
-            delta: pill.delta
-          }))
-        },
-        `Compass hints generated: ${compassPills.length} pills`
-      );
-    },
-    [logger]
-  );
-
-  /**
-   * Log dynamic parameters generation
-   * Records AI-generated consequence metrics
-   *
-   * @param dynamicParams - Array of dynamic parameters
-   */
-  const logDynamicParams = useCallback(
-    (dynamicParams: DynamicParam[]) => {
-      logger.logSystem(
-        'dynamic_params_generated',
-        {
-          paramCount: dynamicParams.length,
-          params: dynamicParams.map(param => ({
-            id: param.id,
-            icon: param.icon,
-            text: param.text,
-            tone: param.tone
-          }))
-        },
-        `Dynamic parameters generated: ${dynamicParams.length} metrics`
       );
     },
     [logger]
@@ -269,10 +196,7 @@ export function useAIOutputLogger() {
 
   return {
     logDilemma,
-    logMirrorAdvice,
     logSupportShifts,
-    logCompassHints,
-    logDynamicParams,
     logCorruptionShift,
     logNarrativeSeed,
     logInquiryResponse,
