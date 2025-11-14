@@ -128,13 +128,7 @@ export default function ActionDeckContent({
 
   // Wrapper handlers with click sound + logging
   const handleSelectCard = (id: string) => {
-    const card = cards.find(c => c.id === id);
     playSfx('click-soft');
-    logger.log('action_card_selected', {
-      actionId: id,
-      actionTitle: card?.title,
-      actionCost: card?.cost
-    }, `User selected action card: ${card?.title || id}`);
     onSelectCard(id);
   };
 

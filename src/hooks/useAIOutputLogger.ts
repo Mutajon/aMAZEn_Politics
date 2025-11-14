@@ -3,7 +3,7 @@
 //
 // Features:
 // - Log all AI outputs systematically
-// - Structured logging for dilemmas, actions, mirror advice, support shifts, etc.
+// - Structured logging for dilemmas, narrative seeds, inquiries, custom actions
 // - Consistent format for research analysis
 //
 // Usage:
@@ -21,7 +21,6 @@
 import { useCallback } from 'react';
 import { useLogger } from './useLogger';
 import type { Dilemma } from '../lib/dilemma';
-import type { SupportEffect, CorruptionShift } from './useEventDataCollector';
 
 export function useAIOutputLogger() {
   const logger = useLogger();
@@ -57,57 +56,6 @@ export function useAIOutputLogger() {
           ...metadata
         },
         `Dilemma generated: ${dilemma.title}`
-      );
-    },
-    [logger]
-  );
-
-  /**
-   * Log support shift analysis
-   * Records AI's explanation for support changes
-   *
-   * @param supportEffects - Array of support shifts with explanations
-   */
-  const logSupportShifts = useCallback(
-    (supportEffects: SupportEffect[]) => {
-      // Log aggregate summary only (removed individual logs to reduce redundancy)
-      // Individual state changes are already logged by useStateChangeLogger
-      logger.logSystem(
-        'support_shifts_summary',
-        {
-          totalShifts: supportEffects.length,
-          shifts: supportEffects.map(e => ({
-            track: e.id,
-            delta: e.delta,
-            explanation: e.explain
-          }))
-        },
-        `Support shifts generated for ${supportEffects.length} tracks`
-      );
-    },
-    [logger]
-  );
-
-  /**
-   * Log corruption shift analysis
-   * Records AI's corruption judgment and reasoning
-   *
-   * @param corruptionShift - Corruption shift data (score + reason)
-   * @param delta - Calculated change in corruption level
-   * @param newLevel - New corruption level after blending
-   */
-  const logCorruptionShift = useCallback(
-    (corruptionShift: CorruptionShift, delta: number, newLevel: number) => {
-      logger.logSystem(
-        'corruption_shift_generated',
-        {
-          score: corruptionShift.score,
-          delta,
-          newLevel,
-          reason: corruptionShift.reason,
-          reasonLength: corruptionShift.reason.length
-        },
-        `Corruption: ${corruptionShift.score}/10 → ${delta >= 0 ? '+' : ''}${delta.toFixed(2)} (${corruptionShift.reason.substring(0, 50)}...)`
       );
     },
     [logger]
@@ -196,8 +144,6 @@ export function useAIOutputLogger() {
 
   return {
     logDilemma,
-    logSupportShifts,
-    logCorruptionShift,
     logNarrativeSeed,
     logInquiryResponse,
     logCustomActionValidation

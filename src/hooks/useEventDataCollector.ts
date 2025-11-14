@@ -892,8 +892,6 @@ export function useEventDataCollector() {
         dynamicParams,
         mirrorText,
         corruptionShift,
-        corruptionDelta,
-        corruptionNewLevel,
       } = turnData;
 
       console.log(`[Collector] ✅ Unified data received for Day ${day}`);
@@ -910,16 +908,6 @@ export function useEventDataCollector() {
         aiLogger.logDilemma(dilemma, {
           crisisMode: storedCrisisMode
         });
-      }
-
-      // Log support shifts (Day 2+)
-      if (supportEffects) {
-        aiLogger.logSupportShifts(supportEffects);
-      }
-
-      // Log corruption shift (Day 2+)
-      if (corruptionShift) {
-        aiLogger.logCorruptionShift(corruptionShift, corruptionDelta, corruptionNewLevel);
       }
 
       console.log(`[Collector] ✅ AI outputs logged for Day ${day}`);

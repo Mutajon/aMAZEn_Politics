@@ -140,16 +140,6 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
       const questionNum = idx + 1;
       const question = quiz[idx];
 
-      // Format: "Q: [question] | Options: [opt1] / [opt2] / [opt3]"
-      const optionsText = question.options.map(opt => opt.a).join(' / ');
-      const logValue = `Q: ${question.q} | Options: ${optionsText}`;
-
-      logger.logSystem(
-        `mirror_question_${questionNum}`,
-        logValue,
-        `System presented mirror question ${questionNum} to player`
-      );
-
       // Start timing for this question
       questionTimingIdRef.current = timingLogger.start('mirror_question_time', {
         questionNumber: questionNum,
