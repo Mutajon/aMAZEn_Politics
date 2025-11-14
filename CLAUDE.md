@@ -22,14 +22,29 @@ npm run server:dev   # Backend with nodemon auto-restart
 ### Browser Console Commands
 
 ```javascript
-// AI Provider Switching (restart server after changing .env models)
+// AI Provider Switching (no restart needed)
 switchToClaude()     # Switch to Anthropic Claude (requires MODEL_DILEMMA_ANTHROPIC in .env)
 switchToGPT()        # Switch to OpenAI GPT (DEFAULT)
+switchToXAI()        # Switch to X.AI/Grok (requires MODEL_DILEMMA_XAI in .env)
 
 // Debug Mode (persists in localStorage)
-enableDebug()        # Shows "Jump to Final Day" button in EventScreen
+enableDebug()        # Shows "Jump to Final Day" button, extra console logs
 disableDebug()       # Disable debug mode
 toggleDebug()        # Toggle debug mode
+
+// Context Control (for diagnosing Day 2+ AI failures)
+skipPreviousContext()      # Skip sending previous dilemma context to AI on Day 2+
+includePreviousContext()   # Include previous context (normal behavior)
+togglePreviousContext()    # Toggle previous context on/off
+
+// Corruption Tracking Toggle
+enableCorruption()   # Enable corruption tracking (AI judges power misuse)
+disableCorruption()  # Disable corruption tracking
+toggleCorruption()   # Toggle corruption tracking
+
+// Hidden Democracy Rating Access (after Aftermath screen)
+showDemocracy()      # Display hidden democracy rating (not shown in UI)
+getDemocracy()       # Alias for showDemocracy()
 ```
 
 ## Deployment
@@ -197,6 +212,42 @@ TTS_VOICE=alloy
 1. Immediate UI: Card animation, coin flight, budget update
 2. Support analysis: Background API call, animated bar updates
 3. Compass analysis: Deferred to next day (appears as "compass pills")
+
+**Custom Action Validation & Consequence System:**
+- **Philosophy**: Highly permissive, pro-player system - default to accepting player creativity
+- **Validation Endpoint**: `POST /api/validate-suggestion` (server/index.mjs, lines 3106-3168, 5383-5425)
+- **Validation Rules** (lines 5393-5418):
+  - ✅ **ACCEPT**: Violent, unethical, immoral, manipulative, coercive suggestions (corruption penalties applied later)
+  - ✅ **ACCEPT**: Risky actions with low probability (assassination, poisoning, coups, bribery)
+  - ✅ **ACCEPT**: Actions that are difficult/unlikely but theoretically possible for the role
+  - ❌ **REJECT**: Only for anachronisms, gibberish, total irrelevance, or physically impossible actions
+- **Authority Boundaries**:
+  - Physical impossibility = Role categorically cannot access required power/technology/resources
+  - Examples: Citizen can propose war ✅, attempt assassination ✅, bribe officials ✅
+  - Examples: Citizen cannot directly command troops ❌ (no command authority)
+  - Examples: King can issue any decree ✅, but cannot use internet in 1600 ❌ (anachronism)
+- **Constructive Rejections**: When rejecting, suggest feasible alternatives
+  - Example: "Try 'Propose to Assembly that we declare war' or 'Attempt to assassinate the enemy commander'"
+- **Probability-Aware Consequences** (lines 5308-5326):
+  - Risky actions get realistic success/failure outcomes based on:
+    * Historical context (surveillance tech, loyalty systems, security apparatus)
+    * Role resources (budget, connections, authority)
+    * Faction support (allies who could help)
+    * Action complexity (poisoning one person vs. overthrowing government)
+  - Outcome types: High-risk failure, partial success, success with consequences, clean success (rare)
+  - Historical realism: Ancient/Medieval (easier covert action, brutal if caught) vs. Modern (higher surveillance)
+- **Corruption Evaluation** (lines 5862-5965):
+  - ALL actions evaluated on 0-10 scale (including violent/unethical choices)
+  - Rubric: Intent (0-4) + Method (0-3) + Impact (0-3)
+  - Violence NOT automatically corruption - depends on intent/method/impact
+  - Examples: Assassination for power = 6-8; Assassination for strategy = 3-5; Defensive war = 0-1
+  - Examples: Coup for self-enrichment = 7-9; Coup to end tyranny = 2-4
+  - Most normal governance scores 0-2 even if controversial
+- **Integration**: Custom actions flow through same pipeline as AI-generated options
+  - Frontend converts custom text to ActionCard (EventScreen3.tsx, lines 623-635)
+  - Sent to `/api/game-turn` as `playerChoice` parameter
+  - Authority-filtered consequence generation (democracies vote, autocracies decree)
+  - Support shifts, corruption penalties, compass changes all apply identically
 
 **Prefetching Systems:**
 - **Aftermath**: Starts Day 8, loads before player clicks

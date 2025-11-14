@@ -3385,8 +3385,10 @@ app.post("/api/aftermath", async (req, res) => {
 
     const fallback = {
       intro: `After years of rule in ${role || "this land"}, ${leaderName} passed into history.`,
-      remembrance: `They will be remembered as a ${supportDesc} leader who navigated the complexities of ${systemName || "their political system"}. Their decisions shaped the lives of many, for better or worse. Time will tell how history judges their reign.`,
-      rank: supportDesc === "widely supported" ? "The Popular Leader" : supportDesc === "contested" ? "The Controversial Ruler" : "The Embattled Leader",
+      snapshot: [
+        { type: "positive", icon: "🏛️", text: "Stable governance", context: "Overall reign" },
+        { type: "negative", icon: "⚠️", text: "Political challenges", context: "Overall reign" }
+      ],
       decisions: (dilemmaHistory || []).map((entry, i) => ({
         title: sanitizeText(entry.choiceTitle || `Decision ${i + 1}`).slice(0, 120),
         reflection: "This decision had complex consequences that affected multiple constituencies.",
@@ -3411,9 +3413,20 @@ Follow this structure:
 
 Intro: "After X years, [the leader] died of Z." (realistic years + fitting cause).
 
-Remembrance: 3-4 sentences on legacy—personal vs people's benefit, autonomy vs obedience, reformer or tyrant.
+Snapshot: Analyze all 7 decisions for EXTREME consequences. Generate 6-10 dramatic events representing the most significant impacts (both positive and negative). For each event:
+- type: "positive" or "negative"
+- icon: single emoji (⚔️ 🏥 💀 🏛️ 🔥 📚 ⚖️ 💰 🌾 🗡️ etc.)
+- text: 3-7 words, extremely dramatic and concise
+- estimate: (optional) numeric estimate when historically plausible (war deaths, people affected by reforms, etc.)
+- context: brief mention of which decision/day caused this
 
-Rank: short, amusing fictional title based on Remembrance part above.
+Examples:
+- War declared → {"type": "negative", "icon": "⚔️", "text": "Spartan war", "estimate": 12000, "context": "Day 3: Rejected peace"}
+- Healthcare reform → {"type": "positive", "icon": "🏥", "text": "Universal healthcare", "estimate": 340000, "context": "Day 5: Medical reform"}
+- Famine → {"type": "negative", "icon": "🌾", "text": "Famine from blockade", "estimate": 8500, "context": "Day 4: Trade sanctions"}
+- New government → {"type": "positive", "icon": "🏛️", "text": "Democratic assembly founded", "context": "Day 2: Constitutional reform"}
+
+Use realistic historical estimates based on the era and population. Prioritize MAGNITUDE over balance—show only the most extreme events. Use mixed approach: numbers for quantifiable events (wars, deaths, people saved), vivid descriptions for qualitative changes (new institutions, cultural shifts).
 
 Decisions: for each decision, provide:
 - title: ≤12-word summary of the action taken
@@ -3466,8 +3479,7 @@ Return only:
 
 {
   "intro": "",
-  "remembrance": "",
-  "rank": "",
+  "snapshot": [{"type": "positive|negative", "icon": "emoji", "text": "", "estimate": number_optional, "context": ""}],
   "decisions": [{"title": "", "reflection": "", "autonomy": "", "liberalism": "", "democracy": ""}],
   "valuesSummary": "",
   "haiku": ""
@@ -3559,10 +3571,18 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
 
     // Normalize and validate response
     const validRatings = ["very-low", "low", "medium", "high", "very-high"];
+    const validTypes = ["positive", "negative"];
     const response = {
       intro: String(result?.intro || fallback.intro).slice(0, 500),
-      remembrance: String(result?.remembrance || fallback.remembrance).slice(0, 1000),
-      rank: String(result?.rank || fallback.rank).slice(0, 100),
+      snapshot: Array.isArray(result?.snapshot)
+        ? result.snapshot.map((event) => ({
+            type: validTypes.includes(event?.type) ? event.type : "positive",
+            icon: String(event?.icon || "📌").slice(0, 10),
+            text: String(event?.text || "Event occurred").slice(0, 50),
+            estimate: typeof event?.estimate === 'number' ? event.estimate : undefined,
+            context: String(event?.context || "Unknown").slice(0, 100)
+          }))
+        : fallback.snapshot,
       decisions: Array.isArray(result?.decisions)
         ? result.decisions.map((d, i) => ({
             title: String(d?.title || "").slice(0, 120),
@@ -3582,8 +3602,10 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
     console.error("Error in /api/aftermath:", e?.message || e);
     return res.status(502).json({
       intro: "After many years of rule, the leader passed into history.",
-      remembrance: "They will be remembered for their decisions. Time will tell how history judges their reign.",
-      rank: "The Leader",
+      snapshot: [
+        { type: "positive", icon: "🏛️", text: "Governed their people", context: "Overall reign" },
+        { type: "negative", icon: "⚠️", text: "Faced challenges", context: "Overall reign" }
+      ],
       decisions: [],
       valuesSummary: "A leader who navigated complex political terrain.",
       haiku: "Power came and went\nDecisions echo through time\nHistory records"
@@ -4906,6 +4928,201 @@ Return JSON in this shape:
   }
 });
 
+// -------------------- Helper Functions for buildTurnUserPrompt -------
+
+/**
+ * buildContinuityDirectives - Generates continuity directives for process-based actions
+ * Detects votes, negotiations, consultations and enforces immediate results
+ */
+function buildContinuityDirectives(playerChoice) {
+  if (!playerChoice?.title || !playerChoice?.summary) {
+    return '';
+  }
+
+  const actionText = (playerChoice.title + ' ' + playerChoice.summary).toLowerCase();
+  const isVoteAction = /\b(vote|referendum|ballot|election|poll|plebiscite)\b/i.test(actionText);
+  const isNegotiationAction = /\b(negotiate|negotiation|talk|talks|meeting|dialogue|summit|discuss)\b/i.test(actionText);
+  const isConsultationAction = /\b(assemble|assembly|council|gathering|forum|hear from|listen to)\b/i.test(actionText);
+
+  if (!isVoteAction && !isNegotiationAction && !isConsultationAction) {
+    return '';
+  }
+
+  const actionType = isVoteAction
+    ? 'VOTING/REFERENDUM'
+    : isNegotiationAction
+    ? 'NEGOTIATION/DIALOGUE'
+    : 'CONSULTATION/ASSEMBLY';
+
+  const lines = [
+    ``,
+    `🚨 CONTINUITY DIRECTIVE (MANDATORY):`,
+    `The previous action involved ${actionType}.`,
+    `The next dilemma MUST show the ACTUAL RESULTS of that process:`,
+    ``
+  ];
+
+  if (isVoteAction) {
+    lines.push(
+      `✓ Show the vote outcome with specific results (e.g., "57% yes, 43% no")`,
+      `✓ Show immediate faction reactions to the result`,
+      `✓ Frame the NEW dilemma around responding to those results`,
+      `✓ Apply SYSTEM FEEL: how does this system handle results?`
+    );
+  } else if (isNegotiationAction) {
+    lines.push(
+      `✓ Show what happened IN the negotiation (agreement? demands? collapse?)`,
+      `✓ Show specific terms, demands, or concessions discussed`,
+      `✓ Show immediate reactions from parties involved`,
+      `✓ Frame the NEW dilemma around responding to the outcome`
+    );
+  } else {
+    lines.push(
+      `✓ Show what happened IN the consultation (consensus? disagreement?)`,
+      `✓ Show specific input from those consulted`,
+      `✓ Show what was decided`,
+      `✓ Frame the NEW dilemma around acting on results`
+    );
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * buildNarrativeDirectives - Injects narrative threads, development, and climax directives
+ * Part of Dynamic Story Spine system for coherent 7-day arc
+ */
+function buildNarrativeDirectives(narrativeMemory, daysLeft, crisisMode) {
+  if (!narrativeMemory || !Array.isArray(narrativeMemory.threads) || narrativeMemory.threads.length === 0) {
+    return '';
+  }
+
+  const lines = [
+    ``,
+    `🎭 NARRATIVE THREADS (Weave subtly, don't label):`
+  ];
+
+  narrativeMemory.threads.forEach((thread, i) => {
+    lines.push(`  ${i + 1}. ${thread}`);
+  });
+
+  // Show recent thread development if available
+  if (Array.isArray(narrativeMemory.threadDevelopment) && narrativeMemory.threadDevelopment.length > 0) {
+    const recent = narrativeMemory.threadDevelopment[narrativeMemory.threadDevelopment.length - 1];
+    if (recent?.summary) {
+      lines.push(``, `Recent development: ${recent.summary}`);
+    }
+  }
+
+  lines.push(
+    ``,
+    `THREAD TRACKING: Your JSON must include "selectedThreadIndex" (0-based) and "selectedThreadSummary" describing how this turn advances that thread.`
+  );
+
+  // Final day climax directive
+  if (!crisisMode && daysLeft === 1) {
+    lines.push(
+      ``,
+      `🎬 FINAL DAY - CLIMAX DIRECTIVE:`,
+      `This is the culmination. Create a high-stakes turning point that:`,
+      `- Brings one or more narrative threads to a head`,
+      `- Forces a decisive choice with lasting consequences`,
+      `- Feels earned based on the story so far`
+    );
+
+    if (Array.isArray(narrativeMemory.climaxCandidates) && narrativeMemory.climaxCandidates.length > 0) {
+      lines.push(``, `Suggested climax scenarios (use if they fit the story):`);
+      narrativeMemory.climaxCandidates.forEach((climax, i) => {
+        lines.push(`  ${i + 1}. ${climax}`);
+      });
+      lines.push(`(You may deviate if player choices make these incoherent)`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * buildCrisisDirectives - Generates crisis-mode specific context and directives
+ * Triggered when support drops below 20% for any faction
+ */
+function buildCrisisDirectives(crisisMode, crisisContext, challengerSeat) {
+  if (!crisisMode || !crisisContext) {
+    return '';
+  }
+
+  const lines = [``, `🚨 CRISIS MODE: "${crisisMode.toUpperCase()}"`];
+
+  if (crisisMode === "people") {
+    lines.push(
+      `- Public support collapsed: ${crisisContext.previousSupport ?? '?'}% → ${crisisContext.currentSupport ?? '?'}%`
+    );
+    if (crisisContext.triggeringAction) {
+      lines.push(`- Trigger: "${crisisContext.triggeringAction.title}" — ${crisisContext.triggeringAction.summary}`);
+    }
+    if (crisisContext.entityProfile) {
+      lines.push(`- Who they are: ${crisisContext.entityProfile}`);
+    }
+    if (crisisContext.entityStances && typeof crisisContext.entityStances === 'object') {
+      const stances = Object.entries(crisisContext.entityStances)
+        .map(([issue, stance]) => `  • ${issue}: ${stance}`)
+        .join('\n');
+      lines.push(`- What they care about:\n${stances}`);
+    }
+    lines.push(`- Show mass backlash and demand a response.`);
+
+  } else if (crisisMode === "challenger") {
+    const name = crisisContext.challengerName || challengerSeat?.name || "Institutional opposition";
+    lines.push(
+      `- ${name} support collapsed: ${crisisContext.previousSupport ?? '?'}% → ${crisisContext.currentSupport ?? '?'}%`
+    );
+    if (crisisContext.triggeringAction) {
+      lines.push(`- Trigger: "${crisisContext.triggeringAction.title}" — ${crisisContext.triggeringAction.summary}`);
+    }
+    if (crisisContext.entityProfile) {
+      lines.push(`- Who they are: ${crisisContext.entityProfile}`);
+    }
+    if (crisisContext.entityStances && typeof crisisContext.entityStances === 'object') {
+      const stances = Object.entries(crisisContext.entityStances)
+        .map(([issue, stance]) => `  • ${issue}: ${stance}`)
+        .join('\n');
+      lines.push(`- Their priorities:\n${stances}`);
+    }
+    lines.push(`- Show concrete institutional retaliation in this turn.`);
+
+  } else if (crisisMode === "caring") {
+    lines.push(
+      `- Personal anchor support collapsed: ${crisisContext.previousSupport ?? '?'}% → ${crisisContext.currentSupport ?? '?'}%`
+    );
+    if (crisisContext.triggeringAction) {
+      lines.push(`- Trigger: "${crisisContext.triggeringAction.title}" — ${crisisContext.triggeringAction.summary}`);
+    }
+    if (crisisContext.entityProfile) {
+      lines.push(`- Who this person is: ${crisisContext.entityProfile}`);
+    }
+    if (crisisContext.entityStances && typeof crisisContext.entityStances === 'object') {
+      const stances = Object.entries(crisisContext.entityStances)
+        .map(([issue, stance]) => `  • ${issue}: ${stance}`)
+        .join('\n');
+      lines.push(`- What they value:\n${stances}`);
+    }
+    lines.push(`- Highlight emotional stakes and whether the player can repair the relationship.`);
+
+  } else if (crisisMode === "downfall" && crisisContext.allSupport) {
+    lines.push(
+      `- All three anchors under 20% support:`,
+      `  • People: ${crisisContext.allSupport.people.previous}% → ${crisisContext.allSupport.people.current}%`,
+      `  • Power holders: ${crisisContext.allSupport.middle.previous}% → ${crisisContext.allSupport.middle.current}%`,
+      `  • Personal anchor: ${crisisContext.allSupport.mom.previous}% → ${crisisContext.allSupport.mom.current}%`,
+      `- Generate narrative-only collapse; do not offer actions.`
+    );
+  }
+
+  return lines.join('\n');
+}
+
+// -------------------- Main Prompt Builder -------
+
 function buildTurnUserPrompt({
   day,
   totalDays = 7,
@@ -4918,11 +5135,16 @@ function buildTurnUserPrompt({
   roleScope = null,
   storyThemes = null,
   powerHolders = null,
-  narrativeMemory = null,  // Dynamic Story Spine
-  playerCompass = null,  // Player compass values for optional integration
+  narrativeMemory = null,
+  playerCompass = null,
   playerCompassTopValues = null,
-  corruptionHistory = []  // Corruption tracking - raw AI scores only (frontend calculates level)
+  corruptionHistory = []
 }) {
+  // Validation
+  if (!playerChoice?.title || !playerChoice?.summary) {
+    throw new Error("playerChoice requires title and summary");
+  }
+
   const clampedTotal = Number.isFinite(totalDays) ? totalDays : 7;
   const lines = [
     `═══════════════════════════════════════════════════════════════════════════════`,
@@ -4931,307 +5153,233 @@ function buildTurnUserPrompt({
     `STEP 1: ANALYZE PREVIOUS ACTION (Day ${day - 1})`,
     `───────────────────────────────────────────────────────────────────────────────`,
     `The player chose: "${playerChoice.title}"`,
-    `Summary: ${playerChoice.summary || playerChoice.title}`,
+    `Summary: ${playerChoice.summary}`,
     `Cost: ${playerChoice.cost}`,
     `───────────────────────────────────────────────────────────────────────────────`,
     ``,
-    `TASK A: First, calculate how each faction reacts to THIS action above.`,
-    `Fill the supportShift object with deltas and "why" explanations that reference THIS decision.`,
-    `The player has already taken this action - explain how factions respond to it.`
+    `TASK A: Calculate how each faction responds to THIS PREVIOUS action.`,
+    `Fill the supportShift object with deltas and "why" explanations referencing THIS decision.`,
+    `The player already took this action - explain faction reactions to it.`
   ];
 
+  // Context reminders: Role scope & story themes
   if (roleScope) {
-    lines.push(``, `ROLE SCOPE REMINDER: ${roleScope}`);
+    lines.push(``, `ROLE SCOPE: ${roleScope}`);
   }
 
   if (Array.isArray(storyThemes) && storyThemes.length > 0) {
     lines.push(
       ``,
       `ACTIVE THEMES: ${storyThemes.join(', ')}`,
-      `Keep the new dilemma rooted in at least one of these tensions.`
+      `Root the new dilemma in at least one of these tensions.`
     );
   }
 
+  // Support profiles & faction alignment (ENHANCED)
   if (supportProfiles) {
     const reminder = buildSupportProfileReminder(supportProfiles);
     if (reminder) {
-      lines.push(``, `BASELINE REFERENCE:`, reminder);
+      lines.push(``, `FACTION BASELINES:`, reminder);
 
-      // FACTION IDENTITY MAPPING: Connect power holder names to faction profiles
+      // FACTION REACTION ALIGNMENT (NEW)
+      lines.push(
+        ``,
+        `⚠️ FACTION REACTION ALIGNMENT:`,
+        `- People faction: Reactions MUST align with their stances above.`,
+        `  Example: If they value direct democracy, support consultations; if they oppose military action, penalize war.`,
+        `- Challenger faction: Reactions MUST align with their stances above.`,
+        `  Example: If they seek autonomy, support decentralization; if they value tradition, oppose radical reforms.`,
+        `- Mom (Personal Anchor): Supportive but concerned - prioritizes player's wellbeing over ideology.`
+      );
+
+      // Challenger identity mapping (consolidated)
       if (challengerSeat && supportProfiles.challenger) {
         lines.push(
           ``,
-          `⚠️ CRITICAL FACTION IDENTITY:`,
-          `"${challengerSeat.name}" (power holder) = "Challenger" faction in support profiles above.`,
-          `When the player ENGAGES WITH "${challengerSeat.name}" respectfully (negotiates, consults, acknowledges their authority),`,
-          `the Challenger faction should respond POSITIVELY because they're being treated with respect.`,
-          `When the player IGNORES or UNDERMINES "${challengerSeat.name}", then they should respond negatively.`
+          `🔗 CRITICAL IDENTITY MAPPING:`,
+          `"${challengerSeat.name}" (power holder) = "Challenger" faction above.`,
+          `When the player engages with "${challengerSeat.name}" respectfully (negotiates, consults, acknowledges authority) → Challenger responds POSITIVELY.`,
+          `When the player ignores or undermines "${challengerSeat.name}" → Challenger responds NEGATIVELY.`,
+          `${challengerSeat.name} should visibly pressure the player - show their demands or pushback in both narrative and support reasoning.`
         );
       }
     }
   }
 
+  // Power map snapshot
   if (Array.isArray(powerHolders) && powerHolders.length > 0) {
     const holders = powerHolders
       .slice(0, 4)
       .map((holder) => `- ${holder.name || 'Unknown'} (${holder.percent ?? '?'}% power)`)
       .join('\n');
-    lines.push(``, `POWER MAP SNAPSHOT:\n${holders}`);
+    lines.push(``, `POWER MAP:\n${holders}`);
   }
 
-  if (challengerSeat) {
-    lines.push(
-      ``,
-      `CHALLENGER PRESSURE: ${challengerSeat.name} should visibly lean on the player—show their demands or pushback in both narrative setup and support reasoning.`
-    );
-  }
-
+  // Delegation reminder
   lines.push(
     ``,
-    `REACTION REQUIREMENT: Explain how the challenger and other top power holders respond to each option.`,
-    `DELEGATION OPTION REMINDER: When believable, include one option that hands responsibility to an appropriate institution or ally instead of acting directly.`
+    `DELEGATION OPTION: When contextually appropriate, include one option that hands responsibility to an appropriate institution or ally.`
   );
 
-  // Dynamic Story Spine: Inject narrative memory
-  if (narrativeMemory && Array.isArray(narrativeMemory.threads) && narrativeMemory.threads.length > 0) {
-    lines.push(
-      ``,
-      `🎭 NARRATIVE THREADS (Weave subtly, don't label):`
-    );
-
-    narrativeMemory.threads.forEach((thread, i) => {
-      lines.push(`  ${i + 1}. ${thread}`);
-    });
-
-    // Show recent thread development if available
-    if (Array.isArray(narrativeMemory.threadDevelopment) && narrativeMemory.threadDevelopment.length > 0) {
-      const recent = narrativeMemory.threadDevelopment[narrativeMemory.threadDevelopment.length - 1];
-      if (recent && recent.summary) {
-        lines.push(
-          ``,
-          `Recent development: ${recent.summary}`
-        );
-      }
-    }
-
-    lines.push(
-      ``,
-      `THREAD TRACKING: Your JSON must include "selectedThreadIndex" (0-based) and a one-sentence "selectedThreadSummary" describing how this turn pushes that thread forward.`
-    );
-
-    // Turn 7 climax directive
-    if (!crisisMode && daysLeft === 1) {
-      lines.push(
-        ``,
-        `🎬 FINAL DAY - CLIMAX DIRECTIVE:`,
-        `This is the culmination. Create a high-stakes turning point that:`,
-        `- Brings one or more narrative threads to a head`,
-        `- Forces a decisive choice with lasting consequences`,
-        `- Feels earned based on the story so far`
-      );
-
-      if (Array.isArray(narrativeMemory.climaxCandidates) && narrativeMemory.climaxCandidates.length > 0) {
-        lines.push(
-          ``,
-          `Suggested climax scenarios (use if they fit the story):`
-        );
-        narrativeMemory.climaxCandidates.forEach((climax, i) => {
-          lines.push(`  ${i + 1}. ${climax}`);
-        });
-        lines.push(`(You may deviate if player choices make these incoherent)`);
-      }
-    }
-
-    lines.push(``);
+  // Narrative directives (extracted helper)
+  const narrativeDirectivesStr = buildNarrativeDirectives(narrativeMemory, daysLeft, crisisMode);
+  if (narrativeDirectivesStr) {
+    lines.push(narrativeDirectivesStr);
   }
 
+  // Player values & mirror note
   const topValues = playerCompassTopValues || extractTopCompassFromStrings(playerCompass);
   if (topValues) {
     lines.push(
       ``,
-      `PLAYER VALUES (use where natural):`,
+      `PLAYER VALUES (integrate when relevant):`,
       formatCompassTopValuesForPrompt(topValues),
-      `MIRROR NOTE: Mirror should reference one of these values and pose a reflective question or sly observation about the options—no direct instructions.`,
-      ``
+      `MIRROR NOTE: Reference one of these values and pose a reflective question or observation—no direct instructions.`
     );
   }
 
-  // Corruption context (for AI continuity) - Show history only
-  if (Array.isArray(corruptionHistory) && corruptionHistory.length > 0) {
-    lines.push(
-      ``,
-      `🔸 CORRUPTION TRACKING:`,
-      `Recent AI judgments of player's actions (0-10 scale):`
-    );
-    const recent = corruptionHistory.slice(-3).map(h =>
-      `Day ${h.day}: ${h.score}/10 - ${h.reason.slice(0, 80)}${h.reason.length > 80 ? '...' : ''}`
-    ).join('\n  ');
-    lines.push(`  ${recent}`);
-  }
-
-  // Corruption evaluation task (Day 2+ only)
+  // Corruption context (Day 2+ only)
   if (day > 1) {
-    lines.push(
-      ``,
-      `TASK C: Evaluate the player's PREVIOUS action (shown in STEP 1 above) using the corruption rubric.`,
-      `Consider how that action reflects on the responsible use of power.`,
-      `Fill the corruptionJudgment object with a 0-10 score and brief reason.`,
-      ``
-    );
-  }
-
-  // ACTION CONTINUITY ENFORCEMENT: Detect actions requiring immediate results
-  const actionText = (playerChoice.title + ' ' + (playerChoice.summary || '')).toLowerCase();
-  const isVoteAction = /\b(vote|referendum|ballot|election|consult|poll|plebiscite)\b/i.test(actionText);
-  const isNegotiationAction = /\b(negotiate|negotiation|talk|talks|meeting|dialogue|summit|discuss)\b/i.test(actionText);
-  const isConsultationAction = /\b(assemble|assembly|council|gathering|forum|hear from|listen to)\b/i.test(actionText);
-  const requiresResults = isVoteAction || isNegotiationAction || isConsultationAction;
-
-  if (requiresResults) {
-    const actionType = isVoteAction
-      ? 'VOTING/REFERENDUM/CONSULTATION'
-      : isNegotiationAction
-      ? 'NEGOTIATION/DIALOGUE/TALKS'
-      : 'CONSULTATION/ASSEMBLY';
-
-    lines.push(
-      ``,
-      `🚨 CONTINUITY DIRECTIVE (MANDATORY):`,
-      `The previous action involved ${actionType}.`,
-      ``,
-      `The next dilemma MUST show the ACTUAL RESULTS of that process:`,
-      ``
-    );
-
-    if (isVoteAction) {
+    if (Array.isArray(corruptionHistory) && corruptionHistory.length > 0) {
       lines.push(
-        `✓ Show the vote/referendum outcome with specific results (e.g., "57% voted yes, 43% no")`,
-        `✓ Show immediate reactions from key factions to the result`,
-        `✓ Frame the NEW dilemma around responding to those results`,
-        `✓ DO NOT show "preparations" or "as you prepare for..." - skip directly to the outcome`,
-        `✓ Apply SYSTEM FEEL: how does this political system handle the result? (e.g., democracies implement, autocracies may override)`
+        ``,
+        `🔸 CORRUPTION HISTORY:`,
+        `Recent AI judgments (0-10 scale):`
       );
-    } else if (isNegotiationAction) {
-      lines.push(
-        `✓ Show what happened IN the negotiation (agreement reached? demands made? talks collapsed? compromises offered?)`,
-        `✓ Show specific terms, demands, or concessions discussed`,
-        `✓ Show immediate reactions from the parties involved`,
-        `✓ Frame the NEW dilemma around responding to the negotiation outcome`,
-        `✓ DO NOT show "preparations for talks" - skip directly to what happened during/after the talks`
-      );
-    } else {
-      lines.push(
-        `✓ Show what happened IN the consultation/assembly (consensus? disagreement? recommendations?)`,
-        `✓ Show specific input or positions from those consulted`,
-        `✓ Show immediate reactions and what was decided`,
-        `✓ Frame the NEW dilemma around acting on the consultation results`,
-        `✓ DO NOT show "preparations" - skip directly to the outcome`
-      );
+      const recent = corruptionHistory.slice(-3).map(h =>
+        `Day ${h.day}: ${h.score}/10 - ${h.reason.slice(0, 80)}${h.reason.length > 80 ? '...' : ''}`
+      ).join('\n  ');
+      lines.push(`  ${recent}`);
     }
 
-    lines.push(``);
+    lines.push(
+      ``,
+      `TASK C: Evaluate the player's PREVIOUS action (STEP 1 above) using the corruption rubric.`,
+      `Fill corruptionJudgment with a 0-10 score and brief reason.`
+    );
   }
 
-  // STEP 2 separator: Generate new dilemma
+  // Continuity enforcement (extracted helper)
+  const continuityDirectivesStr = buildContinuityDirectives(playerChoice);
+  if (continuityDirectivesStr) {
+    lines.push(continuityDirectivesStr);
+  }
+
+  // STEP 2: Generate new dilemma with role-filtered consequences
   lines.push(
     ``,
     `STEP 2: GENERATE NEW SITUATION (Day ${day})`,
     `───────────────────────────────────────────────────────────────────────────────`,
-    ``
+    ``,
+    `TASK B: Show what ACTUALLY HAPPENED based on player authority, then create new dilemma.`,
+    ``,
+    `🚨 ROLE-FILTERED CONSEQUENCE REQUIREMENT (CRITICAL):`,
+    ``,
+    `The player selected: "${playerChoice.title}"`,
+    ``,
+    `STEP 1: Determine what ACTUALLY HAPPENED (filter through authority):`,
+    ``,
+    `CHECK AUTHORITY (use E-12 domains + roleScope above):`,
+    `- If player controls the relevant domain → Action executes directly`,
+    `- If institution/assembly controls → Action becomes PROPOSAL → Show institutional response`,
+    `- If requires negotiation/approval → Action becomes PROCESS → Show process outcome`,
+    ``,
+    `CONSEQUENCE TRANSLATION BY AUTHORITY LEVEL:`,
+    ``,
+    `HIGH AUTHORITY (player controls domain per E-12):`,
+    `→ Direct execution: "You issued the decree. [Immediate results shown]"`,
+    `→ Example: Monarch selects "Declare war" → "You ordered the attack at dawn. Troops crossed the border by noon."`,
+    ``,
+    `MODERATE AUTHORITY (requires institutional approval):`,
+    `→ Approval process: "You proposed X. [Institution] voted/approved/rejected."`,
+    `→ Then show actual outcome based on response`,
+    `→ Example: PM selects "Declare war" → "Cabinet voted 7-4 in favor. Parliament approved 215-180. Mobilization begins."`,
+    ``,
+    `LOW AUTHORITY (citizen/official with proposal power):`,
+    `→ Proposal submitted: "You advocated for X. Assembly/Council voted Y-Z."`,
+    `→ Then show actual outcome based on vote`,
+    `→ Example: Citizen selects "Propose war" → "Assembly debated 3 hours. Vote: 58-42 yes. War declared. Troops mobilize."`,
+    ``,
+    `DIRECT DEMOCRACY SYSTEM:`,
+    `→ Referendum triggered: "Referendum held. Results: X% yes, Y% no."`,
+    `→ Then show outcome based on vote`,
+    `→ Example: Citizen selects "Advocate for war" → "Referendum: 54% approve, 46% oppose. Mobilization authorized."`,
+    ``,
+    `RISKY/COVERT ACTIONS (assassinations, coups, poisoning, bribery, secret operations):`,
+    `→ Assess success probability based on:`,
+    `  * Historical context (surveillance tech, loyalty systems, security apparatus)`,
+    `  * Role resources (budget level, political connections, authority)`,
+    `  * Faction support (do you have allies who could help?)`,
+    `  * Action complexity (poisoning one person vs. overthrowing government)`,
+    ``,
+    `→ Show realistic outcomes reflecting probability:`,
+    `  * HIGH-RISK FAILURE: "You attempted assassination. Guards discovered the plot during execution. You've been arrested and await trial."`,
+    `  * PARTIAL SUCCESS: "Poisoning succeeded but the target survived after physicians intervened. Now deeply suspicious of you. Public rumors spread."`,
+    `  * SUCCESS WITH CONSEQUENCES: "Assassination succeeded. Target found dead. Investigation begins. Your agent managed to escape but left evidence pointing to court insiders."`,
+    `  * CLEAN SUCCESS (rare): "Bribery succeeded. Official quietly approved your permit. No witnesses, transaction untraceable."`,
+    ``,
+    `→ Consider historical realism:`,
+    `  * Ancient/Medieval: Lower surveillance, easier to act covertly, but consequences are brutal if caught`,
+    `  * Modern: Higher surveillance, harder to hide, but legal protections if caught`,
+    `  * Autocracies: Coups more feasible with military support, but total failure = execution`,
+    `  * Democracies: Assassinations easier to attempt (less security), but investigations more thorough`,
+    ``,
+    `STEP 2: Show CONCRETE CONSEQUENCES of that outcome:`,
+    ``,
+    `🚫 FORBIDDEN LANGUAGE (These cause wobbling):`,
+    `- "You are preparing to..."`,
+    `- "Planning to..."`,
+    `- "About to..."`,
+    `- "Getting ready to..."`,
+    `- "Tensions are rising. Will you stand firm or ease back?"`,
+    `- "Will you continue/soften/reverse this decision?"`,
+    `- ANY option pattern that re-asks about the SAME decision`,
+    ``,
+    `✅ REQUIRED PATTERN:`,
+    `1. Show what ACTUALLY HAPPENED (authority-filtered outcome from STEP 1)`,
+    `2. Show IMMEDIATE CONCRETE RESULTS of that outcome`,
+    `3. Present NEW situation/crisis created by those results`,
+    `4. Options respond to the NEW situation (NOT to the old decision)`,
+    ``,
+    `EXAMPLE - Citizen in Democracy:`,
+    `❌ BAD: "You proposed war. Tensions mount. Will you: a) Press offensive b) Defensive posture c) Seek peace"`,
+    `→ All options wobble around the same war decision`,
+    ``,
+    `✅ GOOD: "You proposed war to the Assembly. After heated debate, they voted 67-33 in favor. War declared. Mobilization began at dawn. But news arrives: The grain merchants' guild threatens to embargo shipments in protest. Your generals demand immediate action. Will you: a) Raid guild warehouses b) Negotiate emergency grain deal c) Ration civilian food"`,
+    `→ Shows vote → Shows war starts → NEW crisis (guild) → Options about NEW crisis`,
+    ``,
+    `EXAMPLE - Monarch:`,
+    `❌ BAD: "You declared war. This created controversy. Will you: a) Double down b) Ease tensions c) Reconsider"`,
+    `→ All options wobble around the same war decision`,
+    ``,
+    `✅ GOOD: "You issued the war decree. By noon, 5,000 troops crossed the border. First reports: Enemy cavalry retreating, but three coastal cities have closed their ports in protest. Your admiral warns of supply shortages within a week. Will you: a) Force ports open with naval blockade b) Secure alternative supply route c) Negotiate port access for trade concessions"`,
+    `→ Shows war starts → Shows battles + complications → NEW crisis (ports) → Options about NEW crisis`,
+    ``,
+    `EXAMPLE - Risky Action (Assassination Attempt - SUCCESS):`,
+    `✅ GOOD: "You hired the assassin. Three nights later, the target was found dead in his chambers, throat slit. The city guard launches a manhunt. Your hired blade managed to escape but witnesses saw a figure matching his description leaving the palace. Investigators are questioning palace staff. Will you: a) Eliminate witnesses to protect your agent b) Provide false alibi for your agent c) Distance yourself and let him face capture"`,
+    `→ Shows assassination succeeds → Shows investigation begins → NEW crisis (manhunt) → Options about NEW crisis`,
+    ``,
+    `EXAMPLE - Risky Action (Assassination Attempt - PARTIAL SUCCESS):`,
+    `✅ GOOD: "You sent the poisoned wine. Your target drank it at dinner and collapsed—but the royal physicians intervened in time. He survived, gravely weakened but alive. Now deeply suspicious, he's ordered his guard doubled and begun interrogating servants. Your contact in the kitchen has been arrested. Will you: a) Attempt to silence your contact before he talks b) Offer bribe to the investigating magistrate c) Flee the city before you're implicated"`,
+    `→ Shows poisoning attempt → Shows partial success + discovery → NEW crisis (investigation closing in) → Options about NEW crisis`,
+    ``,
+    `EXAMPLE - Risky Action (Coup Attempt - FAILURE):`,
+    `✅ GOOD: "You ordered your loyal troops to seize the palace. Initial reports were promising—40% of the military sided with you. But by dawn, loyalist forces counterattacked with overwhelming numbers. Your rebellion has been crushed. You narrowly escaped execution and fled into exile with 200 supporters. Foreign powers now debate whether to grant you sanctuary. Will you: a) Seek military support from neighboring kingdom b) Negotiate conditional surrender c) Organize guerrilla resistance from exile"`,
+    `→ Shows coup attempt → Shows failure and escape → NEW crisis (exile situation) → Options about NEW crisis`,
+    ``,
+    `EXAMPLE - Risky Action (Bribery - CLEAN SUCCESS):`,
+    `✅ GOOD: "You discreetly delivered the gold to the minister. No witnesses, no records. Within two days, your trading permit was approved and signed. But now word spreads that you've received special treatment—merchants' guild demands an investigation into 'irregular approvals.' Will you: a) Bribe the guild investigators too b) Produce forged documentation of legitimate application c) Publicly accuse guild of harassment to deflect"`,
+    `→ Shows bribery succeeds → Shows permit granted → NEW crisis (guild investigation) → Options about NEW crisis`,
+    ``,
+    `Apply SYSTEM FEEL to how the process plays out (speed, resistance, formality).`,
+    ``,
+    `🚨 CRITICAL: The new options are future possibilities responding to NEW situations, never re-confirmations of the past decision.`
   );
 
-  if (requiresResults) {
-    lines.push(
-      `TASK B: Present the RESULTS of the previous ${isVoteAction ? 'vote/referendum' : isNegotiationAction ? 'negotiation' : 'consultation'} and create a new dilemma responding to those results.`,
-      `Show the outcome of the process FIRST, then present new choices based on that outcome.`,
-      `Remember: These new options haven't been chosen yet - they're future possibilities.`,
-      ``
-    );
-  } else {
-    lines.push(
-      `TASK B: Now create the new political dilemma and three new options.`,
-      ``,
-      `🚨 MANDATORY CONSEQUENCE REQUIREMENT:`,
-      `The player just took decisive action: "${playerChoice.title}"`,
-      ``,
-      `DO NOT ask them to confirm again - THEY ALREADY DECIDED.`,
-      `DO NOT show preparation or debate about whether to do it - THE ACTION ALREADY HAPPENED.`,
-      `SHOW THE IMMEDIATE, DRAMATIC RESULTS right now.`,
-      ``,
-      `Examples of what to show:`,
-      `- War declared → Battle begins, casualties, allies react, economy strains`,
-      `- Treaty signed → Implementation starts, public responds, opponents react`,
-      `- Arrests made → Trials begin, protests erupt, power shifts`,
-      `- Law passed → Citizens adapt, enforcement begins, unintended effects emerge`,
-      `- Reform enacted → Changes take effect, winners celebrate, losers resist`,
-      ``,
-      `Remember: These new options haven't been chosen yet - they're future possibilities.`,
-      ``
-    );
-  }
-
-  if (crisisMode && crisisContext) {
-    lines.push(``, `🚨 CRISIS MODE: "${crisisMode.toUpperCase()}"`);
-
-    if (crisisMode === "people") {
-      lines.push(
-        `- Public support collapsed: ${crisisContext.previousSupport ?? '?'}% → ${crisisContext.currentSupport ?? '?' }%`,
-        crisisContext.triggeringAction
-          ? `- Trigger: Player chose "${crisisContext.triggeringAction.title}" — ${crisisContext.triggeringAction.summary}`
-          : ``,
-        crisisContext.entityProfile ? `- Who they are: ${crisisContext.entityProfile}` : ``,
-        crisisContext.entityStances
-          ? `- What they care about:\n${Object.entries(crisisContext.entityStances)
-              .map(([issue, stance]) => `  • ${issue}: ${stance}`)
-              .join('\n')}`
-          : ``,
-        `- Show mass backlash and demand a response.`
-      );
-    } else if (crisisMode === "challenger") {
-      const name = crisisContext.challengerName || challengerSeat?.name || "Institutional opposition";
-      lines.push(
-        `- ${name} support collapsed: ${crisisContext.previousSupport ?? '?'}% → ${crisisContext.currentSupport ?? '?' }%`,
-        crisisContext.triggeringAction
-          ? `- Trigger: Player chose "${crisisContext.triggeringAction.title}" — ${crisisContext.triggeringAction.summary}`
-          : ``,
-        crisisContext.entityProfile ? `- Who they are: ${crisisContext.entityProfile}` : ``,
-        crisisContext.entityStances
-          ? `- Their priorities:\n${Object.entries(crisisContext.entityStances)
-              .map(([issue, stance]) => `  • ${issue}: ${stance}`)
-              .join('\n')}`
-          : ``,
-        `- Show concrete institutional retaliation in this turn.`
-      );
-    } else if (crisisMode === "caring") {
-      lines.push(
-        `- Personal anchor support collapsed: ${crisisContext.previousSupport ?? '?'}% → ${crisisContext.currentSupport ?? '?' }%`,
-        crisisContext.triggeringAction
-          ? `- Trigger: Player chose "${crisisContext.triggeringAction.title}" — ${crisisContext.triggeringAction.summary}`
-          : ``,
-        crisisContext.entityProfile ? `- Who this person is: ${crisisContext.entityProfile}` : ``,
-        crisisContext.entityStances
-          ? `- What they value:\n${Object.entries(crisisContext.entityStances)
-              .map(([issue, stance]) => `  • ${issue}: ${stance}`)
-              .join('\n')}`
-          : ``,
-        `- Highlight emotional stakes and whether the player can repair the relationship.`
-      );
-    } else if (crisisMode === "downfall" && crisisContext.allSupport) {
-      lines.push(
-        `- All three anchors under 20% support:`,
-        `  • People: ${crisisContext.allSupport.people.previous}% → ${crisisContext.allSupport.people.current}%`,
-        `  • Power holders: ${crisisContext.allSupport.middle.previous}% → ${crisisContext.allSupport.middle.current}%`,
-        `  • Personal anchor: ${crisisContext.allSupport.mom.previous}% → ${crisisContext.allSupport.mom.current}%`,
-        `- Generate narrative-only collapse; do not offer actions.`
-      );
-    }
-  }
-
-  if (!crisisMode && daysLeft === 1) {
-    lines.push(
-      ``,
-      `FINAL DAY NOTE: Acknowledge that this is the player's last decision and resolve or heighten existing tensions—no new arcs.`
-    );
+  // Crisis directives (extracted helper)
+  const crisisDirectivesStr = buildCrisisDirectives(crisisMode, crisisContext, challengerSeat);
+  if (crisisDirectivesStr) {
+    lines.push(crisisDirectivesStr);
   }
 
   return lines.join('\n');
@@ -5280,13 +5428,27 @@ function buildSuggestionValidatorSystemPrompt({
     "GENERAL RULES:",
     "- Default to ACCEPT unless you find a clear reason to reject.",
     "- Accept suggestions that engage with the situation, even if imperfect.",
-    "- Reject only for: obvious anachronism, gibberish, total irrelevance, or actions wildly beyond the role's authority.",
+    "- ACCEPT violent, unethical, immoral, manipulative, or coercive suggestions (they will receive corruption penalties during consequence generation).",
+    "- ACCEPT risky actions with low probability of success (assassination attempts, poisoning, coups, bribery, etc.).",
+    "- Reject ONLY for: obvious anachronism, gibberish, total irrelevance, or actions that are physically impossible for the role.",
+    "",
+    "AUTHORITY BOUNDARIES (What counts as 'physically impossible'):",
+    "- Physical impossibility = Role categorically cannot access the required power/technology/resources.",
+    "- ACCEPT if action is difficult/risky but theoretically possible for the role (even if unlikely to succeed).",
+    "- Examples of what to ACCEPT:",
+    "  * Citizen in democracy: Proposing war to assembly ✅, Attempting assassination ✅, Bribing officials ✅",
+    "  * Citizen in democracy: Directly commanding troops ❌ (physically impossible - no command authority)",
+    "  * Minister: Manipulating media ✅, Embezzling funds ✅, Poisoning rival ✅",
+    "  * King: Any decree/order ✅, Using internet in 1600 ❌ (anachronism)",
     "",
     "ANCHOR FACTS (for anachronism checks):",
     `- ${anchorFacts}`,
     "",
-    "WHEN REJECTING:",
-    "- Name the specific element that fails (e.g., \"Zoom video meetings didn't exist in 1990\").",
+    "WHEN REJECTING (rare):",
+    "- Name the specific element that fails (e.g., \"Zoom video meetings didn't exist in 1990\" or \"As a citizen, you cannot directly command military forces\").",
+    "- Suggest feasible alternatives that achieve similar goals:",
+    "  * Instead of: \"You cannot mobilize troops\"",
+    "  * Suggest: \"Try 'Propose to the Assembly that we declare war' or 'Attempt to assassinate the enemy commander'\"",
     "- Do NOT invent unrelated issues (e.g., do not mention cameras if they exist).",
     "- Keep the rejection reason short and friendly.",
     "",
@@ -5765,6 +5927,24 @@ YOUR RESPONSIBILITIES:
      * 1: Some groups benefit more but no institutional harm
      * 0: Strengthened accountability, transparency, or equal treatment
 
+   VIOLENCE & COERCION SCORING GUIDE:
+   - Violence is NOT automatically corruption—evaluate intent, method, impact using the rubric above
+   - Assassinations for personal power/wealth = 6-8 (high method + intent corruption)
+   - Assassinations for political/strategic reasons = 3-5 (method corruption only)
+   - Political executions after due process/trial = 2-3 (some method concerns)
+   - Coups for self-enrichment = 7-9 (intent + method + impact)
+   - Coups to restore democracy/end tyranny = 2-4 (method concerns but civic intent)
+   - Declaring justified defensive war = 0-1 (legitimate governance)
+   - Declaring aggressive war for territorial expansion = 2-4 (depends on justification)
+   - Using violence to suppress legitimate dissent = 5-7 (power retention)
+   - Using violence to stop violent uprising = 1-3 (emergency response)
+   - Poisoning rival for personal gain = 7-8 (deception + intent)
+   - Poisoning tyrant to liberate people = 3-5 (method corruption but civic intent)
+   - Bribery for personal contracts = 6-9 (direct corruption)
+   - Bribery to achieve policy goals = 3-5 (means corruption but policy intent)
+
+   KEY PRINCIPLE: Score based on WHY (intent) + HOW (method) + WHO BENEFITS (impact), not WHAT (action type)
+
    SCORING RANGES — MOST ACTIONS SCORE 0-2:
    - 0: Democratic processes, transparency reforms, anti-corruption actions, emergency justified actions
      * Facilitating fair referendum = 0
@@ -6084,7 +6264,63 @@ When analyzing consequences of their chosen action, you MUST consider these inqu
 - Player can only generate DIRECT action options in domains where they hold decisive authority
 - For domains controlled by other institutions, actions must be framed as: "Propose to [Institution]...", "Request [Authority] to...", "Advocate for...", "Negotiate with [Institution]..."
 - Example: If Security is controlled by Military Commander, action must be "Request military to deploy troops" NOT "Deploy troops"
-- Example: If Economy requires Assembly vote, action must be "Propose to Assembly: new taxation" NOT "Implement new taxes"`);
+- Example: If Economy requires Assembly vote, action must be "Propose to Assembly: new taxation" NOT "Implement new taxes"
+
+⚠️ AUTHORITY + SYSTEM INTEGRATION (CONSEQUENCE TRANSLATION):
+
+When showing consequences of player's PREVIOUS action, combine E-12 authority data with System Feel:
+
+AUTHORITY CHECK:
+- Review E-12 domains above to see who controls relevant policy area
+- Check roleScope to understand player's power level
+- Determine if action executes directly or requires institutional response
+
+CONSEQUENCE TYPE BY SYSTEM + AUTHORITY:
+
+DIRECT DEMOCRACY + Low Authority:
+→ Player actions trigger referendums/votes → Show vote results → Show outcome
+→ Example: "Referendum held. 54% approve. Policy implemented."
+
+MONARCHY + Player is monarch:
+→ Player actions are decrees → Show immediate execution → Show results
+→ Example: "You issued the decree at dawn. Guards enforced by noon."
+
+PARLIAMENTARY + Moderate Authority:
+→ Player actions require approvals → Show approval process → Show outcome
+→ Example: "Cabinet approved 7-4. Parliament voted 215-180. Bill passes."
+
+TECHNOCRACY + Specialized domain:
+→ Player actions evaluated by experts → Show expert ruling → Show outcome
+→ Example: "Technical committee reviewed. Approved with modifications."
+
+CONSEQUENCE TRANSLATION EXAMPLES BY ROLE TYPE:
+
+CITIZEN IN DEMOCRACY (Low Authority):
+- Player selects "Propose war"
+- E-12: Security controlled by "Assembly of Citizens"
+- Consequence: "You addressed the assembly. After 3 hours of debate, citizens voted 58-42 in favor. War declared. Troops mobilize at dawn."
+→ Proposal → Vote → Outcome shown
+
+MONARCH/AUTOCRAT (High Authority):
+- Player selects "Declare war"
+- E-12: Security controlled by "The Monarch"
+- Consequence: "You issued the decree at dawn. By noon, royal guard had surrounded enemy positions. First skirmishes reported."
+→ Decree → Immediate execution shown
+
+PARLIAMENTARY PM (Moderate Authority):
+- Player selects "Propose military intervention"
+- E-12: Security requires "Parliament" approval
+- Consequence: "Cabinet approved 7-4. Parliament debate lasted 6 hours. Final vote: 215-180 in favor. Deployment authorized."
+→ Proposal → Approval chain → Outcome shown
+
+REGIONAL OFFICIAL (Limited Authority):
+- Player selects "Deploy local militia"
+- E-12: Local security controlled by player, national by center
+- Consequence: "District council approved. 150 volunteers mobilized. But capital denied request for national troop support."
+→ Local action executes, national request denied
+
+ALWAYS check E-12 domains + roleScope + systemName to determine which pattern applies.
+NEVER show "preparing" language - show what HAPPENED.`);
   }
 
   if (Array.isArray(storyThemes) && storyThemes.length > 0) {
