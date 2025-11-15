@@ -17,7 +17,6 @@ import { useDilemmaStore } from "../store/dilemmaStore";
 import { useCompassStore } from "../store/compassStore";
 import { useLoggingStore } from "../store/loggingStore";
 import { useSettingsStore } from "../store/settingsStore";
-import { useSessionLogger } from "./useSessionLogger";
 import { calculateLiveScoreBreakdown } from "../lib/scoring";
 import type { AftermathResponse } from "../lib/aftermath";
 
@@ -104,10 +103,12 @@ function extractDemocracyRating(decisions: AftermathResponse['decisions']): stri
  * Collect all session summary data
  * @param aftermathData - Aftermath API response (null if incomplete session)
  * @param incomplete - Whether session ended early
+ * @param sessionDuration - Session duration in milliseconds (from sessionLogger.getSessionDuration())
  */
 export function collectSessionSummary(
   aftermathData: AftermathResponse | null,
-  incomplete: boolean
+  incomplete: boolean,
+  sessionDuration: number | null
 ): SessionSummary {
   // Get store states
   const dilemmaStore = useDilemmaStore.getState();
@@ -121,9 +122,8 @@ export function collectSessionSummary(
     ? decisionTimes.reduce((sum, time) => sum + time, 0) / decisionTimes.length
     : 0;
 
-  // Get session duration from sessionLogger
-  const sessionLogger = useSessionLogger.getState();
-  const totalPlayTime = sessionLogger.getSessionDuration();
+  // Use passed session duration (already calculated by caller)
+  const totalPlayTime = sessionDuration || 0;
 
   // Calculate score breakdown
   const scoreBreakdown = calculateLiveScoreBreakdown({

@@ -262,6 +262,10 @@ export default function InquiringModal({
                 Type your inquiry:
               </label>
 
+              <p className="text-sm text-yellow-400/70 mb-2" dir="rtl">
+                אפשר להקליד בעברית
+              </p>
+
               <textarea
                 value={currentQuestion}
                 onChange={(e) => setCurrentQuestion(e.target.value)}

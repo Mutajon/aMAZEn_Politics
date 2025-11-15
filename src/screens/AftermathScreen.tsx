@@ -178,7 +178,7 @@ export default function AftermathScreen({ push }: Props) {
     (async () => {
       try {
         const { collectSessionSummary, sendSessionSummary } = await import('../hooks/useSessionSummary');
-        const summary = collectSessionSummary(data, false); // false = complete session
+        const summary = collectSessionSummary(data, false, sessionDuration); // Pass session duration
         await sendSessionSummary(summary);
         console.log('[AftermathScreen] ✅ Session summary sent to MongoDB');
       } catch (error) {
@@ -186,7 +186,7 @@ export default function AftermathScreen({ push }: Props) {
         // Don't throw - logging should never block user experience
       }
     })();
-  }, [data, isFirstVisit, inquiryHistory, customActionCount, selectedRole, day, score, sessionLogger, logger]);
+  }, [data, isFirstVisit, inquiryHistory, customActionCount, selectedRole, day, score]);
 
   // ========================================================================
   // RENDER: Loading State

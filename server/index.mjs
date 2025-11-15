@@ -3358,6 +3358,7 @@ app.post("/api/aftermath", async (req, res) => {
       gameId,
       playerName,
       role,
+      setting,
       systemName,
       dilemmaHistory,
       finalSupport,
@@ -3370,6 +3371,7 @@ app.post("/api/aftermath", async (req, res) => {
         gameId,
         playerName,
         role,
+        setting,
         systemName,
         historyLength: dilemmaHistory?.length,
         finalSupport,
@@ -3416,7 +3418,12 @@ app.post("/api/aftermath", async (req, res) => {
     };
 
     // Build system prompt using EXACT text from user's preliminary plan
-    const system = `STYLE & TONE
+    const system = `PLAYER ROLE & CONTEXT:
+- Setting: ${setting || role || "Unknown Setting"}
+- Player Role: ${role || "Unknown Role"}
+- Political System: ${systemName || "Unknown System"}
+
+STYLE & TONE
 Write in clear, vivid, reflective language; no jargon or game terms.
 Tone: ironic-cinematic, like a historical epilogue (Reigns, Frostpunk, Democracy 3).
 Accessible for teens; mix wit with weight.
@@ -3431,14 +3438,15 @@ Intro: "After X years, [the leader] died of Z." (realistic years + fitting cause
 Snapshot: Analyze all 7 decisions for EXTREME consequences. Generate 6-10 dramatic events representing the most significant impacts (both positive and negative). For each event:
 - type: "positive" or "negative"
 - icon: single emoji (⚔️ 🏥 💀 🏛️ 🔥 📚 ⚖️ 💰 🌾 🗡️ etc.)
-- text: 3-7 words, extremely dramatic and concise
-- estimate: (optional) numeric estimate when historically plausible (war deaths, people affected by reforms, etc.)
+- text: 3-6 words, extremely dramatic and concise. these can include numeric estimates, try to make them realistic based on current role and setting.
 - context: brief mention of which decision/day caused this
 
 Examples:
-- War declared → {"type": "negative", "icon": "⚔️", "text": "Spartan war", "estimate": 12000, "context": "Day 3: Rejected peace"}
-- Healthcare reform → {"type": "positive", "icon": "🏥", "text": "Universal healthcare", "estimate": 340000, "context": "Day 5: Medical reform"}
-- Famine → {"type": "negative", "icon": "🌾", "text": "Famine from blockade", "estimate": 8500, "context": "Day 4: Trade sanctions"}
+- War declared → {"type": "negative", "icon": "⚔️", "text": "15,000 deaths in Spartan war", "context": "Day 3: Rejected peace"}
+- Healthcare reform → {"type": "positive", "icon": "🏥", "text": "340,000 citizens gain medical access", "context": "Day 5: Medical reform"}
+- Famine → {"type": "negative", "icon": "🌾", "text": "8,500 famine deaths from blockade", "context": "Day 4: Trade sanctions"}
+- Infrastructure → {"type": "positive", "icon": "🌾", "text": "800 acres of new farmland", "context": "Day 6: Agricultural reform"}
+- Riots → {"type": "negative", "icon": "🔥", "text": "47 buildings burned in riots", "context": "Day 2: Tax increase"}
 - New government → {"type": "positive", "icon": "🏛️", "text": "Democratic assembly founded", "context": "Day 2: Constitutional reform"}
 
 Use realistic historical estimates based on the era and population. Prioritize MAGNITUDE over balance—show only the most extreme events. Use mixed approach: numbers for quantifiable events (wars, deaths, people saved), vivid descriptions for qualitative changes (new institutions, cultural shifts).

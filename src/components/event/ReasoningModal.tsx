@@ -298,6 +298,10 @@ export default function ReasoningModal({
               <>
                 {/* Input Section */}
                 <div className="space-y-3">
+                  <p className="text-sm text-purple-400/70 mb-2" dir="rtl">
+                    אפשר להקליד בעברית
+                  </p>
+
                   <textarea
                     value={reasoningText}
                     onChange={(e) => {
