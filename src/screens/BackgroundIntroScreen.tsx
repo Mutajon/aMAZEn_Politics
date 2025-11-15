@@ -8,10 +8,8 @@ import type { PreparedTTS } from "../hooks/useNarrator";
 import { useSettingsStore } from "../store/settingsStore";
 import { useRoleStore } from "../store/roleStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
-import { useCompassStore } from "../store/compassStore";
 import { useLogger } from "../hooks/useLogger";
 import { useLang } from "../i18n/lang";
-import { COMPONENTS } from "../data/compass-data";
 import { useReserveGameSlot } from "../hooks/useReserveGameSlot";
 
 /**

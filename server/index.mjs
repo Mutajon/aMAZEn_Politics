@@ -18,7 +18,7 @@ import {
   detectKeywordHints,
   formatKeywordHintsForPrompt
 } from "./compassKeywordDetector.mjs";
-import { getCountersCollection, incrementCounter, getUsersCollection } from "./db/mongodb.mjs";
+import { getCountersCollection, incrementCounter, getUsersCollection, getScenarioSuggestionsCollection } from "./db/mongodb.mjs";
 
 const app = express();
 
@@ -1067,6 +1067,82 @@ app.post("/api/bg-suggestion", async (req, res) => {
   } catch (err) {
     console.error("Error in /api/bg-suggestion:", err);
     return res.status(500).json({ object: backgroundHeuristic(req?.body?.role) });
+  }
+});
+
+// -------------------- Scenario Suggestion Endpoint --------------------
+/**
+ * POST /api/suggest-scenario
+ * Save a user-submitted scenario suggestion to the database
+ * 
+ * Body: {
+ *   title: string (required),
+ *   role: string (required),
+ *   settings: string (required) - includes place + time,
+ *   introParagraph?: string (optional),
+ *   topicsToEmphasis?: string (optional)
+ * }
+ * 
+ * Returns: {
+ *   success: boolean,
+ *   message: string
+ * }
+ */
+app.post("/api/suggest-scenario", async (req, res) => {
+  try {
+    const { title, role, settings, introParagraph, topicsToEmphasis } = req.body || {};
+
+    // Validate required fields
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Title is required' 
+      });
+    }
+
+    if (!role || typeof role !== 'string' || role.trim().length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Role is required' 
+      });
+    }
+
+    if (!settings || typeof settings !== 'string' || settings.trim().length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Settings (place + time) is required' 
+      });
+    }
+
+    // Get the scenario suggestions collection
+    const collection = await getScenarioSuggestionsCollection();
+
+    // Create the document
+    const suggestion = {
+      title: title.trim(),
+      role: role.trim(),
+      settings: settings.trim(),
+      introParagraph: introParagraph?.trim() || null,
+      topicsToEmphasis: topicsToEmphasis?.trim() || null,
+      createdAt: new Date(),
+      status: 'pending' // For future use
+    };
+
+    // Insert into database
+    await collection.insertOne(suggestion);
+
+    console.log(`[API] Scenario suggestion saved: ${title}`);
+
+    return res.json({
+      success: true,
+      message: 'Scenario suggestion saved successfully'
+    });
+  } catch (error) {
+    console.error("Error in /api/suggest-scenario:", error?.message || error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to save scenario suggestion'
+    });
   }
 });
 
