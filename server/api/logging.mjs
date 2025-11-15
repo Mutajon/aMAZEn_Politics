@@ -11,7 +11,8 @@
 // - Respects ENABLE_DATA_COLLECTION environment variable
 
 import express from 'express';
-import { getLogsCollection } from '../db/mongodb.mjs';
+import rateLimit from 'express-rate-limit';
+import { getLogsCollection, getDb } from '../db/mongodb.mjs';
 
 const router = express.Router();
 
@@ -19,9 +20,92 @@ const router = express.Router();
 const DATA_COLLECTION_ENABLED = process.env.ENABLE_DATA_COLLECTION === 'true';
 const DEFAULT_TREATMENT = process.env.DEFAULT_TREATMENT || 'control';
 
-// Rate limiting: Track logs per session
-const sessionLogCounts = new Map();
+// Rate limiting constants
 const MAX_LOGS_PER_SESSION = 1000;
+const MAX_BATCH_SIZE = 50;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const RATE_LIMIT_MAX_REQUESTS = 200; // 200 requests per hour per IP
+
+// IP-based rate limiting middleware
+const ipRateLimiter = rateLimit({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: RATE_LIMIT_MAX_REQUESTS,
+  message: {
+    success: false,
+    error: `Too many requests from this IP, please try again after an hour`
+  },
+  standardHeaders: true, // Return rate limit info in headers
+  legacyHeaders: false,  // Disable X-RateLimit-* headers
+  handler: (req, res) => {
+    console.warn(`[Rate Limit] IP ${req.ip} exceeded rate limit`);
+    res.status(429).json({
+      success: false,
+      error: `Rate limit exceeded: max ${RATE_LIMIT_MAX_REQUESTS} requests per hour per IP`
+    });
+  }
+});
+
+/**
+ * Get session log count from MongoDB (persistent across server restarts)
+ * @param {string} sessionId - Session ID
+ * @returns {Promise<number>} Current log count for session
+ */
+async function getSessionLogCount(sessionId) {
+  try {
+    const db = await getDb();
+    const rateLimits = db.collection('rateLimits');
+
+    const record = await rateLimits.findOne({ sessionId });
+    return record ? record.count : 0;
+  } catch (error) {
+    console.error('[Rate Limit] Failed to get session count:', error);
+    return 0; // Fail open (don't block on DB errors)
+  }
+}
+
+/**
+ * Update session log count in MongoDB
+ * @param {string} sessionId - Session ID
+ * @param {number} increment - Number to add to count
+ */
+async function updateSessionLogCount(sessionId, increment) {
+  try {
+    const db = await getDb();
+    const rateLimits = db.collection('rateLimits');
+
+    // Upsert with increment and set TTL
+    await rateLimits.updateOne(
+      { sessionId },
+      {
+        $inc: { count: increment },
+        $setOnInsert: { createdAt: new Date() },
+        $set: { updatedAt: new Date() }
+      },
+      { upsert: true }
+    );
+  } catch (error) {
+    console.error('[Rate Limit] Failed to update session count:', error);
+    // Don't throw - rate limiting is secondary to data collection
+  }
+}
+
+// Create TTL index for automatic cleanup of old rate limit records
+(async () => {
+  try {
+    const db = await getDb();
+    const rateLimits = db.collection('rateLimits');
+
+    // Index expires records after 24 hours
+    await rateLimits.createIndex(
+      { createdAt: 1 },
+      { expireAfterSeconds: 24 * 60 * 60 }
+    );
+
+    console.log('[Rate Limit] ✅ TTL index created for rateLimits collection');
+  } catch (error) {
+    console.error('[Rate Limit] ❌ Failed to create TTL index:', error);
+  }
+})();
 
 /**
  * Validate a single log entry
@@ -68,7 +152,7 @@ function validateLogEntry(entry) {
  *   errors?: Array<string>
  * }
  */
-router.post('/batch', async (req, res) => {
+router.post('/batch', ipRateLimiter, async (req, res) => {
   try {
     // Check if data collection is enabled
     if (!DATA_COLLECTION_ENABLED) {
@@ -92,13 +176,24 @@ router.post('/batch', async (req, res) => {
       return res.json({ success: true, inserted: 0 });
     }
 
-    // Rate limiting check
+    // Batch size validation
+    if (logs.length > MAX_BATCH_SIZE) {
+      return res.status(400).json({
+        success: false,
+        error: `Batch size too large: max ${MAX_BATCH_SIZE} logs per request, received ${logs.length}`
+      });
+    }
+
+    // Session-based rate limiting check (MongoDB-persisted)
     if (sessionId) {
-      const currentCount = sessionLogCounts.get(sessionId) || 0;
+      const currentCount = await getSessionLogCount(sessionId);
       if (currentCount + logs.length > MAX_LOGS_PER_SESSION) {
+        console.warn(`[Rate Limit] Session ${sessionId} exceeded limit: ${currentCount + logs.length}/${MAX_LOGS_PER_SESSION}`);
         return res.status(429).json({
           success: false,
-          error: `Rate limit exceeded: max ${MAX_LOGS_PER_SESSION} logs per session`
+          error: `Rate limit exceeded: max ${MAX_LOGS_PER_SESSION} logs per session`,
+          currentCount,
+          maxLogs: MAX_LOGS_PER_SESSION
         });
       }
     }
@@ -146,10 +241,9 @@ router.post('/batch', async (req, res) => {
         console.warn(`[Logging] ⚠️ Partial insert: ${insertedCount}/${validLogs.length} logs inserted`);
       }
 
-      // Update rate limiting counter
+      // Update rate limiting counter in MongoDB
       if (sessionId) {
-        const currentCount = sessionLogCounts.get(sessionId) || 0;
-        sessionLogCounts.set(sessionId, currentCount + insertedCount);
+        await updateSessionLogCount(sessionId, insertedCount);
       }
 
       console.log(`[Logging] ✅ Inserted ${insertedCount} log entries (verified)`);
@@ -239,8 +333,8 @@ router.post('/session/start', async (req, res) => {
     // Use provided treatment or default
     const finalTreatment = treatment || DEFAULT_TREATMENT;
 
-    // Initialize rate limiting counter for this session
-    sessionLogCounts.set(sessionId, 0);
+    // Initialize rate limiting counter in MongoDB for this session
+    await updateSessionLogCount(sessionId, 0);
 
     // Log session start event with strong write guarantees
     const collection = await getLogsCollection();
@@ -251,7 +345,7 @@ router.post('/session/start', async (req, res) => {
       treatment: finalTreatment,
       source: 'system',
       action: 'session_start',
-      value: { sessionId },
+      value: sessionId,  // sessionId value (no need for object wrapper)
       comments: 'User started new game session'
     }, {
       writeConcern: { w: 'majority', j: true, wtimeout: 10000 }
@@ -276,6 +370,70 @@ router.post('/session/start', async (req, res) => {
 });
 
 /**
+ * POST /api/log/summary
+ * Insert session summary into MongoDB summary collection
+ *
+ * Body: SessionSummary object (see useSessionSummary.ts for structure)
+ *
+ * Returns: {
+ *   success: boolean,
+ *   error?: string
+ * }
+ */
+router.post('/summary', ipRateLimiter, async (req, res) => {
+  try {
+    // Check if data collection is enabled
+    if (!DATA_COLLECTION_ENABLED) {
+      return res.status(400).json({
+        success: false,
+        error: 'Data collection is not enabled on this server'
+      });
+    }
+
+    const summary = req.body;
+
+    // Basic validation - ensure required fields exist
+    if (!summary.userId || !summary.sessionId || !summary.gameVersion) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields (userId, sessionId, or gameVersion)'
+      });
+    }
+
+    // Convert timestamp to Date if it's a string
+    if (typeof summary.timestamp === 'string') {
+      summary.timestamp = new Date(summary.timestamp);
+    }
+
+    // Insert into summary collection (separate from gameLogs)
+    const db = await getDb();
+    const summaryCollection = db.collection('summary');
+
+    await summaryCollection.insertOne(summary, {
+      writeConcern: { w: 'majority', j: true, wtimeout: 10000 }
+    });
+
+    console.log(`[Logging] ✅ Session summary inserted: ${summary.sessionId} (user: ${summary.userId}, incomplete: ${summary.incomplete})`);
+
+    // Always return success (don't block user on logging errors)
+    res.json({
+      success: true
+    });
+
+  } catch (error) {
+    console.error('[Logging] ❌ Summary insert failed:', error);
+
+    // Return 200 OK even on error (don't block user experience)
+    // But log the error for debugging
+    res.json({
+      success: false,
+      error: 'Failed to insert summary (non-blocking)',
+      details: error.message
+    });
+  }
+});
+
+/**
  * GET /api/log/status
  * Check if data collection is enabled
  *
@@ -291,18 +449,6 @@ router.get('/status', (req, res) => {
   });
 });
 
-// Clean up old session rate limit counters (every hour)
-setInterval(() => {
-  const maxAge = 60 * 60 * 1000; // 1 hour
-  const now = Date.now();
-
-  for (const [sessionId, _] of sessionLogCounts.entries()) {
-    // Extract timestamp from sessionId (format: timestamp-random)
-    const timestamp = parseInt(sessionId.split('-')[0]);
-    if (now - timestamp > maxAge) {
-      sessionLogCounts.delete(sessionId);
-    }
-  }
-}, 60 * 60 * 1000);
+// Note: Rate limit cleanup now handled by MongoDB TTL index (24 hour expiration)
 
 export default router;

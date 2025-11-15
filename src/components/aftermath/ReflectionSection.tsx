@@ -14,7 +14,7 @@
 // - src/components/event/MirrorCard.tsx: design inspiration
 
 import { motion } from "framer-motion";
-import React, { forwardRef, useMemo, useEffect, useState } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import { mirrorBubbleTheme as T } from "../../theme/mirrorBubbleTheme";
 import { PALETTE, type PropKey } from "../../data/compass-data";
 
@@ -25,10 +25,7 @@ type TopValue = {
 type Props = {
   top3ByDimension: Record<PropKey, TopValue[]>;
   valuesSummary: string;
-  visible: boolean;
-  skipAnimation: boolean;
   onExploreClick: () => void;
-  onComplete: () => void;
 };
 
 // Mirror styling constants from MirrorCard
@@ -41,37 +38,14 @@ const TEXT_INSET_RIGHT_PX = 12;
 const TYPEWRITER_DURATION_S = 2.0;
 
 const FADE_DURATION_S = 0.5;
-const TOTAL_DURATION_S = FADE_DURATION_S + TYPEWRITER_DURATION_S;
 
-const ReflectionSection = forwardRef<HTMLDivElement, Props>(
-  ({ top3ByDimension, valuesSummary, visible, skipAnimation, onExploreClick, onComplete }, ref) => {
-    if (!visible) return null;
-
-    // Call onComplete when fade-in + typewriter finishes or immediately if skipped
-    useEffect(() => {
-      if (skipAnimation) {
-        onComplete();
-      } else {
-        const timer = setTimeout(() => {
-          console.log('[ReflectionSection] Animation complete');
-          onComplete();
-        }, TOTAL_DURATION_S * 1000);
-
-        return () => clearTimeout(timer);
-      }
-    }, [skipAnimation, onComplete]);
-
-    const AnimationWrapper = skipAnimation ? "div" : motion.div;
-    const animationProps = skipAnimation
-      ? {}
-      : {
-          initial: { opacity: 0, y: 20 },
-          animate: { opacity: 1, y: 0 },
-          transition: { duration: FADE_DURATION_S },
-        };
-
+export default function ReflectionSection({ top3ByDimension, valuesSummary, onExploreClick }: Props) {
     return (
-      <AnimationWrapper ref={ref as any} {...animationProps}>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: FADE_DURATION_S }}
+      >
         <div
           className="relative overflow-hidden"
           style={{
@@ -137,11 +111,7 @@ const ReflectionSection = forwardRef<HTMLDivElement, Props>(
 
             {/* Values Summary with typewriter */}
             <p className="text-base leading-relaxed italic">
-              {skipAnimation ? (
-                valuesSummary
-              ) : (
-                <TypewriterText text={valuesSummary} />
-              )}
+              <TypewriterText text={valuesSummary} />
             </p>
           </div>
 
@@ -157,14 +127,9 @@ const ReflectionSection = forwardRef<HTMLDivElement, Props>(
             <span>Explore Values</span>
           </button>
         </div>
-      </AnimationWrapper>
+      </motion.div>
     );
-  }
-);
-
-ReflectionSection.displayName = "ReflectionSection";
-
-export default ReflectionSection;
+}
 
 /** Mirror image overlay component */
 function MirrorImage() {

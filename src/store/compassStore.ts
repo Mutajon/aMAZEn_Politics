@@ -26,18 +26,22 @@ type Effect = { prop: PropKey; idx: number; delta: number };
 
 type CompassStore = {
   values: CompassValues;
+  initialCompassSnapshot: CompassValues | null;  // Snapshot of initial compass values after quiz (for session summary)
   reset: () => void;
   /** Set to an exact integer 0..10 */
   setValue: (prop: PropKey, idx: number, value: number) => void;
   /** Apply deltas; clamps to 0..10; returns the actually applied (clamped) deltas */
   applyEffects: (effects: Effect[]) => Effect[];
+  /** Capture initial compass snapshot (called after quiz completion) */
+  captureInitialSnapshot: () => void;
 };
 
 export const useCompassStore = create<CompassStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       values: emptyValues(),
-      reset: () => set({ values: emptyValues() }),
+      initialCompassSnapshot: null,
+      reset: () => set({ values: emptyValues(), initialCompassSnapshot: null }),
       setValue: (prop, idx, value) =>
         set(state => {
           const next = { ...state.values, [prop]: [...state.values[prop]] };
@@ -62,6 +66,22 @@ export const useCompassStore = create<CompassStore>()(
           return { values: next };
         });
         return applied;
+      },
+      captureInitialSnapshot: () => {
+        const { values, initialCompassSnapshot } = get();
+        // Only capture once (prevent overwriting if called multiple times)
+        if (initialCompassSnapshot === null) {
+          const snapshot: CompassValues = {
+            what: [...values.what],
+            whence: [...values.whence],
+            how: [...values.how],
+            whither: [...values.whither],
+          };
+          set({ initialCompassSnapshot: snapshot });
+          console.log('[compassStore] Initial compass snapshot captured');
+        } else {
+          console.log('[compassStore] Initial snapshot already exists, skipping');
+        }
       },
     }),
     {

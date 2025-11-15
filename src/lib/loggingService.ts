@@ -146,8 +146,8 @@ class LoggingService {
       return;
     }
 
-    // Log session end event
-    this.log('session_end', { sessionId }, 'User completed or abandoned game session');
+    // Log session end event (sessionId already in top-level batch field)
+    this.log('session_end', true, 'User completed or abandoned game session');
 
     // Flush remaining logs
     await this.flush();

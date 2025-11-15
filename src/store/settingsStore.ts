@@ -42,6 +42,11 @@ type SettingsState = {
   setUseLightDilemmaAnthropic: (v: boolean) => void;
   toggleUseLightDilemmaAnthropic: () => void;
 
+  // --- NEW: Use XAI (X.AI/Grok) for game-turn API ---
+  useXAI: boolean;
+  setUseXAI: (v: boolean) => void;
+  toggleUseXAI: () => void;
+
   // --- NEW: In-game narration mute (separate from global toggle) ---
   narrationMutedInGame: boolean;
   setNarrationMutedInGame: (v: boolean) => void;
@@ -127,6 +132,11 @@ export const useSettingsStore = create<SettingsState>()(
       useLightDilemmaAnthropic: false,
       setUseLightDilemmaAnthropic: (v) => set({ useLightDilemmaAnthropic: v }),
       toggleUseLightDilemmaAnthropic: () => set({ useLightDilemmaAnthropic: !get().useLightDilemmaAnthropic }),
+
+      // NEW: Use XAI (X.AI/Grok) for game-turn API (default OFF)
+      useXAI: false,
+      setUseXAI: (v) => set({ useXAI: v }),
+      toggleUseXAI: () => set({ useXAI: !get().useXAI }),
 
       // NEW: In-game narration mute (default OFF - respects global setting)
       narrationMutedInGame: false,

@@ -33,16 +33,18 @@ import { useCoinFlights, CoinFlightOverlay } from "../components/event/CoinFligh
 import { AnimatePresence } from "framer-motion";
 import { bgStyleWithRoleImage } from "../lib/ui";
 import { calculateLiveScoreBreakdown } from "../lib/scoring";
+import { getCorruptionInfo } from "../lib/corruptionLevels";
 import { Building2, Heart, Users } from "lucide-react";
 import type { CompassEffectPing } from "../components/MiniCompass";
 import { loadEventScreenSnapshot, clearEventScreenSnapshot } from "../lib/eventScreenSnapshot";
 import { useLang } from "../i18n/lang";
 import { useRoleProgressStore } from "../store/roleProgressStore";
 import { useTimingLogger } from "../hooks/useTimingLogger";
-import { useAIOutputLogger } from "../hooks/useAIOutputLogger";
 import { useReasoning } from "../hooks/useReasoning";
 import { useLogger } from "../hooks/useLogger";
 import ReasoningModal from "../components/event/ReasoningModal";
+import { useTutorialStore } from "../store/tutorialStore";
+import { TutorialOverlay } from "../components/tutorial/TutorialOverlay";
 
 type Props = {
   push: (path: string) => void;
@@ -60,6 +62,9 @@ export default function EventScreen3({ push }: Props) {
   );
   const showBudget = useSettingsStore((s) => s.showBudget);
   const debugMode = useSettingsStore((s) => s.debugMode);
+
+  // Tutorial state
+  const { hasPlayedBefore, day1TipShown, day2TipShown, markDay1TipShown, markDay2TipShown, markHasPlayedBefore } = useTutorialStore();
 
   // Create role-based background style
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
@@ -131,10 +136,10 @@ export default function EventScreen3({ push }: Props) {
   // Coin flight system (persists across all phases)
   const { flights, triggerCoinFlight, clearFlights } = useCoinFlights();
 
-  // Data logging hooks (Timing, AI outputs)
+  // Data logging hooks (Timing, Player actions)
   // Note: State change tracking is handled globally in App.tsx via useStateChangeLogger
+  // Note: AI output logging is handled in useEventDataCollector.ts at the source
   const timingLogger = useTimingLogger();
-  const aiLogger = useAIOutputLogger();
   const logger = useLogger();
 
   // Reasoning feature (treatment-based)
@@ -227,6 +232,7 @@ export default function EventScreen3({ push }: Props) {
         {
           id: "corruption" as const,
           label: lang("FINAL_SCORE_CORRUPTION"),
+          tierLabel: getCorruptionInfo(breakdown.corruption.normalizedLevel).label,
           valueLabel: `${breakdown.corruption.normalizedLevel.toFixed(1)}/10`,
           points: breakdown.corruption.points,
           maxPoints: breakdown.corruption.maxPoints,
@@ -337,16 +343,7 @@ export default function EventScreen3({ push }: Props) {
   // REMOVED: Logging moved to useEventDataCollector.ts to prevent duplicates
   // AI outputs are now logged ONCE at the source when data is fetched
   //
-  // NOTE: Compass pills are still logged separately in eventDataCleaner.ts
-  // after action confirmation, as they're fetched at a different time
-  useEffect(() => {
-    if (!collectedData) return;
-
-    // Log compass pills if available (these are fetched separately after action)
-    if (collectedData.compassPills) {
-      aiLogger.logCompassHints(collectedData.compassPills);
-    }
-  }, [collectedData, aiLogger]);
+  // NOTE: Compass pills logging removed - no longer tracking compass pill events
 
   // ========================================================================
   // EFFECT 3: Advance to presenting when data ready
@@ -426,6 +423,18 @@ export default function EventScreen3({ push }: Props) {
       push('/downfall');
     }
   }, [collectedData, storedCrisisMode, phase, push]);
+
+  // ========================================================================
+  // EFFECT 5: Mark player as having played before on first interaction
+  // ========================================================================
+  useEffect(() => {
+    if (!hasPlayedBefore && day === 1 && phase === 'interacting') {
+      markHasPlayedBefore();
+      logger.logSystem('first_time_player_detected', {
+        timestamp: Date.now()
+      }, 'First-time player detected, tutorial enabled');
+    }
+  }, [hasPlayedBefore, day, phase, markHasPlayedBefore, logger]);
 
   // ========================================================================
   // ACTION HANDLERS
@@ -523,7 +532,7 @@ export default function EventScreen3({ push }: Props) {
 
     console.log('[EventScreen3] ✅ Action confirmed:', actionCard.title);
 
-    // End decision timing
+    // End decision timing and store in dilemmaStore
     if (decisionTimingIdRef.current) {
       const duration = timingLogger.end(decisionTimingIdRef.current, {
         day,
@@ -533,6 +542,11 @@ export default function EventScreen3({ push }: Props) {
         wasCustomAction: false
       });
       console.log(`[EventScreen3] ⏱️ Decision time: ${duration}ms`);
+
+      // Store decision time for session summary
+      const { addDecisionTime } = useDilemmaStore.getState();
+      addDecisionTime(duration);
+
       decisionTimingIdRef.current = null;
     }
 
@@ -575,7 +589,7 @@ export default function EventScreen3({ push }: Props) {
 
     console.log('[EventScreen3] 💡 Processing custom suggestion:', text);
 
-    // End decision timing (custom action confirmed)
+    // End decision timing (custom action confirmed) and store in dilemmaStore
     if (decisionTimingIdRef.current) {
       const duration = timingLogger.end(decisionTimingIdRef.current, {
         day,
@@ -585,6 +599,11 @@ export default function EventScreen3({ push }: Props) {
         wasCustomAction: true
       });
       console.log(`[EventScreen3] ⏱️ Decision time (custom): ${duration}ms`);
+
+      // Store decision time for session summary
+      const { addDecisionTime } = useDilemmaStore.getState();
+      addDecisionTime(duration);
+
       decisionTimingIdRef.current = null;
     }
 
@@ -710,10 +729,13 @@ export default function EventScreen3({ push }: Props) {
   // Don't show loading overlay if we're restoring from snapshot
   if ((phase === 'collecting' || isCollecting) && !restoredFromSnapshot) {
     return (
-      <CollectorLoadingOverlay
-        progress={progress} // Real-time progress with auto-increment and catchup animation
-        message={lang("GATHERING_INTELLIGENCE")}
-      />
+      <AnimatePresence mode="wait">
+        <CollectorLoadingOverlay
+          key="loading-overlay"
+          progress={progress} // Real-time progress with auto-increment and catchup animation
+          message={lang("GATHERING_INTELLIGENCE")}
+        />
+      </AnimatePresence>
     );
   }
 
@@ -902,7 +924,7 @@ export default function EventScreen3({ push }: Props) {
         </AnimatePresence>
 
         {/* Reasoning Modal - appears after action confirmation (treatment-based) */}
-        {reasoningModalAction && (
+        {reasoningModalAction && collectedData && (
           <ReasoningModal
             isOpen={showReasoningModal}
             onClose={handleReasoningClose}
@@ -913,7 +935,32 @@ export default function EventScreen3({ push }: Props) {
             day={day}
             isOptional={reasoning.isOptional()}
             isSubmitting={isSubmittingReasoning}
+            speakerName={collectedData.dilemma.speaker}
+            speakerImageId="gatekeeper"
           />
+        )}
+
+        {/* Tutorial Overlays - First-time player guidance */}
+        {!hasPlayedBefore && !debugMode && !restoredFromSnapshot && (
+          <>
+            {/* Day 1: Avatar tutorial */}
+            {day === 1 && !day1TipShown && phase === 'interacting' && presentationStep >= 5 && (
+              <TutorialOverlay
+                target="avatar"
+                message="Click your avatar to see your current values"
+                onDismiss={markDay1TipShown}
+              />
+            )}
+
+            {/* Day 2: Support tutorial */}
+            {day === 2 && !day2TipShown && phase === 'interacting' && presentationStep >= 1 && (
+              <TutorialOverlay
+                target="support"
+                message="Click on support entities to learn more about them - so you can make more educated decisions"
+                onDismiss={markDay2TipShown}
+              />
+            )}
+          </>
         )}
       </div>
     );

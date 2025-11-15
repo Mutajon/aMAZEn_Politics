@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { CompassEffectPing } from "../MiniCompass";
 import { COMPONENTS, PALETTE } from "../../data/compass-data";
 import { useAudioManager } from "../../hooks/useAudioManager";
-import { useLogger } from "../../hooks/useLogger";
 
 type Props = {
   effectPills: CompassEffectPing[];
@@ -19,7 +18,6 @@ type Props = {
  *  - Pills animate from/to button position for smooth spatial transitions. */
 export default function CompassPillsOverlay({ effectPills, loading, color }: Props) {
   const { playSfx } = useAudioManager();
-  const logger = useLogger();
 
   // Track expand/collapse
   const [expanded, setExpanded] = useState<boolean>(true);
@@ -98,10 +96,7 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
                   <motion.button
                     key={p.id}
                     type="button"
-                    onClick={() => {
-                      logger.log('compass_pills_closed', { pillCount: effectPills.length }, 'User collapsed compass pills');
-                      setExpanded(false);
-                    }}
+                    onClick={() => setExpanded(false)}
                     className="rounded-full px-2 py-1 text-xs font-semibold focus:outline-none absolute"
                     style={{
                       background: bg,
@@ -151,10 +146,7 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
             <motion.button
               key="pills-collapsed"
               type="button"
-              onClick={() => {
-                logger.log('compass_pills_opened', { pillCount: effectPills.length }, 'User expanded compass pills');
-                setExpanded(true);
-              }}
+              onClick={() => setExpanded(true)}
               className="
                 pointer-events-auto
                 absolute top-1/2 -translate-y-1/2 translate-x-1/2

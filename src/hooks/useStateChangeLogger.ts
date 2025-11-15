@@ -3,15 +3,15 @@
 //
 // Features:
 // - Auto-subscribes to Zustand store changes
-// - Logs compass changes as daily summaries (consolidated to reduce redundancy)
+// - Logs compass and support snapshots on Days 1, 4, 8 (end of day)
 // - Tracks goal status changes
 // - Non-invasive: no manual logging needed in store setters
 //
 // Optimization Notes:
-// - Support, budget, corruption, score, day, crisis mode, and custom action count
+// - Support, budget, corruption, score, crisis mode, and custom action count
 //   logging REMOVED - 100% redundant with AI output logs that include explanations
-// - Compass logging changed from individual events (50+) to daily summaries (7-8)
-// - Reduces ~113 redundant events per game with ZERO research data loss
+// - Compass/support logging changed from continuous tracking to 3 snapshots per game
+// - Reduces ~8-36 redundant events per game while preserving key milestone data
 //
 // Usage:
 //   // In a top-level component (e.g., App.tsx or EventScreen3)
@@ -25,21 +25,13 @@ import { useDilemmaStore } from '../store/dilemmaStore';
 import { useCompassStore } from '../store/compassStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { useLogger } from './useLogger';
-import { COMPONENTS, type PropKey } from '../data/compass-data';
 
 export function useStateChangeLogger() {
   const logger = useLogger();
   const isSubscribed = useRef(false);
 
-  // Accumulator for compass changes per day
-  const compassChangesRef = useRef<Array<{
-    dimension: string;
-    component: string;
-    from: number;
-    to: number;
-    delta: number;
-  }>>([]);
-  const currentDayRef = useRef<number | null>(null);
+  // Track which snapshot days have been logged (to prevent duplicates)
+  const loggedSnapshotsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     if (isSubscribed.current) {
@@ -51,7 +43,7 @@ export function useStateChangeLogger() {
 
     // ============================================================================
     // DILEMMA STORE SUBSCRIPTION
-    // Tracks: goal status changes, day progression (for compass summary)
+    // Tracks: goal status changes, day progression (for snapshots)
     // ============================================================================
     // NOTE: Support, budget, corruption, score, crisis mode, and custom action count
     // logging REMOVED - 100% redundant with AI output logs (support_shifts_summary,
@@ -60,24 +52,45 @@ export function useStateChangeLogger() {
 
     const unsubDilemma = useDilemmaStore.subscribe(
       (state, prevState) => {
-        // Day progression - used to trigger compass summary logging
+        // Day progression - used to trigger snapshot logging on Days 1, 4, 8
         if (state.day !== prevState.day) {
-          // Log compass summary for previous day (if any changes accumulated)
-          if (compassChangesRef.current.length > 0 && currentDayRef.current !== null) {
+          const snapshotDays = [1, 4, 8];
+
+          // Check if we should log a snapshot for the PREVIOUS day (end of day timing)
+          // This ensures we capture state AFTER the player's action on that day
+          if (snapshotDays.includes(prevState.day) && !loggedSnapshotsRef.current.has(prevState.day)) {
+            loggedSnapshotsRef.current.add(prevState.day);
+
+            // Get current compass and support values
+            const compassState = useCompassStore.getState();
+            const supportState = {
+              people: state.supportPeople,
+              middle: state.supportMiddle,
+              mom: state.supportMom
+            };
+
+            // Log compass snapshot
             logger.logSystem(
-              'compass_changes_daily_summary',
+              'compass_snapshot',
               {
-                day: currentDayRef.current,
-                totalChanges: compassChangesRef.current.length,
-                changes: compassChangesRef.current
+                day: prevState.day,
+                values: compassState.values
               },
-              `Day ${currentDayRef.current}: ${compassChangesRef.current.length} compass changes`
+              `Compass snapshot at end of Day ${prevState.day}`
+            );
+
+            // Log support snapshot
+            logger.logSystem(
+              'support_snapshot',
+              {
+                day: prevState.day,
+                people: supportState.people,
+                middle: supportState.middle,
+                mom: supportState.mom
+              },
+              `Support snapshot at end of Day ${prevState.day}: People=${supportState.people}, Middle=${supportState.middle}, MoM=${supportState.mom}`
             );
           }
-
-          // Reset accumulator for new day
-          compassChangesRef.current = [];
-          currentDayRef.current = state.day;
         }
 
         // Goal status changes (keep - not redundant, important for goal tracking)
@@ -103,50 +116,10 @@ export function useStateChangeLogger() {
 
     // ============================================================================
     // COMPASS STORE SUBSCRIPTION
-    // Accumulates compass changes for daily summary logging
     // ============================================================================
-    // NOTE: Changed from individual logging (50+ events) to daily summaries (7-8 events)
-    // to reduce redundancy while preserving all compass data. Saves ~42 events per game.
-
-    const unsubCompass = useCompassStore.subscribe(
-      (state, prevState) => {
-        // Initialize current day if not set
-        if (currentDayRef.current === null) {
-          currentDayRef.current = useDilemmaStore.getState().day;
-        }
-
-        // Check if any compass dimension changed
-        const dimensions = ['what', 'whence', 'how', 'whither'] as const;
-
-        dimensions.forEach(dim => {
-          const newValues = state.values[dim];
-          const oldValues = prevState.values[dim];
-
-          if (!newValues || !oldValues) return;
-
-          // Get component names for this dimension
-          const components = COMPONENTS[dim as PropKey];
-
-          // Check each component in dimension
-          newValues.forEach((newVal, idx) => {
-            const oldVal = oldValues[idx];
-            if (newVal !== oldVal) {
-              const delta = newVal - oldVal;
-              const componentName = components[idx]?.short || `unknown[${idx}]`;
-
-              // Accumulate change instead of logging immediately
-              compassChangesRef.current.push({
-                dimension: dim,
-                component: componentName,
-                from: oldVal,
-                to: newVal,
-                delta
-              });
-            }
-          });
-        });
-      }
-    );
+    // NOTE: Compass logging now done via snapshots (Days 1, 4, 8) in dilemma store
+    // subscription above. No need to subscribe to compass store directly.
+    // This approach reduces events from ~7-8 daily summaries to 3 snapshots per game.
 
     // ============================================================================
     // SETTINGS STORE SUBSCRIPTION
@@ -184,7 +157,6 @@ export function useStateChangeLogger() {
     return () => {
       console.log('[StateChangeLogger] Unsubscribing from store changes');
       unsubDilemma();
-      unsubCompass();
       unsubSettings();
       isSubscribed.current = false;
     };
