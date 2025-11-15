@@ -1503,7 +1503,7 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
       "- NEVER reveal numbers, scores, scales, or ranges.\n" +
       "- NEVER repeat the value labels verbatim; do not quote, uppercase, or mirror slashes.\n" +
       "- Paraphrase technical labels into plain, everyday phrases.\n" +
-      "- Do NOT stage literal actions for values (no "X is doing push-ups", "baking cookies", etc.).\n" +
+      "- Do NOT stage literal actions for values (no X is doing push-ups, baking cookies, etc.).\n" +
       "- No lists, no colons introducing items, no parenthetical asides.\n" +
       "- Keep the sentence clear first, witty second.\n";
 
