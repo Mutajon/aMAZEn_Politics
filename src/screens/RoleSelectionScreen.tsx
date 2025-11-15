@@ -2,7 +2,7 @@
 import { useRef, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Variants } from "framer-motion";
-import { bgStyleWithMaze } from "../lib/ui";
+import { bgStyleRoleSelection } from "../lib/ui";
 import type { PushFn } from "../lib/router";
 import { validateRoleStrict, AIConnectionError } from "../lib/validation";
 import { useRoleStore } from "../store/roleStore";
@@ -275,7 +275,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   };
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center px-5 py-8" style={bgStyleWithMaze}>
+    <div className="min-h-[100dvh] flex items-center justify-center px-5 py-8" style={bgStyleRoleSelection}>
       <div className="w-full max-w-2xl text-center select-none">
         <h2 className="text-3xl font-extrabold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
           {lang("CHOOSE_YOUR_ROLE")}

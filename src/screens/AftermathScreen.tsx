@@ -98,8 +98,11 @@ export default function AftermathScreen({ push }: Props) {
   // ========================================================================
   // EFFECT: NOTIFY PROGRESS (only if not restored from snapshot)
   // ========================================================================
+  const hasNotifiedReadyRef = useRef(false);
+
   useEffect(() => {
-    if (data && !initializedFromSnapshot) {
+    if (data && !initializedFromSnapshot && !hasNotifiedReadyRef.current) {
+      hasNotifiedReadyRef.current = true;
       notifyReady();
     }
   }, [data, notifyReady, initializedFromSnapshot]);

@@ -123,10 +123,10 @@ TTS_VOICE=alloy
 ### AI Endpoints
 
 **Core Game Engine:**
-- `/api/game-turn` - Unified endpoint for all event screen data using conversation state
-  * Replaces legacy stateless endpoints
+- `/api/game-turn-v2` - Unified endpoint for all event screen data using stateful conversation
+  * Uses hosted conversation state with persistent gameId
   * Returns: dilemma, support shifts, mirror advice, dynamic params, compass hints
-  * ~50% token savings after Day 1, ~50% faster
+  * ~50% token savings after Day 1, ~50% faster than original implementation
 
 **Story System:**
 - `/api/narrative-seed` - One-time narrative scaffold generation (2-3 dramatic threads, climax candidates)
@@ -170,7 +170,7 @@ TTS_VOICE=alloy
 - **Immediate Consequences**: AI shows dramatic results of player actions, no re-questioning decisions
 - **Closure Allowance**: If storyline concludes (war ends, treaty signed), AI may show 1 closure dilemma before switching
 - **Forced Switching**: After 2 consecutive on same topic, AI MUST switch to different subject area
-- **Implementation**: Lines 5717-5744 in `server/index.mjs` - explicit topic tracking and enforcement
+- **Implementation**: Implemented in `/api/game-turn-v2` endpoint in `server/index.mjs`
 - **Goal**: Prevent "wobbling" around same decision, ensure varied gameplay experience
 
 **Dynamic Parameters:**
@@ -194,17 +194,17 @@ TTS_VOICE=alloy
 
 **Immediate Consequence System:**
 - **Goal**: Show immediate, dramatic results of player actions - no re-questioning or hesitation
-- **ALL Actions Get Consequences**: Every player decision triggers consequence directive (lines 5040-5060)
+- **ALL Actions Get Consequences**: Every player decision triggers consequence directive
 - **Explicit Examples**: War declared → battles begin; Treaties signed → implementation starts; Arrests → trials begin
 - **Specialized Detection**: Backend also detects votes, referendums, negotiations via regex for tailored result directives
-- **Implementation**: `server/index.mjs` lines 5040-5060 (general), lines 5033-5039 (vote/negotiation specific)
+- **Implementation**: Implemented in `/api/game-turn-v2` endpoint in `server/index.mjs`
 - **Directive Language**: "DO NOT ask them to confirm again - THEY ALREADY DECIDED"
 - **System Feel**: Results play differently across political systems (democracies implement, autocracies may override)
 
 **Faction Identity Mapping:**
 - **Challenge**: AI doesn't inherently know power holder names = faction profiles (e.g., "Coercive Force" = "Challenger")
 - **Solution**: Explicit identity mapping injected in Day 2+ prompts
-- **Implementation**: `server/index.mjs` lines 4569-4580 in `buildTurnUserPrompt`
+- **Implementation**: Implemented in `/api/game-turn-v2` endpoint via `buildGameMasterUserPrompt()`
 - **Effect**: AI understands when player engages respectfully with a power holder, that faction should respond positively
 - **Example**: Athens scenario - negotiating with Spartans makes Coercive Force (the Spartans) respond positively
 
@@ -215,8 +215,8 @@ TTS_VOICE=alloy
 
 **Custom Action Validation & Consequence System:**
 - **Philosophy**: Highly permissive, pro-player system - default to accepting player creativity
-- **Validation Endpoint**: `POST /api/validate-suggestion` (server/index.mjs, lines 3106-3168, 5383-5425)
-- **Validation Rules** (lines 5393-5418):
+- **Validation Endpoint**: `POST /api/validate-suggestion` in `server/index.mjs`
+- **Validation Rules**:
   - ✅ **ACCEPT**: Violent, unethical, immoral, manipulative, coercive suggestions (corruption penalties applied later)
   - ✅ **ACCEPT**: Risky actions with low probability (assassination, poisoning, coups, bribery)
   - ✅ **ACCEPT**: Actions that are difficult/unlikely but theoretically possible for the role
@@ -228,7 +228,7 @@ TTS_VOICE=alloy
   - Examples: King can issue any decree ✅, but cannot use internet in 1600 ❌ (anachronism)
 - **Constructive Rejections**: When rejecting, suggest feasible alternatives
   - Example: "Try 'Propose to Assembly that we declare war' or 'Attempt to assassinate the enemy commander'"
-- **Probability-Aware Consequences** (lines 5308-5326):
+- **Probability-Aware Consequences**:
   - Risky actions get realistic success/failure outcomes based on:
     * Historical context (surveillance tech, loyalty systems, security apparatus)
     * Role resources (budget, connections, authority)
@@ -236,7 +236,7 @@ TTS_VOICE=alloy
     * Action complexity (poisoning one person vs. overthrowing government)
   - Outcome types: High-risk failure, partial success, success with consequences, clean success (rare)
   - Historical realism: Ancient/Medieval (easier covert action, brutal if caught) vs. Modern (higher surveillance)
-- **Corruption Evaluation** (lines 5862-5965):
+- **Corruption Evaluation**:
   - ALL actions evaluated on 0-10 scale (including violent/unethical choices)
   - Rubric: Intent (0-4) + Method (0-3) + Impact (0-3)
   - Violence NOT automatically corruption - depends on intent/method/impact
@@ -244,8 +244,8 @@ TTS_VOICE=alloy
   - Examples: Coup for self-enrichment = 7-9; Coup to end tyranny = 2-4
   - Most normal governance scores 0-2 even if controversial
 - **Integration**: Custom actions flow through same pipeline as AI-generated options
-  - Frontend converts custom text to ActionCard (EventScreen3.tsx, lines 623-635)
-  - Sent to `/api/game-turn` as `playerChoice` parameter
+  - Frontend converts custom text to ActionCard
+  - Sent to `/api/game-turn-v2` as `playerChoice` parameter
   - Authority-filtered consequence generation (democracies vote, autocracies decree)
   - Support shifts, corruption penalties, compass changes all apply identically
 
@@ -293,7 +293,7 @@ if (config.inquiryTokensPerDilemma > 0) { /* Future feature */ }
 ```
 
 **Token Optimization:**
-When treatment is `fullAutonomy`, the `/api/game-turn` endpoint skips generating AI action options, saving ~40-50% of dilemma generation tokens. The `generateActions` flag is passed from frontend to backend automatically.
+When treatment is `fullAutonomy`, the `/api/game-turn-v2` endpoint skips generating AI action options, saving ~40-50% of dilemma generation tokens. The `generateActions` flag is passed from frontend to backend automatically.
 
 **Implementation Points:**
 - **Settings Store** (`settingsStore.ts`): Stores treatment assignment

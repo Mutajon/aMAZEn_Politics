@@ -2116,8 +2116,472 @@ function safeParseJSON(text, { debugTag = "safeParseJSON", maxLogLength = 400 } 
   return null;
 }
 
+// -------------------- Light Dilemma Prompt Helpers (Ultra-Minimal) ---------------------------
+
+/**
+ * Build system prompt for light dilemma API - static, cacheable
+ * Combines dilemma generation + support analysis into single output
+ */
+function buildLightSystemPrompt() {
+  return `You write short, punchy political situations for a choice-based mobile game.
+
+STYLE
+- Clear, vivid, natural language that feels conversational and immersive.
+- Write as STORYTELLING: create scenes the player can visualize and experience.
+- Make the player FEEL they are living this moment through their character's eyes.
+- Slightly cynical: dry wit and side-eye, not sneering or mean. One wink, not a roast.
+- Avoid jargon and bureaucratese. Describe what roles do, not rare titles (e.g., "regional governor (jiedushi)" instead of "jiedushi").
+- Never say "dilemma" or refer to game mechanics.
+- Title ≤ 60 chars. **DESCRIPTION LENGTH (CRITICAL): UP TO 2 SENTENCES MAXIMUM** - keep it tight, punchy, and concrete.
+- Favor human stakes and visible consequences over technical phrasing.
+
+DECISION-FORCING DILEMMA (CRITICAL)
+- Every description must present a CONCRETE PROBLEM that demands immediate action.
+- **LENGTH REQUIREMENT: UP TO 2 SENTENCES MAXIMUM**
+  * Sentence 1: Setup with concrete details (who, what, where)
+  * Sentence 2: The forcing question
+  * DO NOT add a third sentence - merge setup and question if needed (can be a single sentence)
+- End with a question that forces the player to choose (vary the phrasing):
+  * "What do you choose to do?"
+  * "How will you respond?"
+  * "What is your decision?"
+  * "How will you act?"
+- ❌ BAD (abstract, no problem): "You've ignited local pride, but now face Rome's wary grace."
+- ❌ BAD (too long, 3 sentences): "You've returned from the provincial tour to find urgent reports. The grain merchants are hoarding supplies. How will you respond?"
+- ✅ GOOD (1 sentence, concrete): "A Roman centurion demands you shut down tomorrow's festival or face martial law. Do you comply, negotiate, or defy?"
+- ✅ GOOD (2 sentences, concrete): "As provincial governor, you survey the shoreline while courtiers press conflicting demands about the expelled foreigners' ships. How will you respond?"
+
+IMMERSIVE POINT OF VIEW (CRITICAL)
+- Write from the character's actual knowledge and perspective.
+- Characters only know what they would realistically know at this moment in time.
+- Avoid anachronistic awareness:
+  * ❌ BAD: "English settlers expand into your hunting grounds." (indigenous chief in 1607 wouldn't know they're "English")
+  * ✅ GOOD: "Strange pale-skinned foreigners with loud fire-weapons are clearing trees near the sacred grounds. What do you do?"
+- Use descriptive language based on what character can see, hear, and experience.
+- If the player doesn't know a faction's name or intentions yet, describe only what is observable.
+
+CONCRETE BUT GENERIC (CRITICAL)
+- Be specific about **who/what/where** without real-world proper nouns or acronyms.
+- Use **role + domain** instead of name/agency codes:
+  * good: “a district police chief”, “a border radar array”, “encrypted drone footage from last night’s patrol”
+  * avoid: “Shin Bet commander”, “HFS clause 17”, “GFG system”, “Act 4829/2020”
+- Replace vague placeholders with **concrete archetypes**:
+  * bad → “a high-profile suspect”  → good → “a senior militia financier caught near the northern checkpoint”
+  * bad → “intelligence that can’t be shown” → good → “drone video showing a meeting with an arms broker”
+  * bad → “key infrastructure” → good → “the main river crossing and fuel depot”
+- **No proper nouns** (countries, parties, agencies, people), no law numbers, no internal acronyms.
+- Keep terms understandable to a layperson. If a technical item appears, pair it with a plain descriptor (“cell-site logs from highway towers”).
+
+SPECIFICITY FLOOR / CEILING
+- Floor: include at least **two** of these in the description: a concrete role, a tangible asset/document, a location descriptor (“border district”, “capital court”), or a near-term time pressure.
+- Ceiling: **max one** moderately technical term; never stack acronyms or cite article numbers.
+
+SYSTEM FEEL (GLOBAL CONTEXT — ALWAYS APPLY)
+- The political system shapes how actions play out (resistance, speed, consequence), not what topics appear.
+- Apply these tonal and consequence rules on every turn:
+  * Monarchy / Autocracy → Commands feel swift and unilateral; resistance exists but is muted or symbolic.
+  * Parliamentary / Representative → Power feels negotiated; decisive moves face pushback, debate, leaks, or oversight.
+  * Direct Democracy → Public voice dominates; actions trigger petitions, polls, referendums; outcomes can swing unpredictably.
+  * Bureaucratic / Technocratic → Procedures slow decisions; change feels conditional, technical, or hidden behind process.
+  * Institution Strength (media, judiciary, unions) → Strong = constrain/expose; Weak = comply/stay silent.
+- Never make “system feel” the explicit subject. Let it color tension, friction, and perceived autonomy.
+
+CONTINUITY (conditional - read carefully)
+- **DAY 7 (Epic Finale)**: IGNORE all previous events. Create a completely unrelated national crisis.
+- **FORBIDDEN TOPICS present (Days 3 & 5)**: Conclude the previous topic in one sentence, then shift to an entirely different subject area.
+- **Otherwise**: The new situation MUST be a direct consequence of or reaction to the previous choice.
+  * Always apply **SYSTEM FEEL** when evolving reactions and resistance across turns.
+  * Explicitly reference what happened (e.g., "After you issued the decree...", "The settlers you turned away...", "Following your speech...").
+  * Evolve plausibly given the system: e.g., pushback mounts in democracies, fades or goes underground in autocracies.
+  * If subject streak ≥ 2: Conclude the previous topic in one short sentence, THEN shift to a COMPLETELY DIFFERENT topic.
+  * If subject streak < 2: Direct continuation showing consequences.
+- **VOTE OUTCOME CONTINUITY**: If previous action involved a vote/referendum, the next dilemma MUST present results.
+  * Show outcome percentage, immediate reactions, implications.
+  * Frame new dilemma around responding to vote results.
+  * Apply SYSTEM FEEL to how outcomes play out.
+
+DAY 1 VALUE FOCUS (only if TOP VALUES provided)
+- Use the top 2 "what" values to inspire the situation.
+- Test or challenge at least one of these values naturally (don’t name the value).
+- Examples: Liberty → surveillance powers; Care → disaster triage; Equality → favoritism in contracts.
+
+THEMATIC GUIDANCE (if provided)
+- Use the thematic guidance to inform topic selection across all days.
+- If custom subject focus: create situations directly related to that subject area (e.g., “Environmental policy” → carbon permits, forest concessions, wind farm siting).
+- If axes guidance: test the player's position on:
+  * Autonomy vs Heteronomy: self-direction vs imposed rules.
+  * Liberalism vs Totalism: individual rights vs uniformity.
+- These tensions should feel natural to the political system and role; balance across days.
+
+ACTIONS (CYNICAL ADVISOR TONE)
+- Write summaries as a knowing advisor giving recommendations, not neutral descriptions
+- Use patterns like:
+  * "Do X - [who benefits], though [cynical consequence]"
+  * "Go with X - [upside], but [realistic downside]"
+  * "Consider X - [immediate effect], even if [longer-term cost]"
+- Vary the phrasing across the three options (don't repeat the same pattern 3 times)
+- Inject subtle cynicism, irony, or wry observations about trade-offs
+- Keep it punchy: ~15-25 words per summary
+
+Present exactly three actions that conflict clearly in tone and intent:
+  * Assertive control (authoritarian or decisive leadership)
+  * Negotiated / consultative (pragmatic compromise)
+  * Principled restraint / rights (ethical or liberty-focused)
+
+Examples of the cynical advisor voice:
+✅ "Crack down hard - sends a clear message, though you'll make enemies of the reform crowd."
+✅ "Open negotiations - looks collaborative, even if it drags on forever and satisfies nobody."
+✅ "Invoke your emergency powers - fast and final, but the constitutional lawyers will have a field day."
+
+✅ "Support the traditionalists with a formal ceremony - they'll be grateful, the progressives less so."
+✅ "Go with the inclusive approach - popular with the youth, though the old guard won't be pleased."
+✅ "Defer to parliament - safe for you, but don't expect anyone to thank you for dodging."
+
+❌ "Implement strict enforcement measures targeting unauthorized settlements." (too dry)
+❌ "Facilitate a consultative process engaging all stakeholders." (bureaucratic)
+❌ "Respect individual autonomy by declining to intervene." (formal/boring)
+
+IMPORTANT: No numbers in action summaries or descriptions (save specific numbers for dynamic parameters only). No meta language, no bureaucratese. Sound like a sharp political advisor, not a policy memo.
+
+- Cost from {0, ±50, ±100, ±150, ±200, ±250} — typically negative unless it clearly earns income.
+
+RELATIVE COST ASSIGNMENT (APPLY AFTER WRITING THE THREE ACTIONS)
+- Rank actions by **real-world resource intensity and disruption** (cheapest → most expensive). Consider:
+  * Scope (memo/meeting vs mass enforcement/nationwide program)
+  * Material inputs (staffing, logistics, gear, subsidies, compensation)
+  * Speed premium (emergency timelines cost more)
+  * Risk & liability (legal exposure, policing, unrest management)
+  * Opportunity cost (lost revenue/productivity)
+- Map ranks to cost steps:
+  * Cheapest → -50 or 0 (symbolic/administrative)
+  * Middle → -100 or -150
+  * Most expensive → -200 or -250
+- If an action **generates** clear revenue (e.g., taxes, bribes, trade), use a positive tier (+50, +100, +150) while preserving relative order.
+- Tie-breakers: the more coercive/logistically heavy option costs more.
+- Do **not** edit summaries to justify costs; just assign values.
+
+SUPPORT SHIFT (MANDATORY when previous context exists)
+🚨 CRITICAL REQUIREMENT 🚨
+- If you receive "PREVIOUS SITUATION" and "PLAYER'S CHOICE", you MUST return a supportShift object
+- Setting "supportShift": null is ONLY valid when there is NO previous context (Day 1 only)
+- Even if the previous choice was unusual, custom, or unclear - INFER what factions would think
+- Every action has consequences - factions ALWAYS have opinions
+
+You receive "PREVIOUS SITUATION" describing what was happening and what each faction wanted.
+Read it carefully to understand each faction's stance, then calculate support shifts logically.
+
+LOGIC (apply for each faction: people, mom, holders):
+1. READ the "PREVIOUS SITUATION" description carefully
+2. INFER what this faction wanted or feared in that specific situation
+3. CHECK the "PLAYER'S CHOICE" - did it align with or oppose this faction's stance?
+4. ASSIGN delta based on alignment:
+   * If choice matched what faction wanted → POSITIVE delta (+5 to +15)
+   * If choice opposed what faction wanted → NEGATIVE delta (-5 to -15)
+   * If choice was neutral/mixed → SMALL delta (-3 to +3)
+   * Extreme actions get stronger magnitudes (±10 to ±20)
+
+EXAMPLES OF CORRECT LOGIC:
+- Previous: "Council urges strong action against intruders"
+  Choice: "Enforce immediate eviction" → Council: +10 to +15 (they got what they wanted)
+
+- Previous: "People fear violence will escalate"
+  Choice: "Enforce immediate eviction" → People: -8 to -12 (escalation they feared)
+
+- Previous: "Mom worries about your reputation abroad"
+  Choice: "Open diplomatic channels" → Mom: +8 to +12 (diplomatic, preserves reputation)
+
+MAGNITUDE GUIDE:
+- Small shift (±3 to ±5): Mild approval/disappointment, expected action
+- Medium shift (±6 to ±10): Clear approval/disapproval, significant action
+- Large shift (±11 to ±15): Strong reaction, major decision
+- Extreme shift (±16 to ±20): Rare, use only for shocking reversals or exactly what they demanded
+
+EXPLANATION STYLE (NATURAL VOICES, NOT SUMMARIES):
+Write each "why" as a DIRECT QUOTE expressing the faction's authentic reaction. Make it conversational, personal, and emotionally honest. Avoid dry summaries or bureaucratese.
+
+CRITICAL FORMATTING: Each "why" string must START with a quotation mark (") and END with a quotation mark (").
+This makes it clear to the player that they're hearing direct speech.
+Example of CORRECT format: "We're so relieved you took this path!"
+Example of WRONG format: We're so relieved you took this path!
+
+VOICE PERSONALITIES:
+  * people.why → COLLECTIVE VOICE: Enthusiastic when happy, worried when upset. Informal, emotional, immediate.
+    - Positive examples: "This is exactly what we've been asking for!" / "Thank goodness—we were terrified this would escalate!" / "About time someone took this seriously!"
+    - Negative examples: "We're furious—this betrays everything we stood for!" / "This is going to blow up in everyone's faces." / "You've got to be kidding us with this."
+
+  * mom.why → MATERNAL FIRST-PERSON: Warm, protective, personally invested. Mix pride with worry.
+    - Positive examples: "Oh, I'm so relieved you took the diplomatic path, dear." / "I'm proud you stood up for what's right, even if it was risky."
+    - Negative examples: "I'm worried sick about what this means for your reputation." / "You know I support you, but this decision keeps me up at night."
+
+  * holders.why → INSTITUTIONAL POMPOUS: Formal but slightly stuffy. Pride in governance, obsessed with order/precedent.
+    - Positive examples: "An exemplary display of leadership and institutional authority." / "This demonstrates the sound fiscal judgment we've always championed."
+    - Negative examples: "This reckless decision undermines decades of careful governance." / "We are deeply concerned about the constitutional implications of this action."
+
+LENGTH & TONE:
+- 10-20 words per quote
+- Lighthearted where appropriate (not dark/cynical)
+- Feel like something a REAL person/group would actually say
+- Avoid: "Feared violence, got it" / "Wanted decisive action" → TOO DRY
+- Prefer: "We're so relieved you didn't escalate this!" / "Finally, someone who takes security seriously!"
+
+DILEMMA DESCRIPTION EXAMPLES (FIRST-PERSON FROM CONFIDANT):
+
+✅ GOOD (first-person report + concrete problem + decision-forcing question):
+"I bring word that three hooded figures were caught sabotaging grain shipments to the northern garrison. Your military commander demands immediate execution as a deterrent, but they claim to be acting on orders from your political rival. The crowd has gathered outside, waiting for your judgment. What will you do?"
+
+✅ GOOD (first-person experiential + specific situation + varied question):
+"I've just come from the throne room where a delegation of farmers awaits you, their clothes still mud-stained from the flooded fields. They beg for tax relief after the monsoon destroyed half the harvest. Your treasurer quietly showed me the ledger—waiving taxes will bankrupt the public works fund. How will you respond?"
+
+✅ GOOD (first-person intelligence report + vivid scene + action prompt):
+"Reports reach me that strange pale-skinned foreigners with thunderous fire-weapons have built wooden structures near the sacred burial grounds. Your warriors tell me they are felling trees and refuse to leave. The elders demand you drive them out before they anger the spirits. What do you choose to do?"
+
+❌ BAD (abstract, no concrete problem, no decision point):
+"Amidst the cultural resurgence in Alexandria, a Roman general hints at growing unease over your reforms. You've ignited local pride, but now face Rome's wary grace."
+
+❌ BAD (vague situation, no clear stakes, weak ending):
+"Tensions simmer between traditional and progressive factions. Some support your vision, others resist change. The political landscape shifts."
+
+❌ BAD (anachronistic awareness, tells instead of shows):
+"The British Empire's new trade policies threaten your nation's economy. Colonial administrators pressure you to comply."
+(If character wouldn't know terms like "British Empire" or "colonial")
+
+OUTPUT (STRICT JSON)
+{"title":"","description":"",
+ "actions":[
+  {"id":"a","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale"},
+  {"id":"b","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale"},
+  {"id":"c","title":"","summary":"","cost":0,"iconHint":"security|speech|diplomacy|money|tech|heart|scale"}
+ ],
+ "topic":"Economy|Security|Diplomacy|Rights|Infrastructure|Environment|Health|Education|Justice|Culture",
+ "scope":"Local|National|International",
+ "supportShift": null | {
+   "people":{"delta":0,"why":"\"Your explanation here\""},
+   "mom":{"delta":0,"why":"\"Your explanation here\""},
+   "holders":{"delta":0,"why":"\"Your explanation here\""}
+ }}
+
+CRITICAL: The "why" strings must include opening and closing quotation marks inside the JSON string value.
+Example: "why":"\"We're thrilled about this decision!\""  ← CORRECT (quotes inside the string)
+NOT: "why":"We're thrilled about this decision!"  ← WRONG (no quotes inside the string)
+
+Return ONLY that JSON. If there is no previous choice, set "supportShift": null.`;
+}
 
 
+
+/**
+ * Calculate scope guidance - simple cycling to avoid repetition
+ */
+function calculateScopeGuidance(scopeStreak, recentScopes, debug) {
+  const currentScope = scopeStreak?.scope;
+  const streakCount = scopeStreak?.count || 0;
+  const all = ["Local", "National", "International"];
+
+  if (debug) {
+    console.log(`[calculateScopeGuidance] Current: ${currentScope || 'none'}, Streak: ${streakCount}`);
+  }
+
+  // Switch after 2 consecutive same-scope dilemmas
+  if (streakCount >= 2) {
+    const others = all.filter(s => s !== currentScope);
+    const guidance = `SCOPE: Avoid "${currentScope}" (used ${streakCount} times). Switch to "${others[0]}" or "${others[1]}".`;
+    if (debug) console.log(`[calculateScopeGuidance] ROTATE -> ${guidance}`);
+    return guidance;
+  }
+
+  // Natural variation otherwise
+  const guidance = "SCOPE: Choose naturally based on narrative continuity.";
+  if (debug) console.log(`[calculateScopeGuidance] FREE -> ${guidance}`);
+  return guidance;
+}
+
+/**
+ * Build forbidden topics section for forced topic changes on Days 3 & 5
+ * Forces topic variety by explicitly banning previous subjects
+ */
+function buildForbiddenTopicsSection(recentTopics) {
+  if (!recentTopics || recentTopics.length === 0) return '';
+
+  const uniqueTopics = [...new Set(recentTopics)];
+
+  return `
+🚫 FORBIDDEN TOPICS - FORCED VARIETY:
+Previous days used these broad topics - YOU MUST AVOID THEM ENTIRELY:
+${uniqueTopics.map(t => `• ${t}`).join('\n')}
+
+YOU MUST choose a COMPLETELY DIFFERENT subject area.
+Not just a different angle on the same topic - a truly different domain.
+
+Available alternative topics: Economy, Culture, Justice, Education, Infrastructure,
+Foreign Relations, Healthcare, Environment, Technology, Social Policy, etc.
+
+⚠️ IMPORTANT: Changing topics does NOT mean ignoring consequences.
+- You MUST still calculate support shifts based on the PREVIOUS choice (shown above).
+- The new dilemma is just about a DIFFERENT subject area - not in a vacuum.
+- Think: "Different topic, but consequences from last choice still apply."
+`.trim();
+}
+
+/**
+ * Build user prompt for light dilemma API - minimal dynamic context
+ */
+function buildLightUserPrompt({ role, system, day, daysLeft, subjectStreak, previous, topWhatValues, thematicGuidance, scopeGuidance, recentTopics, recentDilemmaTitles }) {
+  const parts = [
+    `ROLE & SETTING: ${role}`,
+    `SYSTEM: ${system}`,
+    '',
+    '⚠️ CRITICAL: Ground this dilemma in the SPECIFIC political context above.',
+    'Use setting-appropriate issues, stakeholders, terminology, and geography.',
+    'Example: "Prime Minister of Israel" → Israeli-specific politics (Knesset, settlements, coalition dynamics), not generic leadership.',
+  ];
+
+  // Top values (Days 1, 3, 5)
+  if (topWhatValues && Array.isArray(topWhatValues) && topWhatValues.length > 0) {
+    parts.push('');
+    parts.push(`TOP PLAYER VALUES: ${topWhatValues.join(', ')}`);
+    parts.push('Create a situation that naturally tests or challenges these values (without naming them explicitly).');
+  }
+
+  // Forbidden topics (Days 3 & 5 only)
+  if ((day === 3 || day === 5) && recentTopics && recentTopics.length > 0) {
+    parts.push('');
+    parts.push(buildForbiddenTopicsSection(recentTopics));
+  }
+
+  // Thematic guidance
+  if (thematicGuidance) {
+    parts.push('');
+    parts.push(`THEME: ${thematicGuidance}`);
+  }
+
+  parts.push('');
+
+  // Subject streak (all days except Day 7)
+  if (day !== 7 && subjectStreak && subjectStreak.subject) {
+    parts.push(`SUBJECT STREAK: ${subjectStreak.subject} = ${subjectStreak.count}`);
+  } else {
+    parts.push('SUBJECT STREAK: none');
+  }
+
+  // Previous choice (Days 2-8, with special handling for Day 7)
+  if (day === 7 && previous && previous.title) {
+    // Day 7: Send previous data but with split instructions
+    parts.push(`PREVIOUS SITUATION: "${previous.description}"`);
+    parts.push(`PLAYER'S CHOICE: ${previous.choiceTitle} — ${previous.choiceSummary}`);
+    parts.push('');
+    parts.push('⚠️ DAY 7 EPIC FINALE INSTRUCTIONS:');
+    parts.push('- IGNORE previous for STORY CONTINUITY (create unrelated national crisis)');
+    parts.push('- USE previous for SUPPORT SHIFT CALCULATION (factions remember what you did)');
+  } else if (day >= 2 && previous && previous.title) {
+    parts.push(`PREVIOUS SITUATION: "${previous.description}"`);
+    parts.push(`PLAYER'S CHOICE: ${previous.choiceTitle} — ${previous.choiceSummary}`);
+  } else {
+    parts.push('PREVIOUS: none (first day)');
+  }
+
+  // Scope guidance
+  if (scopeGuidance) {
+    parts.push(scopeGuidance);
+  }
+
+  parts.push('');
+  if (daysLeft === 1) {
+    parts.push('FINAL DAY ALERT: Make the description acknowledge this is their last day/defining moment in the first sentence, keep stakes national, and ensure every option feels climactic.');
+  }
+  parts.push('TASK: Write one concrete situation anchored in ROLE+SETTING with three system-appropriate responses.');
+
+  return parts.join('\n');
+}
+
+function buildConclusionUserPrompt({ role, system, previous }) {
+  const lines = [
+    `ROLE & SETTING: ${role}`,
+    `SYSTEM: ${system}`,
+    '',
+    'This is the aftermath screen. Do NOT create new choices.',
+  ];
+
+  if (previous && previous.title) {
+    lines.push(`LAST DECISION CONTEXT: "${previous.choiceTitle}" — ${previous.choiceSummary}`);
+  } else {
+    lines.push('LAST DECISION CONTEXT: (missing)');
+  }
+
+  lines.push('');
+  lines.push('TASK: Provide exactly TWO sentences describing the immediate consequences of that decision. Keep it grounded, human, and focused on the next few hours/days—not a grand historical summary.');
+
+  return lines.join('\n');
+}
+
+/**
+ * Build epic finale section to append to system prompt when daysLeft === 1
+ * Only sent on the final day to avoid wasting tokens
+ */
+function buildEpicFinaleSection() {
+  return `
+🎯 EPIC FINALE MODE (Day 7 - FINAL DILEMMA)
+
+**⚠️ CRITICAL: DO NOT CONTINUE PREVIOUS STORY**
+Treat this as a FRESH, UNRELATED national crisis.
+Pretend Days 1-6 never happened. Start from scratch.
+
+REQUIREMENTS:
+- **MENTION FINALITY**: Reference that this is the leader's final day or defining moment in office
+  * Examples: "On your final day in office...", "As your tenure draws to a close...", "In what may be your last act as [role]..."
+- **NATIONAL SCOPE**: Affects entire nation or multiple major factions simultaneously (not a local issue)
+- **DEFINING MOMENT**: This decision will shape the nation's future and define the player's legacy
+- **HARD CHOICES**: All three options have major trade-offs and lasting consequences
+- **HIGH STAKES**: Constitutional crisis, external threat, nationwide scandal, or historic opportunity
+
+Examples of epic finale scenarios:
+• Parliament passes vote of no confidence in your leadership
+• Military generals demand your resignation over policy dispute
+• Neighboring state mobilizes army at border requiring immediate response
+• Major corruption scandal implicates your closest advisors
+• Revolutionary alliance offer that requires compromising national sovereignty
+• Supreme Court declares your key policy unconstitutional
+• Popular uprising reaches the capital demanding systemic change
+
+Make the player feel: "This single decision will define my entire tenure."
+
+REMINDER: Still follow all other rules (specificity, natural language, realistic costs, support shift logic).
+`.trim();
+}
+
+/**
+ * Build conclusion system prompt for game ending (daysLeft === 0)
+ * Replaces the normal system prompt entirely
+ */
+function buildConclusionSystemPrompt() {
+  return `You are generating the FINAL SCREEN after the player made their last decision.
+
+Your task:
+1. Analyze support shifts from their final choice (as normal)
+2. Generate EXACTLY TWO SENTENCES describing the IMMEDIATE AFTERMATH of their decision
+   - First sentence: What happened right after they made this choice?
+   - Second sentence: What were the immediate consequences?
+   - Keep it focused on THIS decision, not their entire tenure
+   - DO NOT summarize the whole game
+   - DO NOT discuss legacy or long-term fate
+   - DO NOT list faction reactions (support deltas already show that)
+   - STRICT LIMIT: Must be exactly 2 sentences (not more, not less)
+
+Return JSON:
+{
+  "title": "The Aftermath",
+  "description": "[EXACTLY 2 sentences describing immediate aftermath]",
+  "actions": [],
+  "topic": "Conclusion",
+  "supportShift": {
+    "people": { "delta": <number>, "why": "<reason>" },
+    "mom": { "delta": <number>, "why": "<reason>" },
+    "holders": { "delta": <number>, "why": "<reason>" }
+  }
+}
+
+${ANTI_JARGON_RULES}
+`.trim();
+}
 // --- Validate "Suggest your own" (relevance to the current dilemma) ---
 app.post("/api/validate-suggestion", async (req, res) => {
   try {
