@@ -12,6 +12,7 @@ import { useCompassStore } from "../store/compassStore";
 import { useLogger } from "../hooks/useLogger";
 import { useLang } from "../i18n/lang";
 import { COMPONENTS } from "../data/compass-data";
+import { useReserveGameSlot } from "../hooks/useReserveGameSlot";
 
 /**
  * Phases:
@@ -31,6 +32,8 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
   const lang = useLang();
   const narrator = useNarrator();
   const narrationEnabled = useSettingsStore((s) => s.narrationEnabled);
+  const experimentMode = useSettingsStore((s) => s.experimentMode);
+  const reserveGameSlotMutation = useReserveGameSlot();
 
   // Logging hook for data collection
   const logger = useLogger();
@@ -283,9 +286,27 @@ useEffect(() => {
 }, [defaultNarrationComplete]);
 
   // 2) Wake up → immediately transition to waitingForSeed phase
-  const onWake = () => {
+  const onWake = async () => {
     // Log player clicking "Wake up" button
     logger.log('button_click_wake_up', 'Wake up', 'User clicked Wake up button');
+
+    // Reserve game slot if experiment mode is enabled
+    if (experimentMode) {
+      try {
+        const result = await reserveGameSlotMutation.mutateAsync();
+        
+        if (!result.success) {
+          // Redirect to capped screen if reservation failed
+          push('/capped');
+          return;
+        }
+      } catch (error) {
+        console.error('[BackgroundIntro] Error reserving game slot:', error);
+        // Redirect to capped screen on error
+        push('/capped');
+        return;
+      }
+    }
 
     // Cancel prefetch if still running to prevent race condition
     if (fetchingIntroRef.current && prefetchAbortRef.current) {

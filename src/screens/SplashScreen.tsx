@@ -16,7 +16,6 @@ import { useLang } from "../i18n/lang";
 import { useLanguage } from "../i18n/LanguageContext";
 import LanguageSelector from "../components/LanguageSelector";
 import IDCollectionModal from "../components/IDCollectionModal";
-import { useReserveGameSlot } from "../hooks/useReserveGameSlot";
 import { useLogger } from "../hooks/useLogger";
 
 const SUBTITLES = [
@@ -36,7 +35,6 @@ export default function SplashScreen({
 }) {
   const lang = useLang();
   const { language } = useLanguage();
-  const reserveGameSlotMutation = useReserveGameSlot();
   const logger = useLogger();
 
   const [visibleSubtitles, setVisibleSubtitles] = useState(0);
@@ -154,20 +152,7 @@ export default function SplashScreen({
 
       console.log(`[SplashScreen] User registered: ${registerData.userId}, treatment: ${registerData.treatment}, isNewUser: ${registerData.isNewUser}`);
 
-      // Only check slot reservation if experiment mode is enabled
-      if (experimentMode) {
-        const result = await reserveGameSlotMutation.mutateAsync();
-        
-        if (!result.success) {
-          setIsLoading(false);
-          if (push) {
-            push('/capped');
-          }
-          return;
-        }
-      }
-
-      // Reservation successful (or skipped in non-experiment mode), proceed with game start
+      // Proceed with game start (slot reservation moved to BackgroundIntroScreen)
       // Start new logging session (will use the ID we just set)
       await loggingService.startSession();
 
