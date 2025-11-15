@@ -86,7 +86,7 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
   };
 
   // script - memoized to update when character gender or name changes
-  const playerName = character?.name || lang("PLAYER_DEFAULT_NAME");
+  const playerName = character?.name || lang(getGenderKey("PLAYER_DEFAULT_NAME"));
   const script = useMemo<Array<{ side: "mirror" | "player"; text: string; italic?: boolean }>>(() => [
     { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_1")), italic: true },
     { side: "player", text: lang(getGenderKey("MIRROR_DIALOGUE_2")) },
@@ -146,7 +146,7 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
             {displayAvatar ? (
               <img src={displayAvatar} alt="Character avatar" className="w-full h-full object-cover" />
             ) : (
-              <div className="text-white/80">{lang("PREPARING_AVATAR")}</div>
+              <div className="text-white/80">{lang(getGenderKey("PREPARING_AVATAR"))}</div>
             )}
           </motion.div>
         </div>
@@ -185,7 +185,7 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
                       }}
                       className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/15 text-white hover:bg-white/25 border border-white/30"
                     >
-                      {lang("MIRROR_DIALOGUE_BUTTON")}
+                      {lang(getGenderKey("MIRROR_DIALOGUE_BUTTON"))}
                     </motion.button>
                   </div>
                 )}

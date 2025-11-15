@@ -13,16 +13,16 @@
 // - src/hooks/useAftermathNarration.ts: narration control
 // - All section components
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import type { AftermathResponse } from "../../lib/aftermath";
 import type { PropKey } from "../../data/compass-data";
-import { useAftermathNarration } from "../../hooks/useAftermathNarration";
-import { FastForward } from "lucide-react";
 import IntroSection from "./IntroSection";
-import RemembranceSection from "./RemembranceSection";
+import SnapshotSection from "./SnapshotSection";
+import FinalScoresSection from "./FinalScoresSection";
 import DecisionBreakdownSection from "./DecisionBreakdownSection";
 import ReflectionSection from "./ReflectionSection";
 import TombstoneSection from "./TombstoneSection";
+import { useLogger } from "../../hooks/useLogger";
 
 type TopValue = {
   short: string;
@@ -32,24 +32,6 @@ type Props = {
   data: AftermathResponse;
   avatarUrl?: string;
   top3ByDimension: Record<PropKey, TopValue[]>;
-  counter: number;
-  steps: {
-    intro: number;
-    remembrance: number;
-    narration: number;
-    decisionsStart: number;
-    ratingsStep: number;
-    reflectionStep: number;
-    tombstoneStep: number;
-    completeStep: number;
-  };
-  isSkipped: boolean;
-  hasReached: (step: number) => boolean;
-  isAtStep: (step: number) => boolean;
-  advanceToNext: () => void;
-  skipToEnd: () => void;
-  showSkipButton: boolean;
-  registerRef: (key: string, element: HTMLElement | null) => void;
   onExploreClick: () => void;
   onRevealScoreClick: () => void;
 };
@@ -58,145 +40,74 @@ export default function AftermathContent({
   data,
   avatarUrl,
   top3ByDimension,
-  counter,
-  steps,
-  isSkipped,
-  hasReached,
-  isAtStep,
-  advanceToNext,
-  skipToEnd,
-  showSkipButton,
-  registerRef,
   onExploreClick,
   onRevealScoreClick,
 }: Props) {
-  // Narration hook - only prepare TTS if not skipped (prevents unnecessary API calls on return from mirror)
-  const { startNarration, stopNarration, canStartNarration } = useAftermathNarration(
-    isSkipped ? undefined : data.remembrance
-  );
+  const logger = useLogger();
 
-  // Ref to ensure narration is only triggered once
-  const narrationStartedRef = useRef(false);
-
-  // Handle narration step specially - wait for TTS to be ready before starting
+  // Log when snapshot pills are displayed
   useEffect(() => {
-    if (isAtStep(steps.narration) && !isSkipped && canStartNarration && !narrationStartedRef.current) {
-      narrationStartedRef.current = true;
-      console.log('[AftermathContent] Starting narration...');
-      startNarration(() => {
-        console.log('[AftermathContent] Narration completed, advancing');
-        advanceToNext();
-      });
+    if (data.snapshot && data.snapshot.length > 0) {
+      logger.logSystem(
+        "snapshot_pills_displayed",
+        { count: data.snapshot.length },
+        `Snapshot pills displayed: ${data.snapshot.length} events`
+      );
     }
-  }, [isAtStep, steps.narration, isSkipped, canStartNarration, startNarration, advanceToNext]);
+  }, [data.snapshot, logger]);
 
-  // Stop narration if skipped
+  // Log when final scores are displayed
   useEffect(() => {
-    if (isSkipped) {
-      stopNarration();
+    if (data.ratings) {
+      logger.logSystem(
+        "final_scores_displayed",
+        {
+          democracy: data.ratings.democracy,
+          autonomy: data.ratings.autonomy,
+          liberalism: data.ratings.liberalism
+        },
+        `Final scores displayed: D=${data.ratings.democracy}, A=${data.ratings.autonomy}, L=${data.ratings.liberalism}`
+      );
     }
-  }, [isSkipped, stopNarration]);
-
-  // Calculate which decision is currently being shown
-  const getCurrentDecisionIndex = (): number => {
-    if (isSkipped) return data.decisions.length - 1;
-
-    // Counter is in the decisions range
-    if (counter >= steps.decisionsStart && counter < steps.ratingsStep) {
-      return counter - steps.decisionsStart;
-    }
-
-    // If we've reached ratings or beyond, show all decisions
-    if (counter >= steps.ratingsStep) {
-      return data.decisions.length - 1;
-    }
-
-    return -1; // None visible yet
-  };
+  }, [data.ratings, logger]);
 
   return (
     <div className="w-full max-w-3xl mx-auto space-y-6">
-      {/* Skip Button */}
-      {showSkipButton && (
-        <button
-          onClick={skipToEnd}
-          className="fixed top-4 right-4 z-50 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 shadow-lg"
-        >
-          <FastForward className="w-4 h-4" />
-          <span>Skip</span>
-        </button>
-      )}
+      {/* Intro Section - Just title */}
+      <IntroSection />
 
-      {/* Intro Section */}
-      {hasReached(steps.intro) && (
-        <IntroSection
-          intro={data.intro}
-          skipTypewriter={isSkipped}
-          onComplete={advanceToNext}
-        />
-      )}
+      {/* Snapshot Section - Avatar + death text + event pills */}
+      <SnapshotSection
+        intro={data.intro}
+        snapshot={data.snapshot}
+        avatarUrl={avatarUrl}
+      />
 
-      {/* Remembrance Section */}
-      {hasReached(steps.remembrance) && (
-        <RemembranceSection
-          ref={(el) => registerRef("remembrance", el)}
-          avatarUrl={avatarUrl}
-          rank={data.rank}
-          remembrance={data.remembrance}
-          visible={true}
-          skipAnimation={isSkipped}
-          onComplete={advanceToNext}
-        />
-      )}
+      {/* Final Scores Section - Democracy/Autonomy/Liberalism pills */}
+      <FinalScoresSection ratings={data.ratings} />
 
-      {/* Decision Breakdown Section */}
-      {hasReached(steps.decisionsStart) && (
-        <DecisionBreakdownSection
-          ref={(el) => registerRef("decisions", el)}
-          decisions={data.decisions}
-          ratings={data.ratings}
-          currentDecisionIndex={getCurrentDecisionIndex()}
-          showFinalRatings={hasReached(steps.ratingsStep)}
-          skipAnimation={isSkipped}
-          onComplete={advanceToNext}
-        />
-      )}
+      {/* Decision Breakdown Section - Collapsible */}
+      <DecisionBreakdownSection decisions={data.decisions} />
 
       {/* Reflection Section */}
-      {hasReached(steps.reflectionStep) && (
-        <ReflectionSection
-          ref={(el) => registerRef("reflection", el)}
-          top3ByDimension={top3ByDimension}
-          valuesSummary={data.valuesSummary}
-          visible={true}
-          skipAnimation={isSkipped}
-          onExploreClick={onExploreClick}
-          onComplete={advanceToNext}
-        />
-      )}
+      <ReflectionSection
+        top3ByDimension={top3ByDimension}
+        valuesSummary={data.valuesSummary}
+        onExploreClick={onExploreClick}
+      />
 
       {/* Tombstone Section */}
-      {hasReached(steps.tombstoneStep) && (
-        <TombstoneSection
-          ref={(el) => registerRef("tombstone", el)}
-          haiku={data.haiku}
-          visible={true}
-          skipAnimation={isSkipped}
-          onComplete={advanceToNext}
-        />
-      )}
+      <TombstoneSection haiku={data.haiku} />
 
       {/* Reveal Final Score Button */}
-      {hasReached(steps.completeStep) && (
-        <div className="pt-4">
-          <button
-            onClick={onRevealScoreClick}
-            className="w-full px-6 py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white text-lg font-bold rounded-xl transition-all duration-200 shadow-lg hover:shadow-amber-500/50"
-          >
-            Reveal final score
-          </button>
-        </div>
-      )}
+      <div className="pt-4">
+        <button
+          onClick={onRevealScoreClick}
+          className="w-full px-6 py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white text-lg font-bold rounded-xl transition-all duration-200 shadow-lg hover:shadow-amber-500/50"
+        >
+          Reveal final score
+        </button>
+      </div>
     </div>
   );
 }

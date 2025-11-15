@@ -22,14 +22,29 @@ npm run server:dev   # Backend with nodemon auto-restart
 ### Browser Console Commands
 
 ```javascript
-// AI Provider Switching (restart server after changing .env models)
+// AI Provider Switching (no restart needed)
 switchToClaude()     # Switch to Anthropic Claude (requires MODEL_DILEMMA_ANTHROPIC in .env)
 switchToGPT()        # Switch to OpenAI GPT (DEFAULT)
+switchToXAI()        # Switch to X.AI/Grok (requires MODEL_DILEMMA_XAI in .env)
 
 // Debug Mode (persists in localStorage)
-enableDebug()        # Shows "Jump to Final Day" button in EventScreen
+enableDebug()        # Shows "Jump to Final Day" button, extra console logs
 disableDebug()       # Disable debug mode
 toggleDebug()        # Toggle debug mode
+
+// Context Control (for diagnosing Day 2+ AI failures)
+skipPreviousContext()      # Skip sending previous dilemma context to AI on Day 2+
+includePreviousContext()   # Include previous context (normal behavior)
+togglePreviousContext()    # Toggle previous context on/off
+
+// Corruption Tracking Toggle
+enableCorruption()   # Enable corruption tracking (AI judges power misuse)
+disableCorruption()  # Disable corruption tracking
+toggleCorruption()   # Toggle corruption tracking
+
+// Hidden Democracy Rating Access (after Aftermath screen)
+showDemocracy()      # Display hidden democracy rating (not shown in UI)
+getDemocracy()       # Alias for showDemocracy()
 ```
 
 ## Deployment
@@ -150,15 +165,20 @@ TTS_VOICE=alloy
 
 ## Key Game Mechanics
 
-**Natural Topic Variety:**
-- AI tracks conversation history to avoid repetition
-- After 3 consecutive same-topic dilemmas: transitions naturally
-- Exception: Urgent follow-ups (vote results, crises)
+**Strict Topic Variety System:**
+- **MAX 2 consecutive dilemmas** on the same broad topic (Military, Economy, Religion, etc.)
+- **Immediate Consequences**: AI shows dramatic results of player actions, no re-questioning decisions
+- **Closure Allowance**: If storyline concludes (war ends, treaty signed), AI may show 1 closure dilemma before switching
+- **Forced Switching**: After 2 consecutive on same topic, AI MUST switch to different subject area
+- **Implementation**: Lines 5717-5744 in `server/index.mjs` - explicit topic tracking and enforcement
+- **Goal**: Prevent "wobbling" around same decision, ensure varied gameplay experience
 
 **Dynamic Parameters:**
-- AI generates 1-3 measurable consequences per turn (Day 2+)
-- Format: 3-5 words with emoji (e.g., "GDP +2.3%", "47 buildings burned")
-- Variety enforced: economic → social → political → cultural rotation
+- AI generates 2-3 dramatic consequences per turn (Day 2+)
+- Format: emoji + vivid consequence, 3-5 words total
+- Numbers are OPTIONAL — used only when they add dramatic impact
+- Examples: "🔥 Royal palace stormed", "👥 4 million march", "🏛️ Parliament dissolved"
+- Emoji variety suggested (not enforced programmatically)
 - Component: `DynamicParameters.tsx`
 
 **Compass Values Integration:**
@@ -172,11 +192,13 @@ TTS_VOICE=alloy
 - Turn 7: Climax directive brings threads to decisive conclusion
 - Graceful degradation if seeding fails
 
-**Action Continuity System:**
-- **Automatic Detection**: Backend detects votes, referendums, negotiations, consultations via regex
-- **Mandatory Results**: When detected, AI receives explicit directive to show ACTUAL RESULTS, not preparation
-- **Implementation**: `server/index.mjs` lines 4695-4769 in `buildTurnUserPrompt`
-- **Covers**: votes/referendums (show outcome %), negotiations (show what happened in talks), consultations (show input received)
+**Immediate Consequence System:**
+- **Goal**: Show immediate, dramatic results of player actions - no re-questioning or hesitation
+- **ALL Actions Get Consequences**: Every player decision triggers consequence directive (lines 5040-5060)
+- **Explicit Examples**: War declared → battles begin; Treaties signed → implementation starts; Arrests → trials begin
+- **Specialized Detection**: Backend also detects votes, referendums, negotiations via regex for tailored result directives
+- **Implementation**: `server/index.mjs` lines 5040-5060 (general), lines 5033-5039 (vote/negotiation specific)
+- **Directive Language**: "DO NOT ask them to confirm again - THEY ALREADY DECIDED"
 - **System Feel**: Results play differently across political systems (democracies implement, autocracies may override)
 
 **Faction Identity Mapping:**
@@ -190,6 +212,42 @@ TTS_VOICE=alloy
 1. Immediate UI: Card animation, coin flight, budget update
 2. Support analysis: Background API call, animated bar updates
 3. Compass analysis: Deferred to next day (appears as "compass pills")
+
+**Custom Action Validation & Consequence System:**
+- **Philosophy**: Highly permissive, pro-player system - default to accepting player creativity
+- **Validation Endpoint**: `POST /api/validate-suggestion` (server/index.mjs, lines 3106-3168, 5383-5425)
+- **Validation Rules** (lines 5393-5418):
+  - ✅ **ACCEPT**: Violent, unethical, immoral, manipulative, coercive suggestions (corruption penalties applied later)
+  - ✅ **ACCEPT**: Risky actions with low probability (assassination, poisoning, coups, bribery)
+  - ✅ **ACCEPT**: Actions that are difficult/unlikely but theoretically possible for the role
+  - ❌ **REJECT**: Only for anachronisms, gibberish, total irrelevance, or physically impossible actions
+- **Authority Boundaries**:
+  - Physical impossibility = Role categorically cannot access required power/technology/resources
+  - Examples: Citizen can propose war ✅, attempt assassination ✅, bribe officials ✅
+  - Examples: Citizen cannot directly command troops ❌ (no command authority)
+  - Examples: King can issue any decree ✅, but cannot use internet in 1600 ❌ (anachronism)
+- **Constructive Rejections**: When rejecting, suggest feasible alternatives
+  - Example: "Try 'Propose to Assembly that we declare war' or 'Attempt to assassinate the enemy commander'"
+- **Probability-Aware Consequences** (lines 5308-5326):
+  - Risky actions get realistic success/failure outcomes based on:
+    * Historical context (surveillance tech, loyalty systems, security apparatus)
+    * Role resources (budget, connections, authority)
+    * Faction support (allies who could help)
+    * Action complexity (poisoning one person vs. overthrowing government)
+  - Outcome types: High-risk failure, partial success, success with consequences, clean success (rare)
+  - Historical realism: Ancient/Medieval (easier covert action, brutal if caught) vs. Modern (higher surveillance)
+- **Corruption Evaluation** (lines 5862-5965):
+  - ALL actions evaluated on 0-10 scale (including violent/unethical choices)
+  - Rubric: Intent (0-4) + Method (0-3) + Impact (0-3)
+  - Violence NOT automatically corruption - depends on intent/method/impact
+  - Examples: Assassination for power = 6-8; Assassination for strategy = 3-5; Defensive war = 0-1
+  - Examples: Coup for self-enrichment = 7-9; Coup to end tyranny = 2-4
+  - Most normal governance scores 0-2 even if controversial
+- **Integration**: Custom actions flow through same pipeline as AI-generated options
+  - Frontend converts custom text to ActionCard (EventScreen3.tsx, lines 623-635)
+  - Sent to `/api/game-turn` as `playerChoice` parameter
+  - Authority-filtered consequence generation (democracies vote, autocracies decree)
+  - Support shifts, corruption penalties, compass changes all apply identically
 
 **Prefetching Systems:**
 - **Aftermath**: Starts Day 8, loads before player clicks

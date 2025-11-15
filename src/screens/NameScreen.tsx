@@ -245,10 +245,11 @@ export default function NameScreen({ push }: { push: PushFn }) {
     (async () => {
       try {
         setAvatarLoading(true);
+        const useXAI = useSettingsStore.getState().useXAI;
         const res = await fetch("/api/generate-avatar", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt }),
+          body: JSON.stringify({ prompt, useXAI }),
           signal: ac.signal,
         });
         const data = await res.json().catch(() => ({}));

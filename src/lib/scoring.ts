@@ -100,12 +100,25 @@ export function normalizeCorruptionLevel(rawLevel: number): number {
 }
 
 /**
- * Convert corruption level (0-10) to penalty points (0 to -500).
- * Spec: 0 → 0 pts deducted, 10 → -500 pts.
+ * Convert corruption level (0-10) to points using V-shaped formula.
+ * Spec:
+ *   0 → +500 pts (bonus for zero corruption)
+ *   5 → 0 pts (neutral midpoint)
+ *   10 → -500 pts (penalty for maximum corruption)
+ * Formula creates linear decrease from 0-5, then linear penalty from 5-10.
  */
 function corruptionLevelToPoints(normalizedLevel: number): number {
   const clamped = clamp(normalizedLevel, 0, 10);
-  return -Math.round((clamped / 10) * CORRUPTION_MAX_POINTS);
+
+  if (clamped <= 5) {
+    // 0-5: Linear decrease from +500 to 0
+    // At 0: +500, At 5: 0
+    return Math.round(CORRUPTION_MAX_POINTS - (clamped / 5) * CORRUPTION_MAX_POINTS);
+  } else {
+    // 5-10: Linear decrease from 0 to -500
+    // At 5: 0, At 10: -500
+    return -Math.round(((clamped - 5) / 5) * CORRUPTION_MAX_POINTS);
+  }
 }
 
 // ===========================================================================

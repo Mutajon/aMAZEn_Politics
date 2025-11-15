@@ -68,9 +68,16 @@ export default function DilemmaCard({ title, description, speaker, speakerDescri
 
   // Determine speaker info
   const confidant = selectedRole ? getConfidantByLegacyKey(selectedRole) : undefined;
-  const speakerName = speaker || confidant?.name || "";
-  const speakerDescText = speakerDescription || confidant?.description || "";
-  const speakerImageId = confidant?.imageId;
+
+  // OVERRIDE: Always use "The Gatekeeper" for all roles
+  const speakerName = "The Gatekeeper";
+  const speakerDescText = "A being made of faint, shifting light. He was trapped here because he had once failed his own final test. Every lost soul that arrived, begging for a name they couldn't remember, was a chance for him to pay his endless debt. He gave them new lives—seven-day threads of existence—because only their success could possibly free him from his own long-dead failure.";
+  const speakerImageId = "gatekeeper"; // Use gatekeeper imageId
+
+  // Original implementation (commented out):
+  // const speakerName = speaker || confidant?.name || "";
+  // const speakerDescText = speakerDescription || confidant?.description || "";
+  // const speakerImageId = confidant?.imageId;
 
   // Show speaker avatar only if we have a speaker name
   const showSpeaker = !!speakerName;
@@ -91,7 +98,7 @@ export default function DilemmaCard({ title, description, speaker, speakerDescri
         className={`relative ${CARD_TONE} ${CARD_PAD}`}
         style={{
           overflow: 'visible', // Allow avatar to extend beyond boundaries
-          paddingLeft: showSpeaker ? '80px' : undefined // Space for avatar with ~20px gap
+          paddingLeft: showSpeaker ? '100px' : undefined // Space for avatar with ~40px gap
         }}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
@@ -103,7 +110,7 @@ export default function DilemmaCard({ title, description, speaker, speakerDescri
           <div
             className="absolute"
             style={{
-              left: '-40px',  // Juts out 40px to the left
+              left: '-60px',  // Juts out 60px to the left (moved 20px more)
               top: '-20px',   // Juts out 20px above the card
               zIndex: 10      // Ensure avatar appears above card background
             }}

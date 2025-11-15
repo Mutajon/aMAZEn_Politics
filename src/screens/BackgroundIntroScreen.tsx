@@ -52,7 +52,18 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
   // Create role-based background style
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
 
-  const DEFAULT_LINE = lang("BACKGROUND_INTRO_DEFAULT_LINE");
+  // Get gender-aware translation keys
+  const getGenderKey = (baseKey: string): string => {
+    if (gender === "female") {
+      return `${baseKey}_FEMALE`;
+    } else if (gender === "male") {
+      return `${baseKey}_MALE`;
+    }
+    // For "any" or undefined, use the base key (which defaults to male form)
+    return baseKey;
+  };
+
+  const DEFAULT_LINE = useMemo(() => lang(getGenderKey("BACKGROUND_INTRO_DEFAULT_LINE")), [lang, gender]);
 
   const [phase, setPhase] = useState<Phase>("preparingDefault");
   const [para, setPara] = useState<string>("");
@@ -182,108 +193,9 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, roleText, gender, defaultNarrationComplete, narrationEnabled]);
 
-// Narrative seeding: Generate story scaffold for 7-day arc
-useEffect(() => {
-  if (!defaultNarrationComplete) return;
-
-  const { initializeGame, setNarrativeMemory } = useDilemmaStore.getState();
-  let gameId = useDilemmaStore.getState().gameId;
-  let narrativeMemory = useDilemmaStore.getState().narrativeMemory;
-
-  if (narrativeMemory) return;
-
-  if (!gameId) {
-    initializeGame();
-    gameId = useDilemmaStore.getState().gameId;
-  }
-
-  if (!gameId) {
-    console.warn("[BackgroundIntro] No gameId available for narrative seeding");
-    return;
-  }
-
-  if (seedPromiseRef.current) {
-    return;
-  }
-
-  const controller = new AbortController();
-  let cancelled = false;
-
-  const run = async () => {
-    try {
-      const roleState = useRoleStore.getState();
-      const compassStore = useCompassStore.getState();
-
-      const getTop2Values = (dimension: 'what' | 'whence' | 'how' | 'whither') => {
-        if (!compassStore.values || !compassStore.values[dimension]) return [];
-        const entries = Object.entries(compassStore.values[dimension])
-          .map(([idx, value]) => ({
-            componentName: COMPONENTS[dimension][parseInt(idx, 10)].short,
-            value,
-            dimension
-          }))
-          .sort((a, b) => b.value - a.value);
-        return entries.slice(0, 2);
-      };
-
-      const topCompassValues = [
-        ...getTop2Values('what'),
-        ...getTop2Values('whence'),
-        ...getTop2Values('how'),
-        ...getTop2Values('whither')
-      ];
-
-      const gameContext = {
-        role: roleState.selectedRole || "Unknown Leader",
-        systemName: roleState.analysis?.systemName || "Unknown System",
-        systemDesc: roleState.analysis?.systemDesc || "",
-        powerHolders: roleState.analysis?.holders || [],
-        challengerSeat: roleState.analysis?.challengerSeat || null,
-        topCompassValues,
-        thematicGuidance: null,
-        supportProfiles: roleState.supportProfiles || roleState.analysis?.supportProfiles || null
-      };
-
-      console.log("[BackgroundIntro] Calling narrative-seed API...");
-
-      const r = await fetch("/api/narrative-seed", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gameId, gameContext }),
-        signal: controller.signal
-      });
-
-      if (!r.ok) {
-        console.warn(`[BackgroundIntro] Narrative seeding failed: ${r.status}`);
-        return;
-      }
-
-      const data = await r.json();
-      if (cancelled) return;
-
-      if (data.narrativeMemory) {
-        console.log("[BackgroundIntro] Narrative seeding succeeded:", data.narrativeMemory);
-        setNarrativeMemory(data.narrativeMemory);
-      }
-    } catch (e: any) {
-      if (e?.name === "AbortError") {
-        console.log("[BackgroundIntro] Narrative seeding aborted");
-        return;
-      }
-      console.warn("[BackgroundIntro] Narrative seeding error:", e.message);
-    }
-  };
-
-  const promise = run().finally(() => {
-    seedPromiseRef.current = null;
-  });
-  seedPromiseRef.current = promise;
-
-  return () => {
-    cancelled = true;
-    controller.abort();
-  };
-}, [defaultNarrationComplete]);
+// Narrative seeding removed - v2 system uses stateful conversation history instead
+// The /api/game-turn-v2 endpoint builds narrative coherence through conversation state,
+// eliminating the need for pre-seeded story threads
 
   // 2) Wake up → immediately transition to waitingForSeed phase
   const onWake = async () => {
@@ -367,14 +279,14 @@ useEffect(() => {
           if (!r.ok) {
             const detail = await r.text().catch(() => "");
             console.warn("Intro API error:", r.status, detail);
-            setPara("The morning arrives, but words fail to settle. Try again in a moment.");
+            setPara(lang(getGenderKey("BACKGROUND_INTRO_ERROR_MESSAGE")));
             setPhase("error");
             return;
           }
           const data = await r.json();
           const paragraph = (data?.paragraph || "").trim();
           if (!paragraph) {
-            setPara("The morning arrives, but words fail to settle. Try again in a moment.");
+            setPara(lang(getGenderKey("BACKGROUND_INTRO_ERROR_MESSAGE")));
             setPhase("error");
             return;
           }
@@ -383,7 +295,7 @@ useEffect(() => {
         } catch (e) {
           if ((e as any)?.name === "AbortError") return;
           console.warn("Intro generation error:", e);
-          setPara("The morning arrives, but words fail to settle. Try again in a moment.");
+          setPara(lang(getGenderKey("BACKGROUND_INTRO_ERROR_MESSAGE")));
           setPhase("error");
         }
       } finally {
@@ -504,17 +416,17 @@ useEffect(() => {
               
             >
               <h1 className="text-3xl sm:text-4xl font-extrabold leading-tight tracking-tight bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]">
-                Night Falls
+                {lang("BACKGROUND_INTRO_NIGHT_FALLS")}
               </h1>
 
-              <p className="mt-3 text-white/80">{DEFAULT_LINE}</p>
+              <p className="mt-3 text-white/80 bg-black/60 border border-amber-500/30 rounded-xl p-4">{DEFAULT_LINE}</p>
 
               <div className="mt-6">
                 <button
                   className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
                   onClick={onWake}
                 >
-                  Wake up
+                  {lang(getGenderKey("BACKGROUND_INTRO_WAKE_UP"))}
                 </button>
               </div>
             </motion.div>
@@ -533,12 +445,12 @@ useEffect(() => {
               className="mt-4"
             >
               <h2 className="text-lg font-medium text-white/80">
-                Weaving the narrative…
+                {lang("BACKGROUND_INTRO_WEAVING_NARRATIVE")}
               </h2>
               <div className="mt-4 flex items-center gap-3 text-white/70">
                 <div className="h-5 w-5 rounded-full border-2 border-white/30 border-t-white animate-spin" aria-hidden />
                 <span>
-                  Preparing your story arc…
+                  {lang("BACKGROUND_INTRO_PREPARING_STORY_ARC")}
                 </span>
               </div>
             </motion.div>
@@ -557,14 +469,14 @@ useEffect(() => {
               className="mt-4"
             >
               <h2 className="text-lg font-medium text-white/80">
-                {phase === "loading" ? "Gathering the threads…" : "Warming the voice…"}
+                {phase === "loading" ? lang("BACKGROUND_INTRO_GATHERING_THREADS") : lang("BACKGROUND_INTRO_WARMING_VOICE")}
               </h2>
               <div className="mt-4 flex items-center gap-3 text-white/70">
                 <div className="h-5 w-5 rounded-full border-2 border-white/30 border-t-white animate-spin" aria-hidden />
                 <span>
                   {phase === "loading"
-                    ? `Shaping your first morning as ${roleText || "your role"}…`
-                    : "Preparing narration…"}
+                    ? lang("BACKGROUND_INTRO_SHAPING_MORNING").replace("{role}", roleText || lang("BACKGROUND_INTRO_YOUR_ROLE") || "your role")
+                    : lang("BACKGROUND_INTRO_PREPARING_NARRATION")}
                 </span>
               </div>
             </motion.div>
@@ -594,7 +506,7 @@ useEffect(() => {
               {lang("BACKGROUND_INTRO_TITLE")}
             </h1>
 
-            <p className="mt-3 text-white/80 whitespace-pre-wrap">{para}</p>
+            <p className="mt-3 text-white/80 whitespace-pre-wrap bg-black/60 border border-amber-500/30 rounded-xl p-4">{para}</p>
 
             <div className="mt-6">
               <button
@@ -608,10 +520,10 @@ useEffect(() => {
                       className="h-4 w-4 rounded-full border-2 border-[#0b1335]/40 border-t-[#0b1335] animate-spin"
                       aria-hidden
                     />
-                    Preparing story…
+                    {lang("BACKGROUND_INTRO_PREPARING_STORY")}
                   </span>
                 ) : (
-                  lang("BACKGROUND_INTRO_BEGIN")
+                  lang(getGenderKey("BACKGROUND_INTRO_BEGIN"))
                 )}
               </button>
             </div>

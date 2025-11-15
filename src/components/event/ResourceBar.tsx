@@ -14,6 +14,7 @@ export type ResourceBarScoreDetails = {
   components: Array<{
     id: "people" | "middle" | "mom" | "corruption";
     label: string;
+    tierLabel?: string;  // Optional tier label for corruption (shown on second line)
     valueLabel: string;
     points: number;
     maxPoints: number;
@@ -341,48 +342,28 @@ function ScorePill({
             </button>
           )}
           <div className="text-xs uppercase tracking-wide text-white/50 mb-2">
-            Score Details
+            Score Breakdown
           </div>
-          {goal !== null && (
-            <div className="space-y-2 text-xs text-white/70 mb-2">
-              <div className="flex items-center justify-between">
-                <span className="uppercase tracking-wide text-white/40">{statusLabel}</span>
-                <span className={statusState === "completed" ? "text-emerald-300 font-semibold" : "text-white/80 font-semibold"}>
-                  {statusValue}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="uppercase tracking-wide text-white/40">{goalLabel}</span>
-                <span className="text-white/85 font-semibold">
-                  {formatPoints(goal)}
-                </span>
-              </div>
-            </div>
-          )}
           <ul className="space-y-1 text-sm">
             {details.components.map((comp) => (
               <li
                 key={comp.id}
                 className="flex items-center justify-between gap-3 text-white/80"
               >
-                <span className="truncate">{comp.label}</span>
-                <span className="text-right text-white/70">
-                  <span className="block text-xs uppercase tracking-wide text-white/40">
-                    {comp.valueLabel}
-                  </span>
-                  <span className="tabular-nums font-semibold text-white/90">
-                    {formatPoints(comp.points)} pts
-                  </span>
+                <span className="truncate">
+                  {comp.label}
+                  {comp.tierLabel && (
+                    <span className="block text-xs text-white/60 mt-0.5">
+                      {comp.tierLabel}
+                    </span>
+                  )}
+                </span>
+                <span className="tabular-nums font-semibold text-white/90">
+                  {formatPoints(comp.points)} pts
                 </span>
               </li>
             ))}
           </ul>
-          <div className="mt-3 border-t border-white/10 pt-2 text-xs text-white/60 flex items-center justify-between">
-            <span>Total</span>
-            <span className="tabular-nums font-semibold text-white/90">
-              {formatPoints(details.total)} / {formatPoints(details.maxTotal)}
-            </span>
-          </div>
         </div>
       )}
     </div>

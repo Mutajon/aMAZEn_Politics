@@ -1,185 +1,119 @@
 // src/components/aftermath/DecisionBreakdownSection.tsx
-// Decision breakdown with sequential reveal of each decision and its analysis
+// Decision breakdown with expand/collapse functionality
 //
 // Shows:
-// - Each decision (title + reflection) appearing one by one
-// - Final Liberalism/Autonomy rating pills after all decisions
+// - Collapsed: "Decisions Breakdown" button
+// - Expanded: All 7 decisions with title + reflection + per-decision rating pills
 //
 // Connects to:
-// - src/screens/AftermathScreen.tsx: main screen
-// - src/hooks/useAftermathSequence.ts: controls which decisions are visible
+// - src/components/aftermath/RatingPill.tsx: per-decision rating pills
+// - src/components/aftermath/AftermathContent.tsx: section orchestration
 
-import { motion } from "framer-motion";
-import { forwardRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useState } from "react";
 import type { DecisionAnalysis } from "../../lib/aftermath";
+import RatingPill from "./RatingPill";
 import { useLang } from "../../i18n/lang";
+import { useLogger } from "../../hooks/useLogger";
 
 type Props = {
   decisions: DecisionAnalysis[];
-  ratings: {
-    autonomy: "very-low" | "low" | "medium" | "high" | "very-high";
-    liberalism: "very-low" | "low" | "medium" | "high" | "very-high";
-  };
-  currentDecisionIndex: number; // -1 means none visible, decisions.length means show ratings
-  showFinalRatings: boolean;
-  skipAnimation: boolean;
-  onComplete: () => void;
 };
 
-const DECISION_DURATION_S = 0.6;
-const RATINGS_DURATION_S = 0.5;
+const EXPAND_ICON = "▼";
+const COLLAPSE_ICON = "▲";
 
-/** Get color for rating level */
-function getRatingColor(level: string): string {
-  switch (level) {
-    case "very-high": return "#10b981"; // green
-    case "high": return "#84cc16"; // light green
-    case "medium": return "#eab308"; // yellow
-    case "low": return "#f97316"; // orange
-    case "very-low": return "#ef4444"; // red
-    default: return "#6b7280"; // gray
-  }
-}
+export default function DecisionBreakdownSection({ decisions }: Props) {
+  const lang = useLang();
+  const logger = useLogger();
+  const [expanded, setExpanded] = useState(false);
 
-/** Format rating text with translation support */
-function formatRating(level: string, lang: (key: string) => string): string {
-  const keyMap: Record<string, string> = {
-    "very-high": "DEMOCRACY_LEVEL_VERY_HIGH",
-    "high": "DEMOCRACY_LEVEL_HIGH",
-    "medium": "DEMOCRACY_LEVEL_MEDIUM",
-    "low": "DEMOCRACY_LEVEL_LOW",
-    "very-low": "DEMOCRACY_LEVEL_VERY_LOW",
+  const toggleExpand = () => {
+    const newState = !expanded;
+    setExpanded(newState);
+
+    // Log interaction
+    if (newState) {
+      logger.log(
+        "decision_breakdown_expanded",
+        { decisionCount: decisions.length },
+        "User expanded decision breakdown"
+      );
+    } else {
+      logger.log(
+        "decision_breakdown_collapsed",
+        { decisionCount: decisions.length },
+        "User collapsed decision breakdown"
+      );
+    }
   };
-  
-  const key = keyMap[level];
-  if (key) {
-    return lang(key);
-  }
-  
-  // Fallback to capitalization
-  return level
-    .split("-")
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
 
-const DecisionBreakdownSection = forwardRef<HTMLDivElement, Props>(
-  ({ decisions, ratings, currentDecisionIndex, showFinalRatings, skipAnimation, onComplete }, ref) => {
-    const lang = useLang();
-    
-    // Call onComplete when animation finishes after a decision or ratings appear
-    useEffect(() => {
-      if (skipAnimation) {
-        // If skipped, don't call onComplete here (parent handles it)
-        return;
-      }
+  return (
+    <motion.div
+      className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      {/* Header with expand/collapse button */}
+      <button
+        onClick={toggleExpand}
+        className="w-full flex items-center justify-between text-left hover:bg-white/5 rounded-lg p-2 transition-colors"
+      >
+        <h2 className="text-xl font-bold text-amber-400">
+          {lang("DECISIONS_BREAKDOWN")} ({decisions.length} {lang("DECISIONS")})
+        </h2>
+        <span className="text-amber-400 text-xl">
+          {expanded ? COLLAPSE_ICON : EXPAND_ICON}
+        </span>
+      </button>
 
-      // If ratings are showing, wait for ratings animation to complete
-      if (showFinalRatings) {
-        const timer = setTimeout(() => {
-          console.log('[DecisionBreakdownSection] Ratings animation complete');
-          onComplete();
-        }, RATINGS_DURATION_S * 1000);
-        return () => clearTimeout(timer);
-      }
-
-      // If a decision is visible, wait for decision animation to complete
-      if (currentDecisionIndex >= 0) {
-        const timer = setTimeout(() => {
-          console.log('[DecisionBreakdownSection] Decision', currentDecisionIndex, 'animation complete');
-          onComplete();
-        }, DECISION_DURATION_S * 1000);
-        return () => clearTimeout(timer);
-      }
-    }, [currentDecisionIndex, showFinalRatings, skipAnimation, onComplete]);
-
-    const AnimationWrapper = skipAnimation ? "div" : motion.div;
-
-    return (
-      <>
-        {/* Decision Breakdown Section */}
-        <div
-          ref={ref}
-          className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6"
-        >
-          <h2 className="text-xl font-bold text-amber-400 mb-4">
-            Decision breakdown
-          </h2>
-          <div className="space-y-3 max-h-[400px] overflow-y-auto">
-            {decisions.map((decision, i) => {
-              const isVisible = skipAnimation || i <= currentDecisionIndex;
-              if (!isVisible) return null;
-
-              const animationProps = skipAnimation
-                ? {}
-                : {
-                    initial: { opacity: 0, y: 10 },
-                    animate: { opacity: 1, y: 0 },
-                    transition: { duration: 0.4 },
-                  };
-
-              return (
-                <AnimationWrapper
+      {/* Expanded content */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-4 max-h-[500px] overflow-y-auto mt-4 pr-2">
+              {decisions.map((decision, i) => (
+                <motion.div
                   key={i}
-                  className="border-b border-white/5 last:border-b-0 pb-3 last:pb-0"
-                  {...animationProps}
+                  className="border-b border-white/5 last:border-b-0 pb-4 last:pb-0"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: i * 0.05 }}
                 >
-                  <p className="text-white/95 font-semibold mb-1">
+                  {/* Day label */}
+                  <p className="text-white/50 text-xs uppercase tracking-wide mb-1">
+                    {lang("DAY")} {i + 1}
+                  </p>
+
+                  {/* Decision title */}
+                  <p className="text-white/95 font-semibold mb-2">
                     {decision.title}
                   </p>
-                  <p className="text-white/70 text-sm">
+
+                  {/* Reflection text */}
+                  <p className="text-white/70 text-sm mb-3">
                     {decision.reflection}
                   </p>
-                </AnimationWrapper>
-              );
-            })}
-          </div>
-        </div>
 
-        {/* Rating Pills Section - appears after all decisions */}
-        {showFinalRatings && (
-          <AnimationWrapper
-            className="flex gap-4 justify-center"
-            {...(skipAnimation
-              ? {}
-              : {
-                  initial: { opacity: 0, scale: 0.9 },
-                  animate: { opacity: 1, scale: 1 },
-                  transition: { duration: 0.5 },
-                })}
-          >
-            {/* Liberalism Pill */}
-            <div
-              className="px-4 py-2 rounded-lg font-semibold uppercase text-sm tracking-wide"
-              style={{
-                backgroundColor: `${getRatingColor(ratings.liberalism)}20`,
-                borderColor: getRatingColor(ratings.liberalism),
-                borderWidth: "1px",
-                color: getRatingColor(ratings.liberalism)
-              }}
-            >
-              {lang("LIBERALISM")}: {formatRating(ratings.liberalism, lang)}
+                  {/* Per-decision rating pills */}
+                  <div className="flex gap-2 flex-wrap">
+                    <RatingPill mini label="D" rating={decision.democracy} />
+                    <RatingPill mini label="A" rating={decision.autonomy} />
+                    <RatingPill mini label="L" rating={decision.liberalism} />
+                  </div>
+                </motion.div>
+              ))}
             </div>
-
-            {/* Autonomy Pill */}
-            <div
-              className="px-4 py-2 rounded-lg font-semibold uppercase text-sm tracking-wide"
-              style={{
-                backgroundColor: `${getRatingColor(ratings.autonomy)}20`,
-                borderColor: getRatingColor(ratings.autonomy),
-                borderWidth: "1px",
-                color: getRatingColor(ratings.autonomy)
-              }}
-            >
-              {lang("AUTONOMY")}: {formatRating(ratings.autonomy, lang)}
-            </div>
-          </AnimationWrapper>
+          </motion.div>
         )}
-      </>
-    );
-  }
-);
-
-DecisionBreakdownSection.displayName = "DecisionBreakdownSection";
-
-export default DecisionBreakdownSection;
+      </AnimatePresence>
+    </motion.div>
+  );
+}

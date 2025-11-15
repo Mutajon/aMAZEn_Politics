@@ -16,7 +16,6 @@ import { mirrorBubbleTheme as T } from "../theme/mirrorBubbleTheme";
 import { saveMirrorReturnRoute } from "../lib/eventScreenSnapshot";
 import MirrorBubbleTyping from "../components/MirrorBubbleTyping";
 import { COMPONENTS, PALETTE } from "../data/compass-data";
-import { useTranslatedConst, createTranslatedConst } from "../i18n/useTranslatedConst";
 import { useLogger } from "../hooks/useLogger";
 import { useTimingLogger } from "../hooks/useTimingLogger";
 import { useLang } from "../i18n/lang";
@@ -42,13 +41,15 @@ const DEFAULT_AVATAR_DATA_URL =
 
 const MIRROR_SRC = "/assets/images/mirror.png";
 
-/** fixed epilogue */
-const MIRROR_EPILOGUE = createTranslatedConst((lang) =>
-  lang("MIRROR_EPILOGUE_TEXT")
-);
+// Mirror shimmer effect configuration (matching MirrorCard.tsx)
+const MIRROR_SHIMMER_ENABLED = true;
+const MIRROR_SHIMMER_MIN_INTERVAL = 5000;   // 5 seconds
+const MIRROR_SHIMMER_MAX_INTERVAL = 10000;  // 10 seconds
+const MIRROR_SHIMMER_DURATION = 1500;       // 1.5 second sweep
+const MIRROR_SHIMMER_COLOR = "rgba(94, 234, 212, 0.6)"; // Cyan/teal
 
+/** fixed epilogue */
 export default function MirrorQuizScreen({ push }: { push: PushFn }) {
-  const mirrorEpilogue = useTranslatedConst(MIRROR_EPILOGUE);
   const lang = useLang();
 
   // compass values + reset
@@ -67,6 +68,23 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
     if (!generateImages) return DEFAULT_AVATAR_DATA_URL;
     return "";
   }, [character?.avatarUrl, generateImages]);
+
+  // Get gender-aware translation keys
+  const getGenderKey = (baseKey: string): string => {
+    const gender = character?.gender;
+    if (gender === "female") {
+      return `${baseKey}_FEMALE`;
+    } else if (gender === "male") {
+      return `${baseKey}_MALE`;
+    }
+    // For "any" or undefined, use the base key (which defaults to male form)
+    return baseKey;
+  };
+
+  // Get gender-aware epilogue text
+  const mirrorEpilogue = useMemo(() => {
+    return lang(getGenderKey("MIRROR_EPILOGUE_TEXT"));
+  }, [lang, character?.gender]);
 
   // Create role-based background style
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
@@ -91,6 +109,9 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   // Track timing for each question
   const questionTimingIdRef = useRef<string | null>(null);
 
+  // Mirror shimmer trigger
+  const [mirrorShimmerTrigger, setMirrorShimmerTrigger] = useState(0);
+
   // Only initialize quiz if it hasn't been started yet
   // This allows returning from MirrorScreen without resetting the completed state
   // New games are handled by resetAll() in SplashScreen
@@ -102,6 +123,25 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only on mount, not on quiz/init/resetCompass changes
 
+  // Random interval shimmer effect for mirror image
+  useEffect(() => {
+    if (!MIRROR_SHIMMER_ENABLED) return;
+
+    const scheduleNextShimmer = () => {
+      const randomInterval =
+        MIRROR_SHIMMER_MIN_INTERVAL +
+        Math.random() * (MIRROR_SHIMMER_MAX_INTERVAL - MIRROR_SHIMMER_MIN_INTERVAL);
+
+      return setTimeout(() => {
+        setMirrorShimmerTrigger(prev => prev + 1);
+        scheduleNextShimmer();
+      }, randomInterval);
+    };
+
+    const timerId = scheduleNextShimmer();
+    return () => clearTimeout(timerId);
+  }, []);
+
   // Log when a new question is presented (system event) + start timing
   // Uses ref to prevent duplicate logging when effect dependencies trigger multiple times
   useEffect(() => {
@@ -110,16 +150,6 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
 
       const questionNum = idx + 1;
       const question = quiz[idx];
-
-      // Format: "Q: [question] | Options: [opt1] / [opt2] / [opt3]"
-      const optionsText = question.options.map(opt => opt.a).join(' / ');
-      const logValue = `Q: ${question.q} | Options: ${optionsText}`;
-
-      logger.logSystem(
-        `mirror_question_${questionNum}`,
-        logValue,
-        `System presented mirror question ${questionNum} to player`
-      );
 
       // Start timing for this question
       questionTimingIdRef.current = timingLogger.start('mirror_question_time', {
@@ -134,22 +164,8 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   useEffect(() => {
     if (pings.length > 0 && !done && !loggedPillsRef.current.has(idx)) {
       loggedPillsRef.current.add(idx);
-
-      const questionNum = idx + 1;
-
-      // Format pills: "+2 Equality, -2 Freedom"
-      const pillsText = pings.map(p => {
-        const label = COMPONENTS[p.prop][p.idx]?.short ?? "";
-        return `${p.delta > 0 ? "+" : ""}${p.delta} ${label}`;
-      }).join(", ");
-
-      logger.logSystem(
-        `compass_pills_shown_question_${questionNum}`,
-        pillsText,
-        `System presented compass value changes for question ${questionNum}`
-      );
     }
-  }, [pings, idx, done, logger]);
+  }, [pings, idx, done]);
 
   // once done, fetch a one-shot summary (Mirror Quiz Light API - Mushu/Genie personality)
   useEffect(() => {
@@ -269,12 +285,31 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
             className="relative self-start"
             style={{ width: MIRROR_SIZE, height: MIRROR_SIZE }}
           >
-            <img
+            <motion.img
+              key={mirrorShimmerTrigger}
               src={MIRROR_SRC}
               alt="Mystic mirror"
               width={MIRROR_SIZE}
               height={MIRROR_SIZE}
               className="rounded-full object-cover"
+              animate={
+                MIRROR_SHIMMER_ENABLED
+                  ? {
+                      filter: [
+                        "drop-shadow(0px 0px 0px transparent)",
+                        `drop-shadow(-8px -8px 12px ${MIRROR_SHIMMER_COLOR})`,
+                        `drop-shadow(0px 0px 16px ${MIRROR_SHIMMER_COLOR})`,
+                        `drop-shadow(8px 8px 12px ${MIRROR_SHIMMER_COLOR})`,
+                        "drop-shadow(0px 0px 0px transparent)",
+                      ],
+                    }
+                  : {}
+              }
+              transition={{
+                duration: MIRROR_SHIMMER_DURATION / 1000,
+                ease: "easeInOut",
+                times: [0, 0.25, 0.5, 0.75, 1],
+              }}
             />
 
             {/* Compass Pills Overlay - displays pings above mirror image */}
@@ -328,7 +363,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
             {displayAvatar ? (
               <img src={displayAvatar} alt="Character avatar" className="w-full h-full object-cover" />
             ) : (
-              <div className="text-white/80 text-sm">{lang("PREPARING_AVATAR")}</div>
+              <div className="text-white/80 text-sm">{lang(getGenderKey("PREPARING_AVATAR"))}</div>
             )}
           </motion.div>
         </div>
@@ -426,7 +461,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
         {done && (
   <div className="mt-12 mx-auto max-w-xl">
     {/* ⬇️ while AI is working, show animated typing bubble */}
-    {!summary && <MirrorBubbleTyping text={lang("MIRROR_PEERING_INTO_SOUL")} />}
+    {!summary && <MirrorBubbleTyping text={lang(getGenderKey("MIRROR_PEERING_INTO_SOUL"))} />}
 
     {/* verdict bubble (types once) */}
     {summary && (
@@ -457,11 +492,16 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
         <button
           onClick={() => {
             logger.log('button_click_go_to_sleep', 'Go to sleep', 'User clicked Go to sleep button');
+
+            // Capture initial compass snapshot for session summary
+            const { captureInitialSnapshot } = useCompassStore.getState();
+            captureInitialSnapshot();
+
             push("/background-intro");
           }}
           className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/90 text-[#0b1335] hover:bg-white"
         >
-          {lang("BUTTON_GO_TO_SLEEP")}
+          {lang(getGenderKey("BUTTON_GO_TO_SLEEP"))}
         </button>
         <button
           onClick={() => {
@@ -472,7 +512,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
           }}
           className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/15 text-white hover:bg-white/25 border border-white/30"
         >
-          {lang("BUTTON_EXAMINE_MIRROR")}
+          {lang(getGenderKey("BUTTON_EXAMINE_MIRROR"))}
         </button>
       </div>
     )}

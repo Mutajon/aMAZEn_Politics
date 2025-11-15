@@ -22,12 +22,26 @@ const useStrict = import.meta.env.MODE !== "development";
 
 (window as any).switchToGPT = () => {
   useSettingsStore.getState().setUseLightDilemmaAnthropic(false);
+  useSettingsStore.getState().setUseXAI(false);
   console.log("✅ Switched to GPT (OpenAI)");
-  console.log("📋 Affected: Dilemma generation + Mirror dialogue");
+  console.log("📋 Affected: Dilemma generation + Mirror dialogue + Image generation");
   console.log("🔧 Models configured in .env:");
   console.log("   - MODEL_DILEMMA");
   console.log("   - MODEL_MIRROR");
-  console.log("💡 Next dilemma/mirror will use OpenAI API");
+  console.log("   - IMAGE_MODEL");
+  console.log("💡 Next dilemma/mirror/avatar will use OpenAI API");
+};
+
+(window as any).switchToXAI = () => {
+  useSettingsStore.getState().setUseLightDilemmaAnthropic(false);
+  useSettingsStore.getState().setUseXAI(true);
+  console.log("✅ Switched to XAI (X.AI/Grok)");
+  console.log("📋 Affected: Dilemma generation + Compass pills + Image generation");
+  console.log("🔧 Models configured in .env:");
+  console.log("   - MODEL_DILEMMA_XAI");
+  console.log("   - IMAGE_MODEL_XAI (optional - falls back to OpenAI)");
+  console.log("💡 Next dilemma/compass will use XAI API");
+  console.log("⚠️  Note: XAI doesn't support image generation yet - will fall back to OpenAI");
 };
 
 // Debug mode toggle commands
@@ -102,6 +116,32 @@ const useStrict = import.meta.env.MODE !== "development";
     console.log('❌ Corruption tracking disabled immediately (no refresh needed).');
   }
 };
+
+// Democracy rating access (hidden axis for analysis)
+(window as any).showDemocracy = () => {
+  const democracyRating = (window as any).__democracyRating;
+  const allRatings = (window as any).__allRatings;
+
+  if (!democracyRating) {
+    console.log('❌ No democracy rating available yet.');
+    console.log('💡 Play through to the Aftermath screen first.');
+    return;
+  }
+
+  console.log('📊 HIDDEN DEMOCRACY RATING (not shown in UI):');
+  console.log(`   Democracy: ${democracyRating}`);
+  console.log('');
+  console.log('📋 All calculated ratings:');
+  console.log(`   Autonomy: ${allRatings.autonomy}`);
+  console.log(`   Liberalism: ${allRatings.liberalism}`);
+  console.log(`   Democracy: ${allRatings.democracy} (hidden)`);
+  console.log('');
+  console.log('ℹ️  Democracy measures: "Who authors the rules and exceptions?"');
+  console.log('   - High: Broad/inclusive authorship, real checks/vetoes');
+  console.log('   - Low: Concentrated elite control, weak checks');
+};
+
+(window as any).getDemocracy = (window as any).showDemocracy; // Alias for convenience
 
 // HIDDEN FOR EXPERIMENTAL DISTRIBUTION
 // Console commands are still available but not advertised to users

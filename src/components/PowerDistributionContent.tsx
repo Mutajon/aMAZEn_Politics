@@ -65,6 +65,18 @@ export default function PowerDistributionContent({
   const logger = useLogger();
   const character = useRoleStore((s) => s.character);
 
+  // Get gender-aware translation keys
+  const getGenderKey = (baseKey: string): string => {
+    const gender = character?.gender;
+    if (gender === "female") {
+      return `${baseKey}_FEMALE`;
+    } else if (gender === "male") {
+      return `${baseKey}_MALE`;
+    }
+    // For "any" or undefined, use the base key (which defaults to male form)
+    return baseKey;
+  };
+
   // Determine if editing is enabled based on setting type
   const isRealSetting = groundingData?.settingType === "real";
 
@@ -193,7 +205,7 @@ export default function PowerDistributionContent({
 
                             {isPlayer && (
                               <span className="text-amber-300 text-sm font-semibold whitespace-nowrap">
-                                {lang("POWER_THATS_YOU")}
+                                {lang(getGenderKey("POWER_THATS_YOU"))}
                               </span>
                             )}
 

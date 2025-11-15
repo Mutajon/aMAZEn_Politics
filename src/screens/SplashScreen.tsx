@@ -149,6 +149,8 @@ export default function SplashScreen({
       useLoggingStore.getState().setUserId(registerData.userId);
       setTreatment(registerData.treatment as 'fullAutonomy' | 'semiAutonomy' | 'noAutonomy');
       useLoggingStore.getState().setTreatment(registerData.treatment);
+      // Set consent to true - user has agreed to participate by submitting email
+      useLoggingStore.getState().setConsented(true);
 
       console.log(`[SplashScreen] User registered: ${registerData.userId}, treatment: ${registerData.treatment}, isNewUser: ${registerData.isNewUser}`);
 
@@ -192,6 +194,9 @@ export default function SplashScreen({
     setShowSettings(false);
 
     try {
+      // Set consent to true for non-experiment mode
+      useLoggingStore.getState().setConsented(true);
+
       // Start new logging session
       await loggingService.startSession();
 
@@ -236,11 +241,6 @@ export default function SplashScreen({
       clearTimeout(buttonTimer);
     };
   }, []);
-
-  // Log splash screen loaded (runs once on mount)
-  useEffect(() => {
-    logger.logSystem('splash_screen_loaded', true, 'Splash screen loaded');
-  }, [logger]);
 
   return (
     <div
@@ -586,12 +586,12 @@ export default function SplashScreen({
     {lang("START_BUTTON")}
   </motion.button>
 
-  {/* Secondary: High Scores (subtle/glass) */}
+  {/* Secondary: High Scores (subtle/glass) - TEMPORARILY HIDDEN */}
   <motion.button
     initial={{ opacity: 0 }}
-    animate={{ opacity: showButton && !isCollectingID ? 1 : 0 }}
+    animate={{ opacity: 0 }}
     transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
-    style={{ visibility: showButton && !isCollectingID ? "visible" : "hidden" }}
+    style={{ visibility: "hidden", pointerEvents: "none" }}
     onClick={() => {
       // Start music on any user interaction
       playMusic('background', true);
@@ -606,12 +606,12 @@ export default function SplashScreen({
     {lang("HALL_OF_FAME")}
   </motion.button>
 
-  {/* Tertiary: Book of Achievements (subtle/glass) */}
+  {/* Tertiary: Book of Achievements (subtle/glass) - TEMPORARILY HIDDEN */}
   <motion.button
     initial={{ opacity: 0 }}
-    animate={{ opacity: showButton && !isCollectingID ? 1 : 0 }}
+    animate={{ opacity: 0 }}
     transition={{ delay: 0.1, type: "spring", stiffness: 250, damping: 22 }}
-    style={{ visibility: showButton && !isCollectingID ? "visible" : "hidden" }}
+    style={{ visibility: "hidden", pointerEvents: "none" }}
     onClick={() => {
       // Start music on any user interaction
       playMusic('background', true);

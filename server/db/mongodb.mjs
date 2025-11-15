@@ -223,6 +223,17 @@ export async function getUsersCollection() {
 }
 
 /**
+ * Get database instance
+ * Automatically connects if not connected
+ * Ensures connection is healthy before returning
+ *
+ * @returns {Promise<Db>} MongoDB database instance
+ */
+export async function getDb() {
+  return await ensureConnection();
+}
+
+/**
  * Atomically increment a named counter by 1
  *
  * @param {string} name - The name of the counter to increment

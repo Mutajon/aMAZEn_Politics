@@ -12,9 +12,10 @@
 //     <App />
 //   </ErrorBoundary>
 
-import { Component, ReactNode } from 'react';
+import { Component, type ReactNode } from 'react';
 import { loggingService } from '../lib/loggingService';
 import { useSettingsStore } from '../store/settingsStore';
+import { captureError } from '../lib/sentry';
 
 type Props = {
   children: ReactNode;
@@ -80,7 +81,10 @@ export class ErrorBoundary extends Component<Props, State> {
       url: window.location.href
     };
 
-    // Log fatal error
+    // Log to Sentry error monitoring
+    captureError(error, errorData);
+
+    // Log fatal error to research database
     loggingService.log(
       'fatal_error',
       errorData,
@@ -90,7 +94,7 @@ export class ErrorBoundary extends Component<Props, State> {
     // Force flush logs immediately (don't wait for auto-flush)
     loggingService.flush(true);
 
-    console.log('[ErrorBoundary] Error logged to database');
+    console.log('[ErrorBoundary] Error logged to database and Sentry');
   }
 
   handleReload = () => {

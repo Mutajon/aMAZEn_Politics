@@ -2,6 +2,10 @@
 import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fetchAndStoreGameSettings, loadGameSettingsFromLocalStorage } from "./lib/gameSettings";
+import { initSentry } from "./lib/sentry";
+
+// Initialize Sentry error monitoring FIRST (before any other code runs)
+initSentry();
 
 // Load game settings from localStorage IMMEDIATELY before any components render
 // This ensures settings are available before Zustand persist loads old values
@@ -41,6 +45,7 @@ import { loggingService } from "./lib/loggingService";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { useStateChangeLogger } from "./hooks/useStateChangeLogger";
 import { useSessionLogger } from "./hooks/useSessionLogger";
+import { usePartialSummaryLogger } from "./hooks/usePartialSummaryLogger";
 import GameCappedScreen from "./screens/GameCappedScreen";
 
 if (import.meta.env.DEV) {
@@ -166,6 +171,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
   // Global logging hooks (run once at app level for comprehensive coverage)
   useStateChangeLogger(); // Automatically logs all Zustand store changes
   useSessionLogger();     // Automatically logs tab visibility, window blur/focus
+  usePartialSummaryLogger(); // Logs partial summary if user closes tab mid-game
 
   if (isLoading) {
     return <LoadingScreen />;
