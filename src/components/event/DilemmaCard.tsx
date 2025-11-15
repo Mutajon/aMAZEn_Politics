@@ -98,7 +98,7 @@ export default function DilemmaCard({ title, description, speaker, speakerDescri
         className={`relative ${CARD_TONE} ${CARD_PAD}`}
         style={{
           overflow: 'visible', // Allow avatar to extend beyond boundaries
-          paddingLeft: showSpeaker ? '80px' : undefined // Space for avatar with ~20px gap
+          paddingLeft: showSpeaker ? '100px' : undefined // Space for avatar with ~40px gap
         }}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
@@ -110,7 +110,7 @@ export default function DilemmaCard({ title, description, speaker, speakerDescri
           <div
             className="absolute"
             style={{
-              left: '-40px',  // Juts out 40px to the left
+              left: '-60px',  // Juts out 60px to the left (moved 20px more)
               top: '-20px',   // Juts out 20px above the card
               zIndex: 10      // Ensure avatar appears above card background
             }}

@@ -14,6 +14,7 @@ export type ResourceBarScoreDetails = {
   components: Array<{
     id: "people" | "middle" | "mom" | "corruption";
     label: string;
+    tierLabel?: string;  // Optional tier label for corruption (shown on second line)
     valueLabel: string;
     points: number;
     maxPoints: number;
@@ -349,7 +350,14 @@ function ScorePill({
                 key={comp.id}
                 className="flex items-center justify-between gap-3 text-white/80"
               >
-                <span className="truncate">{comp.label}</span>
+                <span className="truncate">
+                  {comp.label}
+                  {comp.tierLabel && (
+                    <span className="block text-xs text-white/60 mt-0.5">
+                      {comp.tierLabel}
+                    </span>
+                  )}
+                </span>
                 <span className="tabular-nums font-semibold text-white/90">
                   {formatPoints(comp.points)} pts
                 </span>

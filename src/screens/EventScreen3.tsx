@@ -231,7 +231,8 @@ export default function EventScreen3({ push }: Props) {
         },
         {
           id: "corruption" as const,
-          label: `${lang("FINAL_SCORE_CORRUPTION")} (${getCorruptionInfo(breakdown.corruption.normalizedLevel).label})`,
+          label: lang("FINAL_SCORE_CORRUPTION"),
+          tierLabel: getCorruptionInfo(breakdown.corruption.normalizedLevel).label,
           valueLabel: `${breakdown.corruption.normalizedLevel.toFixed(1)}/10`,
           points: breakdown.corruption.points,
           maxPoints: breakdown.corruption.maxPoints,
@@ -923,7 +924,7 @@ export default function EventScreen3({ push }: Props) {
         </AnimatePresence>
 
         {/* Reasoning Modal - appears after action confirmation (treatment-based) */}
-        {reasoningModalAction && (
+        {reasoningModalAction && collectedData && (
           <ReasoningModal
             isOpen={showReasoningModal}
             onClose={handleReasoningClose}
@@ -934,6 +935,8 @@ export default function EventScreen3({ push }: Props) {
             day={day}
             isOptional={reasoning.isOptional()}
             isSubmitting={isSubmittingReasoning}
+            speakerName={collectedData.dilemma.speaker}
+            speakerImageId="gatekeeper"
           />
         )}
 

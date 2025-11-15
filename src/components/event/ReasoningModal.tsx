@@ -23,11 +23,10 @@ import { useTimingLogger } from "../../hooks/useTimingLogger";
 import { useLogger } from "../../hooks/useLogger";
 import { validateReasoningText } from "../../hooks/useReasoning";
 import { useDilemmaStore } from "../../store/dilemmaStore";
+import { SpeakerAvatar } from "./SpeakerAvatar";
 
-// Mirror image constants (matching MirrorCard)
-const MIRROR_IMG_SRC = "/assets/images/mirror.png";
-const IMG_WIDTH_PX = 65;
-const IMG_OPACITY = 0.95;
+// Speaker avatar constants
+const AVATAR_SIZE_PX = 120; // Sized to show full face and upper body
 
 type Props = {
   isOpen: boolean;
@@ -38,6 +37,8 @@ type Props = {
   actionSummary: string;
   day: number;
   isOptional: boolean;
+  speakerName?: string;        // Speaker name (e.g., "The Gatekeeper")
+  speakerImageId?: string;     // Speaker image ID (e.g., "gatekeeper")
   isSubmitting: boolean;
 };
 
@@ -51,6 +52,8 @@ export default function ReasoningModal({
   day,
   isOptional,
   isSubmitting,
+  speakerName,
+  speakerImageId,
 }: Props) {
   const [reasoningText, setReasoningText] = useState("");
   const [showAcknowledgment, setShowAcknowledgment] = useState(false);
@@ -267,17 +270,16 @@ export default function ReasoningModal({
 
             {/* Icon and Title */}
             <div className="flex items-start gap-4">
-              {/* Mirror Image Icon */}
+              {/* Speaker Avatar (50% size) */}
               <div className="flex-shrink-0">
-                <img
-                  src={MIRROR_IMG_SRC}
-                  alt=""
-                  style={{
-                    width: `${IMG_WIDTH_PX}px`,
-                    opacity: IMG_OPACITY,
-                  }}
-                  className="select-none"
-                />
+                <div style={{ width: `${AVATAR_SIZE_PX}px`, height: `${AVATAR_SIZE_PX}px` }}>
+                  <SpeakerAvatar
+                    speakerName={speakerName || "The Gatekeeper"}
+                    imageId={speakerImageId || "gatekeeper"}
+                    onClick={() => {}} // No-op since description modal isn't needed here
+                    size={AVATAR_SIZE_PX}
+                  />
+                </div>
               </div>
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl font-bold text-white mb-2" style={{ fontFamily: "Georgia, serif" }}>
@@ -303,7 +305,7 @@ export default function ReasoningModal({
                       setValidationError("");
                     }}
                     onKeyPress={handleKeyPress}
-                    placeholder="Explain why you made this decision..."
+                    placeholder="Explain why you made this decision... and be honest."
                     className="w-full h-32 px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all resize-none"
                     disabled={isSubmitting}
                     autoFocus
