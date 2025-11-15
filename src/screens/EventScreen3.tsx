@@ -33,6 +33,7 @@ import { useCoinFlights, CoinFlightOverlay } from "../components/event/CoinFligh
 import { AnimatePresence } from "framer-motion";
 import { bgStyleWithRoleImage } from "../lib/ui";
 import { calculateLiveScoreBreakdown } from "../lib/scoring";
+import { getCorruptionInfo } from "../lib/corruptionLevels";
 import { Building2, Heart, Users } from "lucide-react";
 import type { CompassEffectPing } from "../components/MiniCompass";
 import { loadEventScreenSnapshot, clearEventScreenSnapshot } from "../lib/eventScreenSnapshot";
@@ -230,7 +231,7 @@ export default function EventScreen3({ push }: Props) {
         },
         {
           id: "corruption" as const,
-          label: lang("FINAL_SCORE_CORRUPTION"),
+          label: `${lang("FINAL_SCORE_CORRUPTION")} (${getCorruptionInfo(breakdown.corruption.normalizedLevel).label})`,
           valueLabel: `${breakdown.corruption.normalizedLevel.toFixed(1)}/10`,
           points: breakdown.corruption.points,
           maxPoints: breakdown.corruption.maxPoints,

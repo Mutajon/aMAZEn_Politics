@@ -43,8 +43,7 @@ export type CompassPill = {
 export type DynamicParam = {
   id: string;
   icon: string; // Emoji character (e.g., "🎨", "🔥", "💀")
-  text: string; // Narrative text (e.g., "+1,723 artworks preserved")
-  tone: "up" | "down" | "neutral";
+  text: string; // Narrative text (e.g., "12,000 soldiers mobilized")
 };
 
 export type CorruptionShift = {
@@ -213,11 +212,12 @@ async function fetchGameTurn(): Promise<{
       : `${roleState.selectedRole || "Unknown role"}, ${roleState.roleYear || "Unknown era"}`;
 
     payload.gameContext = {
-      role: roleState.selectedRole || "Unicorn King",
+      role: roleState.roleScope,
       systemName: roleState.analysis?.systemName || "Divine Right Monarchy",
       setting,
-      challengerSeat: roleState.analysis?.challengerSeat || "Unknown Opposition (Institutional Power)",
+      challengerSeat: roleState.analysis?.challengerSeat?.name || "Unknown Opposition (Institutional Power)",
       powerHolders: roleState.analysis?.holders || [],
+      playerIndex: roleState.analysis?.playerIndex ?? null,
       supportProfiles: {
         people: {
           origin: supportPeople,
@@ -506,9 +506,14 @@ async function fetchGameTurn(): Promise<{
   // Compass pills fetched asynchronously elsewhere
   const compassPills: CompassPill[] | null = null;
 
-// Extract dynamic parameters (Day 2+ only)
+  // Extract dynamic parameters (Day 2+ only)
+  // Add id field from index (AI returns {icon, text}, we add id for React keys)
   const dynamicParams: DynamicParam[] = Array.isArray(data.dynamicParams)
-    ? data.dynamicParams
+    ? data.dynamicParams.map((param, index) => ({
+        id: `param-${day}-${index}`,
+        icon: param.icon || '📰',
+        text: param.text || 'Unknown consequence'
+      }))
     : [];
 
   // Extract mirror advice

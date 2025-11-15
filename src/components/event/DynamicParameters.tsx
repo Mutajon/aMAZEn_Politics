@@ -9,9 +9,8 @@ import type { DynamicParam } from "../../hooks/useEventDataCollector";
 /** Types for parameter items */
 export type ParameterItem = {
   id: string;
-  tone: "up" | "down" | "neutral";
   text: string;
-  icon: string; // Now an emoji character (🎨, 🔥, etc.)
+  icon: string; // Emoji character (🎨, 🔥, etc.)
 };
 
 // Day 1 placeholder messages (randomly selected)
@@ -36,7 +35,6 @@ function getRandomDayOneMessages(): ParameterItem[] {
   const shuffled = [...DAY_ONE_MESSAGES].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, 3).map((msg, i) => ({
     id: `day1-${i}`,
-    tone: "neutral" as const,
     text: msg.text,
     icon: msg.emoji
   }));
@@ -62,19 +60,13 @@ export function buildDynamicParamsItems(
   if (!params || params.length === 0) {
     return [{
       id: "placeholder",
-      tone: "neutral" as const,
       text: "News items incoming...",
       icon: "📰"
     }];
   }
 
-  // Day 2+: Show actual dynamic parameters
-  return params.map(p => ({
-    id: p.id,
-    tone: p.tone,
-    text: p.text,
-    icon: p.icon // Now an emoji character from AI
-  }));
+  // Day 2+: Show actual dynamic parameters (already in correct format)
+  return params;
 }
 
 /** Single parameter chip with emoji and text */

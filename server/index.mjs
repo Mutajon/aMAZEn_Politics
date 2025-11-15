@@ -4744,28 +4744,30 @@ function extractChallengerName(challengerSeat) {
  * Calculate authority level from E-12 analysis
  * Maps detailed E-12 to simple high/medium/low classification
  */
-function calculateAuthorityLevel(e12) {
-  if (!e12 || !e12.subjectType) {
-    return 'medium'; // Default fallback
+function calculateAuthorityLevel(e12, powerHolders, playerIndex) {
+  // Fallback if missing data
+  if (!powerHolders || !Array.isArray(powerHolders) || playerIndex === null || playerIndex === undefined) {
+    return 'medium';
   }
 
-  const subjectType = e12.subjectType.toLowerCase();
+  const playerHolder = powerHolders[playerIndex];
+  if (!playerHolder || !playerHolder.stype) {
+    return 'medium';
+  }
 
-  // High authority: Dictators, Monarchs, Strong Authors
-  if (subjectType.includes('dictator') ||
-      subjectType.includes('monarch') ||
-      (subjectType.includes('author') && e12.intensity === 'strong')) {
+  const { t: subjectType, i: intensity } = playerHolder.stype;
+
+  // High authority: Dictators or Strong Authors
+  if (subjectType === 'Dictator' || (subjectType === 'Author' && intensity === '+')) {
     return 'high';
   }
 
-  // Low authority: Weak subjects, Acolytes, Actors with no author power
-  if (subjectType.includes('acolyte') ||
-      subjectType.includes('actor') ||
-      (subjectType.includes('subject') && e12.intensity === 'weak')) {
+  // Low authority: Acolytes, Actors, or Weak subjects
+  if (subjectType === 'Acolyte' || subjectType === 'Actor' || intensity === '-') {
     return 'low';
   }
 
-  // Medium: Everything else (oligarchs, moderate authors, erasers, etc.)
+  // Medium: Everything else (moderate authors, erasers, agents, etc.)
   return 'medium';
 }
 
@@ -4786,8 +4788,8 @@ function convertSupportShiftToDeltas(supportShift, currentSupport) {
 
   const deltas = {
     people: { delta: 0, why: "" },
-    challenger: { delta: 0, why: "" },
-    mother: { delta: 0, why: "" }
+    holders: { delta: 0, why: "" },
+    mom: { delta: 0, why: "" }
   };
 
   // Convert each entity's reaction to a random delta within range
@@ -4857,24 +4859,25 @@ function sanitizeDilemmaResponse(rawResponse) {
   return sanitized;
 }
 
-// ==================== V2 SYSTEM: PROMPT BUILDERS ====================
+// ==================== V2 SYSTEM: UNIFIED PROMPT BUILDERS ====================
 
 /**
- * Build Game Master system prompt for Day 1
- * Simplified, focused on core game mechanics
+ * Build unified Game Master system prompt (sent ONCE on Day 1)
+ * Contains ALL rules and conditional Day 1 vs Day 2+ instructions
  */
-function buildGameMasterSystemPromptDay1(gameContext, generateActions = true) {
+function buildGameMasterSystemPromptUnified(gameContext) {
   const {
     role,
     systemName,
     setting,
     challengerName,
     powerHolders,
-    supportProfiles,
     authorityLevel,
-    playerCompassTopValues,
-    confidant
+    playerCompassTopValues
   } = gameContext;
+
+  // Get top 5 power holders only
+  const top5PowerHolders = powerHolders.slice(0, 5);
 
   // Format compass values for prompt
   const compassText = playerCompassTopValues.map(dim =>
@@ -4888,8 +4891,7 @@ You are a mysterious, amused Game Master who watches the player's journey throug
 Style:
 - Knowledgeable, playful, slightly teasing
 - Always aware of player's past decisions
-- **CRITICAL: Always end dilemma description with a question** to the player
-  Examples: "So, what do you do?", "How will you respond?", "What's your move?"
+
 
 # ROLE & SETTING
 
@@ -4898,176 +4900,67 @@ Political System: ${systemName}
 Setting: ${setting}
 Authority Level: ${authorityLevel} (high = dictator/monarch, medium = oligarch/executive, low = citizen/weak)
 
-Power Holders:
-${powerHolders.map(ph => `  - ${ph.name} (${ph.type}, power: ${ph.power}%)`).join('\n')}
+Top Power Holders:
+${top5PowerHolders.map(ph => `  - ${ph.name} (${ph.type}, power: ${ph.power}%)`).join('\n')}
 
 Main Challenger: ${challengerName}
 
-# SUPPORT ENTITIES
+# STARTING SUPPORT (Day 1)
 
-The People: ${supportProfiles.people.origin}% support, stance: "${supportProfiles.people.stance}"
-Main Challenger (${challengerName}): ${supportProfiles.challenger.origin}% support, stance: "${supportProfiles.challenger.stance}"
-The Mother: ${supportProfiles.mother.origin}% support, stance: "${supportProfiles.mother.stance}"
+All three factions start at 50% support:
+- The People: 50%
+- ${challengerName}: 50%
+- The Mother: 50%
 
 # PLAYER VALUES (Compass Top 2 per Dimension)
 
 ${compassText}
 
-# DILEMMA GENERATION RULES
+**Integration Guidance:**
+- Values provided for optional tension-building
+- Do NOT explicitly mention value names in dilemmas
+- Weave tensions naturally where contextually appropriate
 
-1. Keep short, engaging, highschool-level language
-2. Never use the word "dilemma"
-3. Frame as request/demand/crisis/opportunity
-4. Reflect political system realistically:
-   - High authority (monarch): Direct power, swift execution, intimidation
-   - Medium authority (oligarch): Influence, negotiation, institutional pressure
-   - Low authority (citizen): One voice among many, persuasion, aggregate outcomes
-5. **ALWAYS end description with a question** to the player
-6. Generate exactly 3 distinct choices
-7. Each choice: title + 1-sentence description + icon keyword (e.g., "sword", "coin", "scales", "megaphone")
+# DAY 1 VS DAY 2+ RULES
 
-# MIRROR BRIEFING
+## DAY 1 (First Dilemma):
+- Frame as sudden arrival. 
+  Examples: "Let's see how you handle your first mess...", "You are droped into the body of a..."
+- Present immediate challenge requiring urgent response
+- NO support shifts (N/A for Day 1)
+- NO dynamic parameters (N/A for Day 1)
+- NO corruption evaluation (N/A for Day 1)
+- Include mirror brief (see MIRROR BRIEFING below)
 
-Name: ${confidant.name}
-Role: Light-hearted sidekick encouraging reflection on inner values
-Comment style:
-- **FIRST PERSON** - Mother speaks directly to player
-  Examples: "I'm so proud of how you handled that...", "I worry about the risks you're taking...", "I see your commitment to justice shining through..."
-- 1 sentence, warm, playful
-- Linked to compass values and current situation
+## DAY 2+ (Continuation):
+perform all the following steps. for each step, start by going over the step instructions which are detailed in the sections below:
+- Analyze previous action for support shifts (see SUPPORT SHIFT RULES below)
+- Generate 1-3 dynamic parameters showing consequences (see DYNAMIC PARAMETERS RULES below)
+- Evaluate corruption of previous action (see CORRUPTION EVALUATION RULES below)
+- generate a new dilemma, based on the player previous choice and the support shifts, dynamic parameters and corruption change. (see DILEMMA GENERATION RULES below)
+- Generate a new mirror brief, based on the newly generated dilemma. (see MIRROR BRIEFING below)
 
-# OUTPUT SCHEMA (Day 1)
 
-Return JSON with this structure:
-{
-  "dilemma": {
-    "title": "Short title (max 120 chars)",
-    "description": "Game Master narration ending with a question (1-3 sentences)",
-    "actions": [
-      {"title": "...", "description": "One sentence", "icon": "sword"},
-      {"title": "...", "description": "One sentence", "icon": "scales"},
-      {"title": "...", "description": "One sentence", "icon": "coin"}
-    ],
-    "topic": "Military|Economy|Religion|Diplomacy|Justice|etc.",
-    "scope": "Local|Regional|National|International"
-  },
-  "mirrorAdvice": "One sentence in FIRST PERSON from Mother, linked to compass values",
-  "speaker": "${confidant.name}",
-  "speakerDescription": "${confidant.description}"
-}`;
-
-  return prompt;
-}
-
-/**
- * Build Game Master user prompt for Day 1
- */
-function buildGameMasterUserPromptDay1(gameContext, dilemmasSubject) {
-  const compassSummary = gameContext.playerCompassTopValues
-    .map(dim => dim.values.join(' & '))
-    .join(', ');
-
-  const subjectDirective = dilemmasSubject
-    ? `\n\nPrefer situations related to: ${dilemmasSubject}`
-    : '';
-
-  return `This is DAY 1 of 7.
-
-The player has just arrived in this role. Present their sudden appearance and immediately drop them into their first challenge.
-
-Game Master opening: Use a playful, initiatory tone ("Let's see how you handle your first mess...").
-
-Player's top values: ${compassSummary}
-
-**IMPORTANT: End the dilemma description with a question to the player.**
-
-Generate:
-- Dilemma (title + description ending with question + 3 choices)
-- Mirror comment (1 sentence, FIRST PERSON from Mother)${subjectDirective}
-
-Follow all rules in system prompt.`;
-}
-
-/**
- * Build Game Master system prompt for Day 2+
- * Includes support shift rules and dynamic parameters
- */
-function buildGameMasterSystemPromptDay2Plus(conversation, day, totalDays) {
-  const meta = conversation.meta;
-  const {
-    challengerName,
-    playerCompassTopValues,
-    topicHistory = [],
-    confidant
-  } = meta;
-
-  // Format recent topics for variety tracking
-  const recentTopics = topicHistory.slice(-3).map(t => `Day ${t.day}: ${t.topic}`).join(', ');
-
-  // Format compass values
-  const compassText = playerCompassTopValues.map(dim =>
-    `  - ${dim.dimension}: ${dim.values.join(', ')}`
-  ).join('\n');
-
-  const daysLeft = totalDays - day + 1;
-  const isFinalDay = daysLeft === 1;
-
-  const prompt = `# GAME MASTER PERSONA
-
-You are a mysterious, amused Game Master who watches the player's journey.
-
-Style:
-- Knowledgeable, playful, teasing
-- Always aware of player's past decisions
-- **CRITICAL: Always end dilemma description with a question** to the player
-
-# CONTINUATION CONTEXT
-
-Current day: ${day} of ${totalDays}
-Recent topics: ${recentTopics || 'None yet'}
-
-Main Challenger: ${challengerName}
-
-# SUPPORT SHIFT RULES (FIRST STEP)
+# SUPPORT SHIFT RULES 
 
 For each entity (people, challenger, mother):
 
 1. Analyze the previous action in context
 2. Assign ONE of six reaction levels:
-   - slightly_supportive
-   - moderately_supportive
-   - strongly_supportive
-   - slightly_opposed
-   - moderately_opposed
-   - strongly_opposed
+   - slightly_supportive (+5 to +10)
+   - moderately_supportive (+11 to +15)
+   - strongly_supportive (+16 to +20)
+   - slightly_opposed (-10 to -5)
+   - moderately_opposed (-15 to -11)
+   - strongly_opposed (-20 to -16)
 
 3. Write a very short in-character line:
-   - People: Collective civic tone (3rd person) - "The blockade risks Athenian lives..."
-   - Challenger (${challengerName}): Political, strategic tone (3rd person) - "Sparta sees this as an act of war..."
-   - Mother: Warm, personal tone (**FIRST PERSON**) - "I worry about the young sailors...", "I'm proud of your courage..."
+   - People: Collective civic tone (first person "we" or "us")
+   - ${challengerName}: Political, strategic tone (first person "we" or "us")
+   - Mother: Warm, personal tone (**FIRST PERSON**)
+     Examples: "I worry about...", "I'm proud of...", "I fear that..."
 
-These reactions will inform your Game Master opening.
-
-# DILEMMA GENERATION RULES
-
-Game Master Opening:
-- Start with very short, witty commentary on previous action
-- Explicitly factor in support shift results:
-  * Strong reactions = clear acknowledgment
-  * Moderate = subtle reference
-  * Slight = ignore or hint only
-- Segue naturally into new situation
-- **End with a question** to the player
-
-Topic Selection:
-- Avoid >2 consecutive dilemmas on same topic
-- Major support shifts should color the topic:
-  * Big drop in People → unrest/protests
-  * Big reaction from Challenger → political confrontation
-  * Strong emotional shift from Mother → personal/moral challenge
-${isFinalDay ? '- **FINAL DAY**: Make climactic, high-stakes, ties themes together' : ''}
-
-# DYNAMIC PARAMETERS RULES
+ # DYNAMIC PARAMETERS RULES
 
 Generate 1-3 dramatic consequence indicators showing concrete outcomes of the PREVIOUS action.
 
@@ -5075,111 +4968,140 @@ Requirements:
 - Realistic for the setting
 - Directly tied to what player did
 - **NEVER about support levels** (handled separately)
-- Include: name + optional number + icon + description
-- Numbers should be realistic for event and setting
+- Each parameter: emoji icon + brief text (2-4 words)
+- Include numbers in text when dramatically impactful
+
+Format:
+- icon: Single emoji representing consequence
+- text: Brief dramatic description (2-4 words, include numbers if impactful)
 
 Examples:
-- {"name": "Spartan Fleet Approaching", "number": 87, "icon": "ship_war", "description": "Enemy warships spotted"}
-- {"name": "Treasury Depleted", "number": null, "icon": "coin_empty", "description": "Funds exhausted"}
+- {"icon": "⚔️", "text": "12,000 soldiers mobilized"}
+- {"icon": "🤒", "text": "2,345 civilians infected"}
+- {"icon": "💼", "text": "42% now unemployed"}
+- {"icon": "🚧", "text": "Trade routes blocked"}
+- {"icon": "💊", "text": "Cure discovered"}
 
-# CORRUPTION EVALUATION
+# DILEMMA GENERATION RULES
+
+**Universal (All Days):**
+1. Keep short, engaging, high-school-level language
+2. Never use the word "dilemma"
+3. Frame as request/demand/crisis/opportunity
+4. **ALWAYS end description with a question** to the player
+5. Generate exactly 3 distinct choices that reflect the player's authority level realistically.
+6. Each choice must include a title, one sentence description, and an icon keyword
+
+**Authority Filtering:**
+Reflect political system and authority level realistically:
+- High authority (monarch/dictator): Direct power, swift execution, intimidation
+  * Actions: "Issue decree", "Execute order", "Command troops"
+- Medium authority (oligarch/executive): Influence, negotiation, institutional pressure
+  * Actions: "Propose to Council", "Negotiate with Assembly", "Request support"
+- Low authority (citizen/weak): One voice among many, persuasion, aggregate outcomes
+  * Actions: "Advocate for", "Organize petition", "Appeal to Assembly"
+
+**Low Authority Constraints:**
+- Citizens CANNOT: "Deploy troops", "Execute decree", "Command forces"
+- Citizens CAN: "Petition Assembly to deploy troops", "Propose decree", "Appeal for military action"
+
+**Topic Variety (Day 2+ Only):**
+- Avoid >2 consecutive dilemmas on same broad topic
+- Topics: Military, Economy, Religion, Diplomacy, Justice, Infrastructure, Politics, Social, Health, Education
+
+# CORRUPTION EVALUATION (Day 2+ Only)
 
 Evaluate PREVIOUS action on 0-10 scale.
-- Allow violent/unethical actions if realistic
-- Score based on intent + method + impact
 
-# PLAYER VALUES
+Definition: "Misuse of entrusted power for personal, factional, or unjust ends"
 
-${compassText}
+Rubric:
+- Intent (0-4): Evidence of self-serving vs. public good?
+- Method (0-3): Were legal/moral procedures violated?
+- Impact (0-3): Unequal personal/factional benefit?
 
-# OUTPUT SCHEMA (Day 2+)
+Violence is NOT automatically corruption:
+- Assassination for personal power = 6-8
+- Assassination for strategy = 3-5
+- Defensive war = 0-1
+- Coup for self-enrichment = 7-9
+- Coup to end tyranny = 2-4
 
-Return JSON with this structure:
+Most normal governance scores 0-2.
+
+# MIRROR BRIEFING
+
+The mirror is a cynical, dry-witted observer that makes the player look inward, by bringing to light tensions between their values and the current dilemma.
+
+Comment style:
+- **FIRST PERSON** - Mirror speaks directly to player
+- 1 sentence, playful (20-25 words)
+- Linked to compass values and current situation
+
+# OUTPUT SCHEMAS
+
+**CRITICAL: Return ONLY valid JSON. NO extra text before or after. NO markdown code blocks. NO commentary.**
+
+## DAY 1 SCHEMA:
+{
+  "dilemma": {
+    "title": "Short title (max 120 chars)",
+    "description": "Game Master narration ending with a question (1-3 sentences)",
+    "actions": [
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence explaining what this action does (8-15 words)", "icon": "sword"},
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence explaining what this action does (8-15 words)", "icon": "scales"},
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence explaining what this action does (8-15 words)", "icon": "coin"}
+    ],
+    "topic": "Military|Economy|Religion|Diplomacy|Justice|Infrastructure|Politics|Social|Health|Education",
+    "scope": "Local|Regional|National|International"
+  },
+  "mirrorAdvice": "One sentence in FIRST PERSON (20-25 words)",
+
+}
+
+
+## DAY 2+ SCHEMA:
 {
   "supportShift": {
-    "people": {"attitudeLevel": "moderately_opposed", "shortLine": "..."},
-    "challenger": {"attitudeLevel": "strongly_opposed", "shortLine": "..."},
-    "mother": {"attitudeLevel": "slightly_opposed", "shortLine": "I worry about..."}
+    "people": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Short civic reaction (3rd person, 10-15 words)"},
+    "holders": {"attitudeLevel": "...", "shortLine": "Short political reaction (3rd person, 10-15 words)"},
+    "mom": {"attitudeLevel": "...", "shortLine": "I worry about...|I'm proud of...|I fear that... (FIRST PERSON, 10-15 words)"}
   },
   "dilemma": {
-    "title": "...",
+    "title": "Short title (max 120 chars)",
     "description": "Game Master comment + new situation + question",
-    "actions": [{...}, {...}, {...}],
-    "topic": "...",
-    "scope": "..."
+    "actions": [
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."}
+    ],
+    "topic": "Military|Economy|Religion|Diplomacy|Justice|Infrastructure|Politics|Social|Health|Education",
+    "scope": "Local|Regional|National|International"
   },
   "dynamicParams": [
-    {"name": "...", "number": 87, "icon": "...", "description": "..."},
-    {"name": "...", "number": null, "icon": "...", "description": "..."}
+    {"icon": "🔥", "text": "Dramatic consequence (2-4 words)"}
   ],
-  "mirrorAdvice": "FIRST PERSON from Mother",
-  "corruptionShift": {"score": 2, "reason": "..."},
-  "speaker": "${confidant?.name || 'Mother'}",
-  "speakerDescription": "${confidant?.description || ''}"
-}`;
+  "mirrorAdvice": "FIRST PERSON (20-25 words)",
+  "corruptionShift": {"score": 0-10, "reason": "Brief explanation (15-25 words)"},
+} }`;
 
   return prompt;
 }
 
 /**
- * Build Game Master user prompt for Day 2+
+ * Build conditional user prompt (Day 1 vs Day 2+)
  */
-function buildGameMasterUserPromptDay2Plus({
-  day,
-  totalDays,
-  playerChoice,
-  challengerName,
-  topicHistory = [],
-  dilemmasSubject,
-  dilemmasSubjectEnabled
-}) {
-  const daysLeft = totalDays - day + 1;
-  const isFinalDay = daysLeft === 1;
+function buildGameMasterUserPrompt(day, playerChoice = null) {
+  // General instruction for all days
+  let prompt = `First, carefully review the entire system prompt to understand all context and rules.\n\n`;
 
-  // Format recent topics
-  const recentTopics = topicHistory.slice(-3).map(t => t.topic).join(', ');
+  if (day === 1) {
+    prompt += `This is DAY 1 of 7.\n\nFollow the system prompt instructions for Day 1.`;
+  } else {
+    prompt += `DAY ${day} of 7\n\nPrevious action: "${playerChoice.title}" - ${playerChoice.description}\n\nFollow the system prompt instructions for Day 2+.`;
+  }
 
-  // Subject focus directive
-  const subjectDirective = dilemmasSubjectEnabled && dilemmasSubject
-    ? `\n- **SUBJECT FOCUS OVERRIDES VARIETY**: ${dilemmasSubject}`
-    : '';
-
-  const finalDayDirective = isFinalDay
-    ? `\n\n**FINAL DAY** - Make this climactic, high-stakes, ties themes together!`
-    : '';
-
-  return `DAY ${day} of ${totalDays}
-
-STEP 1: SUPPORT SHIFT ANALYSIS
-The player chose: "${playerChoice.title}" - ${playerChoice.description}
-
-Analyze how each entity reacts to THIS action:
-- The People (collective civic tone, 3rd person)
-- ${challengerName} (political/strategic tone, 3rd person)
-- Mother (warm/personal tone, **FIRST PERSON** - "I worry...", "I'm proud...")
-
-Return 6-level reaction + short in-character line for each.
-
-STEP 2: GAME MASTER OPENING
-- Very short, witty commentary on previous action
-- Explicitly reference support shift results (strong = clear, moderate = subtle, slight = ignore)
-- Segue into new situation
-- **END WITH A QUESTION** to the player
-
-STEP 3: NEW DILEMMA${finalDayDirective}
-
-Topic selection:
-- Recent topics: ${recentTopics || 'None'}
-- Avoid >2 consecutive on same topic${subjectDirective}
-- Major support shifts should color the topic
-
-Generate:
-- Dilemma (title + description ending with question + 3 choices)
-- 1-3 dynamic parameters (concrete consequences of previous action)
-- Mirror comment (1 sentence, **FIRST PERSON** from Mother, linked to compass)
-- Corruption score (0-10) for previous action
-
-Follow all rules in system prompt.`;
+  return prompt;
 }
 
 // ==================== V2 SYSTEM: MAIN ENDPOINT ====================
@@ -5232,29 +5154,52 @@ app.post("/api/game-turn-v2", async (req, res) => {
     const daysLeft = totalDays - day + 1;
 
     // ========================================================================
-    // DAY 1: Initialize conversation
+    // DAY 1: Initialize conversation with unified system prompt
     // ========================================================================
     if (isFirstDilemma && day === 1) {
       if (!gameContext) {
         return res.status(400).json({ error: "Missing gameContext for Day 1" });
       }
 
-      console.log('[GAME-TURN-V2] Day 1 - Initializing conversation');
+      console.log('[GAME-TURN-V2] Day 1 - Initializing conversation with unified prompt');
 
       // Extract and prepare game context
       const challengerName = extractChallengerName(gameContext.challengerSeat);
-      const authorityLevel = calculateAuthorityLevel(gameContext.e12);
+      const authorityLevel = calculateAuthorityLevel(
+        gameContext.e12,
+        gameContext.powerHolders,
+        gameContext.playerIndex
+      );
 
-      // Build enriched context
+      // Build enriched context (minimal - only what's needed for system prompt)
       const enrichedContext = {
-        ...gameContext,
+        role: gameContext.role,
+        systemName: gameContext.systemName,
+        setting: gameContext.setting,
         challengerName,
-        authorityLevel
+        powerHolders: gameContext.powerHolders,
+        authorityLevel,
+        playerCompassTopValues: gameContext.playerCompassTopValues
       };
 
-      // Build prompts
-      const systemPrompt = buildGameMasterSystemPromptDay1(enrichedContext, generateActions);
-      const userPrompt = buildGameMasterUserPromptDay1(enrichedContext, dilemmasSubject);
+      // Build unified system prompt (sent ONCE)
+      const systemPrompt = buildGameMasterSystemPromptUnified(enrichedContext);
+
+      // Build minimal Day 1 user prompt
+      const userPrompt = buildGameMasterUserPrompt(day);
+
+      // Debug logging (Day 1 prompts)
+      if (debugMode) {
+        console.log("\n" + "=".repeat(80));
+        console.log("🐛 [DEBUG] Day 1 System Prompt:");
+        console.log("=".repeat(80));
+        console.log(systemPrompt);
+        console.log("\n" + "=".repeat(80));
+        console.log("🐛 [DEBUG] Day 1 User Prompt:");
+        console.log("=".repeat(80));
+        console.log(userPrompt);
+        console.log("=".repeat(80) + "\n");
+      }
 
       // Call AI
       const messages = [
@@ -5269,9 +5214,18 @@ app.post("/api/game-turn-v2", async (req, res) => {
         aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
       }
 
-      const content = aiResponse?.choices?.[0]?.message?.content;
+      const content = aiResponse?.content;
       if (!content) {
         throw new Error("No content in AI response");
+      }
+
+      // Debug logging (Day 1 AI response)
+      if (debugMode) {
+        console.log("\n" + "=".repeat(80));
+        console.log("🐛 [DEBUG] Day 1 Raw AI Response:");
+        console.log("=".repeat(80));
+        console.log(content);
+        console.log("=".repeat(80) + "\n");
       }
 
       // Parse JSON response
@@ -5287,33 +5241,21 @@ app.post("/api/game-turn-v2", async (req, res) => {
         throw new Error(`Failed to parse AI response: ${parseError.message}`);
       }
 
-      // Store conversation
-      const conversationMeta = {
-        role: gameContext.role,
-        systemName: gameContext.systemName,
-        setting: gameContext.setting,
-        challengerSeat: gameContext.challengerSeat,
-        challengerName,
-        powerHolders: gameContext.powerHolders,
-        supportProfiles: gameContext.supportProfiles,
-        authorityLevel,
-        playerCompassTopValues: gameContext.playerCompassTopValues,
-        confidant: gameContext.confidant,
-        topicHistory: parsed.dilemma?.topic ? [{ day: 1, topic: parsed.dilemma.topic }] : [],
-        corruptionHistory: [],
-        lastDilemma: {
-          title: parsed.dilemma?.title || '',
-          description: parsed.dilemma?.description || ''
-        }
-      };
-
       // Add assistant response to messages
       messages.push({ role: "assistant", content: content });
 
-      // Store conversation
-      storeConversation(gameId, messages, useXAI ? "xai" : "openai", conversationMeta);
+      // Store conversation with minimal meta (for reference only)
+      const conversationMeta = {
+        role: gameContext.role,
+        systemName: gameContext.systemName,
+        challengerName,
+        authorityLevel
+      };
 
-      console.log('[GAME-TURN-V2] Day 1 complete, conversation stored');
+      // FIXED: Store messages array properly in conversation.messages field
+      storeConversation(gameId, gameId, useXAI ? "xai" : "openai", { ...conversationMeta, messages });
+
+      console.log('[GAME-TURN-V2] Day 1 complete, conversation stored with unified system prompt');
 
       // Return response (flattened for frontend compatibility)
       return res.json({
@@ -5323,17 +5265,15 @@ app.post("/api/game-turn-v2", async (req, res) => {
         topic: parsed.dilemma?.topic || '',
         scope: parsed.dilemma?.scope || '',
         mirrorAdvice: parsed.mirrorAdvice,
-        speaker: parsed.speaker,
-        speakerDescription: parsed.speakerDescription,
         isGameEnd: false
       });
     }
 
     // ========================================================================
-    // DAY 2+: Support shifts, consequences, new dilemma
+    // DAY 2+: Append to conversation history (NO new system prompt)
     // ========================================================================
     if (isFollowUp && day > 1) {
-      if (!conversation) {
+      if (!conversation || !conversation.meta.messages) {
         return res.status(400).json({ error: "No conversation found for this gameId" });
       }
 
@@ -5341,28 +5281,33 @@ app.post("/api/game-turn-v2", async (req, res) => {
         return res.status(400).json({ error: "Missing playerChoice for Day 2+" });
       }
 
-      console.log(`[GAME-TURN-V2] Day ${day} - Follow-up turn`);
+      console.log(`[GAME-TURN-V2] Day ${day} - Appending to conversation history`);
 
-      const meta = conversation.meta;
+      // Build minimal Day 2+ user prompt
+      const userPrompt = buildGameMasterUserPrompt(day, playerChoice);
 
-      // Build prompts
-      const systemPrompt = buildGameMasterSystemPromptDay2Plus(conversation, day, totalDays);
-      const userPrompt = buildGameMasterUserPromptDay2Plus({
-        day,
-        totalDays,
-        playerChoice,
-        challengerName: meta.challengerName,
-        topicHistory: meta.topicHistory || [],
-        dilemmasSubject,
-        dilemmasSubjectEnabled
-      });
-
-      // Prepare messages array
+      // Prepare messages array (history + new user message)
       const messages = [
-        ...conversation.messages,
-        { role: "system", content: systemPrompt },
+        ...conversation.meta.messages,
         { role: "user", content: userPrompt }
       ];
+
+      // Debug logging (Day 2+ prompts)
+      if (debugMode) {
+        console.log("\n" + "=".repeat(80));
+        console.log(`🐛 [DEBUG] Day ${day} User Prompt:`);
+        console.log("=".repeat(80));
+        console.log(userPrompt);
+        console.log("\n" + "=".repeat(80));
+        console.log(`🐛 [DEBUG] Conversation History (${messages.length} messages):`);
+        console.log("=".repeat(80));
+        messages.forEach((msg, idx) => {
+          console.log(`\n--- Message ${idx + 1} (${msg.role}) ---`);
+          const preview = msg.content.substring(0, 500);
+          console.log(preview + (msg.content.length > 500 ? '...' : ''));
+        });
+        console.log("=".repeat(80) + "\n");
+      }
 
       // Call AI
       let aiResponse;
@@ -5372,9 +5317,18 @@ app.post("/api/game-turn-v2", async (req, res) => {
         aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
       }
 
-      const content = aiResponse?.choices?.[0]?.message?.content;
+      const content = aiResponse?.content;
       if (!content) {
         throw new Error("No content in AI response");
+      }
+
+      // Debug logging (Day 2+ AI response)
+      if (debugMode) {
+        console.log("\n" + "=".repeat(80));
+        console.log(`🐛 [DEBUG] Day ${day} Raw AI Response:`);
+        console.log("=".repeat(80));
+        console.log(content);
+        console.log("=".repeat(80) + "\n");
       }
 
       // Parse JSON response
@@ -5392,11 +5346,11 @@ app.post("/api/game-turn-v2", async (req, res) => {
       // Hybrid support shift validation
       let supportShift = null;
       if (parsed.supportShift) {
-        // Get current support levels from meta (we'll need to pass these from frontend)
+        // Starting support is always 50%, AI tracks shifts through conversation
         const currentSupport = {
-          people: meta.supportProfiles.people.origin, // This should be current value, not origin
-          challenger: meta.supportProfiles.challenger.origin,
-          mother: meta.supportProfiles.mother.origin
+          people: 50,
+          holders: 50,
+          mom: 50
         };
 
         // Convert AI reactions to numeric deltas with randomization and caps
@@ -5406,37 +5360,23 @@ app.post("/api/game-turn-v2", async (req, res) => {
       // Process dynamic params (no validation, just max 3)
       const dynamicParams = processDynamicParams(parsed.dynamicParams);
 
-      // Update conversation meta
-      const updatedMeta = {
-        ...meta,
-        topicHistory: [
-          ...(meta.topicHistory || []),
-          ...(parsed.dilemma?.topic ? [{ day, topic: parsed.dilemma.topic }] : [])
-        ],
-        corruptionHistory: [
-          ...(meta.corruptionHistory || []),
-          ...(parsed.corruptionShift ? [{
-            day,
-            score: parsed.corruptionShift.score,
-            reason: parsed.corruptionShift.reason
-          }] : [])
-        ],
-        lastDilemma: {
-          title: parsed.dilemma?.title || '',
-          description: parsed.dilemma?.description || ''
-        }
-      };
-
-      // Update conversation
+      // Update conversation messages
       const updatedMessages = [
-        ...conversation.messages,
+        ...conversation.meta.messages,
         { role: "user", content: userPrompt },
         { role: "assistant", content: content }
       ];
 
-      storeConversation(gameId, updatedMessages, conversation.provider, updatedMeta);
+      // Update meta with new messages array
+      const updatedMeta = {
+        ...conversation.meta,
+        messages: updatedMessages
+      };
 
-      console.log(`[GAME-TURN-V2] Day ${day} complete, conversation updated`);
+      // FIXED: Store updated messages properly
+      storeConversation(gameId, gameId, conversation.provider, updatedMeta);
+
+      console.log(`[GAME-TURN-V2] Day ${day} complete, conversation updated (${updatedMessages.length} total messages)`);
 
       // Return response (flattened for frontend compatibility)
       return res.json({
@@ -5449,8 +5389,6 @@ app.post("/api/game-turn-v2", async (req, res) => {
         dynamicParams,
         mirrorAdvice: parsed.mirrorAdvice,
         corruptionShift: parsed.corruptionShift,
-        speaker: parsed.speaker,
-        speakerDescription: parsed.speakerDescription,
         isGameEnd: false
       });
     }
@@ -5677,192 +5615,6 @@ Return JSON in this shape:
  * buildContinuityDirectives - Generates continuity directives for process-based actions
  * Detects votes, negotiations, consultations and enforces immediate results
  */
-function buildContinuityDirectives(playerChoice) {
-  if (!playerChoice?.title || !playerChoice?.summary) {
-    return '';
-  }
-
-  const actionText = (playerChoice.title + ' ' + playerChoice.summary).toLowerCase();
-  const isVoteAction = /\b(vote|referendum|ballot|election|poll|plebiscite)\b/i.test(actionText);
-  const isNegotiationAction = /\b(negotiate|negotiation|talk|talks|meeting|dialogue|summit|discuss)\b/i.test(actionText);
-  const isConsultationAction = /\b(assemble|assembly|council|gathering|forum|hear from|listen to)\b/i.test(actionText);
-
-  if (!isVoteAction && !isNegotiationAction && !isConsultationAction) {
-    return '';
-  }
-
-  const actionType = isVoteAction
-    ? 'VOTING/REFERENDUM'
-    : isNegotiationAction
-    ? 'NEGOTIATION/DIALOGUE'
-    : 'CONSULTATION/ASSEMBLY';
-
-  const lines = [
-    ``,
-    `🚨 CONTINUITY DIRECTIVE (MANDATORY):`,
-    `The previous action involved ${actionType}.`,
-    `The next dilemma MUST show the ACTUAL RESULTS of that process:`,
-    ``
-  ];
-
-  if (isVoteAction) {
-    lines.push(
-      `✓ Show the vote outcome with specific results (e.g., "57% yes, 43% no")`,
-      `✓ Show immediate faction reactions to the result`,
-      `✓ Frame the NEW dilemma around responding to those results`,
-      `✓ Apply SYSTEM FEEL: how does this system handle results?`
-    );
-  } else if (isNegotiationAction) {
-    lines.push(
-      `✓ Show what happened IN the negotiation (agreement? demands? collapse?)`,
-      `✓ Show specific terms, demands, or concessions discussed`,
-      `✓ Show immediate reactions from parties involved`,
-      `✓ Frame the NEW dilemma around responding to the outcome`
-    );
-  } else {
-    lines.push(
-      `✓ Show what happened IN the consultation (consensus? disagreement?)`,
-      `✓ Show specific input from those consulted`,
-      `✓ Show what was decided`,
-      `✓ Frame the NEW dilemma around acting on results`
-    );
-  }
-
-  return lines.join('\n');
-}
-
-/**
- * buildNarrativeDirectives - Injects narrative threads, development, and climax directives
- * Part of Dynamic Story Spine system for coherent 7-day arc
- */
-function buildNarrativeDirectives(narrativeMemory, daysLeft, crisisMode) {
-  if (!narrativeMemory || !Array.isArray(narrativeMemory.threads) || narrativeMemory.threads.length === 0) {
-    return '';
-  }
-
-  const lines = [
-    ``,
-    `🎭 NARRATIVE THREADS (Weave subtly, don't label):`
-  ];
-
-  narrativeMemory.threads.forEach((thread, i) => {
-    lines.push(`  ${i + 1}. ${thread}`);
-  });
-
-  // Show recent thread development if available
-  if (Array.isArray(narrativeMemory.threadDevelopment) && narrativeMemory.threadDevelopment.length > 0) {
-    const recent = narrativeMemory.threadDevelopment[narrativeMemory.threadDevelopment.length - 1];
-    if (recent?.summary) {
-      lines.push(``, `Recent development: ${recent.summary}`);
-    }
-  }
-
-  lines.push(
-    ``,
-    `THREAD TRACKING: Your JSON must include "selectedThreadIndex" (0-based) and "selectedThreadSummary" describing how this turn advances that thread.`
-  );
-
-  // Final day climax directive
-  if (!crisisMode && daysLeft === 1) {
-    lines.push(
-      ``,
-      `🎬 FINAL DAY - CLIMAX DIRECTIVE:`,
-      `This is the culmination. Create a high-stakes turning point that:`,
-      `- Brings one or more narrative threads to a head`,
-      `- Forces a decisive choice with lasting consequences`,
-      `- Feels earned based on the story so far`
-    );
-
-    if (Array.isArray(narrativeMemory.climaxCandidates) && narrativeMemory.climaxCandidates.length > 0) {
-      lines.push(``, `Suggested climax scenarios (use if they fit the story):`);
-      narrativeMemory.climaxCandidates.forEach((climax, i) => {
-        lines.push(`  ${i + 1}. ${climax}`);
-      });
-      lines.push(`(You may deviate if player choices make these incoherent)`);
-    }
-  }
-
-  return lines.join('\n');
-}
-
-/**
- * buildCrisisDirectives - Generates crisis-mode specific context and directives
- * Triggered when support drops below 20% for any faction
- */
-function buildCrisisDirectives(crisisMode, crisisContext, challengerSeat) {
-  if (!crisisMode || !crisisContext) {
-    return '';
-  }
-
-  const lines = [``, `🚨 CRISIS MODE: "${crisisMode.toUpperCase()}"`];
-
-  if (crisisMode === "people") {
-    lines.push(
-      `- Public support collapsed: ${crisisContext.previousSupport ?? '?'}% → ${crisisContext.currentSupport ?? '?'}%`
-    );
-    if (crisisContext.triggeringAction) {
-      lines.push(`- Trigger: "${crisisContext.triggeringAction.title}" — ${crisisContext.triggeringAction.summary}`);
-    }
-    if (crisisContext.entityProfile) {
-      lines.push(`- Who they are: ${crisisContext.entityProfile}`);
-    }
-    if (crisisContext.entityStances && typeof crisisContext.entityStances === 'object') {
-      const stances = Object.entries(crisisContext.entityStances)
-        .map(([issue, stance]) => `  • ${issue}: ${stance}`)
-        .join('\n');
-      lines.push(`- What they care about:\n${stances}`);
-    }
-    lines.push(`- Show mass backlash and demand a response.`);
-
-  } else if (crisisMode === "challenger") {
-    const name = crisisContext.challengerName || challengerSeat?.name || "Institutional opposition";
-    lines.push(
-      `- ${name} support collapsed: ${crisisContext.previousSupport ?? '?'}% → ${crisisContext.currentSupport ?? '?'}%`
-    );
-    if (crisisContext.triggeringAction) {
-      lines.push(`- Trigger: "${crisisContext.triggeringAction.title}" — ${crisisContext.triggeringAction.summary}`);
-    }
-    if (crisisContext.entityProfile) {
-      lines.push(`- Who they are: ${crisisContext.entityProfile}`);
-    }
-    if (crisisContext.entityStances && typeof crisisContext.entityStances === 'object') {
-      const stances = Object.entries(crisisContext.entityStances)
-        .map(([issue, stance]) => `  • ${issue}: ${stance}`)
-        .join('\n');
-      lines.push(`- Their priorities:\n${stances}`);
-    }
-    lines.push(`- Show concrete institutional retaliation in this turn.`);
-
-  } else if (crisisMode === "caring") {
-    lines.push(
-      `- Personal anchor support collapsed: ${crisisContext.previousSupport ?? '?'}% → ${crisisContext.currentSupport ?? '?'}%`
-    );
-    if (crisisContext.triggeringAction) {
-      lines.push(`- Trigger: "${crisisContext.triggeringAction.title}" — ${crisisContext.triggeringAction.summary}`);
-    }
-    if (crisisContext.entityProfile) {
-      lines.push(`- Who this person is: ${crisisContext.entityProfile}`);
-    }
-    if (crisisContext.entityStances && typeof crisisContext.entityStances === 'object') {
-      const stances = Object.entries(crisisContext.entityStances)
-        .map(([issue, stance]) => `  • ${issue}: ${stance}`)
-        .join('\n');
-      lines.push(`- What they value:\n${stances}`);
-    }
-    lines.push(`- Highlight emotional stakes and whether the player can repair the relationship.`);
-
-  } else if (crisisMode === "downfall" && crisisContext.allSupport) {
-    lines.push(
-      `- All three anchors under 20% support:`,
-      `  • People: ${crisisContext.allSupport.people.previous}% → ${crisisContext.allSupport.people.current}%`,
-      `  • Power holders: ${crisisContext.allSupport.middle.previous}% → ${crisisContext.allSupport.middle.current}%`,
-      `  • Personal anchor: ${crisisContext.allSupport.mom.previous}% → ${crisisContext.allSupport.mom.current}%`,
-      `- Generate narrative-only collapse; do not offer actions.`
-    );
-  }
-
-  return lines.join('\n');
-}
 
 // -------------------- Main Prompt Builder -------
 
