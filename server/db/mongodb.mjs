@@ -180,6 +180,13 @@ async function createIndexes() {
     await usersCollection.createIndex({ treatment: 1 }, { name: 'treatment', background: true });
     await usersCollection.createIndex({ createdAt: -1 }, { name: 'createdAt', background: true });
 
+    // summary collection - for session summary analytics
+    const summaryCollection = db.collection('summary');
+    await summaryCollection.createIndex({ sessionId: 1 }, { name: 'sessionId_unique', unique: true, background: true });
+    await summaryCollection.createIndex({ userId: 1, timestamp: -1 }, { name: 'userId_timestamp', background: true });
+    await summaryCollection.createIndex({ treatment: 1, incomplete: 1 }, { name: 'treatment_incomplete', background: true });
+    await summaryCollection.createIndex({ timestamp: -1 }, { name: 'timestamp', background: true });
+
     console.log('[MongoDB] ✅ Indexes created/verified');
   } catch (error) {
     console.warn('[MongoDB] ⚠️ Index creation failed (non-critical):', error.message);

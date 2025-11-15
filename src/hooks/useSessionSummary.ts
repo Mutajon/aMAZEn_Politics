@@ -17,6 +17,7 @@ import { useDilemmaStore } from "../store/dilemmaStore";
 import { useCompassStore } from "../store/compassStore";
 import { useLoggingStore } from "../store/loggingStore";
 import { useSettingsStore } from "../store/settingsStore";
+import { useRoleStore } from "../store/roleStore";
 import { calculateLiveScoreBreakdown } from "../lib/scoring";
 import type { AftermathResponse } from "../lib/aftermath";
 
@@ -115,6 +116,15 @@ export function collectSessionSummary(
   const compassStore = useCompassStore.getState();
   const loggingStore = useLoggingStore.getState();
   const settingsStore = useSettingsStore.getState();
+  const roleStore = useRoleStore.getState();
+
+  // Defensive validation - ensure critical fields exist
+  if (!loggingStore.userId || !loggingStore.sessionId) {
+    console.warn('[useSessionSummary] ⚠️ Missing critical fields:', {
+      userId: loggingStore.userId,
+      sessionId: loggingStore.sessionId
+    });
+  }
 
   // Calculate average decision time
   const { decisionTimes } = dilemmaStore;
@@ -124,6 +134,13 @@ export function collectSessionSummary(
 
   // Use passed session duration (already calculated by caller)
   const totalPlayTime = sessionDuration || 0;
+
+  // Calculate total inquiries (sum all arrays in the Map)
+  // inquiryHistory is Map<day, inquiry[]> so we need to sum array lengths
+  let totalInquiries = 0;
+  dilemmaStore.inquiryHistory.forEach((dayInquiries) => {
+    totalInquiries += dayInquiries.length;
+  });
 
   // Calculate score breakdown
   const scoreBreakdown = calculateLiveScoreBreakdown({
@@ -142,14 +159,14 @@ export function collectSessionSummary(
 
   const summary: SessionSummary = {
     timestamp: new Date(),
-    userId: loggingStore.userId,
-    sessionId: loggingStore.sessionId,
+    userId: loggingStore.userId || 'unknown',
+    sessionId: loggingStore.sessionId || 'unknown',
     gameVersion: loggingStore.gameVersion,
     treatment: settingsStore.treatment,
-    role: dilemmaStore.role || 'Unknown',
+    role: roleStore.selectedRole || 'Unknown',
     totalPlayTime,
     averageDecisionTime,
-    totalInquiries: dilemmaStore.inquiryHistory.size,
+    totalInquiries,
     totalReasoningSubmissions: dilemmaStore.reasoningSubmissionCount,
     totalCustomActions: dilemmaStore.customActionCount,
     initialCompass: compassStore.initialCompassSnapshot,
@@ -202,14 +219,27 @@ export async function sendSessionSummary(summary: SessionSummary): Promise<void>
     });
 
     if (!response.ok) {
-      console.error('[useSessionSummary] Failed to send summary:', response.status, response.statusText);
+      console.error('[useSessionSummary] ❌ HTTP error sending summary:', response.status, response.statusText);
+      // Don't throw - we don't want to block the user experience
+      return;
+    }
+
+    // Check if backend returned success: false
+    const result = await response.json();
+    if (!result.success) {
+      console.error('[useSessionSummary] ❌ Backend validation failed:', result.error);
+      console.error('[useSessionSummary] Summary that failed validation:', {
+        userId: summary.userId,
+        sessionId: summary.sessionId,
+        gameVersion: summary.gameVersion
+      });
       // Don't throw - we don't want to block the user experience
       return;
     }
 
     console.log('[useSessionSummary] ✅ Session summary sent successfully');
   } catch (error) {
-    console.error('[useSessionSummary] Error sending summary:', error);
+    console.error('[useSessionSummary] ❌ Error sending summary:', error);
     // Don't throw - we don't want to block the user experience
   }
 }
