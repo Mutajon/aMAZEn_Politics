@@ -13,16 +13,19 @@ let client = null;
 let db = null;
 let isConnecting = false;
 let lastHealthCheck = null;
-const HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
+const HEALTH_CHECK_INTERVAL = 10000; // 10 seconds (reduced from 30s for faster failure detection)
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_DELAYS = [1000, 2000, 5000]; // Exponential backoff: 1s, 2s, 5s
 
 /**
- * Connect to MongoDB
+ * Connect to MongoDB with automatic retry logic
  * Uses connection pooling - subsequent calls return cached connection
  *
+ * @param {number} attemptNumber - Current attempt number (for internal retry logic)
  * @returns {Promise<Db>} MongoDB database instance
- * @throws {Error} If MONGODB_URI is not set or connection fails
+ * @throws {Error} If MONGODB_URI is not set or all connection attempts fail
  */
-export async function connectDB() {
+export async function connectDB(attemptNumber = 0) {
   // Return existing connection if available
   if (db) return db;
 
@@ -44,7 +47,11 @@ export async function connectDB() {
       throw new Error('MONGODB_URI environment variable is not set');
     }
 
-    console.log('[MongoDB] Connecting to database...');
+    if (attemptNumber === 0) {
+      console.log('[MongoDB] Connecting to database...');
+    } else {
+      console.log(`[MongoDB] Retry attempt ${attemptNumber}/${MAX_RETRY_ATTEMPTS}...`);
+    }
 
     // Create new client with recommended options
     client = new MongoClient(uri, {
@@ -79,7 +86,19 @@ export async function connectDB() {
 
   } catch (error) {
     isConnecting = false;
-    console.error('[MongoDB] ❌ Connection failed:', error.message);
+
+    // Retry with exponential backoff if we haven't exceeded max attempts
+    if (attemptNumber < MAX_RETRY_ATTEMPTS) {
+      const delay = RETRY_DELAYS[attemptNumber];
+      console.warn(`[MongoDB] ⚠️ Connection failed (attempt ${attemptNumber + 1}/${MAX_RETRY_ATTEMPTS + 1}): ${error.message}`);
+      console.log(`[MongoDB] Retrying in ${delay}ms...`);
+
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return connectDB(attemptNumber + 1);
+    }
+
+    // All retries exhausted
+    console.error(`[MongoDB] ❌ Connection failed after ${MAX_RETRY_ATTEMPTS + 1} attempts:`, error.message);
     throw error;
   }
 }

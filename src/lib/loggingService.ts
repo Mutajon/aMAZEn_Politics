@@ -268,9 +268,12 @@ class LoggingService {
 
     this.isFlushing = true;
 
+    // Declare outside try block so catch block can access it
+    let logsToSend: LogEntry[] = [];
+
     try {
       // Take logs from queue (up to BATCH_SIZE)
-      const logsToSend = this.queue.splice(0, BATCH_SIZE);
+      logsToSend = this.queue.splice(0, BATCH_SIZE);
 
       // Prepare request
       const request: BatchLogRequest = {

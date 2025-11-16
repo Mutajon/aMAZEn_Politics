@@ -20,6 +20,42 @@ import {
 } from "./compassKeywordDetector.mjs";
 import { getCountersCollection, incrementCounter, getUsersCollection } from "./db/mongodb.mjs";
 
+// -------------------- Process Error Handlers ---------------------------
+/**
+ * Prevent server crashes from unhandled promise rejections
+ * These can occur when async operations fail without proper error handling
+ */
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Process] ❌ Unhandled Promise Rejection:', {
+    reason: reason?.message || reason,
+    stack: reason?.stack,
+    promise
+  });
+  // Don't exit - let the server continue running
+  // In production, you might want to log this to an error monitoring service
+});
+
+/**
+ * Catch any uncaught exceptions that would otherwise crash the server
+ */
+process.on('uncaughtException', (error) => {
+  console.error('[Process] ❌ Uncaught Exception:', {
+    message: error?.message || error,
+    stack: error?.stack
+  });
+  // Don't exit immediately - allow cleanup and logging
+  // In a production environment, you might want to gracefully shutdown after logging
+});
+
+/**
+ * Graceful shutdown on SIGTERM (used by nodemon and container orchestrators)
+ */
+process.on('SIGTERM', () => {
+  console.log('[Process] SIGTERM received, shutting down gracefully...');
+  // Server will close existing connections and exit
+  process.exit(0);
+});
+
 const app = express();
 
 // CORS Configuration - Security for production deployment
@@ -4336,11 +4372,83 @@ if (process.env.NODE_ENV === "production") {
   console.log(`[server] serving static files from ${distPath}`);
 }
 
+// -------------------- Health Check Endpoint ---------------------------
+/**
+ * GET /health
+ * Health check endpoint for monitoring server and MongoDB status
+ * Returns 200 if healthy, 503 if unhealthy
+ */
+app.get("/health", async (req, res) => {
+  try {
+    // Check MongoDB connection by attempting to get a collection
+    const countersCollection = await getCountersCollection();
+    if (!countersCollection) {
+      throw new Error("MongoDB connection unavailable");
+    }
+
+    res.status(200).json({
+      status: "healthy",
+      mongodb: "connected",
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error("[Health Check] Failed:", error?.message || error);
+    res.status(503).json({
+      status: "unhealthy",
+      mongodb: "disconnected",
+      error: error?.message || "Unknown error",
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// -------------------- Global Error Middleware ---------------------------
+/**
+ * Global error handler - catches all unhandled errors in Express routes
+ * MUST be defined after all routes
+ */
+app.use((err, req, res, next) => {
+  console.error("[Express] Unhandled error:", {
+    message: err?.message || err,
+    stack: err?.stack,
+    path: req.path,
+    method: req.method
+  });
+
+  // Don't send error if headers already sent
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  res.status(500).json({
+    success: false,
+    error: "Internal server error"
+  });
+});
+
 // -------------------- Start server ---------------------------
 const PORT = Number(process.env.PORT) || 3001;
-app.listen(PORT, () => {
-  console.log(`[server] listening on http://localhost:${PORT}`);
 
-  // Start conversation cleanup task
-  startCleanupTask();
-});
+// Initialize MongoDB connection before starting server
+async function startServer() {
+  try {
+    // Test MongoDB connection by getting counters collection
+    console.log("[Server] Initializing MongoDB connection...");
+    const countersCollection = await getCountersCollection();
+    if (countersCollection) {
+      console.log("[Server] ✅ MongoDB connection verified");
+    }
+  } catch (error) {
+    console.warn("[Server] ⚠️ MongoDB connection failed, but server will start anyway:", error?.message);
+    console.warn("[Server] MongoDB will auto-reconnect when available");
+  }
+
+  app.listen(PORT, () => {
+    console.log(`[server] listening on http://localhost:${PORT}`);
+
+    // Start conversation cleanup task
+    startCleanupTask();
+  });
+}
+
+startServer();
