@@ -62,9 +62,9 @@ export async function validateSuggestionStrict(
     era: string;
     settingType: string;
     year: string;
-    roleScope?: string;
-    challengerName?: string;
-    topHolders?: string[];
+    politicalSystem: string;
+    roleName: string;
+    roleScope: string;
   }
 ): Promise<ValidationResult> {
   const controller = new AbortController();
@@ -81,9 +81,9 @@ export async function validateSuggestionStrict(
         era: roleCtx?.era || "",
         settingType: roleCtx?.settingType || "",
         year: roleCtx?.year || "",
-        roleScope: roleCtx?.roleScope || "",
-        challengerName: roleCtx?.challengerName || "",
-        topHolders: roleCtx?.topHolders || [],
+        politicalSystem: roleCtx?.politicalSystem || "",
+        roleName: roleCtx?.roleName || "",
+        roleScope: roleCtx?.roleScope || ""
       }),
       signal: controller.signal,
     });

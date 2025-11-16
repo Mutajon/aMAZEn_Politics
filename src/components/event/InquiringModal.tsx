@@ -55,7 +55,8 @@ function validateQuestion(q: string): { valid: boolean; message: string } {
     return { valid: false, message: "Question must be 200 characters or less" };
   }
 
-  const letterCount = (trimmed.match(/[a-zA-Z]/g) || []).length;
+  // Support both English and Hebrew letters
+  const letterCount = (trimmed.match(/[a-zA-Z\u0590-\u05FF]/g) || []).length;
   if (letterCount < 3) {
     return { valid: false, message: "Question must contain at least 3 letters" };
   }

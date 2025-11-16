@@ -2,32 +2,31 @@
 // Loading overlay for EventDataCollector
 //
 // Shows:
-// - Spinning hourglass animation
-// - Days left bar (starts at totalDays, empties with each day)
-// - Loading message
+// - Video background (role-specific)
+// - Minimal loading indicator at bottom:
+//   * Spinner + percentage
+//   * Rotating gameplay tips
 //
 // Used by: EventScreen3 during data collection
-// Props: day, totalDays
+// Props: progress
 
 import { useMemo } from "react";
-import { Hourglass } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useRoleStore } from "../../store/roleStore";
-import { useRotatingLeader } from "../../hooks/useRotatingLeader";
-import LeaderProfileCard from "./LeaderProfileCard";
+import { useRotatingTips } from "../../hooks/useRotatingTips";
 import { VideoBackground } from "./VideoBackground";
 import { getRoleVideoPath } from "../../data/predefinedRoles";
 import { motion } from "framer-motion";
 
 type Props = {
   progress: number; // 0-100 real-time progress percentage (REQUIRED)
-  message?: string;
+  message?: string; // Kept for backwards compatibility, not displayed
 };
 
 export default function CollectorLoadingOverlay({
   progress,
-  message = "Gathering political intelligence..."
 }: Props) {
-  const { currentLeader, currentRank, fadeState } = useRotatingLeader();
+  const { currentTip, fadeState } = useRotatingTips();
 
   // Get role background image from store
   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
@@ -45,68 +44,42 @@ export default function CollectorLoadingOverlay({
     return imageId ? getRoleVideoPath(imageId) : '';
   }, [imageId]);
 
+  // Opacity values for fade transitions
+  const tipOpacity = fadeState === 'in' || fadeState === 'out' ? 0 : 1;
+
   return (
     <motion.div
       initial={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.5 }}
-      className="min-h-screen flex items-center justify-center relative"
+      className="min-h-screen flex items-end justify-center relative pb-20"
     >
       {/* Video background (with fallback to static image) */}
       <VideoBackground videoPath={videoPath} imagePath={roleBackgroundImage} />
-      {/* Golden frame container wrapping all loading content - positioned above video */}
-      <div className="rounded-2xl border-slate-700/50 bg-black/60 backdrop-blur-sm ring-1 ring-amber-400/40 p-8 shadow-xl max-w-2xl relative z-10">
-        <div className="text-center">
-          {/* Spinning Hourglass - Golden Yellow */}
-          <div className="flex justify-center mb-6">
-            <div className="relative">
-              <Hourglass
-                className="w-16 h-16 text-amber-400 animate-spin"
-                style={{ animationDuration: "2s" }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-amber-300/10 to-transparent animate-pulse" />
-            </div>
-          </div>
 
-          {/* Loading Message */}
-          <p className="text-white/90 text-lg font-medium mb-4">
-            {message}
+      {/* Minimal loading indicator - positioned at lower part */}
+      <div className="relative z-10 flex flex-col items-center gap-4">
+        {/* Spinner + Percentage */}
+        <div className="flex items-center gap-3">
+          <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
+          <p className="text-xl font-medium text-white/95 tabular-nums">
+            {Math.round(progress)}%
           </p>
-
-          {/* Collection Progress Percentage */}
-          <div className="mb-10">
-            <p className="text-6xl font-bold text-white/95 tabular-nums">
-              {Math.round(progress)}%
-            </p>
-          </div>
-
-          {/* Hall of Fame Section */}
-          <div className="mb-6 mt-8">
-            {/* Title */}
-            <h3 className="text-lg uppercase tracking-wide text-amber-300/90 mb-6">
-              Top Hall of Famers:
-            </h3>
-
-            {/* Leader Profile Card */}
-            <div className="min-h-[160px] flex items-center justify-center">
-              <LeaderProfileCard leader={currentLeader} rank={currentRank} fadeState={fadeState} />
-            </div>
-          </div>
-
-          {/* Pulsing dots */}
-          <div className="flex justify-center gap-1">
-            {[0, 1, 2].map(i => (
-              <div
-                key={i}
-                className="w-2 h-2 rounded-full bg-amber-400/60 animate-pulse"
-                style={{
-                  animationDelay: `${i * 0.2}s`,
-                  animationDuration: "1.4s"
-                }}
-              />
-            ))}
-          </div>
         </div>
+
+        {/* Rotating Tips with Radial Gradient Background */}
+        <motion.div
+          animate={{ opacity: tipOpacity }}
+          transition={{ duration: 0.5 }}
+          className="relative px-8 py-3 max-w-md text-center"
+          style={{
+            background: 'radial-gradient(ellipse at center, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 100%)',
+          }}
+        >
+          <p className="text-sm text-white/90 leading-relaxed">
+            {currentTip}
+          </p>
+        </motion.div>
       </div>
     </motion.div>
   );

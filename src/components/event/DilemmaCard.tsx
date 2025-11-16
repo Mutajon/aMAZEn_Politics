@@ -10,10 +10,10 @@
 // - src/components/event/InquiringModal.tsx: Modal UI
 // - src/data/experimentConfig.ts: Treatment-based feature gating
 //
-// 🔧 Easy knobs (edit these first):
-const TITLE_CLASS = "text-base font-semibold text-white/95";
-const DESC_CLASS  = "text-[13px] leading-snug text-white/85";
-const CARD_PAD    = "px-3 py-3"; // overall padding
+// 🔧 Easy knobs (edit these first - Mobile-first responsive):
+const TITLE_CLASS = "text-sm md:text-base font-semibold text-white/95";
+const DESC_CLASS  = "text-[12px] md:text-[13px] leading-snug text-white/85";
+const CARD_PAD    = "px-2 py-2 md:px-3 md:py-3"; // overall padding (mobile → desktop)
 const CARD_TONE   = "border-slate-700/50 bg-black/60 backdrop-blur-sm ring-1 ring-amber-400/40 rounded-2xl shadow-sm";
 
 import { motion } from "framer-motion";
@@ -95,23 +95,22 @@ export default function DilemmaCard({ title, description, speaker, speakerDescri
     <>
       {/* Speaker Avatar + Dilemma Card Layout - "Breaking the Frame" Design */}
       <motion.div
-        className={`relative ${CARD_TONE} ${CARD_PAD}`}
+        className={`relative ${CARD_TONE} ${CARD_PAD} ${showSpeaker ? 'pl-[80px] md:pl-[130px]' : ''}`}
         style={{
           overflow: 'visible', // Allow avatar to extend beyond boundaries
-          paddingLeft: showSpeaker ? '100px' : undefined // Space for avatar with ~40px gap
         }}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "tween", duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         aria-label="Current dilemma"
       >
-        {/* Speaker Avatar - positioned absolutely to jut out of card boundaries */}
+        {/* Speaker Avatar - positioned absolutely to jut out of card boundaries (smaller on mobile) */}
         {showSpeaker && (
           <div
             className="absolute"
             style={{
-              left: '-60px',  // Juts out 60px to the left (moved 20px more)
-              top: '-20px',   // Juts out 20px above the card
+              left: '-15px',  // Reduced protrusion for tighter composition
+              top: '5px',     // Moved down for better vertical alignment
               zIndex: 10      // Ensure avatar appears above card background
             }}
           >
@@ -119,35 +118,38 @@ export default function DilemmaCard({ title, description, speaker, speakerDescri
               speakerName={speakerName}
               imageId={speakerImageId}
               onClick={handleSpeakerClick}
+              size={100}  // Smaller avatar for mobile (100px instead of 180px)
             />
           </div>
         )}
 
-        {/* Dilemma Content */}
-        <div className={TITLE_CLASS}>{title}</div>
-        <p className={`mt-1 ${DESC_CLASS}`}>{description}</p>
+        {/* Dilemma Content - with left margin to prevent speaker avatar overlap */}
+        <div className={showSpeaker ? 'ml-4 md:ml-6' : ''}>
+          <div className={TITLE_CLASS}>{title}</div>
+          <p className={`mt-1 ${DESC_CLASS}`}>{description}</p>
 
-        {/* Inquiry Button - positioned at bottom of card */}
-        {showInquiryButton && (
-          <motion.button
-            onClick={openModal}
-            disabled={!hasCredits}
-            className={`
-              mt-3 w-full px-4 py-2 rounded-lg font-semibold text-sm
-              transition-all duration-200 flex items-center justify-center gap-2
-              ${hasCredits
-                ? 'bg-yellow-500/90 hover:bg-yellow-400 text-gray-900 hover:shadow-lg'
-                : 'bg-gray-600/50 text-gray-400 cursor-not-allowed'}
-            `}
-            whileHover={hasCredits ? { scale: 1.02 } : {}}
-            whileTap={hasCredits ? { scale: 0.98 } : {}}
-          >
-            <MessageCircle className="w-4 h-4" />
-            <span>
-              Inquire more {hasCredits && `(${inquiryCreditsRemaining})`}
-            </span>
-          </motion.button>
-        )}
+          {/* Inquiry Button - positioned at bottom of card */}
+          {showInquiryButton && (
+            <motion.button
+              onClick={openModal}
+              disabled={!hasCredits}
+              className={`
+                mt-3 w-full px-4 py-2 rounded-lg font-semibold text-sm
+                transition-all duration-200 flex items-center justify-center gap-2
+                ${hasCredits
+                  ? 'bg-yellow-500/90 hover:bg-yellow-400 text-gray-900 hover:shadow-lg'
+                  : 'bg-gray-600/50 text-gray-400 cursor-not-allowed'}
+              `}
+              whileHover={hasCredits ? { scale: 1.02 } : {}}
+              whileTap={hasCredits ? { scale: 0.98 } : {}}
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>
+                Inquire more {hasCredits && `(${inquiryCreditsRemaining})`}
+              </span>
+            </motion.button>
+          )}
+        </div>
       </motion.div>
 
       {/* Inquiry Modal */}

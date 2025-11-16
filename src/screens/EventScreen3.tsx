@@ -23,7 +23,7 @@ import ResourceBar, { type ResourceBarScoreDetails } from "../components/event/R
 import SupportList from "../components/event/SupportList";
 import { DynamicParameters, buildDynamicParamsItems } from "../components/event/DynamicParameters";
 import DilemmaCard from "../components/event/DilemmaCard";
-import MirrorWithAvatar from "../components/event/MirrorWithAvatar";
+import MirrorCard from "../components/event/MirrorCard";
 import CompassPillsOverlay from "../components/event/CompassPillsOverlay";
 import CorruptionPill from "../components/event/CorruptionPill";
 import ActionDeck, { type ActionCard } from "../components/event/ActionDeck";
@@ -792,7 +792,7 @@ export default function EventScreen3({ push }: Props) {
     );
 
     return (
-      <div className="min-h-screen p-6 pb-24" style={roleBgStyle}>
+      <div className="min-h-screen p-4 pb-20 md:p-6 md:pb-24" style={roleBgStyle}>
         {/* Debug: Jump to Final Day button */}
         {debugMode && day < 7 && phase === 'interacting' && (
           <button
@@ -804,7 +804,7 @@ export default function EventScreen3({ push }: Props) {
           </button>
         )}
 
-        <div className="max-w-3xl mx-auto space-y-3">
+        <div className="max-w-3xl mx-auto space-y-2 md:space-y-3">
           {/* Step 0+: ResourceBar (always visible) */}
           {presentationStep >= 0 && (
             <ResourceBar
@@ -815,6 +815,7 @@ export default function EventScreen3({ push }: Props) {
               goalStatus={roleProgress?.status ?? "uncompleted"}
               score={score}
               scoreDetails={scoreDetails}
+              avatarSrc={character?.avatarUrl || null}
             />
           )}
 
@@ -869,12 +870,11 @@ export default function EventScreen3({ push }: Props) {
             </>
           )}
 
-          {/* Step 5+: MirrorWithAvatar with Compass Pills Overlay (skip if game end) */}
+          {/* Step 5+: MirrorCard with Compass Pills Overlay (skip if game end) */}
           {!isGameEnd && presentationStep >= 5 && collectedData && (
             <div className="relative">
-              <MirrorWithAvatar
+              <MirrorCard
                 text={collectedData.mirrorText}
-                avatarSrc={character?.avatarUrl || null}
                 // onExploreClick temporarily removed - navigation bugs prevent safe return to EventScreen
               />
               {/* Compass Pills Overlay - appears at Step 4A (Day 2+) */}

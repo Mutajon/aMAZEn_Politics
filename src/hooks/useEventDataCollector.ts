@@ -276,6 +276,35 @@ async function fetchGameTurn(): Promise<{
   const useXAI = useSettingsStore.getState().useXAI;
   payload.useXAI = useXAI;
 
+  // Day 1: Initialize compass conversation with game context
+  if (day === 1 && payload.gameContext) {
+    try {
+      console.log(`[fetchGameTurn] Initializing compass conversation for gameId=${currentGameId}`);
+      const compassInitResponse = await fetch("/api/compass-conversation/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gameId: currentGameId,
+          gameContext: {
+            setting: payload.gameContext.setting,
+            role: payload.gameContext.role,
+            systemName: payload.gameContext.systemName
+          },
+          debugMode
+        })
+      });
+
+      if (!compassInitResponse.ok) {
+        console.warn(`[fetchGameTurn] Compass conversation init failed (${compassInitResponse.status}) - will fallback to non-stateful analysis`);
+      } else {
+        console.log(`[fetchGameTurn] ✅ Compass conversation initialized successfully`);
+      }
+    } catch (error) {
+      console.warn(`[fetchGameTurn] Compass conversation init error:`, error);
+      // Non-fatal - compass analysis will fall back to non-stateful mode
+    }
+  }
+
   console.log(`[fetchGameTurn] Calling /api/game-turn-v2 for Day ${day}, gameId=${currentGameId}, treatment=${treatment}, generateActions=${payload.generateActions}, useXAI=${useXAI}`);
 
   const response = await fetch("/api/game-turn-v2", {
@@ -577,10 +606,32 @@ export async function fetchCompassHintsForAction(
   action: { title: string; summary: string }
 ): Promise<CompassPill[]> {
   try {
-    const response = await fetch("/api/compass-hints", {
+    // Get game context and debug mode from stores
+    const roleState = useRoleStore.getState();
+    const debugMode = useSettingsStore.getState().debugMode;
+
+    // Build context for compass analysis
+    const setting = roleState.roleIntro
+      ? roleState.roleIntro.split('.')[0]
+      : `${roleState.selectedRole || "Unknown role"}, ${roleState.roleYear || "Unknown era"}`;
+
+    const gameContext = {
+      setting,
+      role: roleState.roleScope,
+      systemName: roleState.analysis?.systemName || "Divine Right Monarchy"
+    };
+
+    console.log(`[fetchCompassHintsForAction] Calling /api/compass-conversation/analyze for gameId=${gameId}`);
+
+    const response = await fetch("/api/compass-conversation/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gameId, action })
+      body: JSON.stringify({
+        gameId,
+        action,
+        gameContext,
+        debugMode
+      })
     });
 
     if (!response.ok) {
@@ -591,7 +642,7 @@ export async function fetchCompassHintsForAction(
     const data = await response.json();
     return transformCompassHints(data?.compassHints);
   } catch (error) {
-    console.error("[fetchGameTurn] ⚠️ Compass hints request failed:", error);
+    console.error("[fetchCompassHintsForAction] ⚠️ Compass hints request failed:", error);
     return [];
   }
 }

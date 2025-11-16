@@ -95,7 +95,7 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
   };
 
   return (
-    <div className="min-h-dvh w-full" style={roleBgStyle}>
+    <div className="min-h-dvh w-full safe-top safe-bottom" style={roleBgStyle}>
       <LoadingOverlay visible={fetchState === "loading"} title={lang("ANALYZING_YOUR_WORLD")} quotes={quotes} />
 
       <PowerDistributionContent

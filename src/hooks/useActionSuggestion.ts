@@ -30,20 +30,18 @@ function getRoleContext(): {
   era: string;
   settingType: string;
   year: string;
+  politicalSystem: string;
+  roleName: string;
   roleScope: string;
-  challengerName: string;
-  topHolders: string[];
 } {
   const roleStore = useRoleStore.getState();
   const era = roleStore.analysis?.grounding?.era || "";
   const settingType = roleStore.analysis?.grounding?.settingType || "unclear";
   const year = roleStore.roleYear || "";
+  const politicalSystem = roleStore.analysis?.polityType || roleStore.systemName || "";
+  const roleName = roleStore.selectedRole || roleStore.customRole || "";
   const roleScope = roleStore.roleScope || roleStore.analysis?.roleScope || "";
-  const challengerName = roleStore.analysis?.challengerSeat?.name || "";
-  const holders = Array.isArray(roleStore.analysis?.holders)
-    ? roleStore.analysis!.holders.slice(0, 4).map((h) => h.name).filter(Boolean)
-    : [];
-  return { era, settingType, year, roleScope, challengerName, topHolders: holders };
+  return { era, settingType, year, politicalSystem, roleName, roleScope };
 }
 
 // Gated debug logger (Settings → Debug mode)
@@ -100,20 +98,31 @@ export function useActionSuggestion({
 
       const ctx = getDilemmaContext(dilemma);
       const roleCtx = getRoleContext();
-      debugLog("validateSuggestionStrict -> request", {
-        hasProp: Boolean(dilemma),
-        titleLen: ctx.title.length,
-        descriptionLen: ctx.description.length,
-        roleEra: roleCtx.era,
-        roleYear: roleCtx.year,
-        roleScopePreview: roleCtx.roleScope.slice(0, 80),
+
+      // Enhanced debug logging - show full request payload
+      debugLog("=== VALIDATION REQUEST ===");
+      debugLog("Player text:", trimmedText);
+      debugLog("Request payload:", {
+        text: trimmedText,
+        title: ctx.title,
+        description: ctx.description,
+        era: roleCtx.era,
+        year: roleCtx.year,
+        settingType: roleCtx.settingType,
+        politicalSystem: roleCtx.politicalSystem,
+        roleName: roleCtx.roleName,
+        roleScope: roleCtx.roleScope
       });
 
       const result = await validateSuggestionStrict(trimmedText, ctx, roleCtx);
-      debugLog("validateSuggestionStrict -> response", result);
+
+      // Enhanced debug logging - show full response
+      debugLog("=== VALIDATION RESPONSE ===");
+      debugLog("Valid:", result.valid);
+      debugLog("Reason:", result.reason);
+      debugLog("Full response:", result);
 
       if (!result.valid) {
-        debugLog("validateSuggestionStrict -> invalid", result.reason || "(no reason)");
         setSuggestError(result.reason || "Please refine your suggestion so it clearly relates to the dilemma.");
         setValidatingSuggest(false);
         return false;

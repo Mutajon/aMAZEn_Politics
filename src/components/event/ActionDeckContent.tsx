@@ -17,13 +17,13 @@ import { useLogger } from "../../hooks/useLogger";
 import { getTreatmentConfig, type TreatmentType } from "../../data/experimentConfig";
 import { useSettingsStore } from "../../store/settingsStore";
 
-// Visual constants
+// Visual constants (Mobile-first responsive)
 const ENTER_STAGGER = 0.12;
 const ENTER_DURATION = 0.36;
 
-const CARD_TITLE_CLASS = "text-[14px] font-semibold text-white";
-const CARD_DESC_CLASS = "text-[12.5px] leading-snug text-white/95";
-const CARD_PAD = "p-3";
+const CARD_TITLE_CLASS = "text-[12px] md:text-[14px] font-semibold text-white";
+const CARD_DESC_CLASS = "text-[11px] md:text-[12.5px] leading-snug text-white/95";
+const CARD_PAD = "p-2 md:p-3";
 const CARD_BASE = "rounded-2xl ring-1 ring-white/20 shadow-sm";
 
 const CONFIRM_BTN_CLASS =
@@ -191,9 +191,9 @@ export default function ActionDeckContent({
           animate="show"
           variants={{ hidden: {}, show: { transition: { staggerChildren: ENTER_STAGGER } } }}
         >
-        {/* Cards row (3 columns) - TREATMENT: semiAutonomy & noAutonomy show AI options */}
+        {/* Cards row (responsive: 1 col mobile, 2 col tablet, 3 col desktop) - TREATMENT: semiAutonomy & noAutonomy show AI options */}
         {config.showAIOptions && cards.length > 0 && (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
             {cards.map((c) => {
               const isSelected = selectedCard?.id === c.id;
               const disabled = Boolean(confirmingId) || !c.affordable;
@@ -246,7 +246,7 @@ export default function ActionDeckContent({
                       <Coins className="w-3.5 h-3.5 text-amber-300" />
                       <span
                         className={[
-                          "text-[11px] font-semibold",
+                          "text-[9px] md:text-[11px] font-semibold",
                           !c.affordable && (c.cost ?? 0) < 0 ? "text-rose-100" : (c.cost ?? 0) >= 0 ? "text-emerald-100" : "text-white",
                         ].join(" ")}
                       >
@@ -416,6 +416,10 @@ export default function ActionDeckContent({
                     </div>
                   )}
                 </div>
+
+                <p className="text-sm text-cyan-400/70 mb-2 mt-2" dir="rtl">
+                  אפשר להקליד בעברית
+                </p>
 
                 <div className="mt-3">
                   <input

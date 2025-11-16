@@ -175,8 +175,8 @@ export const useSettingsStore = create<SettingsState>()(
       setExperimentMode: (v) => set({ experimentMode: v }),
       toggleExperimentMode: () => set({ experimentMode: !get().experimentMode }),
 
-      // NEW: Corruption tracking (default OFF)
-      corruptionTrackingEnabled: false,
+      // NEW: Corruption tracking (default ON)
+      corruptionTrackingEnabled: true,
       setCorruptionTrackingEnabled: (v) => set({ corruptionTrackingEnabled: v }),
       toggleCorruptionTrackingEnabled: () => set({ corruptionTrackingEnabled: !get().corruptionTrackingEnabled }),
     }),

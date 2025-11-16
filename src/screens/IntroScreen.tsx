@@ -1,134 +1,152 @@
 // src/screens/IntroScreen.tsx
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { bgStyleWithMaze } from "../lib/ui";
+import { motion } from "framer-motion";
 import type { PushFn } from "../lib/router";
-import { lang } from "../i18n/lang";
 import { useLogger } from "../hooks/useLogger";
+import Gatekeeper from "../components/Gatekeeper";
 
-// Animated word component for cycling through synonyms
-function AnimatedWord() {
-  const words = [
-    "shifting",
-    "drifting",
-    "transitioning",
-    "evolving",
-    "morphing",
-    "emerging",
-    "flowing",
-    "unfolding",
-  ];
+const dialogLines = [
+  "Oh, Another one. Lost.",
+  "I can see it in your eyes. The blank confusion of a soul Name-Washed.",
+  "You don't remember where you are, or who you were. That's a problem.",
+  "I am the Gatekeeper, and this is the Crossroad of Consciousness. Where the people transition from the world of the living to their eternal rest.",
+  "Yes, you are dead. My condolences.",
+  "But your bigger issue is the Amnesia of the Self. You cannot proceed to rest until you recall your true nature.",
+  "That's where I come in.",
+  "I offer you a short trip back to the world of the living. Seven days. Be whoever you want.",
+  "A chance to test your values, remember who you are.",
+  "Each life gives you a fragment of who you truly were.",
+  "Gather three such Fragments, and your true Name will be woven. Your self will be complete.",
+  "What's the catch?",
+  "I come with you. Every decision you make, every motive you hide, I will observe and collect.",
+  "I need it to pay an old, lingering debt and finally leave this place.",
+  "So. Interested?",
+  "Good. Because you don't really have a choice.",
+  "Let me know when you're ready.",
+];
 
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % words.length);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <span className="inline-block relative mx-1" style={{ minWidth: "120px" }}>
-      <AnimatePresence mode="wait">
-        <motion.span
-          key={currentIndex}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.4 }}
-          className="absolute inset-0 text-amber-300"
-        >
-          {words[currentIndex]}
-        </motion.span>
-      </AnimatePresence>
-      {/* Invisible placeholder to maintain width */}
-      <span className="invisible">{words[0]}</span>
-    </span>
-  );
-}
+// Background style using etherplace.jpg
+const etherPlaceBackground = {
+  backgroundImage: "url('/assets/images/BKGs/etherPlace.jpg')",
+  backgroundSize: "cover",
+  backgroundPosition: "center",
+  backgroundRepeat: "no-repeat",
+};
 
 export default function IntroScreen({ push }: { push: PushFn }) {
   const logger = useLogger();
-  const paragraphs = [
-    lang("INTRO_READY_TO_BE_AMAZED"),
-    lang("INTRO_LIFE_BRANCHING"),
-    lang("INTRO_MAZE_POLITICS"),
-    lang("INTRO_KNOW_YOURSELF"),
-    lang("INTRO_READY_TO_PICK"),
-  ];
+  const [showGatekeeper, setShowGatekeeper] = useState(false);
+  const [currentLineIndex, setCurrentLineIndex] = useState(0);
+  const [isLastLine, setIsLastLine] = useState(false);
 
-  const [visibleCount, setVisibleCount] = useState(0);
-
+  // Show gatekeeper after 1 second delay
   useEffect(() => {
-    if (visibleCount < paragraphs.length) {
-      const t = setTimeout(() => setVisibleCount((c) => c + 1), 1500);
-      return () => clearTimeout(t);
-    }
-  }, [visibleCount, paragraphs.length]);
+    const timer = setTimeout(() => {
+      setShowGatekeeper(true);
+      logger.logSystem(
+        "intro_gatekeeper_shown",
+        { delay: 1000 },
+        "Gatekeeper appeared on intro screen after 1 second delay"
+      );
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [logger]);
 
-  const allShown = visibleCount >= paragraphs.length;
-
-  // Helper to render text with animated "shifting" word
-  const renderTextWithAnimation = (text: string, index: number) => {
-    // Only apply animation to the maze politics paragraph
-    if (index === 2 && text.includes("shifting")) {
-      const parts = text.split("shifting");
-      return (
-        <>
-          {parts[0]}
-          <AnimatedWord />
-          {parts[1]}
-        </>
+  // Handle gatekeeper dismissal (click to advance)
+  const handleGatekeeperClick = () => {
+    if (currentLineIndex < dialogLines.length - 1) {
+      setCurrentLineIndex((prev) => prev + 1);
+      logger.log(
+        "intro_dialog_advanced",
+        { lineIndex: currentLineIndex + 1, lineText: dialogLines[currentLineIndex + 1] },
+        `Advanced to dialog line ${currentLineIndex + 2}/${dialogLines.length}`
+      );
+    } else {
+      // Reached last line - show "I'm ready" button
+      setIsLastLine(true);
+      logger.log(
+        "intro_dialog_completed",
+        { totalLines: dialogLines.length },
+        "User reached last dialog line"
       );
     }
-    return text;
+  };
+
+  // Handle skip button
+  const handleSkip = () => {
+    setCurrentLineIndex(dialogLines.length - 1);
+    setIsLastLine(true);
+    logger.log(
+      "intro_dialog_skipped",
+      { skippedFrom: currentLineIndex, totalLines: dialogLines.length },
+      `User skipped dialog from line ${currentLineIndex + 1} to last line`
+    );
+  };
+
+  // Handle "I'm ready" button
+  const handleReady = () => {
+    logger.log(
+      "button_click_im_ready",
+      { screen: "/intro" },
+      "User clicked 'I'm ready' button to proceed to role selection"
+    );
+    push("/role");
   };
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center px-5" style={bgStyleWithMaze}>
-      <div className="w-full max-w-md text-center space-y-5">
-        {paragraphs.map((text, i) => (
-          <motion.p
-            key={i}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: i < visibleCount ? 1 : 0 }}
-            transition={{ duration: 0.8 }}
-            className={
-              i === 0
-                ? "text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent"
-                : i === paragraphs.length - 1
-                ? "text-lg sm:text-xl bg-gradient-to-r from-indigo-200 via-violet-200 to-amber-200 bg-clip-text text-transparent"
-                : "text-lg sm:text-xl text-white/90"
-            }
-          >
-            {renderTextWithAnimation(text, i)}
-          </motion.p>
-        ))}
+    <div
+      className="min-h-[100dvh] flex items-center justify-center px-5 relative"
+      style={etherPlaceBackground}
+    >
+      {/* Gatekeeper with dialog */}
+      {showGatekeeper && (
+        <Gatekeeper
+          text={dialogLines[currentLineIndex]}
+          isVisible={true}
+          onDismiss={handleGatekeeperClick}
+          showHint={currentLineIndex === 0}
+        />
+      )}
 
-        <div className="mt-8 flex justify-center min-h-[60px]">
-          {allShown && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              transition={{
-                type: "spring",
-                stiffness: 300,
-                damping: 20
-              }}
-              onClick={() => {
-                logger.log('button_click', 'Yes!', 'User clicked Yes! button to proceed to role selection');
-                push("/role");
-              }}
-              className="rounded-full px-6 py-2 font-bold text-lg bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg"
-            >
-              {lang("YES!")}
-            </motion.button>
-          )}
-        </div>
-      </div>
+      {/* Skip button - shown until last line is reached */}
+      {showGatekeeper && !isLastLine && (
+        <motion.button
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.5, duration: 0.5 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSkip();
+          }}
+          className="fixed bottom-8 left-8 px-4 py-2 text-sm font-medium text-white/70 hover:text-white/90 underline underline-offset-2 transition-colors"
+          style={{ zIndex: 40 }}
+        >
+          Skip
+        </motion.button>
+      )}
+
+      {/* "I'm ready" button - shown when last line is reached */}
+      {isLastLine && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 20,
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleReady();
+          }}
+          className="fixed bottom-8 left-8 rounded-full px-8 py-3 font-bold text-lg bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg"
+          style={{ zIndex: 150 }}
+        >
+          I'm ready
+        </motion.button>
+      )}
     </div>
   );
 }
