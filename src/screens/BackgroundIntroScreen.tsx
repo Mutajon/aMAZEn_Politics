@@ -8,10 +8,9 @@ import type { PreparedTTS } from "../hooks/useNarrator";
 import { useSettingsStore } from "../store/settingsStore";
 import { useRoleStore } from "../store/roleStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
-import { useCompassStore } from "../store/compassStore";
 import { useLogger } from "../hooks/useLogger";
 import { useLang } from "../i18n/lang";
-import { COMPONENTS } from "../data/compass-data";
+import { useReserveGameSlot } from "../hooks/useReserveGameSlot";
 
 /**
  * Phases:
@@ -31,6 +30,8 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
   const lang = useLang();
   const narrator = useNarrator();
   const narrationEnabled = useSettingsStore((s) => s.narrationEnabled);
+  const experimentMode = useSettingsStore((s) => s.experimentMode);
+  const reserveGameSlotMutation = useReserveGameSlot();
 
   // Logging hook for data collection
   const logger = useLogger();
@@ -49,7 +50,18 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
   // Create role-based background style
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
 
-  const DEFAULT_LINE = lang("BACKGROUND_INTRO_DEFAULT_LINE");
+  // Get gender-aware translation keys
+  const getGenderKey = (baseKey: string): string => {
+    if (gender === "female") {
+      return `${baseKey}_FEMALE`;
+    } else if (gender === "male") {
+      return `${baseKey}_MALE`;
+    }
+    // For "any" or undefined, use the base key (which defaults to male form)
+    return baseKey;
+  };
+
+  const DEFAULT_LINE = useMemo(() => lang(getGenderKey("BACKGROUND_INTRO_DEFAULT_LINE")), [lang, gender]);
 
   const [phase, setPhase] = useState<Phase>("preparingDefault");
   const [para, setPara] = useState<string>("");
@@ -184,9 +196,27 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
 // eliminating the need for pre-seeded story threads
 
   // 2) Wake up → immediately transition to waitingForSeed phase
-  const onWake = () => {
+  const onWake = async () => {
     // Log player clicking "Wake up" button
     logger.log('button_click_wake_up', 'Wake up', 'User clicked Wake up button');
+
+    // Reserve game slot if experiment mode is enabled
+    if (experimentMode) {
+      try {
+        const result = await reserveGameSlotMutation.mutateAsync();
+        
+        if (!result.success) {
+          // Redirect to capped screen if reservation failed
+          push('/capped');
+          return;
+        }
+      } catch (error) {
+        console.error('[BackgroundIntro] Error reserving game slot:', error);
+        // Redirect to capped screen on error
+        push('/capped');
+        return;
+      }
+    }
 
     // Cancel prefetch if still running to prevent race condition
     if (fetchingIntroRef.current && prefetchAbortRef.current) {
@@ -247,14 +277,14 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
           if (!r.ok) {
             const detail = await r.text().catch(() => "");
             console.warn("Intro API error:", r.status, detail);
-            setPara("The morning arrives, but words fail to settle. Try again in a moment.");
+            setPara(lang(getGenderKey("BACKGROUND_INTRO_ERROR_MESSAGE")));
             setPhase("error");
             return;
           }
           const data = await r.json();
           const paragraph = (data?.paragraph || "").trim();
           if (!paragraph) {
-            setPara("The morning arrives, but words fail to settle. Try again in a moment.");
+            setPara(lang(getGenderKey("BACKGROUND_INTRO_ERROR_MESSAGE")));
             setPhase("error");
             return;
           }
@@ -263,7 +293,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
         } catch (e) {
           if ((e as any)?.name === "AbortError") return;
           console.warn("Intro generation error:", e);
-          setPara("The morning arrives, but words fail to settle. Try again in a moment.");
+          setPara(lang(getGenderKey("BACKGROUND_INTRO_ERROR_MESSAGE")));
           setPhase("error");
         }
       } finally {
@@ -384,7 +414,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
               
             >
               <h1 className="text-3xl sm:text-4xl font-extrabold leading-tight tracking-tight bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]">
-                Night Falls
+                {lang("BACKGROUND_INTRO_NIGHT_FALLS")}
               </h1>
 
               <p className="mt-3 text-white/80 bg-black/60 border border-amber-500/30 rounded-xl p-4">{DEFAULT_LINE}</p>
@@ -394,7 +424,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
                   className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
                   onClick={onWake}
                 >
-                  Wake up
+                  {lang(getGenderKey("BACKGROUND_INTRO_WAKE_UP"))}
                 </button>
               </div>
             </motion.div>
@@ -413,12 +443,12 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
               className="mt-4"
             >
               <h2 className="text-lg font-medium text-white/80">
-                Weaving the narrative…
+                {lang("BACKGROUND_INTRO_WEAVING_NARRATIVE")}
               </h2>
               <div className="mt-4 flex items-center gap-3 text-white/70">
                 <div className="h-5 w-5 rounded-full border-2 border-white/30 border-t-white animate-spin" aria-hidden />
                 <span>
-                  Preparing your story arc…
+                  {lang("BACKGROUND_INTRO_PREPARING_STORY_ARC")}
                 </span>
               </div>
             </motion.div>
@@ -437,14 +467,14 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
               className="mt-4"
             >
               <h2 className="text-lg font-medium text-white/80">
-                {phase === "loading" ? "Gathering the threads…" : "Warming the voice…"}
+                {phase === "loading" ? lang("BACKGROUND_INTRO_GATHERING_THREADS") : lang("BACKGROUND_INTRO_WARMING_VOICE")}
               </h2>
               <div className="mt-4 flex items-center gap-3 text-white/70">
                 <div className="h-5 w-5 rounded-full border-2 border-white/30 border-t-white animate-spin" aria-hidden />
                 <span>
                   {phase === "loading"
-                    ? `Shaping your first morning as ${roleText || "your role"}…`
-                    : "Preparing narration…"}
+                    ? lang("BACKGROUND_INTRO_SHAPING_MORNING").replace("{role}", roleText || lang("BACKGROUND_INTRO_YOUR_ROLE") || "your role")
+                    : lang("BACKGROUND_INTRO_PREPARING_NARRATION")}
                 </span>
               </div>
             </motion.div>
@@ -488,10 +518,10 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
                       className="h-4 w-4 rounded-full border-2 border-[#0b1335]/40 border-t-[#0b1335] animate-spin"
                       aria-hidden
                     />
-                    Preparing story…
+                    {lang("BACKGROUND_INTRO_PREPARING_STORY")}
                   </span>
                 ) : (
-                  lang("BACKGROUND_INTRO_BEGIN")
+                  lang(getGenderKey("BACKGROUND_INTRO_BEGIN"))
                 )}
               </button>
             </div>

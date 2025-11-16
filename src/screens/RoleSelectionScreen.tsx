@@ -106,6 +106,19 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const [checking, setChecking] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  // Scenario suggestion modal state
+  const [showScenarioModal, setShowScenarioModal] = useState(false);
+  const [scenarioForm, setScenarioForm] = useState({
+    title: "",
+    role: "",
+    settings: "",
+    introParagraph: "",
+    topicsToEmphasis: ""
+  });
+  const [scenarioSubmitting, setScenarioSubmitting] = useState(false);
+  const [scenarioSuccess, setScenarioSuccess] = useState(false);
+  const [scenarioError, setScenarioError] = useState("");
+
   // Click outside to collapse
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -138,6 +151,82 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
     setShowSuggestModal(false);
     setAiMsg("");
     setAiError("");
+  };
+
+  const openScenarioModal = () => {
+    setShowScenarioModal(true);
+    setScenarioForm({
+      title: "",
+      role: "",
+      settings: "",
+      introParagraph: "",
+      topicsToEmphasis: ""
+    });
+    setScenarioSuccess(false);
+    setScenarioError("");
+    logger.log('button_click', 'Suggest Scenario', 'User clicked Suggest Scenario button');
+  };
+
+  const closeScenarioModal = () => {
+    setShowScenarioModal(false);
+    setScenarioSuccess(false);
+    setScenarioError("");
+  };
+
+  const handleScenarioSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate required fields
+    if (!scenarioForm.title.trim() || !scenarioForm.role.trim() || !scenarioForm.settings.trim()) {
+      setScenarioError("Please fill in all required fields (Title, Role, Settings)");
+      return;
+    }
+
+    setScenarioSubmitting(true);
+    setScenarioError("");
+    setScenarioSuccess(false);
+
+    try {
+      const response = await fetch("/api/suggest-scenario", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: scenarioForm.title.trim(),
+          role: scenarioForm.role.trim(),
+          settings: scenarioForm.settings.trim(),
+          introParagraph: scenarioForm.introParagraph.trim() || undefined,
+          topicsToEmphasis: scenarioForm.topicsToEmphasis.trim() || undefined
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Failed to submit scenario suggestion");
+      }
+
+      setScenarioSuccess(true);
+      logger.log('scenario_suggestion_submitted', scenarioForm.title, 'User submitted scenario suggestion');
+
+      // Reset form after successful submission
+      setTimeout(() => {
+        setScenarioForm({
+          title: "",
+          role: "",
+          settings: "",
+          introParagraph: "",
+          topicsToEmphasis: ""
+        });
+        setScenarioSuccess(false);
+        closeScenarioModal();
+      }, 2000);
+    } catch (error: any) {
+      console.error("Error submitting scenario suggestion:", error);
+      setScenarioError(error.message || "Failed to submit scenario suggestion. Please try again.");
+      logger.log('scenario_suggestion_error', error.message, 'Error submitting scenario suggestion');
+    } finally {
+      setScenarioSubmitting(false);
+    }
   };
 
   const amusingFallbacks = [
@@ -400,7 +489,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                                 {/* "You are:" section */}
                                 <div className="pt-2 border-t border-slate-700/40">
                                   <p className="text-sm text-white/95">
-                                    <span className="font-semibold text-amber-300">You are:</span>{" "}
+                                    <span className="font-semibold text-amber-300">{lang("YOU_ARE")}</span>{" "}
                                     <span className="text-white/90">{role.youAre}</span>
                                   </p>
                                 </div>
@@ -472,18 +561,29 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
           })}
 
           {!experimentMode && (
-            <motion.div variants={itemVariants}>
-              <button
-                onClick={() => {
-                  logger.log('button_click', 'Suggest Your Own', 'User clicked "Suggest your own" button');
-                  openSuggest();
-                }}
-                className="w-full px-6 py-4 rounded-2xl bg-gradient-to-r from-purple-900/90 to-purple-700/90 hover:from-purple-800/95 hover:to-purple-700/95 text-white border border-purple-500/30 hover:border-purple-400/40 transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-3 shadow-xl"
-              >
-                <span className="text-xl leading-none">❓</span>
-                <span className="text-base font-medium tracking-wide drop-shadow-sm">{lang("SUGGEST_YOUR_OWN")}</span>
-              </button>
-            </motion.div>
+            <>
+              <motion.div variants={itemVariants}>
+                <button
+                  onClick={() => {
+                    logger.log('button_click', 'Suggest Your Own', 'User clicked "Suggest your own" button');
+                    openSuggest();
+                  }}
+                  className="w-full px-6 py-4 rounded-2xl bg-gradient-to-r from-purple-900/90 to-purple-700/90 hover:from-purple-800/95 hover:to-purple-700/95 text-white border border-purple-500/30 hover:border-purple-400/40 transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-3 shadow-xl"
+                >
+                  <span className="text-xl leading-none">❓</span>
+                  <span className="text-base font-medium tracking-wide drop-shadow-sm">{lang("SUGGEST_YOUR_OWN")}</span>
+                </button>
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <button
+                  onClick={openScenarioModal}
+                  className="w-full px-6 py-4 rounded-2xl bg-gradient-to-r from-blue-900/90 to-blue-700/90 hover:from-blue-800/95 hover:to-blue-700/95 text-white border border-blue-500/30 hover:border-blue-400/40 transition-all duration-300 active:scale-[0.98] flex items-center justify-center gap-3 shadow-xl"
+                >
+                  <span className="text-xl leading-none">💡</span>
+                  <span className="text-base font-medium tracking-wide drop-shadow-sm">Suggest a Scenario</span>
+                </button>
+              </motion.div>
+            </>
           )}
         </motion.div>
 
@@ -582,6 +682,166 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                     {checking ? lang("CHECKING") : lang("CONFIRM")}
                   </button>
                 </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Scenario Suggestion Modal */}
+        <AnimatePresence>
+          {showScenarioModal && (
+            <motion.div
+              className="fixed inset-0 z-50 grid place-items-center"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <div className="absolute inset-0 bg-black/60" onClick={closeScenarioModal} />
+              <motion.div
+                role="dialog"
+                aria-modal="true"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ type: "spring", stiffness: 300, damping: 24 }}
+                className="relative w-[92%] max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 bg-neutral-900/90 backdrop-blur border border-white/10 shadow-xl text-left"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  aria-label="Close"
+                  onClick={closeScenarioModal}
+                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 grid place-items-center text-white transition-colors"
+                >
+                  ×
+                </button>
+                <h3 className="text-2xl font-semibold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent mb-2">
+                  Suggest a Scenario
+                </h3>
+                <p className="text-white/80 text-sm mb-6">
+                  Help us expand the game by suggesting a new historical or fictional scenario. Your suggestion will be reviewed and may be added to the game.
+                </p>
+
+                <form onSubmit={handleScenarioSubmit} className="space-y-4">
+                  {/* Title (required) */}
+                  <div>
+                    <label className="block text-sm font-medium text-white/90 mb-2">
+                      Title <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={scenarioForm.title}
+                      onChange={(e) => setScenarioForm({ ...scenarioForm, title: e.target.value })}
+                      placeholder="e.g., The Great Depression"
+                      required
+                      className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
+                    />
+                  </div>
+
+                  {/* Role (required) */}
+                  <div>
+                    <label className="block text-sm font-medium text-white/90 mb-2">
+                      Role <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={scenarioForm.role}
+                      onChange={(e) => setScenarioForm({ ...scenarioForm, role: e.target.value })}
+                      placeholder="e.g., President"
+                      required
+                      className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
+                    />
+                  </div>
+
+                  {/* Settings (required) */}
+                  <div>
+                    <label className="block text-sm font-medium text-white/90 mb-2">
+                      Settings (Place + Time) <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={scenarioForm.settings}
+                      onChange={(e) => setScenarioForm({ ...scenarioForm, settings: e.target.value })}
+                      placeholder="e.g., USA during the 30s"
+                      required
+                      className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
+                    />
+                  </div>
+
+                  {/* Intro Paragraph (optional) */}
+                  <div>
+                    <label className="block text-sm font-medium text-white/90 mb-2">
+                      Intro Paragraph <span className="text-white/50 text-xs">(optional)</span>
+                    </label>
+                    <textarea
+                      value={scenarioForm.introParagraph}
+                      onChange={(e) => setScenarioForm({ ...scenarioForm, introParagraph: e.target.value })}
+                      placeholder="Describe the setting and role in an engaging way"
+                      rows={4}
+                      className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60 resize-none"
+                    />
+                  </div>
+
+                  {/* Topics to Emphasis (optional) */}
+                  <div>
+                    <label className="block text-sm font-medium text-white/90 mb-2">
+                      Topics to Emphasis <span className="text-white/50 text-xs">(optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={scenarioForm.topicsToEmphasis}
+                      onChange={(e) => setScenarioForm({ ...scenarioForm, topicsToEmphasis: e.target.value })}
+                      placeholder="e.g., equality, racial tensions, taxes"
+                      className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
+                    />
+                  </div>
+
+                  {/* Success message */}
+                  {scenarioSuccess && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 text-emerald-200 text-sm px-4 py-3"
+                      role="alert"
+                    >
+                      ✓ Scenario suggestion submitted successfully! Thank you for your contribution.
+                    </motion.div>
+                  )}
+
+                  {/* Error message */}
+                  {scenarioError && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-xl border border-red-400/40 bg-red-500/10 text-red-200 text-sm px-4 py-3"
+                      role="alert"
+                    >
+                      {scenarioError}
+                    </motion.div>
+                  )}
+
+                  {/* Form buttons */}
+                  <div className="flex gap-3 justify-end pt-4">
+                    <button
+                      type="button"
+                      onClick={closeScenarioModal}
+                      disabled={scenarioSubmitting}
+                      className="rounded-xl px-5 py-2.5 text-sm font-medium bg-white/10 text-white hover:bg-white/15 transition-colors disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={scenarioSubmitting || !scenarioForm.title.trim() || !scenarioForm.role.trim() || !scenarioForm.settings.trim()}
+                      className={`rounded-xl px-5 py-2.5 text-sm font-semibold shadow transition-all ${
+                        scenarioSubmitting || !scenarioForm.title.trim() || !scenarioForm.role.trim() || !scenarioForm.settings.trim()
+                          ? "bg-amber-300/40 text-[#0b1335]/60 cursor-not-allowed"
+                          : "bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] hover:from-amber-400 hover:to-amber-600"
+                      }`}
+                    >
+                      {scenarioSubmitting ? "Submitting..." : "Submit Suggestion"}
+                    </button>
+                  </div>
+                </form>
               </motion.div>
             </motion.div>
           )}

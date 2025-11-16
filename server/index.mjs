@@ -18,7 +18,7 @@ import {
   detectKeywordHints,
   formatKeywordHintsForPrompt
 } from "./compassKeywordDetector.mjs";
-import { getCountersCollection, incrementCounter, getUsersCollection } from "./db/mongodb.mjs";
+import { getCountersCollection, incrementCounter, getUsersCollection, getScenarioSuggestionsCollection } from "./db/mongodb.mjs";
 
 // -------------------- Process Error Handlers ---------------------------
 /**
@@ -87,13 +87,32 @@ app.use(bodyParser.json());
 const GAME_LIMIT = 100;
 
 /**
- * Randomly assign treatment to ensure balanced distribution
- * @returns {string} One of: 'fullAutonomy', 'semiAutonomy', 'noAutonomy'
+ * Adaptively assign treatment to ensure balanced distribution
+ * Selects from treatments with the minimum count, ensuring even distribution
+ * @returns {Promise<string>} One of: 'fullAutonomy', 'semiAutonomy', 'noAutonomy'
  */
-function assignRandomTreatment() {
+async function assignRandomTreatment() {
   const treatments = ['fullAutonomy', 'semiAutonomy', 'noAutonomy'];
-  const randomIndex = Math.floor(Math.random() * treatments.length);
-  return treatments[randomIndex];
+  const countersCollection = await getCountersCollection();
+  
+  // Get current counts for all treatments
+  const counts = {};
+  for (const treatment of treatments) {
+    const counterName = `treatment_${treatment}`;
+    const counter = await countersCollection.findOne({ name: counterName });
+    counts[treatment] = counter?.value || 0;
+  }
+  
+  // Find the minimum count
+  const minCount = Math.min(...Object.values(counts));
+  const underrepresented = treatments.filter(t => counts[t] === minCount);
+  const selected = underrepresented[
+    Math.floor(Math.random() * underrepresented.length)
+  ];
+  
+  await incrementCounter(`treatment_${selected}`);
+  
+  return selected;
 }
 
 // -------------------- User Registration & Treatment Assignment --------------------
@@ -140,8 +159,8 @@ app.post("/api/users/register", async (req, res) => {
       });
     }
 
-    // New user - assign random treatment
-    const treatment = assignRandomTreatment();
+    // New user - assign adaptive treatment
+    const treatment = await assignRandomTreatment();
     const now = new Date();
 
     const newUser = {
@@ -1087,6 +1106,82 @@ app.post("/api/bg-suggestion", async (req, res) => {
   }
 });
 
+// -------------------- Scenario Suggestion Endpoint --------------------
+/**
+ * POST /api/suggest-scenario
+ * Save a user-submitted scenario suggestion to the database
+ * 
+ * Body: {
+ *   title: string (required),
+ *   role: string (required),
+ *   settings: string (required) - includes place + time,
+ *   introParagraph?: string (optional),
+ *   topicsToEmphasis?: string (optional)
+ * }
+ * 
+ * Returns: {
+ *   success: boolean,
+ *   message: string
+ * }
+ */
+app.post("/api/suggest-scenario", async (req, res) => {
+  try {
+    const { title, role, settings, introParagraph, topicsToEmphasis } = req.body || {};
+
+    // Validate required fields
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Title is required' 
+      });
+    }
+
+    if (!role || typeof role !== 'string' || role.trim().length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Role is required' 
+      });
+    }
+
+    if (!settings || typeof settings !== 'string' || settings.trim().length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Settings (place + time) is required' 
+      });
+    }
+
+    // Get the scenario suggestions collection
+    const collection = await getScenarioSuggestionsCollection();
+
+    // Create the document
+    const suggestion = {
+      title: title.trim(),
+      role: role.trim(),
+      settings: settings.trim(),
+      introParagraph: introParagraph?.trim() || null,
+      topicsToEmphasis: topicsToEmphasis?.trim() || null,
+      createdAt: new Date(),
+      status: 'pending' // For future use
+    };
+
+    // Insert into database
+    await collection.insertOne(suggestion);
+
+    console.log(`[API] Scenario suggestion saved: ${title}`);
+
+    return res.json({
+      success: true,
+      message: 'Scenario suggestion saved successfully'
+    });
+  } catch (error) {
+    console.error("Error in /api/suggest-scenario:", error?.message || error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to save scenario suggestion'
+    });
+  }
+});
+
 // -------------------- Challenger Seat Selection Helper ---------------
 /**
  * Select the Challenger Seat (top non-player structured seat)
@@ -1608,16 +1703,15 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
     const useAnthropic = !!req.body?.useAnthropic;
     const topWhat = Array.isArray(req.body?.topWhat) ? req.body.topWhat.slice(0, 2) : [];
     const topWhence = Array.isArray(req.body?.topWhence) ? req.body.topWhence.slice(0, 2) : [];
+    const systemPrompt = req.body?.systemPrompt; // Get translated system prompt from client
+    const userPrompt = req.body?.userPrompt; // Get translated user prompt from client
 
     if (topWhat.length < 2 || topWhence.length < 2) {
       return res.status(400).json({ error: "Need at least 2 top values for both 'what' and 'whence'" });
     }
 
-    const [what1, what2] = topWhat;
-    const [whence1, whence2] = topWhence;
-
-    // === System prompt: dry wit, but no literal label dump, no numbers, no "values doing actions" ===
-    const system =
+    // Use translated prompts if provided, otherwise fall back to English defaults
+    const system = systemPrompt ||
       "You are a magical mirror sidekick bound to the player's soul. You reflect their inner values with warmth, speed, and theatrical charm.\n\n" +
       "VOICE:\n" +
       "- Succinct, deadpan, and a little wry; think quick backstage whisper, not stage show.\n" +
@@ -1628,12 +1722,15 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
       "- NEVER reveal numbers, scores, scales, or ranges.\n" +
       "- NEVER repeat the value labels verbatim; do not quote, uppercase, or mirror slashes.\n" +
       "- Paraphrase technical labels into plain, everyday phrases.\n" +
-      "- Do NOT stage literal actions for values (no “X is doing push-ups”, “baking cookies”, etc.).\n" +
+      "- Do NOT stage literal actions for values (no X is doing push-ups, baking cookies, etc.).\n" +
       "- No lists, no colons introducing items, no parenthetical asides.\n" +
       "- Keep the sentence clear first, witty second.\n";
 
-    // === User prompt: pass names only (no strengths), ask for paraphrased synthesis ===
-    const user =
+    const [what1, what2] = topWhat;
+    const [whence1, whence2] = topWhence;
+
+    // Use translated user prompt if provided, otherwise fall back to English default
+    const user = userPrompt ||
       `PLAYER TOP VALUES (names only):\n` +
       `GOALS: ${what1.name}, ${what2.name}\n` +
       `JUSTIFICATIONS: ${whence1.name}, ${whence2.name}\n\n` +
@@ -1646,7 +1743,11 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
       : await aiText({ system, user, model: MODEL_MIRROR });
 
     // === Last-mile sanitizer: keep one sentence and clamp word count ===
-    const raw = (text || "The mirror squints… then grins mischievously.").trim();
+    // Use appropriate fallback based on language (detect from prompt or default to English)
+    const fallbackText = systemPrompt && systemPrompt.includes("אתה שותף מראה") 
+      ? "המראה מצמצת… ואז מחייכת בערמומיות."
+      : "The mirror squints… then grins mischievously.";
+    const raw = (text || fallbackText).trim();
 
     // take first sentence-ish chunk
     let one = raw.split(/[.!?]+/).map(s => s.trim()).filter(Boolean)[0] || raw;

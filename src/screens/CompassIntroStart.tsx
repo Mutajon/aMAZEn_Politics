@@ -114,14 +114,30 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
     return DEFAULT_AVATAR_DATA_URL;
   }, [character?.avatarUrl, generateImages]);
 
+  // Get gender-aware translation keys
+  const getGenderKey = (baseKey: string): string => {
+    const gender = character?.gender;
+    if (gender === "female") {
+      return `${baseKey}_FEMALE`;
+    } else if (gender === "male") {
+      return `${baseKey}_MALE`;
+    }
+    // For "any" or undefined, use the base key (which defaults to male form)
+    return baseKey;
+  };
+
   // Get translated role text
   const roleText = useMemo(() => {
     if (!selectedRole) return "";
     
     const roleData = getPredefinedRole(selectedRole);
     if (roleData) {
-      // For predefined roles, use the translated youAreKey
-      return lang(roleData.youAreKey);
+      // For predefined roles, use gender-aware translation of youAreKey
+      const gender = character?.gender;
+      const genderKey = gender === "female" ? `${roleData.youAreKey}_FEMALE` : 
+                       gender === "male" ? `${roleData.youAreKey}_MALE` : 
+                       roleData.youAreKey;
+      return lang(genderKey);
     }
     
     // For custom roles, use the old genderize logic
@@ -143,7 +159,16 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
 
     console.log("[CompassIntroStart] ✅ Required data present, proceeding with narration");
 
-    const narrationText = `${lang("COMPASS_INTRO_WELCOME")} ${character.name}. ${lang("COMPASS_INTRO_NIGHT_BEFORE")} ${roleText}. ${lang("COMPASS_INTRO_PACKAGE")} ${lang("COMPASS_INTRO_KNOW_THYSELF")}. ${lang("COMPASS_INTRO_MIRROR")}`;
+    const welcomeKey = character.gender === "female" ? "COMPASS_INTRO_WELCOME_FEMALE" : 
+                       character.gender === "male" ? "COMPASS_INTRO_WELCOME_MALE" : 
+                       "COMPASS_INTRO_WELCOME";
+    const nightBeforeKey = character.gender === "female" ? "COMPASS_INTRO_NIGHT_BEFORE_FEMALE" : 
+                           character.gender === "male" ? "COMPASS_INTRO_NIGHT_BEFORE_MALE" : 
+                           "COMPASS_INTRO_NIGHT_BEFORE";
+    const knowThyselfKey = character.gender === "female" ? "COMPASS_INTRO_KNOW_THYSELF_FEMALE" : 
+                          character.gender === "male" ? "COMPASS_INTRO_KNOW_THYSELF_MALE" : 
+                          "COMPASS_INTRO_KNOW_THYSELF";
+    const narrationText = `${lang(welcomeKey)} ${character.name}. ${lang(nightBeforeKey)} ${roleText}. ${lang("COMPASS_INTRO_PACKAGE")} ${lang(knowThyselfKey)}. ${lang("COMPASS_INTRO_MIRROR")}`;
 
     const prepareAndStartNarration = async () => {
       try {
@@ -190,7 +215,7 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
         preparedTTSRef.current = null;
       }
     };
-  }, [character?.name, roleText, prepare, narrationEnabled]);
+  }, [character?.name, character?.gender, roleText, lang, prepare, narrationEnabled]);
 
   return (
     <div className="min-h-[100dvh] px-5 py-6" style={roleBgStyle}>
@@ -229,11 +254,11 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
               transition={{ duration: 0.3 }}
               className="mt-5 text-center text-white/90 leading-relaxed"
             >
-              <p className="text-lg">{lang("COMPASS_INTRO_WELCOME")} {character?.name},</p>
+              <p className="text-lg">{lang(getGenderKey("COMPASS_INTRO_WELCOME"))} {character?.name},</p>
               <p className="mt-3">
-                {lang("COMPASS_INTRO_NIGHT_BEFORE")}{" "}
+                {lang(getGenderKey("COMPASS_INTRO_NIGHT_BEFORE"))}{" "}
                 <span className="font-semibold">{roleText}</span>. {lang("COMPASS_INTRO_PACKAGE")}{" "}
-                <span className="font-extrabold text-amber-300">{lang("COMPASS_INTRO_KNOW_THYSELF")}</span>.
+                <span className="font-extrabold text-amber-300">{lang(getGenderKey("COMPASS_INTRO_KNOW_THYSELF"))}</span>.
               </p>
               <p className="mt-3">{lang("COMPASS_INTRO_MIRROR")}</p>
             </motion.div>
@@ -249,12 +274,12 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
                 exit={{ opacity: 0, scale: 0.92, y: 8 }}
                 transition={{ type: "spring", stiffness: 300, damping: 22 }}
                 onClick={() => {
-                  logger.log('button_click_look_in_mirror', lang("COMPASS_INTRO_LOOK_IN_MIRROR"), 'User clicked Look in the mirror button');
+                  logger.log('button_click_look_in_mirror', lang(getGenderKey("COMPASS_INTRO_LOOK_IN_MIRROR")), 'User clicked Look in the mirror button');
                   push("/compass-mirror");
                 }}
                 className="rounded-2xl px-5 py-3 font-semibold text-lg shadow-lg bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] hover:scale-[1.02] active:scale-[0.98]"
               >
-                {lang("COMPASS_INTRO_LOOK_IN_MIRROR")}
+                {lang(getGenderKey("COMPASS_INTRO_LOOK_IN_MIRROR"))}
               </motion.button>
             )}
           </AnimatePresence>

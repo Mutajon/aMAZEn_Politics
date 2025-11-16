@@ -206,6 +206,10 @@ async function createIndexes() {
     await summaryCollection.createIndex({ treatment: 1, incomplete: 1 }, { name: 'treatment_incomplete', background: true });
     await summaryCollection.createIndex({ timestamp: -1 }, { name: 'timestamp', background: true });
 
+    // scenarioSuggestions collection
+    const scenarioSuggestionsCollection = db.collection('scenarioSuggestions');
+    await scenarioSuggestionsCollection.createIndex({ createdAt: -1 }, { name: 'createdAt', background: true });
+
     console.log('[MongoDB] ✅ Indexes created/verified');
   } catch (error) {
     console.warn('[MongoDB] ⚠️ Index creation failed (non-critical):', error.message);
@@ -246,6 +250,18 @@ export async function getCountersCollection() {
 export async function getUsersCollection() {
   const database = await ensureConnection();
   return database.collection('users');
+}
+
+/**
+ * Get scenarioSuggestions collection
+ * Automatically connects to database if not connected
+ * Ensures connection is healthy before returning collection
+ *
+ * @returns {Promise<Collection>} MongoDB collection instance
+ */
+export async function getScenarioSuggestionsCollection() {
+  const database = await ensureConnection();
+  return database.collection('scenarioSuggestions');
 }
 
 /**

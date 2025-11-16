@@ -74,9 +74,26 @@ export function translateLeaderDescription(leaderName: string, description: stri
 }
 
 /**
- * Translates quiz question based on quiz ID
+ * Translates quiz question based on quiz ID with gender awareness
  */
-export function translateQuizQuestion(quizId: string, question: string, lang: (key: string) => string): string {
+export function translateQuizQuestion(
+  quizId: string, 
+  question: string, 
+  lang: (key: string) => string,
+  gender?: "male" | "female" | "any"
+): string {
+  // Try gender-specific key first
+  if (gender === "female") {
+    const femaleKey = `${quizId}_Q_FEMALE`;
+    const femaleTranslated = lang(femaleKey);
+    if (femaleTranslated !== femaleKey) return femaleTranslated;
+  } else if (gender === "male") {
+    const maleKey = `${quizId}_Q_MALE`;
+    const maleTranslated = lang(maleKey);
+    if (maleTranslated !== maleKey) return maleTranslated;
+  }
+  
+  // Fall back to base key
   const key = `${quizId}_Q`;
   const translated = lang(key);
   return translated !== key ? translated : question;

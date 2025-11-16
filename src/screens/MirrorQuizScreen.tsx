@@ -16,7 +16,6 @@ import { mirrorBubbleTheme as T } from "../theme/mirrorBubbleTheme";
 import { saveMirrorReturnRoute } from "../lib/eventScreenSnapshot";
 import MirrorBubbleTyping from "../components/MirrorBubbleTyping";
 import { COMPONENTS, PALETTE } from "../data/compass-data";
-import { useTranslatedConst, createTranslatedConst } from "../i18n/useTranslatedConst";
 import { useLogger } from "../hooks/useLogger";
 import { useTimingLogger } from "../hooks/useTimingLogger";
 import { useLang } from "../i18n/lang";
@@ -50,12 +49,7 @@ const MIRROR_SHIMMER_DURATION = 1500;       // 1.5 second sweep
 const MIRROR_SHIMMER_COLOR = "rgba(94, 234, 212, 0.6)"; // Cyan/teal
 
 /** fixed epilogue */
-const MIRROR_EPILOGUE = createTranslatedConst((lang) =>
-  lang("MIRROR_EPILOGUE_TEXT")
-);
-
 export default function MirrorQuizScreen({ push }: { push: PushFn }) {
-  const mirrorEpilogue = useTranslatedConst(MIRROR_EPILOGUE);
   const lang = useLang();
 
   // compass values + reset
@@ -74,6 +68,23 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
     if (!generateImages) return DEFAULT_AVATAR_DATA_URL;
     return "";
   }, [character?.avatarUrl, generateImages]);
+
+  // Get gender-aware translation keys
+  const getGenderKey = (baseKey: string): string => {
+    const gender = character?.gender;
+    if (gender === "female") {
+      return `${baseKey}_FEMALE`;
+    } else if (gender === "male") {
+      return `${baseKey}_MALE`;
+    }
+    // For "any" or undefined, use the base key (which defaults to male form)
+    return baseKey;
+  };
+
+  // Get gender-aware epilogue text
+  const mirrorEpilogue = useMemo(() => {
+    return lang(getGenderKey("MIRROR_EPILOGUE_TEXT"));
+  }, [lang, character?.gender]);
 
   // Create role-based background style
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
@@ -352,7 +363,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
             {displayAvatar ? (
               <img src={displayAvatar} alt="Character avatar" className="w-full h-full object-cover" />
             ) : (
-              <div className="text-white/80 text-sm">{lang("PREPARING_AVATAR")}</div>
+              <div className="text-white/80 text-sm">{lang(getGenderKey("PREPARING_AVATAR"))}</div>
             )}
           </motion.div>
         </div>
@@ -383,7 +394,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
                       className="text-[19px] font-semibold italic drop-shadow"
                       style={{ color: T.textColor, fontFamily: T.fontFamily }}
                     >
-                      {translateQuizQuestion(quiz[idx].id, quiz[idx].q, lang)}
+                      {translateQuizQuestion(quiz[idx].id, quiz[idx].q, lang, character?.gender)}
                     </div>
 
                     {/* OPTIONS — mirror bubble style buttons */}
@@ -450,7 +461,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
         {done && (
   <div className="mt-12 mx-auto max-w-xl">
     {/* ⬇️ while AI is working, show animated typing bubble */}
-    {!summary && <MirrorBubbleTyping text={lang("MIRROR_PEERING_INTO_SOUL")} />}
+    {!summary && <MirrorBubbleTyping text={lang(getGenderKey("MIRROR_PEERING_INTO_SOUL"))} />}
 
     {/* verdict bubble (types once) */}
     {summary && (
@@ -490,7 +501,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
           }}
           className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/90 text-[#0b1335] hover:bg-white"
         >
-          {lang("BUTTON_GO_TO_SLEEP")}
+          {lang(getGenderKey("BUTTON_GO_TO_SLEEP"))}
         </button>
         <button
           onClick={() => {
@@ -501,7 +512,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
           }}
           className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/15 text-white hover:bg-white/25 border border-white/30"
         >
-          {lang("BUTTON_EXAMINE_MIRROR")}
+          {lang(getGenderKey("BUTTON_EXAMINE_MIRROR"))}
         </button>
       </div>
     )}

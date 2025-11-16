@@ -73,15 +73,27 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
   // Logging hook for data collection
   const logger = useLogger();
 
-  // script
-  const playerName = character?.name || lang("PLAYER_DEFAULT_NAME");
-  const script: Array<{ side: "mirror" | "player"; text: string; italic?: boolean }> = [
-    { side: "mirror", text: lang("MIRROR_DIALOGUE_1"), italic: true },
-    { side: "player", text: lang("MIRROR_DIALOGUE_2") },
-    { side: "mirror", text: lang("MIRROR_DIALOGUE_3").replace("{playerName}", playerName), italic: true },
-    { side: "mirror", text: lang("MIRROR_DIALOGUE_4"), italic: true },
-    { side: "mirror", text: lang("MIRROR_DIALOGUE_5"), italic: true },
-  ];
+  // Get gender-aware translation keys
+  const getGenderKey = (baseKey: string): string => {
+    const gender = character?.gender;
+    if (gender === "female") {
+      return `${baseKey}_FEMALE`;
+    } else if (gender === "male") {
+      return `${baseKey}_MALE`;
+    }
+    // For "any" or undefined, use the base key (which defaults to male form)
+    return baseKey;
+  };
+
+  // script - memoized to update when character gender or name changes
+  const playerName = character?.name || lang(getGenderKey("PLAYER_DEFAULT_NAME"));
+  const script = useMemo<Array<{ side: "mirror" | "player"; text: string; italic?: boolean }>>(() => [
+    { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_1")), italic: true },
+    { side: "player", text: lang(getGenderKey("MIRROR_DIALOGUE_2")) },
+    { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_3")).replace("{playerName}", playerName), italic: true },
+    { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_4")), italic: true },
+    { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_5")), italic: true },
+  ], [character?.gender, character?.name, lang]);
 
   const [chatIndex, setChatIndex] = useState(0);
 
@@ -134,7 +146,7 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
             {displayAvatar ? (
               <img src={displayAvatar} alt="Character avatar" className="w-full h-full object-cover" />
             ) : (
-              <div className="text-white/80">{lang("PREPARING_AVATAR")}</div>
+              <div className="text-white/80">{lang(getGenderKey("PREPARING_AVATAR"))}</div>
             )}
           </motion.div>
         </div>
@@ -173,7 +185,7 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
                       }}
                       className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/15 text-white hover:bg-white/25 border border-white/30"
                     >
-                      {lang("MIRROR_DIALOGUE_BUTTON")}
+                      {lang(getGenderKey("MIRROR_DIALOGUE_BUTTON"))}
                     </motion.button>
                   </div>
                 )}

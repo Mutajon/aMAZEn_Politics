@@ -123,6 +123,15 @@ export async function generateMirrorQuizSummary(
 
   if (useAI) {
     try {
+      // Get translated prompts
+      const systemPrompt = lang("MIRROR_QUIZ_SYSTEM_PROMPT");
+      const userPromptTemplate = lang("MIRROR_QUIZ_USER_PROMPT");
+      const userPrompt = userPromptTemplate
+        .replace("{what1}", whatTop[0].name)
+        .replace("{what2}", whatTop[1].name)
+        .replace("{whence1}", whenceTop[0].name)
+        .replace("{whence2}", whenceTop[1].name);
+
       const resp = await fetch("/api/mirror-quiz-light", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -130,6 +139,8 @@ export async function generateMirrorQuizSummary(
           topWhat: whatTop.map(minify),
           topWhence: whenceTop.map(minify),
           useAnthropic: useLightDilemmaAnthropic,
+          systemPrompt: systemPrompt,
+          userPrompt: userPrompt,
         }),
       });
 
