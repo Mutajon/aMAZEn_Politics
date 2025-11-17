@@ -36,6 +36,7 @@ import { EXPERIMENT_PREDEFINED_ROLE_KEYS } from "../data/predefinedRoles";
 import { useSessionLogger } from "../hooks/useSessionLogger";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useLogger } from "../hooks/useLogger";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import { usePastGamesStore } from "../store/pastGamesStore";
 import { buildPastGameEntry } from "../lib/pastGamesService";
 import { useFragmentsStore } from "../store/fragmentsStore";
@@ -72,6 +73,13 @@ export default function AftermathScreen({ push }: Props) {
   // Fragments store for fragment collection
   const addFragment = useFragmentsStore((s) => s.addFragment);
   const fragmentCount = useFragmentsStore((s) => s.getFragmentCount());
+
+  // Navigation guard - prevent back button during aftermath
+  useNavigationGuard({
+    enabled: true,
+    confirmationMessage: lang("CONFIRM_EXIT_AFTERMATH"),
+    screenName: "aftermath_screen"
+  });
 
   // ========================================================================
   // SNAPSHOT RESTORATION (synchronous, before first render)
@@ -224,35 +232,77 @@ export default function AftermathScreen({ push }: Props) {
       if (fragmentCount < 3) {
         addFragment(pastGameEntry.gameId);
 
-        logger.logSystem(
-          'fragment_collected',
-          {
-            gameId: pastGameEntry.gameId,
-            fragmentIndex: fragmentCount,
-            totalFragments: fragmentCount + 1,
-            playerName: pastGameEntry.playerName,
-            roleTitle: pastGameEntry.roleTitle
-          },
-          `Fragment ${fragmentCount + 1}/3 collected: ${pastGameEntry.playerName} in ${pastGameEntry.roleTitle}`
-        );
-
-        console.log(`[AftermathScreen] 🧩 Fragment ${fragmentCount + 1}/3 collected`);
-
-        // Log if all 3 fragments now collected
-        if (fragmentCount + 1 === 3) {
+        // CRITICAL FIX: Force immediate localStorage write to prevent race condition
+        // Zustand persist middleware is async and can fail silently if tab loses focus
+        try {
+          const fragmentsState = useFragmentsStore.getState();
+          const persistData = {
+            state: {
+              firstIntro: fragmentsState.firstIntro,
+              fragmentGameIds: fragmentsState.fragmentGameIds.slice(0, 3)
+            },
+            version: 0
+          };
+          localStorage.setItem('amaze-politics-fragments-v1', JSON.stringify(persistData));
+          console.log('[AftermathScreen] ✅ Fragment manually persisted to localStorage');
+        } catch (persistError) {
+          console.error('[AftermathScreen] ❌ Failed to persist fragment to localStorage:', persistError);
           logger.logSystem(
-            'fragments_all_collected',
-            { totalFragments: 3 },
-            'All 3 fragments collected!'
+            'fragment_persist_failed',
+            {
+              gameId: pastGameEntry.gameId,
+              error: persistError instanceof Error ? persistError.message : String(persistError)
+            },
+            'Failed to persist fragment to localStorage'
           );
-          console.log('[AftermathScreen] 🎉 All 3 fragments collected!');
+        }
+
+        // Verify fragment was actually added by re-reading from store
+        const updatedFragmentCount = useFragmentsStore.getState().getFragmentCount();
+        const fragmentWasAdded = updatedFragmentCount > fragmentCount;
+
+        if (!fragmentWasAdded) {
+          console.error('[AftermathScreen] ⚠️ WARNING: Fragment was not added to store!');
+          logger.logSystem(
+            'fragment_addition_failed',
+            {
+              gameId: pastGameEntry.gameId,
+              expectedCount: fragmentCount + 1,
+              actualCount: updatedFragmentCount
+            },
+            'Fragment was not added to store'
+          );
+        } else {
+          logger.logSystem(
+            'fragment_collected',
+            {
+              gameId: pastGameEntry.gameId,
+              fragmentIndex: fragmentCount,
+              totalFragments: updatedFragmentCount,
+              playerName: pastGameEntry.playerName,
+              roleTitle: pastGameEntry.roleTitle
+            },
+            `Fragment ${updatedFragmentCount}/3 collected: ${pastGameEntry.playerName} in ${pastGameEntry.roleTitle}`
+          );
+
+          console.log(`[AftermathScreen] 🧩 Fragment ${updatedFragmentCount}/3 collected (verified)`);
+
+          // Log if all 3 fragments now collected
+          if (updatedFragmentCount === 3) {
+            logger.logSystem(
+              'fragments_all_collected',
+              { totalFragments: 3 },
+              'All 3 fragments collected!'
+            );
+            console.log('[AftermathScreen] 🎉 All 3 fragments collected!');
+          }
         }
       }
     } catch (error) {
       console.error('[AftermathScreen] ❌ Failed to save past game:', error);
       // Don't throw - saving past games should never block user experience
     }
-  }, [data, isFirstVisit, inquiryHistory, customActionCount, selectedRole, day, score, addPastGame, addFragment, fragmentCount, logger]);
+  }, [data, isFirstVisit, inquiryHistory, customActionCount, selectedRole, day, score, addPastGame, addFragment, logger]);
 
   // ========================================================================
   // RENDER: Loading State
@@ -302,18 +352,6 @@ export default function AftermathScreen({ push }: Props) {
         data={data}
         avatarUrl={character?.avatarUrl}
         top3ByDimension={top3ByDimension}
-        onExploreClick={() => {
-          // Save snapshot before navigating
-          if (data) {
-            saveAftermathScreenSnapshot({
-              data,
-              timestamp: Date.now()
-            });
-          }
-          // Save return route
-          saveAftermathReturnRoute('/aftermath');
-          push('/mirror');
-        }}
         onRevealScoreClick={() => {
           // Save snapshot with ratings before navigating to FinalScoreScreen
           // This ensures ideology ratings persist when navigating back
