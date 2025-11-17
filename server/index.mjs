@@ -2647,6 +2647,11 @@ IMPORTANT: The frontend will calculate overall ratings by averaging all 7 decisi
 
 Values Summary: one sentence capturing main motivations, justifications, means, and who benefited.
 
+Legacy: Generate one vivid, historically resonant sentence capturing how the player will be remembered. Format: "You will be remembered as [legacy description]". Base this on all decisions, snapshot events, compass values, and overall impact. Make it specific to their actions, not generic. Consider both their intentions and actual consequences. Examples:
+- "You will be remembered as the tyrant who drowned dissent in blood."
+- "You will be remembered as the cautious reformer who preserved peace at the cost of progress."
+- "You will be remembered as the liberator whose bold vision birthed a new era."
+
 Haiku: a 3-line poetic summary of their reign.
 
 OUTPUT (STRICT JSON)
@@ -2657,6 +2662,7 @@ Return only:
   "snapshot": [{"type": "positive|negative", "icon": "emoji", "text": "", "estimate": number_optional, "context": ""}],
   "decisions": [{"title": "", "reflection": "", "autonomy": "", "liberalism": "", "democracy": ""}],
   "valuesSummary": "",
+  "legacy": "",
   "haiku": ""
 }`;
 

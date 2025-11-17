@@ -45,6 +45,16 @@ toggleCorruption()   # Toggle corruption tracking
 // Hidden Democracy Rating Access (after Aftermath screen)
 showDemocracy()      # Display hidden democracy rating (not shown in UI)
 getDemocracy()       # Alias for showDemocracy()
+
+// Past Games Storage (saved game history)
+getPastGames()       # View all stored past games (max 10)
+clearPastGames()     # Clear all past games from localStorage
+exportPastGames()    # Export games as JSON (auto-copies to clipboard)
+
+// Fragment Collection (progression system)
+getFragments()       # View fragment collection status
+clearFragments()     # Clear all collected fragments (with confirmation)
+resetIntro()         # Reset first intro flag (show full dialog again)
 ```
 
 ## Deployment
@@ -112,6 +122,10 @@ TTS_VOICE=alloy
 - **mirrorQuizStore** - Compass assessment progress
 - **aftermathStore** - Aftermath data prefetching
 - **dilemmaPrefetchStore** - First dilemma prefetching
+- **pastGamesStore** - Completed game history (max 10 games, localStorage persisted)
+- **fragmentsStore** - Fragment collection progression (max 3 fragments, firstIntro flag)
+- **highscoreStore** - Top 50 highscores (without avatars to save storage)
+- **loggingStore** - User ID, treatment, consent, experiment progress
 
 ### Hosted State Architecture
 
@@ -423,6 +437,119 @@ Power distribution analysis using Exception-12 framework - classifies political 
 - Status: 🚧 Under Construction
 - 7 achievements defined in `src/data/achievements.ts`
 - Display only, no tracking yet
+
+### Past Games Storage
+- **Purpose**: Save completed game history for future gallery/comparison screens
+- **Storage**: localStorage (max 10 games, auto-prunes oldest)
+- **Size**: ~50-80KB per game (includes full base64 avatars)
+
+**Stored Data Per Game:**
+- Player name, avatar (base64), role title, political system
+- Final score, support levels (people/middle/mom), corruption
+- Legacy string ("You will be remembered as...")
+- 3-6 snapshot highlights (dramatic aftermath events)
+- Top 2-3 compass values per dimension (8-12 total)
+- Democracy/autonomy/liberalism ratings
+
+**Architecture:**
+- **Store**: `src/store/pastGamesStore.ts` - Zustand store with localStorage persistence
+- **Types**: `src/lib/types/pastGames.ts` - TypeScript interfaces
+- **Service**: `src/lib/pastGamesService.ts` - Data collection helpers
+- **Integration**: `src/screens/AftermathScreen.tsx` - Saves after session summary
+
+**Console Commands:**
+```javascript
+getPastGames()      // View all stored games (formatted table)
+clearPastGames()    // Clear all stored games (with confirmation)
+exportPastGames()   // Export as JSON (auto-copies to clipboard)
+```
+
+**Key Functions:**
+- `buildPastGameEntry(aftermathData)` - Collects data from all stores
+- `getTopCompassValues(compassValues, topN)` - Extracts top compass values
+- `selectSnapshotHighlights(snapshot, maxCount)` - Prioritizes dramatic events
+- `addGame(entry)` - Saves game with duplicate detection & auto-pruning
+
+**Auto-Pruning:**
+- Keeps only 10 most recent games
+- Sorted by timestamp (newest first)
+- Oldest games automatically removed when limit exceeded
+
+**Logging:**
+- Logs `past_game_saved` event with game metadata
+- Integrates with existing logging system
+- Saved only on first aftermath visit (not on snapshot restoration)
+
+**Future Use Cases:**
+- Gallery screen displaying all past games
+- Side-by-side comparison of playthroughs
+- Personal statistics across games
+- Export/share game summaries
+
+### Fragment Collection System
+- **Purpose**: Progressive narrative system where players collect 3 fragments to "remember who they are"
+- **Storage**: localStorage (max 3 fragments, firstIntro flag)
+- **Integration**: Intro screen adapts based on fragment collection progress
+
+**Fragment Lifecycle:**
+1. **First Visit**: Full gatekeeper dialog (26 lines), fragments appear at line 20
+2. **Game Completion**: Fragment automatically collected when reaching aftermath screen
+3. **Return Visits**: Abbreviated gatekeeper message, fragment slots immediately visible
+4. **3 Fragments**: Special completion message from gatekeeper
+
+**Fragment Data:**
+- Links to `pastGamesStore` via `gameId`
+- Displays: Player avatar, name, setting, legacy, snapshot pills
+- Click fragment → popup with full game details
+
+**First Intro Flag:**
+- `firstIntro: true` → Show full 26-line dialog
+- `firstIntro: false` → Show abbreviated message + fragment slots
+- Automatically set to `false` after first "I'm ready" click
+
+**Gatekeeper Messages:**
+- **First visit**: Original 26-line narrative
+- **Returning (< 3 fragments)**: "Are you ready for another trip to the world of the living?"
+- **Returning (3 fragments)**: "You've collected all the required fragments. You're ready to move on to your eternal rest."
+
+**Architecture:**
+- **Store**: `src/store/fragmentsStore.ts` - Tracks fragments and firstIntro flag
+- **Components**:
+  - `src/components/fragments/FragmentSlots.tsx` - Visual display (3 slots)
+  - `src/components/fragments/FragmentPopup.tsx` - Details modal
+- **Integration Points**:
+  - `src/screens/IntroScreen.tsx` - Conditional dialog + fragment display
+  - `src/screens/AftermathScreen.tsx` - Fragment collection (lines 223-250)
+  - `src/screens/FinalScoreScreen.tsx` - Routes to `/intro` (not `/role`)
+
+**Visual Design:**
+- Empty slots: Puzzle icon (Lucide React), 50% opacity
+- Filled slots: Player avatar, clickable
+- Sizes: 50x50px (desktop), 35x35px (mobile)
+- Layout: Horizontal row at top center of intro screen
+- Animation: Fade-in, scale transitions (Framer Motion)
+
+**Console Commands:**
+```javascript
+getFragments()       // View collection status
+clearFragments()     // Reset for testing
+resetIntro()         // Reset first intro flag
+```
+
+**Logging Events:**
+- `intro_first_visit_completed` - First intro dialog completed
+- `intro_return_visit` - Subsequent visits
+- `fragment_collected` - Fragment added (includes index, player name, role)
+- `fragments_all_collected` - All 3 fragments collected
+- `fragment_popup_opened` - User clicked fragment for details
+
+**localStorage Key:**
+- `amaze-politics-fragments-v1`
+
+**Future Enhancements:**
+- Special reward/ending when 3 fragments collected
+- Fragment-specific achievements
+- "True Name" reveal system
 
 ## Code Patterns & Architecture
 

@@ -63,7 +63,7 @@ export default function SupportList({
   const logger = useLogger();
 
   return (
-    <div className="border-slate-400/30 bg-slate-900/60 backdrop-blur-sm rounded-2xl p-3 md:p-4" data-tutorial-target="support-list">
+    <div className="border-slate-400/30 bg-slate-900/60 backdrop-blur-sm rounded-2xl p-3 md:p-4">
       <div className="space-y-2 md:space-y-2">
         {items.map((it, index) => (
           <SupportCard

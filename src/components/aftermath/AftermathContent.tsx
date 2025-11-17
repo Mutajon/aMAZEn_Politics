@@ -81,6 +81,7 @@ export default function AftermathContent({
         intro={data.intro}
         snapshot={data.snapshot}
         avatarUrl={avatarUrl}
+        legacy={data.legacy}
       />
 
       {/* Final Scores Section - Democracy/Autonomy/Liberalism pills */}

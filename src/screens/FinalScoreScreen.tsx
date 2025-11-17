@@ -368,7 +368,7 @@ export default function FinalScoreScreen({ push }: Props) {
     useCompassStore.getState().reset();
     useMirrorQuizStore.getState().resetAll();
     clearAllSnapshots();
-    push("/role");
+    push("/intro"); // Route to intro screen (to show fragment collection)
   };
 
   const handleVisitHallOfFame = () => {

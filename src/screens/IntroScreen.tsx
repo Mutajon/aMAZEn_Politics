@@ -4,19 +4,25 @@ import { motion } from "framer-motion";
 import type { PushFn } from "../lib/router";
 import { useLogger } from "../hooks/useLogger";
 import Gatekeeper from "../components/Gatekeeper";
+import FragmentSlots from "../components/fragments/FragmentSlots";
+import FragmentPopup from "../components/fragments/FragmentPopup";
+import { useFragmentsStore } from "../store/fragmentsStore";
+import type { PastGameEntry } from "../lib/types/pastGames";
 
 const dialogLines = [
   "Oh, Another one. Lost.",
   "I can see it in your eyes. The blank confusion of a soul Name-Washed.",
   "You don't remember where you are, or who you were. That's a problem.",
-  "I am the Gatekeeper, and this is the Crossroad of Consciousness. Where the people transition from the world of the living to their eternal rest.",
+  "Let me save us both some time: I am the Gatekeeper, and this is the Crossroad of Consciousness.",
+  "A place Where people transition from the world of the living to their eternal rest.",
   "Yes, you are dead. My condolences.",
   "But your bigger issue is the Amnesia of the Self. You cannot proceed to rest until you recall your true nature.",
   "That's where I come in.",
   "I offer you a short trip back to the world of the living. Seven days. Be whoever you want.",
   "A chance to test your values, remember who you are.",
-  "Each life gives you a fragment of who you truly were.",
-  "Gather three such Fragments, and your true Name will be woven. Your self will be complete.",
+  "Each veunture will give you a fragment of yourself.",
+  "Gather three such Fragments, and your true Name will be woven.",
+  "Your self will be complete, and you'll be ready to move on.",
   "What's the catch?",
   "I come with you. Every decision you make, every motive you hide, I will observe and collect.",
   "I need it to pay an old, lingering debt and finally leave this place.",
@@ -24,6 +30,11 @@ const dialogLines = [
   "Good. Because you don't really have a choice.",
   "Let me know when you're ready.",
 ];
+
+// Find fragment reveal line by text content (resilient to dialog changes)
+const FRAGMENT_LINE_INDEX = dialogLines.findIndex(
+  (line) => line.includes("Gather") && line.includes("Fragments")
+);
 
 // Background style using etherplace.jpg
 const etherPlaceBackground = {
@@ -38,6 +49,36 @@ export default function IntroScreen({ push }: { push: PushFn }) {
   const [showGatekeeper, setShowGatekeeper] = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [isLastLine, setIsLastLine] = useState(false);
+
+  // Fragment state
+  const firstIntro = useFragmentsStore((s) => s.firstIntro);
+  const fragmentCount = useFragmentsStore((s) => s.getFragmentCount());
+  const hasAllFragments = useFragmentsStore((s) => s.hasCompletedThreeFragments());
+  const markIntroCompleted = useFragmentsStore((s) => s.markIntroCompleted);
+  const [selectedFragment, setSelectedFragment] = useState<PastGameEntry | null>(null);
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
+
+  // Fragment reveal pause state
+  const [isFragmentPause, setIsFragmentPause] = useState(false);
+  const [fragmentsRevealed, setFragmentsRevealed] = useState(false);
+
+  // Determine gatekeeper message based on first visit and fragment count
+  const getGatekeeperMessage = () => {
+    if (firstIntro) {
+      return dialogLines[currentLineIndex];
+    }
+
+    // Returning visit - show abbreviated message
+    if (hasAllFragments) {
+      return "You've collected all the required fragments. You're ready to move on to your eternal rest.";
+    }
+
+    return "Ready for another trip to the world of the living?";
+  };
+
+  const shouldShowFragments = firstIntro
+    ? (currentLineIndex >= FRAGMENT_LINE_INDEX && fragmentsRevealed)
+    : true;
 
   // Show gatekeeper after 1 second delay
   useEffect(() => {
@@ -54,6 +95,32 @@ export default function IntroScreen({ push }: { push: PushFn }) {
 
   // Handle gatekeeper dismissal (click to advance)
   const handleGatekeeperClick = () => {
+    // Returning visit - go straight to "I'm ready"
+    if (!firstIntro) {
+      setIsLastLine(true);
+      logger.log(
+        "intro_return_visit",
+        { fragmentCount, hasAllFragments },
+        "Returning visit - skipping dialog"
+      );
+      return;
+    }
+
+    // First visit - check for fragment reveal line
+    if (currentLineIndex === FRAGMENT_LINE_INDEX && !fragmentsRevealed) {
+      // PAUSE for fragment reveal
+      setFragmentsRevealed(true);
+      setIsFragmentPause(true);
+      logger.log(
+        "fragment_reveal_started",
+        { fragmentLineIndex: FRAGMENT_LINE_INDEX, lineText: dialogLines[FRAGMENT_LINE_INDEX] },
+        "Fragment reveal sequence started - dialog paused"
+      );
+      // Don't advance line yet - will auto-advance after timer
+      return;
+    }
+
+    // First visit - advance through dialog
     if (currentLineIndex < dialogLines.length - 1) {
       setCurrentLineIndex((prev) => prev + 1);
       logger.log(
@@ -74,6 +141,10 @@ export default function IntroScreen({ push }: { push: PushFn }) {
 
   // Handle skip button
   const handleSkip = () => {
+    if (isFragmentPause) {
+      setIsFragmentPause(false); // Cancel pause
+    }
+    setFragmentsRevealed(true); // Mark as revealed
     setCurrentLineIndex(dialogLines.length - 1);
     setIsLastLine(true);
     logger.log(
@@ -85,31 +156,87 @@ export default function IntroScreen({ push }: { push: PushFn }) {
 
   // Handle "I'm ready" button
   const handleReady = () => {
+    // Mark intro as completed on first visit
+    if (firstIntro) {
+      markIntroCompleted();
+      logger.log(
+        "intro_first_visit_completed",
+        { screen: "/intro" },
+        "User completed first intro visit"
+      );
+    }
+
     logger.log(
       "button_click_im_ready",
-      { screen: "/intro" },
+      { screen: "/intro", firstIntro, fragmentCount },
       "User clicked 'I'm ready' button to proceed to role selection"
     );
     push("/role");
   };
+
+  // Handle fragment click
+  const handleFragmentClick = (fragment: PastGameEntry, index: number) => {
+    setSelectedFragment(fragment);
+    setIsPopupOpen(true);
+    logger.log(
+      "fragment_popup_opened",
+      { gameId: fragment.gameId, index, playerName: fragment.playerName },
+      `Opened fragment popup for ${fragment.playerName}`
+    );
+  };
+
+  // Handle popup close
+  const handlePopupClose = () => {
+    setIsPopupOpen(false);
+    setSelectedFragment(null);
+  };
+
+  // Auto-advance after fragment reveal
+  useEffect(() => {
+    if (!isFragmentPause) return;
+
+    // Wait for fragment animation (400ms) + additional pause (1000ms)
+    const timer = setTimeout(() => {
+      setCurrentLineIndex((prev) => prev + 1); // Advance to next line
+      setIsFragmentPause(false);
+
+      logger.log(
+        "fragment_reveal_completed",
+        { fragmentLineIndex: FRAGMENT_LINE_INDEX, nextLine: currentLineIndex + 1 },
+        "Fragment reveal completed, dialog continuing"
+      );
+    }, 1400);
+
+    return () => clearTimeout(timer);
+  }, [isFragmentPause, currentLineIndex, logger]);
 
   return (
     <div
       className="min-h-[100dvh] flex items-center justify-center px-5 relative"
       style={etherPlaceBackground}
     >
+      {/* Fragment Slots - shown when fragments mentioned or on returning visits */}
+      {shouldShowFragments && <FragmentSlots onFragmentClick={handleFragmentClick} />}
+
+      {/* Fragment Popup */}
+      <FragmentPopup
+        isOpen={isPopupOpen}
+        fragment={selectedFragment}
+        onClose={handlePopupClose}
+      />
+
       {/* Gatekeeper with dialog */}
       {showGatekeeper && (
         <Gatekeeper
-          text={dialogLines[currentLineIndex]}
+          text={getGatekeeperMessage()}
           isVisible={true}
-          onDismiss={handleGatekeeperClick}
-          showHint={currentLineIndex === 0}
+          onDismiss={isFragmentPause ? () => {} : handleGatekeeperClick}
+          showHint={firstIntro && currentLineIndex === 0}
         />
       )}
 
-      {/* Skip button - shown until last line is reached */}
-      {showGatekeeper && !isLastLine && (
+      {/* Skip button - shown only on first visit until last line is reached */}
+      {showGatekeeper && !isLastLine && firstIntro && (
         <motion.button
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

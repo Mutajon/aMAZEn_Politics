@@ -179,23 +179,12 @@ export default function Gatekeeper({
           }}
           onClick={handleClick}
         >
-          {/* Speech Bubble with bobbing animation */}
+          {/* Speech Bubble (static - no bobbing animation) */}
           <motion.div
             className="relative mb-3"
             style={{
               maxWidth: `${responsiveTheme.maxWidth}px`,
               minWidth: `${responsiveTheme.minWidth}px`,
-            }}
-            animate={{
-              y: [0, -gatekeeperTheme.bobbingDistance, 0],
-            }}
-            transition={{
-              y: {
-                repeat: Infinity,
-                duration: gatekeeperTheme.bobbingDuration,
-                ease: 'easeInOut',
-                times: [0, 0.5, 1],
-              },
             }}
           >
             {/* Bubble content */}

@@ -589,7 +589,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
 
       {/* Gatekeeper tutorial hint */}
       <Gatekeeper
-        text="Welcome traveler."
+        text="So, who would you like to be this time?"
         isVisible={showGatekeeper}
         onDismiss={() => setShowGatekeeper(false)}
       />

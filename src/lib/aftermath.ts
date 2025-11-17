@@ -66,6 +66,7 @@ export type AftermathResponse = {
     democracy: RatingLevel; // NOW INCLUDED (was hidden before)
   };
   valuesSummary: string; // one sentence summary
+  legacy: string; // how the player will be remembered ("You will be remembered as...")
   haiku: string; // 3-line poetic summary
 };
 

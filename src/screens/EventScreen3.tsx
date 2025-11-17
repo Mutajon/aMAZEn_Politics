@@ -43,8 +43,6 @@ import { useTimingLogger } from "../hooks/useTimingLogger";
 import { useReasoning } from "../hooks/useReasoning";
 import { useLogger } from "../hooks/useLogger";
 import ReasoningModal from "../components/event/ReasoningModal";
-import { useTutorialStore } from "../store/tutorialStore";
-import { TutorialOverlay } from "../components/tutorial/TutorialOverlay";
 
 type Props = {
   push: (path: string) => void;
@@ -62,9 +60,6 @@ export default function EventScreen3({ push }: Props) {
   );
   const showBudget = useSettingsStore((s) => s.showBudget);
   const debugMode = useSettingsStore((s) => s.debugMode);
-
-  // Tutorial state
-  const { hasPlayedBefore, day1TipShown, day2TipShown, markDay1TipShown, markDay2TipShown, markHasPlayedBefore } = useTutorialStore();
 
   // Create role-based background style
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
@@ -423,18 +418,6 @@ export default function EventScreen3({ push }: Props) {
       push('/downfall');
     }
   }, [collectedData, storedCrisisMode, phase, push]);
-
-  // ========================================================================
-  // EFFECT 5: Mark player as having played before on first interaction
-  // ========================================================================
-  useEffect(() => {
-    if (!hasPlayedBefore && day === 1 && phase === 'interacting') {
-      markHasPlayedBefore();
-      logger.logSystem('first_time_player_detected', {
-        timestamp: Date.now()
-      }, 'First-time player detected, tutorial enabled');
-    }
-  }, [hasPlayedBefore, day, phase, markHasPlayedBefore, logger]);
 
   // ========================================================================
   // ACTION HANDLERS
@@ -938,29 +921,6 @@ export default function EventScreen3({ push }: Props) {
             speakerName={collectedData.dilemma.speaker}
             speakerImageId="gatekeeper"
           />
-        )}
-
-        {/* Tutorial Overlays - First-time player guidance */}
-        {!hasPlayedBefore && !debugMode && !restoredFromSnapshot && (
-          <>
-            {/* Day 1: Avatar tutorial */}
-            {day === 1 && !day1TipShown && phase === 'interacting' && presentationStep >= 5 && (
-              <TutorialOverlay
-                target="avatar"
-                message="Click your avatar to see your current values"
-                onDismiss={markDay1TipShown}
-              />
-            )}
-
-            {/* Day 2: Support tutorial */}
-            {day === 2 && !day2TipShown && phase === 'interacting' && presentationStep >= 1 && (
-              <TutorialOverlay
-                target="support"
-                message="Click on support entities to learn more about them - so you can make more educated decisions"
-                onDismiss={markDay2TipShown}
-              />
-            )}
-          </>
         )}
       </div>
     );

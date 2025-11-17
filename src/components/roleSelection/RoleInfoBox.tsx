@@ -60,9 +60,6 @@ export default function RoleInfoBox({
             <h3 className="text-xl sm:text-2xl md:text-3xl font-cinzel font-bold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
               {item.title}
             </h3>
-            {item.subtitle && (
-              <p className="text-sm text-amber-200/70 mt-2">{item.subtitle}</p>
-            )}
           </div>
           <button
             onClick={onOpenCustomRole}
@@ -81,9 +78,6 @@ export default function RoleInfoBox({
             <h3 className="text-xl sm:text-2xl md:text-3xl font-cinzel font-bold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
               {item.title}
             </h3>
-            {item.subtitle && (
-              <p className="text-sm text-amber-200/70 mt-2">{item.subtitle}</p>
-            )}
           </div>
           <button
             onClick={onOpenScenario}
@@ -104,9 +98,6 @@ export default function RoleInfoBox({
             <h3 className="text-lg sm:text-xl md:text-2xl font-cinzel font-bold text-white tracking-wide drop-shadow-md">
               {item.title}
             </h3>
-            {item.subtitle && (
-              <p className="text-sm text-amber-200/70 mt-1">{item.subtitle}</p>
-            )}
           </div>
           <div className="flex flex-col items-end gap-2">
             {item.year && (
@@ -128,16 +119,6 @@ export default function RoleInfoBox({
           <p className="text-sm text-white/90 leading-relaxed">
             {item.intro}
           </p>
-        )}
-
-        {/* "You are:" section */}
-        {item.youAre && (
-          <div className="pt-2 border-t border-slate-700/40">
-            <p className="text-sm">
-              <span className="font-semibold text-amber-300">You are:</span>{" "}
-              <span className="text-white/90">{item.youAre}</span>
-            </p>
-          </div>
         )}
 
         {/* Score goal badge */}

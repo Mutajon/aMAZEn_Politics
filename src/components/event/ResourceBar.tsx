@@ -173,7 +173,6 @@ export default function ResourceBar({
           className="shrink-0 rounded-xl overflow-hidden ring-1 ring-white/15 bg-white/5 hover:ring-white/30 hover:bg-white/10 transition-all duration-200"
           style={{ width: 80, height: 80, minWidth: 80 }}
           aria-label={`View ${playerName}'s character information`}
-          data-tutorial-target="avatar"
           title={`View ${playerName}'s character card`}
         >
           {avatarSrc && !imgError ? (

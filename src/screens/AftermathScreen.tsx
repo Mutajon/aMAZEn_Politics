@@ -36,6 +36,9 @@ import { EXPERIMENT_PREDEFINED_ROLE_KEYS } from "../data/predefinedRoles";
 import { useSessionLogger } from "../hooks/useSessionLogger";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useLogger } from "../hooks/useLogger";
+import { usePastGamesStore } from "../store/pastGamesStore";
+import { buildPastGameEntry } from "../lib/pastGamesService";
+import { useFragmentsStore } from "../store/fragmentsStore";
 
 type Props = {
   push: PushFn;
@@ -62,6 +65,13 @@ export default function AftermathScreen({ push }: Props) {
   const selectedRole = useRoleStore((s) => s.selectedRole);
   const day = useDilemmaStore((s) => s.day);
   const score = useDilemmaStore((s) => s.score);
+
+  // Past games store for saving completed game data
+  const addPastGame = usePastGamesStore((s) => s.addGame);
+
+  // Fragments store for fragment collection
+  const addFragment = useFragmentsStore((s) => s.addFragment);
+  const fragmentCount = useFragmentsStore((s) => s.getFragmentCount());
 
   // ========================================================================
   // SNAPSHOT RESTORATION (synchronous, before first render)
@@ -189,7 +199,60 @@ export default function AftermathScreen({ push }: Props) {
         // Don't throw - logging should never block user experience
       }
     })();
-  }, [data, isFirstVisit, inquiryHistory, customActionCount, selectedRole, day, score]);
+
+    // Save game to past games storage (localStorage)
+    try {
+      const pastGameEntry = buildPastGameEntry(data);
+      addPastGame(pastGameEntry);
+
+      // Log that we saved the game
+      logger.logSystem(
+        'past_game_saved',
+        {
+          gameId: pastGameEntry.gameId,
+          playerName: pastGameEntry.playerName,
+          roleTitle: pastGameEntry.roleTitle,
+          finalScore: pastGameEntry.finalScore,
+          timestamp: pastGameEntry.timestamp
+        },
+        `Past game saved: ${pastGameEntry.playerName} in ${pastGameEntry.roleTitle} (Score: ${pastGameEntry.finalScore})`
+      );
+
+      console.log('[AftermathScreen] 💾 Past game saved to localStorage');
+
+      // Collect fragment if less than 3 collected
+      if (fragmentCount < 3) {
+        addFragment(pastGameEntry.gameId);
+
+        logger.logSystem(
+          'fragment_collected',
+          {
+            gameId: pastGameEntry.gameId,
+            fragmentIndex: fragmentCount,
+            totalFragments: fragmentCount + 1,
+            playerName: pastGameEntry.playerName,
+            roleTitle: pastGameEntry.roleTitle
+          },
+          `Fragment ${fragmentCount + 1}/3 collected: ${pastGameEntry.playerName} in ${pastGameEntry.roleTitle}`
+        );
+
+        console.log(`[AftermathScreen] 🧩 Fragment ${fragmentCount + 1}/3 collected`);
+
+        // Log if all 3 fragments now collected
+        if (fragmentCount + 1 === 3) {
+          logger.logSystem(
+            'fragments_all_collected',
+            { totalFragments: 3 },
+            'All 3 fragments collected!'
+          );
+          console.log('[AftermathScreen] 🎉 All 3 fragments collected!');
+        }
+      }
+    } catch (error) {
+      console.error('[AftermathScreen] ❌ Failed to save past game:', error);
+      // Don't throw - saving past games should never block user experience
+    }
+  }, [data, isFirstVisit, inquiryHistory, customActionCount, selectedRole, day, score, addPastGame, addFragment, fragmentCount, logger]);
 
   // ========================================================================
   // RENDER: Loading State
