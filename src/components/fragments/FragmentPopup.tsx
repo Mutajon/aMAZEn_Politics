@@ -2,11 +2,11 @@
  * src/components/fragments/FragmentPopup.tsx
  *
  * Modal popup showing details of a collected fragment
- * Displays player name, setting, legacy, and snapshot pills
+ * Displays player avatar, name, setting, and snapshot pills
  */
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X } from "lucide-react";
+import { X, Puzzle } from "lucide-react";
 import type { PastGameEntry } from "../../lib/types/pastGames";
 import { useEffect } from "react";
 
@@ -50,42 +50,57 @@ export default function FragmentPopup({
             onClick={onClose}
           />
 
-          {/* Popup Card */}
+          {/* Popup Card - Mobile-optimized centering */}
           <motion.div
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[201] w-[90vw] max-w-md"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[201] w-[90vw] max-w-md max-h-[85vh] overflow-y-auto"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
           >
-            <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 shadow-2xl relative">
+            <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 md:p-6 shadow-2xl relative">
               {/* Close Button */}
               <button
                 onClick={onClose}
-                className="absolute top-3 right-3 p-1.5 rounded-lg bg-gray-800/50 hover:bg-gray-700 transition-colors"
+                className="absolute top-3 right-3 p-1.5 rounded-lg bg-gray-800/50 hover:bg-gray-700 transition-colors z-10"
                 aria-label="Close popup"
               >
                 <X className="w-5 h-5 text-white/80" />
               </button>
 
-              {/* Player Name */}
-              <h2 className="text-2xl font-bold text-white mb-2 pr-8">
-                {fragment.playerName}
-              </h2>
+              {/* Avatar + Name Section (Horizontal Layout) */}
+              <div className="flex items-center gap-4 mb-6 pr-8">
+                {/* Avatar */}
+                <div className="flex-shrink-0 w-20 h-20 rounded-full overflow-hidden bg-gray-800/50 flex items-center justify-center">
+                  {fragment.avatarUrl ? (
+                    <img
+                      src={fragment.avatarUrl}
+                      alt={fragment.playerName}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Fallback to puzzle icon if image fails
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <Puzzle className="w-10 h-10 text-gray-400" />
+                  )}
+                </div>
 
-              {/* Setting */}
-              <p className="text-sm text-gray-400 mb-4">{fragment.roleTitle}</p>
-
-              {/* Legacy */}
-              <div className="mb-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
-                <p className="text-sm text-white/90 italic leading-relaxed">
-                  "{fragment.legacy}"
-                </p>
+                {/* Name + Setting */}
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-xl md:text-2xl font-bold text-white mb-1 truncate">
+                    {fragment.playerName}
+                  </h2>
+                  <p className="text-xs md:text-sm text-gray-400 line-clamp-2">
+                    {fragment.roleTitle}
+                  </p>
+                </div>
               </div>
 
               {/* Snapshot Pills */}
               {fragment.snapshotHighlights.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-2 mb-4">
                   <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
                     Key Events
                   </h3>

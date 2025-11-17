@@ -21,8 +21,8 @@ import { useSettingsStore } from "../../store/settingsStore";
 const ENTER_STAGGER = 0.12;
 const ENTER_DURATION = 0.36;
 
-const CARD_TITLE_CLASS = "text-[12px] md:text-[14px] font-semibold text-white";
-const CARD_DESC_CLASS = "text-[11px] md:text-[12.5px] leading-snug text-white/95";
+const CARD_TITLE_CLASS = "text-[14px] md:text-[15px] font-semibold text-white";
+const CARD_DESC_CLASS = "text-[12px] md:text-[13.5px] leading-snug text-white/95";
 const CARD_PAD = "p-2 md:p-3";
 const CARD_BASE = "rounded-2xl ring-1 ring-white/20 shadow-sm";
 
@@ -422,17 +422,24 @@ export default function ActionDeckContent({
                 </p>
 
                 <div className="mt-3">
-                  <input
-                    type="text"
+                  <textarea
+                    rows={2}
                     autoFocus
                     value={suggestText}
-                    onChange={(e) => onSuggestTextChange(e.target.value)}
+                    onChange={(e) => {
+                      onSuggestTextChange(e.target.value);
+                      // Ensure cursor stays visible while typing
+                      requestAnimationFrame(() => {
+                        const pos = e.target.selectionStart;
+                        e.target.setSelectionRange(pos, pos);
+                      });
+                    }}
                     placeholder={!config.showAIOptions
                       ? "Type in your desired action"
                       : "Type your suggestion…"}
-                    className="w-full rounded-xl bg-black/35 ring-1 ring-white/25 text-white placeholder-white/70 px-3 py-2 outline-none focus:ring-white/35"
+                    className="w-full rounded-xl bg-black/35 ring-1 ring-white/25 text-white placeholder-white/70 px-3 py-2 outline-none focus:ring-white/35 resize-none"
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+                      if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
                         onConfirmSuggestion();
                       }

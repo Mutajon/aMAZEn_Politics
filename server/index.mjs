@@ -283,8 +283,9 @@ const IMAGE_QUALITY = process.env.IMAGE_QUALITY || "low"; // low|medium|high
 // Note: "Cove" is not currently available in the public TTS API. If OpenAI
 // exposes it in the future, change TTS_VOICE to "cove".
 const TTS_URL = "https://api.openai.com/v1/audio/speech";
-const TTS_MODEL = process.env.TTS_MODEL || "tts-1";       // or "tts-1-hd"
-const TTS_VOICE = process.env.TTS_VOICE || "alloy";     // alloy|echo|fable|onyx|nova|shimmer
+const TTS_MODEL = process.env.TTS_MODEL || "tts-1";       // tts-1, tts-1-hd, or gpt-4o-mini-tts
+const TTS_VOICE = process.env.TTS_VOICE || "alloy";       // alloy|echo|fable|onyx|nova|shimmer
+const TTS_INSTRUCTIONS = process.env.TTS_INSTRUCTIONS || undefined; // Optional: style/tone instructions (only for gpt-4o-mini-tts)
 const TTS_FORMAT = process.env.TTS_FORMAT || "mp3";       // mp3|opus|aac|flac
 // ---------------------------------------------------------------------------
 
@@ -1769,7 +1770,7 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
 
 
 // -------------------- NEW: Text-to-Speech endpoint -----------
-// POST /api/tts { text: string, voice?: string, format?: "mp3"|"opus"|"aac"|"flac" }
+// POST /api/tts { text: string, voice?: string, format?: "mp3"|"opus"|"aac"|"flac", instructions?: string }
 // Returns raw audio bytes with appropriate Content-Type.
 app.post("/api/tts", async (req, res) => {
   try {
@@ -1784,18 +1785,30 @@ app.post("/api/tts", async (req, res) => {
     }
     const format = String(req.body?.format || TTS_FORMAT || "mp3").trim().toLowerCase();
 
+    // Instructions for tone/style (only supported by gpt-4o-mini-tts and newer models)
+    // Can be overridden per-request, falls back to env var, or undefined if not set
+    const instructions = req.body?.instructions || TTS_INSTRUCTIONS;
+
+    // Build request body - only include instructions if defined
+    const requestBody = {
+      model: TTS_MODEL,
+      voice: voiceRequested,
+      input: text,
+      response_format: format, // mp3|opus|aac|flac
+    };
+
+    // Only add instructions field if it's defined (optional parameter)
+    if (instructions) {
+      requestBody.instructions = instructions;
+    }
+
     const r = await fetch(TTS_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: TTS_MODEL,
-        voice: voiceRequested,
-        input: text,
-        response_format: format, // mp3|opus|aac|flac
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!r.ok) {
@@ -2189,6 +2202,17 @@ function normalizeControlCharacters(text) {
 }
 
 /**
+ * Remove trailing commas before closing brackets/braces
+ * Fixes common AI JSON generation error: [item,] or {key: value,}
+ * Safe for strings - commas inside strings won't be followed by ] or }
+ */
+function removeTrailingCommas(text) {
+  if (typeof text !== "string") return text;
+  // Remove commas before ] or } (with optional whitespace)
+  return text.replace(/,(\s*[\]\}])/g, '$1');
+}
+
+/**
  * Safely parse JSON with fallback extraction
  * Handles markdown code blocks (```json...\n{...}\n```) by extracting content between { }
  */
@@ -2217,31 +2241,59 @@ function safeParseJSON(text, { debugTag = "safeParseJSON", maxLogLength = 400 } 
   };
 
   // Attempt 1: Direct parse
-  const direct = tryParse(text, "direct");
+  const direct = tryParse(text, "1-direct");
   if (direct) return direct;
 
   // Attempt 2: Strip comments and retry
   const cleaned = stripJsonComments(text);
   if (cleaned && cleaned !== text) {
-    const parsedClean = tryParse(cleaned, "strip-comments");
+    const parsedClean = tryParse(cleaned, "2-strip-comments");
     if (parsedClean) return parsedClean;
   }
 
-  // Attempt 3: Normalize control characters and retry
-  const normalized = normalizeControlCharacters(cleaned || text);
-  if (normalized !== (cleaned || text)) {
-    const parsedNormalized = tryParse(normalized, "normalized-control-chars");
+  // Attempt 3: Remove trailing commas and retry
+  const noTrailing = removeTrailingCommas(text);
+  if (noTrailing !== text) {
+    const parsedNoTrailing = tryParse(noTrailing, "3-remove-trailing-commas");
+    if (parsedNoTrailing) return parsedNoTrailing;
+  }
+
+  // Attempt 4: Strip comments + remove trailing commas
+  const cleanedNoTrailing = removeTrailingCommas(cleaned || text);
+  if (cleanedNoTrailing !== (cleaned || text)) {
+    const parsedCleanNoTrailing = tryParse(cleanedNoTrailing, "4-comments+trailing");
+    if (parsedCleanNoTrailing) return parsedCleanNoTrailing;
+  }
+
+  // Attempt 5: Normalize control characters
+  const normalized = normalizeControlCharacters(cleanedNoTrailing || cleaned || text);
+  if (normalized !== (cleanedNoTrailing || cleaned || text)) {
+    const parsedNormalized = tryParse(normalized, "5-normalized-control-chars");
     if (parsedNormalized) return parsedNormalized;
   }
 
-  // Attempt 4: Extract braces and retry
-  const fallbackSource = normalized || cleaned || text;
+  // Attempt 6: All repairs combined (comments + trailing + control chars)
+  const fullyRepaired = normalizeControlCharacters(removeTrailingCommas(stripJsonComments(text)));
+  if (fullyRepaired !== text && fullyRepaired !== normalized) {
+    const parsedFully = tryParse(fullyRepaired, "6-all-repairs-combined");
+    if (parsedFully) return parsedFully;
+  }
+
+  // Attempt 7: Extract braces and retry with repairs
+  const fallbackSource = normalized || cleanedNoTrailing || cleaned || text;
   const match = typeof fallbackSource === "string" ? fallbackSource.match(/\{[\s\S]*\}/) : null;
   if (match) {
+    const parsedFallback = tryParse(match[0], "7-fallback-braces");
+    if (parsedFallback) return parsedFallback;
+  }
+
+  // Attempt 8: Fallback braces + all repairs
+  if (match) {
     const candidate = stripJsonComments(match[0]);
-    const candidateNormalized = normalizeControlCharacters(candidate);
-    const parsed = tryParse(candidateNormalized, "fallback-braces-normalized");
-    if (parsed) return parsed;
+    const candidateNoTrailing = removeTrailingCommas(candidate);
+    const candidateNormalized = normalizeControlCharacters(candidateNoTrailing);
+    const parsedFallbackRepaired = tryParse(candidateNormalized, "8-fallback+all-repairs");
+    if (parsedFallbackRepaired) return parsedFallbackRepaired;
   } else {
     console.warn(`[${debugTag}] No JSON object detected using fallback brace extraction.`);
   }
@@ -3744,7 +3796,18 @@ Comment style:
 
 # OUTPUT SCHEMAS
 
-**CRITICAL: Return ONLY valid JSON. NO extra text before or after. NO markdown code blocks. NO commentary.**
+**CRITICAL JSON FORMAT RULES:**
+
+1. Return ONLY valid JSON - no extra text before or after
+2. You MAY wrap in markdown code blocks like \`\`\`json...\`\`\` (optional but acceptable)
+3. **ALWAYS include commas between properties:**
+   - ✅ CORRECT: "mirrorAdvice": "...", "corruptionShift": {...}
+   - ❌ WRONG: "mirrorAdvice": "..." "corruptionShift": {...}
+4. DO NOT use trailing commas after the last property in an object or array
+5. Use double quotes (") for all keys and string values
+6. Ensure all braces {...} and brackets [...] are properly closed
+
+**If you're unsure about JSON syntax, always include commas between properties.**
 
 ## DAY 1 SCHEMA:
 {
@@ -3966,17 +4029,30 @@ app.post("/api/game-turn-v2", async (req, res) => {
         console.log("=".repeat(80) + "\n");
       }
 
-      // Parse JSON response
+      // Parse JSON response with robust error handling
       let parsed;
-      try {
-        // Try to extract JSON from markdown code blocks if present
-        const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/```\n?([\s\S]*?)\n?```/);
-        const jsonStr = jsonMatch ? jsonMatch[1] : content;
-        parsed = JSON.parse(jsonStr);
-      } catch (parseError) {
-        console.error('[GAME-TURN-V2] JSON parse error:', parseError);
-        console.error('[GAME-TURN-V2] Raw content:', content);
-        throw new Error(`Failed to parse AI response: ${parseError.message}`);
+
+      // Try existing safeParseJSON utility first
+      parsed = safeParseJSON(content, { debugTag: "GAME-TURN-V2-DAY1" });
+
+      // If safeParseJSON fails, try custom comma repair
+      if (!parsed) {
+        console.log('[GAME-TURN-V2] safeParseJSON failed, attempting comma repair...');
+        try {
+          // Extract from markdown code blocks if present
+          const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/```\n?([\s\S]*?)\n?```/);
+          const jsonStr = jsonMatch ? jsonMatch[1] : content;
+
+          // Fix missing commas: "value"\n"key" -> "value",\n"key"
+          const commaFixed = jsonStr.replace(/("\s*)\n(\s*"[^"]+"\s*:)/g, '$1,\n$2');
+          parsed = JSON.parse(commaFixed);
+          console.log('[GAME-TURN-V2] ✅ Comma repair successful');
+        } catch (commaError) {
+          console.error('[GAME-TURN-V2] All JSON parse attempts failed');
+          console.error('[GAME-TURN-V2] Comma repair error:', commaError);
+          console.error('[GAME-TURN-V2] Raw content:', content);
+          throw new Error(`Failed to parse AI response after all repair attempts: ${commaError.message}`);
+        }
       }
 
       // Add assistant response to messages
@@ -4069,16 +4145,30 @@ app.post("/api/game-turn-v2", async (req, res) => {
         console.log("=".repeat(80) + "\n");
       }
 
-      // Parse JSON response
+      // Parse JSON response with robust error handling
       let parsed;
-      try {
-        const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/```\n?([\s\S]*?)\n?```/);
-        const jsonStr = jsonMatch ? jsonMatch[1] : content;
-        parsed = JSON.parse(jsonStr);
-      } catch (parseError) {
-        console.error('[GAME-TURN-V2] JSON parse error:', parseError);
-        console.error('[GAME-TURN-V2] Raw content:', content);
-        throw new Error(`Failed to parse AI response: ${parseError.message}`);
+
+      // Try existing safeParseJSON utility first
+      parsed = safeParseJSON(content, { debugTag: "GAME-TURN-V2-DAY2+" });
+
+      // If safeParseJSON fails, try custom comma repair
+      if (!parsed) {
+        console.log('[GAME-TURN-V2] safeParseJSON failed, attempting comma repair...');
+        try {
+          // Extract from markdown code blocks if present
+          const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/```\n?([\s\S]*?)\n?```/);
+          const jsonStr = jsonMatch ? jsonMatch[1] : content;
+
+          // Fix missing commas: "value"\n"key" -> "value",\n"key"
+          const commaFixed = jsonStr.replace(/("\s*)\n(\s*"[^"]+"\s*:)/g, '$1,\n$2');
+          parsed = JSON.parse(commaFixed);
+          console.log('[GAME-TURN-V2] ✅ Comma repair successful');
+        } catch (commaError) {
+          console.error('[GAME-TURN-V2] All JSON parse attempts failed');
+          console.error('[GAME-TURN-V2] Comma repair error:', commaError);
+          console.error('[GAME-TURN-V2] Raw content:', content);
+          throw new Error(`Failed to parse AI response after all repair attempts: ${commaError.message}`);
+        }
       }
 
       // Hybrid support shift validation

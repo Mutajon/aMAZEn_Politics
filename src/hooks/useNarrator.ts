@@ -13,6 +13,7 @@ type SpeakOptions = {
   voiceName?: string;           // OpenAI voice name; default "alloy"
   format?: "mp3" | "opus" | "aac" | "flac";
   volume?: number;              // 0..1
+  instructions?: string;        // Optional: Style/tone instructions (only for gpt-4o-mini-tts and newer models)
 };
 
 export type PreparedTTS = {
@@ -101,12 +102,24 @@ export function useNarrator() {
       const voice = (opts.voiceName || "alloy").toLowerCase();
       const format = opts.format || "mp3";
       const volume = typeof opts.volume === "number" ? Math.max(0, Math.min(1, opts.volume)) : 1;
+      const instructions = opts.instructions;
 
-      log("prepare() fetch /api/tts … voice =", voice, "format =", format);
+      log("prepare() fetch /api/tts … voice =", voice, "format =", format, instructions ? `instructions = "${instructions}"` : "");
+
+      // Build request body - only include instructions if defined
+      const requestBody: { text: string; voice: string; format: string; instructions?: string } = {
+        text,
+        voice,
+        format,
+      };
+      if (instructions) {
+        requestBody.instructions = instructions;
+      }
+
       const r = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice, format }),
+        body: JSON.stringify(requestBody),
         signal: globalAbortRef.signal,
       });
       if (!r.ok) {

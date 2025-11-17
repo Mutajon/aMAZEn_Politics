@@ -12,7 +12,7 @@
 //
 // 🔧 Easy knobs (edit these first - Mobile-first responsive):
 const TITLE_CLASS = "text-sm md:text-base font-semibold text-white/95";
-const DESC_CLASS  = "text-[12px] md:text-[13px] leading-snug text-white/85";
+const DESC_CLASS  = "text-[13px] md:text-[14px] leading-snug text-white/85";
 const CARD_PAD    = "px-2 py-2 md:px-3 md:py-3"; // overall padding (mobile → desktop)
 const CARD_TONE   = "border-slate-700/50 bg-black/60 backdrop-blur-sm ring-1 ring-amber-400/40 rounded-2xl shadow-sm";
 

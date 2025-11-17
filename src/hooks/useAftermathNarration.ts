@@ -50,7 +50,11 @@ export function useAftermathNarration(remembranceText: string | undefined) {
         }
 
         console.log('[AftermathNarration] Preparing narration...');
-        const p = await narrator.prepare(remembranceText, { voiceName: "alloy", format: "mp3" });
+        const p = await narrator.prepare(remembranceText, {
+          voiceName: "alloy",
+          format: "mp3",
+          instructions: "Speak in a solemn, reflective tone with gravitas and reverence"
+        });
         if (cancelled) {
           p.dispose();
           return;

@@ -61,6 +61,7 @@ export default function IntroScreen({ push }: { push: PushFn }) {
   // Fragment reveal pause state
   const [isFragmentPause, setIsFragmentPause] = useState(false);
   const [fragmentsRevealed, setFragmentsRevealed] = useState(false);
+  const [animationComplete, setAnimationComplete] = useState(false);
 
   // Determine gatekeeper message based on first visit and fragment count
   const getGatekeeperMessage = () => {
@@ -80,6 +81,9 @@ export default function IntroScreen({ push }: { push: PushFn }) {
     ? (currentLineIndex >= FRAGMENT_LINE_INDEX && fragmentsRevealed)
     : true;
 
+  // Determine if gatekeeper should be interactive (wait for animation on return visits)
+  const isGatekeeperInteractive = firstIntro || animationComplete;
+
   // Show gatekeeper after 1 second delay
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -93,16 +97,28 @@ export default function IntroScreen({ push }: { push: PushFn }) {
     return () => clearTimeout(timer);
   }, [logger]);
 
+  // Handle animation completion
+  const handleAnimationComplete = () => {
+    setAnimationComplete(true);
+    logger.log(
+      "fragment_animation_completed",
+      { fragmentCount, hasAllFragments },
+      "Fragment fall-in and bob animation completed"
+    );
+  };
+
   // Handle gatekeeper dismissal (click to advance)
   const handleGatekeeperClick = () => {
-    // Returning visit - go straight to "I'm ready"
+    // Returning visit - wait for animation, then go to "I'm ready"
     if (!firstIntro) {
-      setIsLastLine(true);
-      logger.log(
-        "intro_return_visit",
-        { fragmentCount, hasAllFragments },
-        "Returning visit - skipping dialog"
-      );
+      if (animationComplete) {
+        setIsLastLine(true);
+        logger.log(
+          "intro_return_visit",
+          { fragmentCount, hasAllFragments },
+          "Returning visit - skipping dialog"
+        );
+      }
       return;
     }
 
@@ -191,12 +207,9 @@ export default function IntroScreen({ push }: { push: PushFn }) {
     setSelectedFragment(null);
   };
 
-  // Auto-advance after fragment reveal
+  // Auto-advance after fragment animation completes (first visit only)
   useEffect(() => {
-    if (!isFragmentPause) return;
-
-    // Wait for fragment animation (400ms) + additional pause (1000ms)
-    const timer = setTimeout(() => {
+    if (isFragmentPause && animationComplete) {
       setCurrentLineIndex((prev) => prev + 1); // Advance to next line
       setIsFragmentPause(false);
 
@@ -205,10 +218,8 @@ export default function IntroScreen({ push }: { push: PushFn }) {
         { fragmentLineIndex: FRAGMENT_LINE_INDEX, nextLine: currentLineIndex + 1 },
         "Fragment reveal completed, dialog continuing"
       );
-    }, 1400);
-
-    return () => clearTimeout(timer);
-  }, [isFragmentPause, currentLineIndex, logger]);
+    }
+  }, [isFragmentPause, animationComplete, currentLineIndex, logger]);
 
   return (
     <div
@@ -216,7 +227,12 @@ export default function IntroScreen({ push }: { push: PushFn }) {
       style={etherPlaceBackground}
     >
       {/* Fragment Slots - shown when fragments mentioned or on returning visits */}
-      {shouldShowFragments && <FragmentSlots onFragmentClick={handleFragmentClick} />}
+      {shouldShowFragments && (
+        <FragmentSlots
+          onFragmentClick={handleFragmentClick}
+          onAnimationComplete={handleAnimationComplete}
+        />
+      )}
 
       {/* Fragment Popup */}
       <FragmentPopup
@@ -230,7 +246,11 @@ export default function IntroScreen({ push }: { push: PushFn }) {
         <Gatekeeper
           text={getGatekeeperMessage()}
           isVisible={true}
-          onDismiss={isFragmentPause ? () => {} : handleGatekeeperClick}
+          onDismiss={
+            isFragmentPause || (!firstIntro && !animationComplete)
+              ? () => {}
+              : handleGatekeeperClick
+          }
           showHint={firstIntro && currentLineIndex === 0}
         />
       )}

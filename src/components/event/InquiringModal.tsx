@@ -269,7 +269,14 @@ export default function InquiringModal({
 
               <textarea
                 value={currentQuestion}
-                onChange={(e) => setCurrentQuestion(e.target.value)}
+                onChange={(e) => {
+                  setCurrentQuestion(e.target.value);
+                  // Ensure cursor stays visible while typing
+                  requestAnimationFrame(() => {
+                    const pos = e.target.selectionStart;
+                    e.target.setSelectionRange(pos, pos);
+                  });
+                }}
                 onKeyPress={handleKeyPress}
                 placeholder="What would you like to know about this situation?"
                 className="w-full h-24 px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-yellow-500/50 transition-all resize-none"

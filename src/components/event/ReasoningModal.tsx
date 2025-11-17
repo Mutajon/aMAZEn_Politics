@@ -140,6 +140,12 @@ export default function ReasoningModal({
 
     typingTimingIdRef.current = null;
 
+    // Store reasoning duration for session summary
+    if (typingDuration !== null) {
+      const { addReasoningTime } = useDilemmaStore.getState();
+      addReasoningTime(typingDuration);
+    }
+
     // Log submission
     logger.log(
       "reasoning_submitted",
@@ -307,6 +313,11 @@ export default function ReasoningModal({
                     onChange={(e) => {
                       setReasoningText(e.target.value);
                       setValidationError("");
+                      // Ensure cursor stays visible while typing
+                      requestAnimationFrame(() => {
+                        const pos = e.target.selectionStart;
+                        e.target.setSelectionRange(pos, pos);
+                      });
                     }}
                     onKeyPress={handleKeyPress}
                     placeholder="Explain why you made this decision... and be honest."

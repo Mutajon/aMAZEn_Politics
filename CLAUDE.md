@@ -80,8 +80,10 @@ CHAT_MODEL=gpt-5-mini
 MODEL_DILEMMA=gpt-5
 MODEL_MIRROR=gpt-5
 IMAGE_MODEL=gpt-image-1
-TTS_MODEL=tts-1
-TTS_VOICE=alloy
+TTS_MODEL=gpt-4o-mini-tts
+TTS_VOICE=onyx
+TTS_INSTRUCTIONS=Speak in a mysterious and amused tone, with ethereal echo
+TTS_FORMAT=mp3
 ```
 
 **Render Configuration:**
@@ -338,6 +340,42 @@ When treatment is `fullAutonomy`, the `/api/game-turn-v2` endpoint skips generat
 - TTS controlled by SFX toggle
 - When SFX muted, narration disabled (prevents API requests)
 - Used in EventScreen and AftermathScreen
+
+**Text-to-Speech (TTS) System:**
+- **Provider:** OpenAI TTS API
+- **Models:**
+  - `gpt-4o-mini-tts` (default, supports instructions for tone/style control)
+  - `tts-1` (basic, no instructions support)
+  - `tts-1-hd` (high quality, no instructions support)
+- **Voices:** alloy, echo, fable, onyx, nova, shimmer
+- **Instructions Support:**
+  - Only `gpt-4o-mini-tts` and newer models support the `instructions` parameter
+  - Use to control tone, style, emotion (e.g., "Speak in a mysterious and amused tone, with ethereal echo")
+  - Falls back gracefully if instructions not supported
+- **Per-Screen Customization:**
+  - **Dilemmas** (`useEventNarration.ts`): "Speak as a dramatic political narrator with gravitas and urgency"
+  - **Aftermath** (`useAftermathNarration.ts`): "Speak in a solemn, reflective tone with gravitas and reverence"
+  - **Environment Variable Default** (`TTS_INSTRUCTIONS`): Global fallback for all TTS requests
+- **Implementation Files:**
+  - Backend: `server/index.mjs` (lines 1773-1821) - API endpoint
+  - Core Hook: `src/hooks/useNarrator.ts` - TTS preparation & playback
+  - Dilemma Narration: `src/hooks/useEventNarration.ts`
+  - Aftermath Narration: `src/hooks/useAftermathNarration.ts`
+- **Configuration:**
+  - `TTS_MODEL` - Model name (default: `gpt-4o-mini-tts`)
+  - `TTS_VOICE` - Voice selection (default: `onyx`)
+  - `TTS_INSTRUCTIONS` - Optional global tone/style instructions
+  - `TTS_FORMAT` - Audio format: mp3, opus, aac, flac (default: `mp3`)
+- **Example Usage:**
+  ```typescript
+  const { prepare } = useNarrator();
+  const audio = await prepare("Your text here", {
+    voiceName: "onyx",
+    format: "mp3",
+    instructions: "Speak dramatically with urgency"
+  });
+  await audio.start();
+  ```
 
 ## Political Compass System
 

@@ -42,6 +42,7 @@ import { useRoleProgressStore } from "../store/roleProgressStore";
 import { useTimingLogger } from "../hooks/useTimingLogger";
 import { useReasoning } from "../hooks/useReasoning";
 import { useLogger } from "../hooks/useLogger";
+import { useSessionLogger } from "../hooks/useSessionLogger";
 import ReasoningModal from "../components/event/ReasoningModal";
 
 type Props = {
@@ -115,7 +116,7 @@ export default function EventScreen3({ push }: Props) {
   const { progress, start: startProgress, reset: resetProgress, notifyReady } = useLoadingProgress();
 
   // Phase tracking
-  const [phase, setPhase] = useState<'collecting' | 'presenting' | 'interacting' | 'reasoning' | 'cleaning'>('collecting');
+  const [phase, setPhase] = useState<'collecting' | 'presenting' | 'interacting' | 'reasoning' | 'cleaning' | 'confirming'>('collecting');
 
   // Presentation step tracking (controls what's visible)
   const [presentationStep, setPresentationStep] = useState<number>(-1);
@@ -131,11 +132,12 @@ export default function EventScreen3({ push }: Props) {
   // Coin flight system (persists across all phases)
   const { flights, triggerCoinFlight, clearFlights } = useCoinFlights();
 
-  // Data logging hooks (Timing, Player actions)
+  // Data logging hooks (Timing, Player actions, Session lifecycle)
   // Note: State change tracking is handled globally in App.tsx via useStateChangeLogger
   // Note: AI output logging is handled in useEventDataCollector.ts at the source
   const timingLogger = useTimingLogger();
   const logger = useLogger();
+  const sessionLogger = useSessionLogger();
 
   // Reasoning feature (treatment-based)
   const reasoning = useReasoning();
@@ -280,6 +282,30 @@ export default function EventScreen3({ push }: Props) {
       notifyReady();
     });
   }, [registerOnReady, notifyReady]);
+
+  // ========================================================================
+  // EFFECT 0C: Start session timing on first mount (not on snapshot restore)
+  // Session timing: EventScreen first load → AftermathScreen load
+  // ========================================================================
+  const sessionStartedRef = useRef(false);
+
+  useEffect(() => {
+    // Only start session once, and only if NOT restored from snapshot
+    if (!sessionStartedRef.current && !restoredFromSnapshot) {
+      const { selectedRole } = useRoleStore.getState();
+      const { character } = useRoleStore.getState();
+
+      sessionLogger.start({
+        role: selectedRole || 'Unknown',
+        playerName: character?.name || 'Unknown',
+        day,
+        totalDays
+      });
+
+      sessionStartedRef.current = true;
+      console.log('[EventScreen3] ⏱️ Session timing started');
+    }
+  }, [restoredFromSnapshot, day, totalDays, sessionLogger]);
 
   // ========================================================================
   // EFFECT 1: Trigger collection when phase changes TO 'collecting'
@@ -502,6 +528,9 @@ export default function EventScreen3({ push }: Props) {
    * Handle action confirmation - delegates ALL logic to EventDataCleaner
    */
   const handleConfirm = async (id: string) => {
+    // Set phase to confirming immediately to show loading overlay
+    setPhase('confirming');
+
     // Find the action card
     const actionsForDeck = collectedData?.dilemma
       ? actionsToDeckCards(collectedData.dilemma.actions)
@@ -565,6 +594,9 @@ export default function EventScreen3({ push }: Props) {
    * Handle custom action suggestion
    */
   const handleSuggest = async (text?: string) => {
+    // Set phase to confirming immediately to show loading overlay
+    setPhase('confirming');
+
     if (!text || !text.trim()) {
       console.warn('[EventScreen3] ❌ handleSuggest called with empty text');
       return;
@@ -707,10 +739,10 @@ export default function EventScreen3({ push }: Props) {
   // };
 
   // ========================================================================
-  // RENDER: Loading State (collecting phase)
+  // RENDER: Loading State (confirming or collecting phase)
   // ========================================================================
   // Don't show loading overlay if we're restoring from snapshot
-  if ((phase === 'collecting' || isCollecting) && !restoredFromSnapshot) {
+  if ((phase === 'confirming' || phase === 'collecting' || isCollecting) && !restoredFromSnapshot) {
     return (
       <AnimatePresence mode="wait">
         <CollectorLoadingOverlay

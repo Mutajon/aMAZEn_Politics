@@ -8,6 +8,8 @@ import { useState, useEffect, useRef } from 'react';
  * - 0.5s fade in
  * - 9s visible
  * - 0.5s fade out
+ *
+ * Tips are shuffled on mount so each overlay display shows a random tip first
  */
 
 const LOADING_TIPS = [
@@ -18,9 +20,23 @@ const LOADING_TIPS = [
   "You can click inquire to learn more about a problem before making a decision",
 ];
 
+/**
+ * Fisher-Yates shuffle algorithm for randomizing array
+ */
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 type FadeState = 'in' | 'visible' | 'out';
 
 export function useRotatingTips() {
+  // Shuffle tips once when hook mounts - ensures different tip on first display
+  const [shuffledTips] = useState(() => shuffleArray(LOADING_TIPS));
   const [currentIndex, setCurrentIndex] = useState(0);
   const [fadeState, setFadeState] = useState<FadeState>('in');
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -39,8 +55,8 @@ export function useRotatingTips() {
           setFadeState('out');
 
           timerRef.current = setTimeout(() => {
-            // Move to next tip
-            setCurrentIndex((prev) => (prev + 1) % LOADING_TIPS.length);
+            // Move to next tip (cycling through shuffled array)
+            setCurrentIndex((prev) => (prev + 1) % shuffledTips.length);
           }, 500);
         }, 9000);
       }, 500);
@@ -53,10 +69,10 @@ export function useRotatingTips() {
         clearTimeout(timerRef.current);
       }
     };
-  }, [currentIndex]);
+  }, [currentIndex, shuffledTips.length]);
 
   return {
-    currentTip: LOADING_TIPS[currentIndex],
+    currentTip: shuffledTips[currentIndex],
     fadeState,
   };
 }

@@ -73,6 +73,12 @@ type DilemmaState = {
   // Decision timing tracking (for session summary statistics)
   decisionTimes: number[];  // Array of decision durations in milliseconds
 
+  // Reasoning timing tracking (for session summary statistics)
+  reasoningTimes: number[];  // Array of reasoning durations in milliseconds
+
+  // Custom action text tracking (for session summary)
+  customActionTexts: string[];  // Array of custom action text submissions
+
   current: Dilemma | null;
   history: Dilemma[];
   loading: boolean;
@@ -216,6 +222,12 @@ type DilemmaState = {
   // Decision timing methods (for session summary)
   addDecisionTime: (duration: number) => void;                  // Store decision duration
 
+  // Reasoning timing methods (for session summary)
+  addReasoningTime: (duration: number) => void;                 // Store reasoning duration
+
+  // Custom action text methods (for session summary)
+  addCustomActionText: (text: string) => void;                  // Store custom action text
+
   // Crisis detection methods (NEW)
   detectAndSetCrisis: () => "downfall" | "people" | "challenger" | "caring" | null;  // Detect crisis after support updates, returns crisis mode
   clearCrisis: () => void;          // Clear crisis state after handling
@@ -256,6 +268,12 @@ export const useDilemmaStore = create<DilemmaState>()(
 
   // Decision timing (initialized empty, populated as player makes decisions)
   decisionTimes: [],
+
+  // Reasoning timing (initialized empty, populated as player provides reasoning)
+  reasoningTimes: [],
+
+  // Custom action texts (initialized empty, populated as player submits custom actions)
+  customActionTexts: [],
 
   current: null,
   history: [],
@@ -427,6 +445,8 @@ export const useDilemmaStore = create<DilemmaState>()(
       inquiryCreditsRemaining: 0,
       reasoningSubmissionCount: 0,
       decisionTimes: [],
+      reasoningTimes: [],
+      customActionTexts: [],
     });
   },
 
@@ -857,6 +877,28 @@ export const useDilemmaStore = create<DilemmaState>()(
     const newTimes = [...decisionTimes, duration];
     dlog("addDecisionTime ->", duration, "ms | total decisions:", newTimes.length);
     set({ decisionTimes: newTimes });
+  },
+
+  // ========================================================================
+  // REASONING TIMING METHODS
+  // ========================================================================
+
+  addReasoningTime(duration) {
+    const { reasoningTimes } = get();
+    const newTimes = [...reasoningTimes, duration];
+    dlog("addReasoningTime ->", duration, "ms | total reasonings:", newTimes.length);
+    set({ reasoningTimes: newTimes });
+  },
+
+  // ========================================================================
+  // CUSTOM ACTION TEXT METHODS
+  // ========================================================================
+
+  addCustomActionText(text) {
+    const { customActionTexts } = get();
+    const newTexts = [...customActionTexts, text];
+    dlog("addCustomActionText ->", text.length, "chars | total custom actions:", newTexts.length);
+    set({ customActionTexts: newTexts });
   },
 
   // ========================================================================

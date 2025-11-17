@@ -12,6 +12,7 @@ import { useState, useRef, useLayoutEffect, useEffect } from "react";
 import { useAnimationControls } from "framer-motion";
 import { useTimingLogger } from "./useTimingLogger";
 import { useLogger } from "./useLogger";
+import { useDilemmaStore } from "../store/dilemmaStore";
 
 export type ActionCard = {
   id: string;
@@ -181,6 +182,10 @@ export function useActionDeckState(actions: ActionCard[]) {
         budgetBefore,
         typingDuration: duration
       }, `Custom action: ${suggestText.substring(0, 50)}... (${suggestText.length} chars, ${duration}ms, cost: ${cost})`);
+
+      // Store custom action text for session summary
+      const { addCustomActionText } = useDilemmaStore.getState();
+      addCustomActionText(suggestText);
 
       suggestTypingTimingIdRef.current = null;
     }
