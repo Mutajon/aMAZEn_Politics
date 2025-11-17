@@ -6,6 +6,11 @@ import "./index.css";
 import { useSettingsStore } from "./store/settingsStore";
 import { usePastGamesStore } from "./store/pastGamesStore";
 import { useFragmentsStore } from "./store/fragmentsStore";
+import { useLoggingStore } from "./store/loggingStore";
+import { useDilemmaStore } from "./store/dilemmaStore";
+import { useCompassStore } from "./store/compassStore";
+import { useRoleStore } from "./store/roleStore";
+import { useHighscoreStore } from "./store/highscoreStore";
 
 // Disable StrictMode in development to avoid double-invoked effects (which fire duplicate API calls).
 const useStrict = import.meta.env.MODE !== "development";
@@ -310,14 +315,58 @@ const useStrict = import.meta.env.MODE !== "development";
 };
 
 (window as any).resetExperimentProgress = () => {
-  if (confirm('⚠️ Reset all experiment progress? This will unlock all 3 experiment roles.')) {
+  if (confirm('⚠️ Reset experiment progress? This will unlock all 3 roles and clear past games/fragments.')) {
     useLoggingStore.getState().resetExperimentProgress();
+    usePastGamesStore.getState().clearAll();
+    useFragmentsStore.getState().clearFragments();
+    useFragmentsStore.getState().resetIntro();
     console.log('✅ Experiment progress reset! All roles unlocked.');
+    console.log('✅ Past games cleared.');
+    console.log('✅ Fragments cleared and intro reset.');
     console.log('💡 Refresh the page if you\'re on role selection screen.');
   }
 };
 
 (window as any).clearExperimentProgress = (window as any).resetExperimentProgress;
+
+// ========================================================================
+// Complete Reset (First-Time Player Experience)
+// ========================================================================
+(window as any).resetAll = () => {
+  if (confirm('⚠️ COMPLETE RESET: This will erase ALL game data (progress, scores, ID) except user preferences (audio, language). Continue?')) {
+    // Core game state
+    useDilemmaStore.getState().reset();
+    useCompassStore.getState().reset();
+    useRoleStore.getState().reset();
+
+    // Progression systems
+    useLoggingStore.getState().resetExperimentProgress();
+    usePastGamesStore.getState().clearAll();
+    useFragmentsStore.getState().clearFragments();
+    useFragmentsStore.getState().resetIntro();
+    useHighscoreStore.getState().reset();
+
+    // User identity & treatment
+    useLoggingStore.getState().resetLoggingStore(); // Generates new userId
+    useSettingsStore.getState().setTreatment('semiAutonomy'); // Reset to default
+
+    // Manual cleanup
+    localStorage.removeItem('logging_queue_backup');
+    localStorage.removeItem('hasSeenTutorial');
+
+    console.log('✅ Complete reset successful!');
+    console.log('   → Game state cleared (dilemma/compass/role)');
+    console.log('   → Experiment progress reset');
+    console.log('   → Past games cleared');
+    console.log('   → Fragments cleared, intro reset');
+    console.log('   → Highscores reset to defaults');
+    console.log('   → New anonymous user ID generated');
+    console.log('   → Treatment reset to semiAutonomy');
+    console.log('   → Logging queue cleared');
+    console.log('💾 User preferences preserved (audio, language, display)');
+    console.log('💡 Refresh the page to start fresh!');
+  }
+};
 
 // HIDDEN FOR EXPERIMENTAL DISTRIBUTION
 // Console commands are still available but not advertised to users

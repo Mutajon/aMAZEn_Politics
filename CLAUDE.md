@@ -58,8 +58,13 @@ resetIntro()         # Reset first intro flag (show full dialog again)
 
 // Experiment Mode Management
 getExperimentProgress()    # View completed roles and progress
-resetExperimentProgress()  # Reset all experiment progress (unlock all roles)
+resetExperimentProgress()  # Reset experiment progress + clear past games/fragments
 clearExperimentProgress()  # Alias for resetExperimentProgress()
+
+// Complete Reset (First-Time Player Experience)
+resetAll()                 # FULL RESET: All data except user preferences (audio, language)
+                           # Resets: game state, progress, scores, user ID, treatment
+                           # Preserves: audio settings, language, display preferences
 ```
 
 ## Deployment
