@@ -147,6 +147,9 @@ export function buildPastGameEntry(
   // Extract ratings
   const ratings = aftermathData.ratings;
 
+  // Extract self-judgment
+  const selfJudgment = dilemmaStore.selfJudgment || null;
+
   // Build the entry
   const entry: PastGameEntry = {
     // Identifiers
@@ -176,6 +179,9 @@ export function buildPastGameEntry(
 
     // Compass Top Values
     topCompassValues,
+
+    // Self-Assessment
+    selfJudgment,
 
     // Ratings
     ratings,

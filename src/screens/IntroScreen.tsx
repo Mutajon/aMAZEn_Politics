@@ -22,13 +22,13 @@ const dialogLines = [
   "That's where I come in.",
   "I offer you a short trip back to the world of the living. Seven days. Be whoever you want.",
   "A chance to test your values, remember who you are.",
-  "Each veunture will give you a fragment of yourself.",
+  "Each venture will give you a fragment of yourself.",
   "Gather three such Fragments, and your true Name will be woven.",
   "Your self will be complete, and you'll be ready to move on.",
   "What's the catch?",
   "I come with you. Every decision you make, every motive you hide, I will observe and collect.",
-  "I need it to pay an old, lingering debt and finally leave this place.",
-  "So. Interested?",
+  "I need it to pay an old debt, so that I too can finally leave this place.",
+  "So, Interested?",
   "Good. Because you don't really have a choice.",
   "Let me know when you are ready.",
 ];
@@ -48,6 +48,18 @@ const getVoiceoverKey = (lineIndex: number): VoKey | null => {
     3: 'gatekeeper-3',
     4: 'gatekeeper-4',
     5: 'gatekeeper-5',
+    6: 'gatekeeper-6',
+    7: 'gatekeeper-7',
+    8: 'gatekeeper-8',
+    9: 'gatekeeper-9',
+    10: 'gatekeeper-10',
+    11: 'gatekeeper-11',
+    12: 'gatekeeper-12',
+    13: 'gatekeeper-13',
+    14: 'gatekeeper-14',
+    15: 'gatekeeper-15',
+    16: 'gatekeeper-16',
+    17: 'gatekeeper-17',
     18: 'gatekeeper-18', // Last line: "Let me know when you're ready"
   };
   return mapping[lineIndex] || null;
@@ -89,7 +101,7 @@ export default function IntroScreen({ push }: { push: PushFn }) {
 
     // Returning visit - show abbreviated message
     if (hasAllFragments) {
-      return "You've collected all the required fragments. You're ready to move on to your eternal rest.";
+      return "You have collected all the required fragments. You are ready to move on to your eternal rest.";
     }
 
     return "Ready for another trip to the world of the living?";
@@ -107,8 +119,9 @@ export default function IntroScreen({ push }: { push: PushFn }) {
     const timer = setTimeout(() => {
       setShowGatekeeper(true);
 
-      // Play first line voiceover (only on first visit)
+      // Play appropriate voiceover based on visit type
       if (firstIntro) {
+        // First visit - play line 0
         const voKey = getVoiceoverKey(0);
         if (voKey) {
           audioManager.playVoiceover(voKey);
@@ -118,6 +131,17 @@ export default function IntroScreen({ push }: { push: PushFn }) {
             "Started voiceover for line 0"
           );
         }
+      } else {
+        // Returning visit - play appropriate message
+        const voKey: VoKey = hasAllFragments
+          ? 'gatekeeper-return-complete'
+          : 'gatekeeper-return-incomplete';
+        audioManager.playVoiceover(voKey);
+        logger.logSystem(
+          "gatekeeper_voiceover_started",
+          { visitType: 'returning', fragmentCount, voiceoverKey: voKey },
+          `Started voiceover for returning visit (${fragmentCount} fragments)`
+        );
       }
 
       logger.logSystem(
@@ -127,7 +151,7 @@ export default function IntroScreen({ push }: { push: PushFn }) {
       );
     }, 1000);
     return () => clearTimeout(timer);
-  }, [logger, firstIntro]);
+  }, [logger, firstIntro, fragmentCount, hasAllFragments]);
 
   // Handle animation completion
   const handleAnimationComplete = () => {

@@ -52,8 +52,8 @@ export function useAftermathNarration(remembranceText: string | undefined) {
         console.log('[AftermathNarration] Preparing narration...');
         const p = await narrator.prepare(remembranceText, {
           voiceName: "onyx",
-          format: "mp3",
-          instructions: "Speak in a solemn, reflective tone with gravitas and reverence"
+          format: "mp3"
+          // No instructions - will use .env TTS_INSTRUCTIONS
         });
         if (cancelled) {
           p.dispose();

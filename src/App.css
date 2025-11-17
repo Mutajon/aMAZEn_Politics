@@ -23,3 +23,20 @@
 }
 .animate-arrow-up   { animation: arrow-up   1400ms ease-in-out infinite; }
 .animate-arrow-down { animation: arrow-down 1400ms ease-in-out infinite; }
+
+/* golden shimmer effect for fragment collection text */
+@keyframes shimmer-text {
+  0%, 100% {
+    text-shadow: 0 0 12px rgba(251, 191, 36, 0.8),
+                 0 0 24px rgba(251, 191, 36, 0.5),
+                 0 0 36px rgba(251, 191, 36, 0.2);
+  }
+  50% {
+    text-shadow: 0 0 20px rgba(251, 191, 36, 1.0),
+                 0 0 36px rgba(251, 191, 36, 0.8),
+                 0 0 48px rgba(251, 191, 36, 0.4);
+  }
+}
+.animate-shimmer-text {
+  animation: shimmer-text 2s ease-in-out infinite;
+}

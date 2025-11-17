@@ -23,13 +23,32 @@ const AUDIO_FILES = {
     'drumroll': '/assets/sounds/Drum Roll Medium.mp3', // Note: filename has spaces
   },
   vo: {
+    // First-visit dialogue (19 lines total)
     'gatekeeper-0': '/assets/sounds/VO/gatekeeperIntro/anotherLost.wav',
     'gatekeeper-1': '/assets/sounds/VO/gatekeeperIntro/seeItInYourEyes.wav',
     'gatekeeper-2': '/assets/sounds/VO/gatekeeperIntro/thatsAProblem.wav',
     'gatekeeper-3': '/assets/sounds/VO/gatekeeperIntro/iAmTheGatekeeper.wav',
     'gatekeeper-4': '/assets/sounds/VO/gatekeeperIntro/eternalRest.wav',
     'gatekeeper-5': '/assets/sounds/VO/gatekeeperIntro/youAreDead.wav',
+    'gatekeeper-6': '/assets/sounds/VO/gatekeeperIntro/biggerIssue.wav',
+    'gatekeeper-7': '/assets/sounds/VO/gatekeeperIntro/thatsWhereI.wav',
+    'gatekeeper-8': '/assets/sounds/VO/gatekeeperIntro/iOfferYou.wav',
+    'gatekeeper-9': '/assets/sounds/VO/gatekeeperIntro/aChanceToTestValues.wav',
+    'gatekeeper-10': '/assets/sounds/VO/gatekeeperIntro/EachVenture.wav',
+    'gatekeeper-11': '/assets/sounds/VO/gatekeeperIntro/gatherThreeSuch.wav',
+    'gatekeeper-12': '/assets/sounds/VO/gatekeeperIntro/yourSelfComplete.wav',
+    'gatekeeper-13': '/assets/sounds/VO/gatekeeperIntro/whatsTheCatch.wav',
+    'gatekeeper-14': '/assets/sounds/VO/gatekeeperIntro/iComeWithYou.wav',
+    'gatekeeper-15': '/assets/sounds/VO/gatekeeperIntro/needItToPayDebt.wav',
+    'gatekeeper-16': '/assets/sounds/VO/gatekeeperIntro/soInterested.wav',
+    'gatekeeper-17': '/assets/sounds/VO/gatekeeperIntro/goodBecauseNoChoice.wav',
     'gatekeeper-18': '/assets/sounds/VO/gatekeeperIntro/letMeKnowWhenReady.wav',
+    // Returning-visit messages
+    'gatekeeper-return-incomplete': '/assets/sounds/VO/gatekeeperIntro/readyForAnotherTrip.wav',
+    'gatekeeper-return-complete': '/assets/sounds/VO/gatekeeperIntro/youHaveCollectedAllRequired.wav',
+    // Self-judgment and aftermath
+    'time-is-up': '/assets/sounds/VO/gatekeeperIntro/timeIsUp.wav',
+    'behold-fragment': '/assets/sounds/VO/gatekeeperIntro/beholdFragment.wav',
   },
 } as const;
 

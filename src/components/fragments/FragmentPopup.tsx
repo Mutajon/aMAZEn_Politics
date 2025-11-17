@@ -41,7 +41,7 @@ export default function FragmentPopup({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 pointer-events-auto">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center px-4 pointer-events-auto">
           {/* Backdrop */}
           <motion.div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -127,6 +127,17 @@ export default function FragmentPopup({
                         type={snapshot.type}
                       />
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Self-Judgment */}
+              {fragment.selfJudgment && (
+                <div className="mb-4">
+                  <div className="bg-purple-900/20 border border-purple-700/40 rounded-lg px-4 py-3">
+                    <p className="text-sm text-purple-200">
+                      <span className="font-semibold">Self judgment:</span> {fragment.selfJudgment}
+                    </p>
                   </div>
                 </div>
               )}

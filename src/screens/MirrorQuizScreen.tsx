@@ -21,6 +21,7 @@ import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import { useTimingLogger } from "../hooks/useTimingLogger";
 import { useLang } from "../i18n/lang";
 import { translateQuizQuestion, translateQuizAnswer } from "../i18n/translateGameData";
+import { useLoggingStore } from "../store/loggingStore";
 
 
 /** placeholder avatar for images OFF */
@@ -251,9 +252,21 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
 
           // Capture initial compass snapshot for session summary
           // This happens automatically after quiz completes, before any navigation
-          const { captureInitialSnapshot } = useCompassStore.getState();
+          const { captureInitialSnapshot, values } = useCompassStore.getState();
           captureInitialSnapshot();
-          console.log('[MirrorQuizScreen] ✅ Initial compass snapshot captured automatically after quiz completion');
+
+          // DEFENSIVE DOUBLE-PERSISTENCE: Also save to loggingStore
+          // This provides redundant storage in case compassStore localStorage fails
+          const { setInitialCompassSnapshot } = useLoggingStore.getState();
+          const snapshot = {
+            what: [...values.what],
+            whence: [...values.whence],
+            how: [...values.how],
+            whither: [...values.whither],
+          };
+          setInitialCompassSnapshot(snapshot);
+
+          console.log('[MirrorQuizScreen] ✅ Initial compass snapshot captured and persisted to both stores');
 
           // Log quiz completion
           logger.log(

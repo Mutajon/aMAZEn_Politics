@@ -79,6 +79,9 @@ type DilemmaState = {
   // Custom action text tracking (for session summary)
   customActionTexts: string[];  // Array of custom action text submissions
 
+  // Self-judgment (Day 8 aftermath questionnaire)
+  selfJudgment: string | null;  // Player's self-assessment of their choices
+
   current: Dilemma | null;
   history: Dilemma[];
   loading: boolean;
@@ -228,6 +231,9 @@ type DilemmaState = {
   // Custom action text methods (for session summary)
   addCustomActionText: (text: string) => void;                  // Store custom action text
 
+  // Self-judgment methods (Day 8 aftermath questionnaire)
+  addSelfJudgment: (judgment: string) => void;                  // Store player self-assessment
+
   // Crisis detection methods (NEW)
   detectAndSetCrisis: () => "downfall" | "people" | "challenger" | "caring" | null;  // Detect crisis after support updates, returns crisis mode
   clearCrisis: () => void;          // Clear crisis state after handling
@@ -274,6 +280,9 @@ export const useDilemmaStore = create<DilemmaState>()(
 
   // Custom action texts (initialized empty, populated as player submits custom actions)
   customActionTexts: [],
+
+  // Self-judgment (null until day 8 aftermath questionnaire)
+  selfJudgment: null,
 
   current: null,
   history: [],
@@ -447,6 +456,7 @@ export const useDilemmaStore = create<DilemmaState>()(
       decisionTimes: [],
       reasoningTimes: [],
       customActionTexts: [],
+      selfJudgment: null,
     });
   },
 
@@ -899,6 +909,15 @@ export const useDilemmaStore = create<DilemmaState>()(
     const newTexts = [...customActionTexts, text];
     dlog("addCustomActionText ->", text.length, "chars | total custom actions:", newTexts.length);
     set({ customActionTexts: newTexts });
+  },
+
+  // ========================================================================
+  // SELF-JUDGMENT METHODS
+  // ========================================================================
+
+  addSelfJudgment(judgment) {
+    dlog("addSelfJudgment ->", judgment);
+    set({ selfJudgment: judgment });
   },
 
   // ========================================================================

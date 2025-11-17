@@ -51,8 +51,8 @@ export function useEventNarration() {
 
         const p = await prepareNarration(speech, {
           voiceName: "onyx",
-          format: "mp3",
-          instructions: "Speak as a dramatic political narrator with gravitas and urgency"
+          format: "mp3"
+          // No instructions - will use .env TTS_INSTRUCTIONS
         });
         if (cancelled) {
           p.dispose();

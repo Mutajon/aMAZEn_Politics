@@ -62,6 +62,7 @@ export type SessionSummary = {
     mom: number;
   };
   finalScore: number;            // Total final score
+  selfJudgment: string | null;   // Player's self-assessment (Day 8)
   ideologyRatings: {             // From aftermath API
     autonomy: string;            // "very-low" | "low" | "medium" | "high" | "very-high"
     liberalism: string;          // Same scale
@@ -210,6 +211,13 @@ export function collectSessionSummary(
     democracy: extractDemocracyRating(aftermathData.decisions)
   } : null;
 
+  // Get initial compass snapshot with fallback chain: loggingStore → compassStore → null
+  // loggingStore has more reliable localStorage persistence (proven working)
+  const initialCompassSnapshot =
+    loggingStore.initialCompassSnapshot ||
+    compassStore.initialCompassSnapshot ||
+    null;
+
   const summary: SessionSummary = {
     timestamp: new Date(),
     userId: loggingStore.userId || 'unknown',
@@ -232,8 +240,8 @@ export function collectSessionSummary(
       count: customActionTexts.length,
       texts: customActionTexts,
     },
-    initialCompass: compassStore.initialCompassSnapshot
-      ? mapCompassToNamed(compassStore.initialCompassSnapshot)
+    initialCompass: initialCompassSnapshot
+      ? mapCompassToNamed(initialCompassSnapshot)
       : null,
     finalCompass: mapCompassToNamed(compassStore.values),
     supportBreakdown: {
@@ -242,6 +250,7 @@ export function collectSessionSummary(
       mom: dilemmaStore.supportMom,
     },
     finalScore: scoreBreakdown.final,
+    selfJudgment: dilemmaStore.selfJudgment || null,
     ideologyRatings,
     incomplete,
   };
@@ -249,10 +258,19 @@ export function collectSessionSummary(
   // Defensive logging for critical compass issue
   if (!summary.initialCompass) {
     console.warn('[useSessionSummary] ⚠️ CRITICAL: initialCompass is null!', {
-      initialCompassSnapshot: compassStore.initialCompassSnapshot,
+      loggingStoreSnapshot: loggingStore.initialCompassSnapshot,
+      compassStoreSnapshot: compassStore.initialCompassSnapshot,
       compassValues: compassStore.values,
       timestamp: new Date().toISOString()
     });
+  } else {
+    // Success logging - show which source was used
+    const source = loggingStore.initialCompassSnapshot
+      ? 'loggingStore (primary)'
+      : compassStore.initialCompassSnapshot
+      ? 'compassStore (fallback)'
+      : 'unknown';
+    console.log(`[useSessionSummary] ✅ Initial compass loaded from: ${source}`);
   }
 
   console.log('[useSessionSummary] Session summary collected:', {

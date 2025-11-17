@@ -40,6 +40,7 @@ import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import { usePastGamesStore } from "../store/pastGamesStore";
 import { buildPastGameEntry } from "../lib/pastGamesService";
 import { useFragmentsStore } from "../store/fragmentsStore";
+import { audioManager } from "../lib/audioManager";
 
 type Props = {
   push: PushFn;
@@ -152,6 +153,9 @@ export default function AftermathScreen({ push }: Props) {
 
     // Mark as logged immediately to prevent any re-fires
     hasLoggedAftermathRef.current = true;
+
+    // Play beholdFragment voiceover (first visit only)
+    audioManager.playVoiceover('behold-fragment');
 
     // Calculate total inquiries across all days
     let totalInquiries = 0;

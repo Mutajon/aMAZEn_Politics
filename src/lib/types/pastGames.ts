@@ -59,6 +59,9 @@ export interface PastGameEntry {
   // Compass Top Values
   topCompassValues: CompassHighlight[]; // Top 2-3 per dimension (8-12 total)
 
+  // Self-Assessment
+  selfJudgment: string | null; // Player's self-assessment (Day 8)
+
   // Ratings
   ratings: {
     democracy: RatingLevel;

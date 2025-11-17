@@ -131,6 +131,7 @@ function FragmentSlot({
 }: FragmentSlotProps) {
   const label = isEmpty ? "Missing Fragment" : "Fragment Collected";
   const controls = useAnimation();
+  const [showPulse, setShowPulse] = useState(false);
 
   // Fall-in animation
   useEffect(() => {
@@ -174,36 +175,85 @@ function FragmentSlot({
     }
   }, [animationPhase, isNewest, isEmpty, controls, onBobComplete]);
 
+  // Enable pulse animation after all intro animations complete
+  useEffect(() => {
+    console.log(`[FragmentSlot] animationPhase: ${animationPhase}, isEmpty: ${isEmpty}, isNewest: ${isNewest}`);
+    if (animationPhase === "complete" && !isEmpty) {
+      console.log(`[FragmentSlot] Enabling pulse animation for collected fragment`);
+      setShowPulse(true);
+    }
+  }, [animationPhase, isEmpty, isNewest]);
+
   return (
     <div className="flex flex-col items-center gap-2">
       {/* Fragment Icon/Avatar */}
       <motion.div
-        className={`
-          w-[70px] h-[70px] md:w-[100px] md:h-[100px]
-          rounded-lg
-          flex items-center justify-center
-          transition-all duration-300
-          cursor-pointer
-          ${
-            isEmpty
-              ? "bg-gray-700/50 opacity-50 hover:opacity-70 hover:scale-105"
-              : "bg-gray-800/80 opacity-100 hover:scale-110 hover:opacity-100"
-          }
-        `}
-        onClick={onClick}
-        whileHover={{ scale: isEmpty ? 1.05 : 1.1 }}
-        whileTap={{ scale: 0.95 }}
+        className="w-[70px] h-[70px] md:w-[100px] md:h-[100px]"
         initial={isEmpty ? { opacity: 0.5 } : { y: -200, opacity: 0 }}
-        animate={controls}
+        animate={isEmpty ? { opacity: 0.5 } : controls}
         onAnimationComplete={
           !isEmpty && onFallInComplete ? onFallInComplete : undefined
         }
       >
+        {/* Pulsing wrapper for collected fragments */}
+        <motion.div
+          className={`
+            w-full h-full
+            rounded-lg
+            flex items-center justify-center
+            overflow-hidden
+            cursor-pointer
+            ${
+              isEmpty
+                ? "bg-gray-700/50 opacity-50 hover:opacity-70"
+                : "bg-gray-800/80 opacity-100"
+            }
+          `}
+          onClick={onClick}
+          whileHover={{ scale: isEmpty ? 1.05 : 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          animate={
+            showPulse && !isEmpty
+              ? {
+                  scale: [1.0, 1.08, 1.0],
+                }
+              : {}
+          }
+          transition={
+            showPulse && !isEmpty
+              ? {
+                  duration: 2.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }
+              : { duration: 0.2 }
+          }
+          onAnimationStart={() => {
+            if (showPulse && !isEmpty) {
+              console.log("[FragmentSlot] Pulse animation started!");
+            }
+          }}
+        >
         {isEmpty ? (
           // Empty slot: Show puzzle piece icon
           <Puzzle className="w-10 h-10 md:w-14 md:h-14 text-gray-400" />
+        ) : game?.roleImageId ? (
+          // Filled slot: Show role background banner
+          <img
+            src={`/assets/images/BKGs/Roles/banners/${game.roleImageId}Banner.png`}
+            alt={game.roleTitle || "Fragment background"}
+            className="w-full h-full object-cover rounded-lg"
+            onError={(e) => {
+              console.error(
+                "Fragment banner failed to load:",
+                game.roleImageId
+              );
+              // Hide broken image, show fallback
+              e.currentTarget.style.display = "none";
+            }}
+          />
         ) : game?.avatarUrl ? (
-          // Filled slot: Show avatar image
+          // Fallback: Show avatar image for custom roles (backward compatibility)
           <img
             src={game.avatarUrl}
             alt={game.playerName || "Fragment avatar"}
@@ -215,14 +265,22 @@ function FragmentSlot({
             }}
           />
         ) : (
-          // Fallback if avatar missing
+          // Final fallback if all images missing
           <Puzzle className="w-10 h-10 md:w-14 md:h-14 text-gray-300" />
         )}
+        </motion.div>
       </motion.div>
 
       {/* Label */}
       <motion.p
-        className="text-[20px] md:text-2xl text-white/70 text-center font-medium max-w-[120px] md:max-w-[160px]"
+        className={`
+          text-[20px] md:text-2xl text-center font-medium max-w-[120px] md:max-w-[160px]
+          ${
+            isEmpty
+              ? "text-white/70"
+              : "text-amber-400 animate-shimmer-text"
+          }
+        `}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.2 }}

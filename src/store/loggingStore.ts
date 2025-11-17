@@ -10,6 +10,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { CompassValues } from "./compassStore";
 
 // ===== DATA LOGGING VARIABLES =====
 
@@ -39,6 +40,10 @@ type LoggingState = {
   // --- Initialization ---
   isInitialized: boolean;            // Has logging service been initialized?
   setInitialized: (v: boolean) => void;
+
+  // --- Initial compass snapshot (for session summary) ---
+  initialCompassSnapshot: CompassValues | null;  // Snapshot of initial compass values after quiz
+  setInitialCompassSnapshot: (snapshot: CompassValues) => void;
 
   // --- Experiment mode progress (sequential role runs) ---
   experimentProgress: ExperimentProgress;
@@ -98,6 +103,13 @@ export const useLoggingStore = create<LoggingState>()(
       isInitialized: false,
       setInitialized: (v) => set({ isInitialized: v }),
 
+      // --- Initial compass snapshot ---
+      initialCompassSnapshot: null,
+      setInitialCompassSnapshot: (snapshot) => {
+        set({ initialCompassSnapshot: snapshot });
+        console.log('[loggingStore] Initial compass snapshot saved (defensive persistence)');
+      },
+
       // --- Experiment mode progress ---
       experimentProgress: defaultExperimentProgress(),
       setExperimentActiveRole: (key) =>
@@ -120,7 +132,7 @@ export const useLoggingStore = create<LoggingState>()(
       resetExperimentProgress: () => set({ experimentProgress: defaultExperimentProgress() }),
     }),
     {
-      name: "logging-v4",  // bumped from v3 to v4 to include sessionStartTime
+      name: "logging-v5",  // bumped from v4 to v5 to include initialCompassSnapshot
       partialize: (s) => ({
         // Only persist these fields
         userId: s.userId,
@@ -129,6 +141,7 @@ export const useLoggingStore = create<LoggingState>()(
         consented: s.consented,
         experimentProgress: s.experimentProgress,
         sessionStartTime: s.sessionStartTime,  // Persist session start time
+        initialCompassSnapshot: s.initialCompassSnapshot,  // Persist initial compass snapshot
         // DON'T persist: sessionId, isInitialized
         // NOTE: 'enabled' removed - now controlled by settingsStore.dataCollectionEnabled
       }),
@@ -166,6 +179,7 @@ export function resetLoggingStore() {
     treatment: 'control',
     consented: false,
     isInitialized: false,
+    initialCompassSnapshot: null,
     experimentProgress: defaultExperimentProgress(),
   });
 }

@@ -45,6 +45,7 @@ import { useLogger } from "../hooks/useLogger";
 import { useSessionLogger } from "../hooks/useSessionLogger";
 import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import ReasoningModal from "../components/event/ReasoningModal";
+import SelfJudgmentModal from "../components/event/SelfJudgmentModal";
 
 type Props = {
   push: (path: string) => void;
@@ -147,6 +148,9 @@ export default function EventScreen3({ push }: Props) {
   const [isSubmittingReasoning, setIsSubmittingReasoning] = useState(false);
   const reasoningResolveRef = useRef<(() => void) | null>(null);
   const addReasoningEntry = useDilemmaStore((s) => s.addReasoningEntry);
+
+  // Self-judgment modal (Day 8 only)
+  const [showSelfJudgmentModal, setShowSelfJudgmentModal] = useState(false);
 
   // Navigation guard - prevent back button during gameplay
   useNavigationGuard({
@@ -874,7 +878,7 @@ export default function EventScreen3({ push }: Props) {
                   </p>
                   {phase === 'interacting' && (
                     <button
-                      onClick={() => push('/aftermath')}
+                      onClick={() => setShowSelfJudgmentModal(true)}
                       className="w-full px-6 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-amber-500/50"
                     >
                       View Aftermath
@@ -962,6 +966,29 @@ export default function EventScreen3({ push }: Props) {
             speakerImageId="gatekeeper"
           />
         )}
+
+        {/* Self-Judgment Modal - appears on Day 8 before aftermath */}
+        <SelfJudgmentModal
+          isOpen={showSelfJudgmentModal}
+          onClose={() => setShowSelfJudgmentModal(false)}
+          onSubmit={(judgment) => {
+            // Store judgment in dilemmaStore
+            useDilemmaStore.getState().addSelfJudgment(judgment);
+
+            // Log self-judgment selection
+            logger.log(
+              'self_judgment_selected',
+              {
+                day: 8,
+                judgment,
+              },
+              `Player selected self-judgment: ${judgment}`
+            );
+
+            // Navigate to aftermath
+            push('/aftermath');
+          }}
+        />
       </div>
     );
   }
