@@ -32,7 +32,6 @@ type Props = {
   data: AftermathResponse;
   avatarUrl?: string;
   top3ByDimension: Record<PropKey, TopValue[]>;
-  onExploreClick: () => void;
   onRevealScoreClick: () => void;
 };
 
@@ -40,7 +39,6 @@ export default function AftermathContent({
   data,
   avatarUrl,
   top3ByDimension,
-  onExploreClick,
   onRevealScoreClick,
 }: Props) {
   const logger = useLogger();
@@ -94,7 +92,6 @@ export default function AftermathContent({
       <ReflectionSection
         top3ByDimension={top3ByDimension}
         valuesSummary={data.valuesSummary}
-        onExploreClick={onExploreClick}
       />
 
       {/* Tombstone Section */}

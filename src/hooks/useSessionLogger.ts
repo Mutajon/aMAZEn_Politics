@@ -22,10 +22,10 @@
 
 import { useCallback, useRef } from 'react';
 import { useLogger } from './useLogger';
+import { useLoggingStore } from '../store/loggingStore';
 
 export function useSessionLogger() {
   const logger = useLogger();
-  const sessionStartTime = useRef<number | null>(null);
   const currentScreen = useRef<string | null>(null);
   const screenStartTime = useRef<number | null>(null);
 
@@ -37,7 +37,8 @@ export function useSessionLogger() {
    */
   const start = useCallback(
     (metadata?: Record<string, unknown>) => {
-      sessionStartTime.current = Date.now();
+      const startTime = Date.now();
+      useLoggingStore.getState().setSessionStartTime(startTime);
 
       logger.logSystem(
         'session_start',
@@ -48,7 +49,7 @@ export function useSessionLogger() {
         'User started new game session'
       );
 
-      console.log('[SessionLogger] ✅ Session started');
+      console.log('[SessionLogger] ✅ Session started at', new Date(startTime).toISOString());
     },
     [logger]
   );
@@ -61,11 +62,14 @@ export function useSessionLogger() {
    */
   const end = useCallback(
     (summary?: Record<string, unknown>) => {
-      if (!sessionStartTime.current) {
+      const sessionStartTime = useLoggingStore.getState().sessionStartTime;
+
+      if (!sessionStartTime) {
+        console.warn('[SessionLogger] ⚠️ Cannot end session: sessionStartTime is null');
         return;
       }
 
-      const sessionDuration = Date.now() - sessionStartTime.current;
+      const sessionDuration = Date.now() - sessionStartTime;
 
       logger.logSystem(
         'session_end',
@@ -81,7 +85,8 @@ export function useSessionLogger() {
         summary
       });
 
-      sessionStartTime.current = null;
+      // Clear session start time
+      useLoggingStore.getState().setSessionStartTime(null);
     },
     [logger]
   );
@@ -122,11 +127,14 @@ export function useSessionLogger() {
    * @returns Duration in milliseconds, or null if session not started
    */
   const getSessionDuration = useCallback((): number | null => {
-    if (!sessionStartTime.current) {
+    const sessionStartTime = useLoggingStore.getState().sessionStartTime;
+
+    if (!sessionStartTime) {
+      console.warn('[SessionLogger] ⚠️ Cannot get session duration: sessionStartTime is null');
       return null;
     }
 
-    return Date.now() - sessionStartTime.current;
+    return Date.now() - sessionStartTime;
   }, []);
 
   /**

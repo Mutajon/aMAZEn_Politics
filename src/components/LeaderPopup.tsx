@@ -32,9 +32,9 @@ function imgForLeader(name: string) {
 /** Simple badge/pill used for rankings */
 function Badge({ label, value }: { label: string; value: string }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-gradient-to-br from-white/12 to-white/5 px-3 py-2">
-      <span className="text-[11px] uppercase tracking-wide text-white/70">{label}</span>
-      <span className="px-2 py-1 rounded-md bg-white/10 text-white/90 text-sm font-semibold">{value}</span>
+    <span className="inline-flex items-center gap-1.5 md:gap-2 rounded-xl border border-white/15 bg-gradient-to-br from-white/12 to-white/5 px-2 py-1.5 md:px-3 md:py-2">
+      <span className="text-[10px] md:text-[11px] uppercase tracking-wide text-white/70">{label}</span>
+      <span className="px-2 py-1 rounded-md bg-white/10 text-white/90 text-xs md:text-sm font-semibold">{value}</span>
     </span>
   );
 }
@@ -58,9 +58,9 @@ function ValuePill({
 }) {
   const c = VALUE_COLORS[color];
   return (
-    <div className={`rounded-2xl px-4 py-3 ${c.bg} ${c.text} shadow-lg`}>
-      <div className="text-xs font-bold tracking-wide opacity-90">{label}:</div>
-      <div className="text-sm md:text-base font-semibold">{value || "—"}</div>
+    <div className={`rounded-2xl px-3 py-2 md:px-4 md:py-3 ${c.bg} ${c.text} shadow-lg`}>
+      <div className="text-[10px] md:text-xs font-bold tracking-wide opacity-90">{label}:</div>
+      <div className="text-xs md:text-sm lg:text-base font-semibold truncate">{value || "—"}</div>
     </div>
   );
 }
@@ -125,22 +125,22 @@ export default function LeaderPopup({
             className="relative w-[min(92vw,760px)] rounded-3xl overflow-hidden shadow-2xl border border-white/10"
           >
             {/* Header: image + title */}
-            <div className="relative px-5 py-4 bg-gradient-to-r from-[#0f1f7a] via-[#142aa8] to-[#0f1f7a]">
-              <div className="flex items-center gap-4 flex-wrap">
+            <div className="relative px-3 py-3 md:px-5 md:py-4 bg-gradient-to-r from-[#0f1f7a] via-[#142aa8] to-[#0f1f7a]">
+              <div className="flex items-center gap-3 md:gap-4 flex-wrap">
                 <img
                   src={imgForLeader(entry.name)}
                   alt={entry.name}
-                  width={90}
-                  height={90}
-                  className="w-[90px] h-[90px] rounded-xl object-cover border-2 border-white/20 shadow"
+                  width={64}
+                  height={64}
+                  className="w-16 h-16 md:w-[90px] md:h-[90px] rounded-xl object-cover border-2 border-white/20 shadow flex-shrink-0"
                   onError={(ev) => {
                     (ev.currentTarget as HTMLImageElement).src =
                       "/assets/images/leaders/placeholder.jpg";
                   }}
                 />
-                <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2 md:gap-3 flex-wrap flex-1 min-w-0">
                   <h3
-                    className="text-3xl md:text-[40px] font-bold tracking-tight text-white drop-shadow"
+                    className="text-xl md:text-3xl lg:text-[40px] font-bold tracking-tight text-white drop-shadow truncate"
                     style={{ fontFamily: "'Playfair Display', ui-serif, serif" }}
                   >
                     {entry.name}
@@ -148,17 +148,17 @@ export default function LeaderPopup({
 
                   {/* period pill */}
                   {period && (
-                    <span className="inline-flex items-center rounded-lg bg-white/10 text-white/90 px-3 py-1 text-sm font-semibold border border-white/15">
+                    <span className="inline-flex items-center rounded-lg bg-white/10 text-white/90 px-2 py-1 md:px-3 md:py-1 text-xs md:text-sm font-semibold border border-white/15">
                       {period}
                     </span>
                   )}
                 </div>
               </div>
 
-              {/* Close */}
+              {/* Close - larger touch target on mobile */}
               <button
                 onClick={onClose}
-                className="absolute top-2 right-2 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white text-lg"
+                className="absolute top-2 right-2 w-11 h-11 md:w-9 md:h-9 rounded-full bg-white/10 hover:bg-white/20 text-white text-lg"
                 aria-label="Close"
               >
                 ×
@@ -166,37 +166,37 @@ export default function LeaderPopup({
             </div>
 
             {/* Body */}
-            <div className="bg-[#0c1440] px-5 pt-5 pb-4 text-white/90">
+            <div className="bg-[#0c1440] px-3 pt-4 pb-3 md:px-5 md:pt-5 md:pb-4 text-white/90">
               {/* System row */}
-              <div className="mb-3 flex items-center gap-2">
-                <span className="text-[11px] uppercase tracking-wide text-white/70">{lang("POWER_POLITICAL_SYSTEM")}</span>
+              <div className="mb-3 flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] md:text-[11px] uppercase tracking-wide text-white/70">{lang("POWER_POLITICAL_SYSTEM")}</span>
                 {entry.politicalSystem ? (
                   <button
                     type="button"
                     onClick={() => setShowSystemModal(true)}
-                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10"
+                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 md:py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-sm"
                     aria-label="Show system details"
                   >
-                    <span className="font-semibold">{translatePoliticalSystem(entry.politicalSystem, lang)}</span>
-                    <HelpCircle className="w-4 h-4 text-amber-300" />
+                    <span className="font-semibold truncate max-w-[200px] md:max-w-none">{translatePoliticalSystem(entry.politicalSystem, lang)}</span>
+                    <HelpCircle className="w-5 h-5 md:w-4 md:h-4 text-amber-300 flex-shrink-0" />
                   </button>
                 ) : (
                   <span className="px-2 py-1 rounded-md bg-white/5 text-white/60">—</span>
                 )}
               </div>
 
-              <p className="leading-relaxed">{translateLeaderDescription(entry.name, entry.about, lang)}</p>
+              <p className="leading-relaxed text-sm md:text-base">{translateLeaderDescription(entry.name, entry.about, lang)}</p>
 
               {/* Ranking pills */}
-              <div className="mt-5 flex flex-wrap gap-3">
+              <div className="mt-4 md:mt-5 flex flex-wrap gap-2 md:gap-3">
                 <Badge label={lang("LIBERALISM")} value={translateDemocracyLevel(entry.democracy, lang)} />
                 <Badge label={lang("AUTONOMY")} value={translateDemocracyLevel(entry.autonomy, lang)} />
               </div>
             </div>
 
             {/* Footer: Personal values (four 2-line colored pills) */}
-            <div className="bg-gradient-to-t from-[#5f2e83] to-[#533076] px-5 py-5">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-gradient-to-t from-[#5f2e83] to-[#533076] px-3 py-4 md:px-5 md:py-5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-3">
                 <ValuePill label={lang("COMPASS_WHAT").toUpperCase() as any}    value={translateCompassValue(parsed.what, lang)}    color="indigo" />
                 <ValuePill label={lang("COMPASS_WHENCE").toUpperCase() as any}  value={translateCompassValue(parsed.whence, lang)}  color="emerald" />
                 <ValuePill label={lang("COMPASS_HOW").toUpperCase() as any}     value={translateCompassValue(parsed.how, lang)}     color="amber" />
@@ -209,14 +209,14 @@ export default function LeaderPopup({
           <AnimatePresence>
             {showSystemModal && systemMeta && (
               <motion.div
-                className="fixed inset-0 z-[1001] grid place-items-center"
+                className="fixed inset-0 z-[1001] grid place-items-center px-4"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
                 <div className="absolute inset-0 bg-black/55" onClick={() => setShowSystemModal(false)} />
                 <motion.div
-                  className="relative z-10 w-full max-w-lg rounded-3xl border border-white/10 bg-gradient-to-b from-[#1b1f3b] to-[#261c4a] p-5 shadow-2xl"
+                  className="relative z-10 w-[min(90vw,512px)] rounded-3xl border border-white/10 bg-gradient-to-b from-[#1b1f3b] to-[#261c4a] p-4 md:p-5 shadow-2xl"
                   initial={{ scale: 0.94, y: 10, opacity: 0 }}
                   animate={{ scale: 1, y: 0, opacity: 1 }}
                   exit={{ scale: 0.97, y: 6, opacity: 0 }}
@@ -224,20 +224,20 @@ export default function LeaderPopup({
                   role="dialog"
                   aria-modal="true"
                 >
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-2xl font-extrabold bg-gradient-to-r from-yellow-200 via-yellow-300 to-amber-400 bg-clip-text text-transparent">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-xl md:text-2xl font-extrabold bg-gradient-to-r from-yellow-200 via-yellow-300 to-amber-400 bg-clip-text text-transparent truncate">
                       {translatePoliticalSystem(systemMeta.name, lang)}
                     </h2>
                     <button
                       onClick={() => setShowSystemModal(false)}
-                      className="rounded-xl px-2 py-1 bg-white/5 border border-white/10 text-white/80 hover:bg-white/10"
+                      className="rounded-xl px-3 py-2 bg-white/5 border border-white/10 text-white/80 hover:bg-white/10 text-sm flex-shrink-0"
                     >
                       {lang("CLOSE")}
                     </button>
                   </div>
-                  <p className="mt-3 text-white/85">{systemMeta.description}</p>
+                  <p className="mt-3 text-white/85 text-sm md:text-base leading-relaxed">{systemMeta.description}</p>
                   {systemMeta.flavor && (
-                    <p className="mt-3 italic text-amber-200/90">{systemMeta.flavor}</p>
+                    <p className="mt-3 italic text-amber-200/90 text-sm md:text-base">{systemMeta.flavor}</p>
                   )}
                 </motion.div>
               </motion.div>

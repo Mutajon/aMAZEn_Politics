@@ -50,7 +50,7 @@ export function useEventNarration() {
         skipNarrationLogRef.current = false;
 
         const p = await prepareNarration(speech, {
-          voiceName: "alloy",
+          voiceName: "onyx",
           format: "mp3",
           instructions: "Speak as a dramatic political narrator with gravitas and urgency"
         });

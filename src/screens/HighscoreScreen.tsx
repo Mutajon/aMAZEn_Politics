@@ -96,20 +96,20 @@ export default function HighscoreScreen() {
   }, [highlightName]);
 
   return (
-    <div className="min-h-[100dvh] px-5 py-8" style={bgStyleSplash}>
+    <div className="min-h-[100dvh] px-3 py-6 md:px-5 md:py-8" style={bgStyleSplash}>
       <div className="w-full max-w-5xl mx-auto">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-extrabold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
+            <h1 className="text-2xl md:text-4xl font-extrabold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
               {lang("HIGHSCORE_TITLE")}
             </h1>
-            <p className="text-white/60 text-sm mt-1">
+            <p className="text-white/60 text-xs md:text-sm mt-1">
               {lang("HIGHSCORE_CLICK_LEADERS")}
             </p>
           </div>
           <button
             onClick={() => window.history.back()}
-            className="rounded-xl px-3 py-2 bg-white/10 hover:bg-white/15 text-white"
+            className="rounded-xl px-3 py-2 bg-white/10 hover:bg-white/15 text-white text-sm"
           >
             {lang("HIGHSCORE_BACK")}
           </button>
@@ -118,19 +118,23 @@ export default function HighscoreScreen() {
         <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
           {/* Header */}
           <div
-            className="grid gap-3 pl-1 pr-4 py-3 text-[12px] uppercase tracking-wide text-white/70 sticky top-0 bg-white/10 backdrop-blur z-10"
-            style={{ gridTemplateColumns: "44px 1.2fr 1.1fr 1fr 1fr 0.7fr" }}
+            className="grid gap-2 md:gap-3 pl-1 pr-2 md:pr-4 py-3 text-[11px] md:text-[12px] uppercase tracking-wide text-white/70 sticky top-0 bg-white/10 backdrop-blur z-10"
+            style={{
+              gridTemplateColumns: window.innerWidth < 640
+                ? "44px 1fr 80px"
+                : "44px 1.2fr 1.1fr 1fr 1fr 0.7fr"
+            }}
           >
             <div className="text-right">{lang("HIGHSCORE_RANK")}</div>
             <div>{lang("HIGHSCORE_LEADER")}</div>
-            <div>{lang("HIGHSCORE_SYSTEM")}</div>
-            <div>{lang("HIGHSCORE_LIBERALISM")}</div>
-            <div>{lang("HIGHSCORE_AUTONOMY")}</div>
+            <div className="hidden sm:block">{lang("HIGHSCORE_SYSTEM")}</div>
+            <div className="hidden sm:block">{lang("HIGHSCORE_LIBERALISM")}</div>
+            <div className="hidden sm:block">{lang("HIGHSCORE_AUTONOMY")}</div>
             <div className="text-right">{lang("HIGHSCORE_SCORE")}</div>
           </div>
 
           {/* Scrollable body */}
-          <div className="max-h-[70vh] overflow-y-auto divide-y divide-white/5">
+          <div className="max-h-[60vh] md:max-h-[70vh] overflow-y-auto divide-y divide-white/5">
   <motion.div
     initial="hidden"
     animate="show"
@@ -140,6 +144,7 @@ export default function HighscoreScreen() {
             {list.map((e, i) => {
               const color = rankColor(i);
               const isHighlighted = highlightName && e.name === highlightName;
+              const isMobile = window.innerWidth < 640;
               return (
                 <motion.button
   type="button"
@@ -147,21 +152,25 @@ export default function HighscoreScreen() {
   ref={isHighlighted ? highlightedRef : null}
   onClick={() => setSelected(e)}
   className={[
-    "w-full text-left grid items-center gap-3 pl-1 pr-4 py-3 focus:outline-none will-change-[transform,opacity]",
+    "w-full text-left grid items-center gap-2 md:gap-3 pl-1 pr-2 md:pr-4 py-3 focus:outline-none will-change-[transform,opacity]",
     isHighlighted
       ? "bg-amber-500/20 border-2 border-amber-400 ring-2 ring-amber-400/50 rounded-lg my-1"
       : "hover:bg-white/8"
   ].join(" ")}
-  style={{ gridTemplateColumns: "44px 1.2fr 1.1fr 1fr 1fr 0.7fr" }}
+  style={{
+    gridTemplateColumns: isMobile
+      ? "44px 1fr 80px"
+      : "44px 1.2fr 1.1fr 1fr 1fr 0.7fr"
+  }}
   variants={rowVariants}
 >
 
                   {/* Rank */}
-                  <div className="flex items-center h-[50px] justify-end">
+                  <div className="flex items-center h-10 md:h-[50px] justify-end">
                     <span
                       className={[
                         "font-bold tabular-nums leading-none",
-                        "text-xl",
+                        "text-lg md:text-xl",
                         color ? "" : "text-white/90",
                       ].join(" ")}
                       style={color ? { color } : undefined}
@@ -171,34 +180,37 @@ export default function HighscoreScreen() {
                     </span>
                   </div>
 
-                  {/* Leader cell: 50x50 image + name */}
-                  <div className="flex items-center gap-3 min-w-0">
+                  {/* Leader cell: responsive image + name */}
+                  <div className="flex items-center gap-2 md:gap-3 min-w-0">
                     <img
                       src={imgForLeader(e, i)}
                       alt={e.name}
-                      width={50}
-                      height={50}
-                      className="w-[50px] h-[50px] rounded-lg object-cover border border-white/10"
+                      width={isMobile ? 40 : 50}
+                      height={isMobile ? 40 : 50}
+                      className="w-10 h-10 md:w-[50px] md:h-[50px] rounded-lg object-cover border border-white/10 flex-shrink-0"
                       onError={(ev) => {
                         (ev.currentTarget as HTMLImageElement).src =
                           "/assets/images/leaders/placeholder.jpg";
                       }}
                     />
-                    <span className="truncate px-2 py-1 rounded-md bg-white/10 text-white/90 text-sm font-medium">
+                    <span className="truncate px-2 py-1 rounded-md bg-white/10 text-white/90 text-xs md:text-sm font-medium">
                       {e.name}
                     </span>
                   </div>
 
-                  {/* System */}
-                  <div className="text-white/90">
-                    <span className="px-2 py-1 rounded-md bg-white/10">{translatePoliticalSystem(e.politicalSystem, lang) || "—"}</span>
+                  {/* System - hidden on mobile */}
+                  <div className="hidden sm:block text-white/90 text-sm">
+                    <span className="px-2 py-1 rounded-md bg-white/10 truncate">{translatePoliticalSystem(e.politicalSystem, lang) || "—"}</span>
                   </div>
 
-                  <div className="text-white/90">{translateDemocracyLevel(e.democracy, lang)}</div>
-                  <div className="text-white/90">{translateDemocracyLevel(e.autonomy, lang)}</div>
+                  {/* Liberalism - hidden on mobile */}
+                  <div className="hidden sm:block text-white/90 text-sm">{translateDemocracyLevel(e.democracy, lang)}</div>
+
+                  {/* Autonomy - hidden on mobile */}
+                  <div className="hidden sm:block text-white/90 text-sm">{translateDemocracyLevel(e.autonomy, lang)}</div>
 
                   {/* Score */}
-                  <div className="text-right font-extrabold text-amber-300 tabular-nums">
+                  <div className="text-right font-extrabold text-amber-300 tabular-nums text-sm md:text-base">
                     {e.score.toLocaleString()}
                   </div>
                   </motion.button>

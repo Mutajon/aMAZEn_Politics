@@ -10,7 +10,7 @@ import { useCallback, useState } from "react";
 import { useSettingsStore } from "../store/settingsStore";
 
 type SpeakOptions = {
-  voiceName?: string;           // OpenAI voice name; default "alloy"
+  voiceName?: string;           // OpenAI voice name; default "onyx"
   format?: "mp3" | "opus" | "aac" | "flac";
   volume?: number;              // 0..1
   instructions?: string;        // Optional: Style/tone instructions (only for gpt-4o-mini-tts and newer models)
@@ -99,7 +99,7 @@ export function useNarrator() {
       _cleanup();
       globalAbortRef = new AbortController();
 
-      const voice = (opts.voiceName || "alloy").toLowerCase();
+      const voice = (opts.voiceName || "onyx").toLowerCase();
       const format = opts.format || "mp3";
       const volume = typeof opts.volume === "number" ? Math.max(0, Math.min(1, opts.volume)) : 1;
       const instructions = opts.instructions;

@@ -15,11 +15,13 @@ import { useEffect, useState } from "react";
 
 interface FragmentSlotsProps {
   onFragmentClick?: (fragment: PastGameEntry, index: number) => void;
+  onEmptySlotClick?: () => void;
   onAnimationComplete?: () => void;
 }
 
 export default function FragmentSlots({
   onFragmentClick,
+  onEmptySlotClick,
   onAnimationComplete,
 }: FragmentSlotsProps) {
   const fragmentGameIds = useFragmentsStore((s) => s.fragmentGameIds);
@@ -92,7 +94,9 @@ export default function FragmentSlots({
                 : undefined
             }
             onClick={() => {
-              if (slot.game && onFragmentClick) {
+              if (slot.isEmpty && onEmptySlotClick) {
+                onEmptySlotClick();
+              } else if (slot.game && onFragmentClick) {
                 onFragmentClick(slot.game, slot.index);
               }
             }}
@@ -179,15 +183,16 @@ function FragmentSlot({
           rounded-lg
           flex items-center justify-center
           transition-all duration-300
+          cursor-pointer
           ${
             isEmpty
-              ? "bg-gray-700/50 opacity-50"
-              : "bg-gray-800/80 opacity-100 cursor-pointer hover:scale-110 hover:opacity-100"
+              ? "bg-gray-700/50 opacity-50 hover:opacity-70 hover:scale-105"
+              : "bg-gray-800/80 opacity-100 hover:scale-110 hover:opacity-100"
           }
         `}
-        onClick={isEmpty ? undefined : onClick}
-        whileHover={isEmpty ? {} : { scale: 1.1 }}
-        whileTap={isEmpty ? {} : { scale: 0.95 }}
+        onClick={onClick}
+        whileHover={{ scale: isEmpty ? 1.05 : 1.1 }}
+        whileTap={{ scale: 0.95 }}
         initial={isEmpty ? { opacity: 0.5 } : { y: -200, opacity: 0 }}
         animate={controls}
         onAnimationComplete={

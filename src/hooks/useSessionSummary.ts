@@ -175,6 +175,15 @@ export function collectSessionSummary(
   // Use passed session duration (convert from milliseconds to seconds)
   const totalPlayTime = sessionDuration ? sessionDuration / 1000 : 0;
 
+  // Defensive logging for critical timing issue
+  if (!sessionDuration || sessionDuration === 0) {
+    console.warn('[useSessionSummary] ⚠️ CRITICAL: sessionDuration is null or 0!', {
+      sessionDuration,
+      sessionStartTime: loggingStore.sessionStartTime,
+      timestamp: new Date().toISOString()
+    });
+  }
+
   // Extract inquiry texts from Map
   const inquiryTexts: string[] = [];
   dilemmaStore.inquiryHistory.forEach((dayInquiries) => {
@@ -237,6 +246,15 @@ export function collectSessionSummary(
     incomplete,
   };
 
+  // Defensive logging for critical compass issue
+  if (!summary.initialCompass) {
+    console.warn('[useSessionSummary] ⚠️ CRITICAL: initialCompass is null!', {
+      initialCompassSnapshot: compassStore.initialCompassSnapshot,
+      compassValues: compassStore.values,
+      timestamp: new Date().toISOString()
+    });
+  }
+
   console.log('[useSessionSummary] Session summary collected:', {
     userId: summary.userId,
     sessionId: summary.sessionId,
@@ -250,6 +268,7 @@ export function collectSessionSummary(
     finalScore: summary.finalScore,
     supportBreakdown: summary.supportBreakdown,
     incomplete: summary.incomplete,
+    hasInitialCompass: !!summary.initialCompass,
   });
 
   return summary;

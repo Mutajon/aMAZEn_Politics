@@ -2,6 +2,27 @@
 
 This file provides guidance to Claude Code when working with this political simulation game codebase.
 
+## ⚠️ CRITICAL: Dev Server Management
+
+**ALWAYS kill the dev server after testing code changes!**
+
+When you run `npm run dev` (or any background server process) to test changes:
+1. ✅ Test your changes
+2. ✅ Verify compilation succeeds
+3. ✅ **IMMEDIATELY kill the server using `KillShell` tool**
+
+**Why:** The user needs to run the server on their side. Leaving it running blocks them from testing.
+
+**Example:**
+```bash
+# After running npm run dev in background with shell_id 163811
+KillShell(shell_id: "163811")
+```
+
+**Never forget this step. The user has requested this many times.**
+
+---
+
 ## Development Commands
 
 ### Terminal Commands

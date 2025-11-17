@@ -99,7 +99,7 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
   console.log("[CompassIntroStart] Current state:", { loading, showImage, showText, narrationReady });
 
   // Narration setup
-  const { prepare } = useNarrator();
+  const { prepare, stop } = useNarrator();
   const preparedTTSRef = useRef<PreparedTTS | null>(null);
 
   // Logging hook for data collection
@@ -222,8 +222,9 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
         preparedTTSRef.current.dispose();
         preparedTTSRef.current = null;
       }
+      stop(); // Stop global narration when navigating away
     };
-  }, [character?.name, character?.gender, roleText, lang, prepare, narrationEnabled]);
+  }, [character?.name, character?.gender, roleText, lang, prepare, stop, narrationEnabled]);
 
   return (
     <div className="min-h-[100dvh] px-5 py-6" style={roleBgStyle}>

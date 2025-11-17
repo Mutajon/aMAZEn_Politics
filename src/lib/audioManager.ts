@@ -22,15 +22,27 @@ const AUDIO_FILES = {
     'click-soft': '/assets/sounds/click soft.mp3', // Note: filename has space
     'drumroll': '/assets/sounds/Drum Roll Medium.mp3', // Note: filename has spaces
   },
+  vo: {
+    'gatekeeper-0': '/assets/sounds/VO/gatekeeperIntro/anotherLost.wav',
+    'gatekeeper-1': '/assets/sounds/VO/gatekeeperIntro/seeItInYourEyes.wav',
+    'gatekeeper-2': '/assets/sounds/VO/gatekeeperIntro/thatsAProblem.wav',
+    'gatekeeper-3': '/assets/sounds/VO/gatekeeperIntro/iAmTheGatekeeper.wav',
+    'gatekeeper-4': '/assets/sounds/VO/gatekeeperIntro/eternalRest.wav',
+    'gatekeeper-5': '/assets/sounds/VO/gatekeeperIntro/youAreDead.wav',
+    'gatekeeper-18': '/assets/sounds/VO/gatekeeperIntro/letMeKnowWhenReady.wav',
+  },
 } as const;
 
 type MusicKey = keyof typeof AUDIO_FILES.music;
 type SfxKey = keyof typeof AUDIO_FILES.sfx;
+type VoKey = keyof typeof AUDIO_FILES.vo;
 
 class AudioManager {
   private musicTracks: Map<MusicKey, HTMLAudioElement> = new Map();
   private sfxTracks: Map<SfxKey, HTMLAudioElement> = new Map();
+  private voiceoverTracks: Map<VoKey, HTMLAudioElement> = new Map();
   private currentMusic: HTMLAudioElement | null = null;
+  private currentVoiceover: HTMLAudioElement | null = null;
   private initialized = false;
 
   /**
@@ -52,6 +64,13 @@ class AudioManager {
       const audio = new Audio(path);
       audio.preload = 'auto';
       this.sfxTracks.set(key as SfxKey, audio);
+    });
+
+    // Preload voiceovers
+    Object.entries(AUDIO_FILES.vo).forEach(([key, path]) => {
+      const audio = new Audio(path);
+      audio.preload = 'auto';
+      this.voiceoverTracks.set(key as VoKey, audio);
     });
 
     this.initialized = true;
@@ -140,6 +159,55 @@ class AudioManager {
   }
 
   /**
+   * Play voiceover (e.g., Gatekeeper intro dialogue)
+   * @param name - Voiceover name (e.g., 'gatekeeper-0')
+   * @param volumeOverride - Optional volume override (0.0 - 1.0)
+   */
+  playVoiceover(name: VoKey, volumeOverride?: number) {
+    const settings = useSettingsStore.getState();
+
+    // Check if SFX is enabled (voiceover is treated as SFX)
+    if (!settings.sfxEnabled) {
+      return; // Silent fail for better UX
+    }
+
+    const audio = this.voiceoverTracks.get(name);
+    if (!audio) {
+      console.warn(`🎤 Voiceover not found: ${name}`);
+      return;
+    }
+
+    // Stop current voiceover if playing
+    if (this.currentVoiceover && this.currentVoiceover !== audio) {
+      this.currentVoiceover.pause();
+      this.currentVoiceover.currentTime = 0;
+    }
+
+    // Set volume
+    audio.volume = volumeOverride ?? settings.sfxVolume ?? 1.0;
+
+    // Play (with error handling)
+    audio.play().catch((err) => {
+      console.warn(`🎤 Voiceover playback failed for ${name}:`, err);
+    });
+
+    this.currentVoiceover = audio;
+    console.log(`🎤 Playing voiceover: ${name} (volume: ${audio.volume.toFixed(2)})`);
+  }
+
+  /**
+   * Stop current voiceover
+   */
+  stopVoiceover() {
+    if (this.currentVoiceover) {
+      this.currentVoiceover.pause();
+      this.currentVoiceover.currentTime = 0;
+      this.currentVoiceover = null;
+      console.log('🎤 Voiceover stopped');
+    }
+  }
+
+  /**
    * Update music volume (affects currently playing track)
    * @param volume - Volume level (0.0 - 1.0)
    */
@@ -198,4 +266,4 @@ if (!audioManager['initialized']) {
   audioManager.init();
 }
 
-export type { MusicKey, SfxKey };
+export type { MusicKey, SfxKey, VoKey };

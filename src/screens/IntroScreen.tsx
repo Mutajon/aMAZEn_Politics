@@ -6,11 +6,13 @@ import { useLogger } from "../hooks/useLogger";
 import Gatekeeper from "../components/Gatekeeper";
 import FragmentSlots from "../components/fragments/FragmentSlots";
 import FragmentPopup from "../components/fragments/FragmentPopup";
+import EmptyFragmentPopup from "../components/fragments/EmptyFragmentPopup";
 import { useFragmentsStore } from "../store/fragmentsStore";
 import type { PastGameEntry } from "../lib/types/pastGames";
+import { audioManager, type VoKey } from "../lib/audioManager";
 
 const dialogLines = [
-  "Oh, Another one. Lost.",
+  "Oh! Another one. Lost.",
   "I can see it in your eyes. The blank confusion of a soul Name-Washed.",
   "You don't remember where you are, or who you were. That's a problem.",
   "Let me save us both some time: I am the Gatekeeper, and this is the Crossroad of Consciousness.",
@@ -28,13 +30,28 @@ const dialogLines = [
   "I need it to pay an old, lingering debt and finally leave this place.",
   "So. Interested?",
   "Good. Because you don't really have a choice.",
-  "Let me know when you're ready.",
+  "Let me know when you are ready.",
 ];
 
 // Find fragment reveal line by text content (resilient to dialog changes)
 const FRAGMENT_LINE_INDEX = dialogLines.findIndex(
   (line) => line.includes("Gather") && line.includes("Fragments")
 );
+
+// Voiceover mapping: line index → audio key
+// Returns voiceover key if audio exists for this line, null otherwise
+const getVoiceoverKey = (lineIndex: number): VoKey | null => {
+  const mapping: Record<number, VoKey> = {
+    0: 'gatekeeper-0',
+    1: 'gatekeeper-1',
+    2: 'gatekeeper-2',
+    3: 'gatekeeper-3',
+    4: 'gatekeeper-4',
+    5: 'gatekeeper-5',
+    18: 'gatekeeper-18', // Last line: "Let me know when you're ready"
+  };
+  return mapping[lineIndex] || null;
+};
 
 // Background style using etherplace.jpg
 const etherPlaceBackground = {
@@ -57,6 +74,7 @@ export default function IntroScreen({ push }: { push: PushFn }) {
   const markIntroCompleted = useFragmentsStore((s) => s.markIntroCompleted);
   const [selectedFragment, setSelectedFragment] = useState<PastGameEntry | null>(null);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [isEmptySlotPopupOpen, setIsEmptySlotPopupOpen] = useState(false);
 
   // Fragment reveal pause state
   const [isFragmentPause, setIsFragmentPause] = useState(false);
@@ -81,13 +99,27 @@ export default function IntroScreen({ push }: { push: PushFn }) {
     ? (currentLineIndex >= FRAGMENT_LINE_INDEX && fragmentsRevealed)
     : true;
 
-  // Determine if gatekeeper should be interactive (wait for animation on return visits)
-  const isGatekeeperInteractive = firstIntro || animationComplete;
+  // Determine if gatekeeper should be interactive (always interactive on return visits)
+  const isGatekeeperInteractive = true; // Allow immediate interaction
 
   // Show gatekeeper after 1 second delay
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowGatekeeper(true);
+
+      // Play first line voiceover (only on first visit)
+      if (firstIntro) {
+        const voKey = getVoiceoverKey(0);
+        if (voKey) {
+          audioManager.playVoiceover(voKey);
+          logger.logSystem(
+            "gatekeeper_voiceover_started",
+            { lineIndex: 0, voiceoverKey: voKey },
+            "Started voiceover for line 0"
+          );
+        }
+      }
+
       logger.logSystem(
         "intro_gatekeeper_shown",
         { delay: 1000 },
@@ -95,7 +127,7 @@ export default function IntroScreen({ push }: { push: PushFn }) {
       );
     }, 1000);
     return () => clearTimeout(timer);
-  }, [logger]);
+  }, [logger, firstIntro]);
 
   // Handle animation completion
   const handleAnimationComplete = () => {
@@ -109,16 +141,14 @@ export default function IntroScreen({ push }: { push: PushFn }) {
 
   // Handle gatekeeper dismissal (click to advance)
   const handleGatekeeperClick = () => {
-    // Returning visit - wait for animation, then go to "I'm ready"
+    // Returning visit - show "I'm ready" button immediately (don't wait for animation)
     if (!firstIntro) {
-      if (animationComplete) {
-        setIsLastLine(true);
-        logger.log(
-          "intro_return_visit",
-          { fragmentCount, hasAllFragments },
-          "Returning visit - skipping dialog"
-        );
-      }
+      setIsLastLine(true);
+      logger.log(
+        "intro_return_visit",
+        { fragmentCount, hasAllFragments },
+        "Returning visit - showing ready button"
+      );
       return;
     }
 
@@ -138,11 +168,24 @@ export default function IntroScreen({ push }: { push: PushFn }) {
 
     // First visit - advance through dialog
     if (currentLineIndex < dialogLines.length - 1) {
-      setCurrentLineIndex((prev) => prev + 1);
+      const nextIndex = currentLineIndex + 1;
+      setCurrentLineIndex(nextIndex);
+
+      // Play voiceover for next line if available
+      const voKey = getVoiceoverKey(nextIndex);
+      if (voKey) {
+        audioManager.playVoiceover(voKey);
+        logger.logSystem(
+          "gatekeeper_voiceover_started",
+          { lineIndex: nextIndex, voiceoverKey: voKey },
+          `Started voiceover for line ${nextIndex}`
+        );
+      }
+
       logger.log(
         "intro_dialog_advanced",
-        { lineIndex: currentLineIndex + 1, lineText: dialogLines[currentLineIndex + 1] },
-        `Advanced to dialog line ${currentLineIndex + 2}/${dialogLines.length}`
+        { lineIndex: nextIndex, lineText: dialogLines[nextIndex] },
+        `Advanced to dialog line ${nextIndex + 1}/${dialogLines.length}`
       );
     } else {
       // Reached last line - show "I'm ready" button
@@ -160,8 +203,29 @@ export default function IntroScreen({ push }: { push: PushFn }) {
     if (isFragmentPause) {
       setIsFragmentPause(false); // Cancel pause
     }
+
+    // Stop current voiceover
+    audioManager.stopVoiceover();
+    logger.logSystem(
+      "gatekeeper_voiceover_stopped",
+      { lineIndex: currentLineIndex, reason: "skip" },
+      "Stopped voiceover (user skipped)"
+    );
+
+    // Play last line voiceover (line 18)
+    const lastLineIndex = dialogLines.length - 1; // Line 18
+    const voKey = getVoiceoverKey(lastLineIndex);
+    if (voKey) {
+      audioManager.playVoiceover(voKey);
+      logger.logSystem(
+        "gatekeeper_voiceover_started",
+        { lineIndex: lastLineIndex, voiceoverKey: voKey },
+        `Started voiceover for last line ${lastLineIndex}`
+      );
+    }
+
     setFragmentsRevealed(true); // Mark as revealed
-    setCurrentLineIndex(dialogLines.length - 1);
+    setCurrentLineIndex(lastLineIndex);
     setIsLastLine(true);
     logger.log(
       "intro_dialog_skipped",
@@ -207,6 +271,26 @@ export default function IntroScreen({ push }: { push: PushFn }) {
     setSelectedFragment(null);
   };
 
+  // Handle empty slot click
+  const handleEmptySlotClick = () => {
+    setIsEmptySlotPopupOpen(true);
+    logger.log(
+      "empty_fragment_clicked",
+      { fragmentCount, hasAllFragments },
+      "User clicked empty fragment slot"
+    );
+  };
+
+  // Handle empty slot popup close
+  const handleEmptySlotPopupClose = () => {
+    setIsEmptySlotPopupOpen(false);
+    logger.log(
+      "empty_fragment_popup_closed",
+      {},
+      "User closed empty fragment popup"
+    );
+  };
+
   // Auto-advance after fragment animation completes (first visit only)
   useEffect(() => {
     if (isFragmentPause && animationComplete) {
@@ -221,6 +305,14 @@ export default function IntroScreen({ push }: { push: PushFn }) {
     }
   }, [isFragmentPause, animationComplete, currentLineIndex, logger]);
 
+  // Cleanup: Stop voiceover on unmount
+  useEffect(() => {
+    return () => {
+      audioManager.stopVoiceover();
+      console.log('🎤 IntroScreen unmounted - voiceover stopped');
+    };
+  }, []);
+
   return (
     <div
       className="min-h-[100dvh] flex items-center justify-center px-5 relative"
@@ -230,6 +322,7 @@ export default function IntroScreen({ push }: { push: PushFn }) {
       {shouldShowFragments && (
         <FragmentSlots
           onFragmentClick={handleFragmentClick}
+          onEmptySlotClick={handleEmptySlotClick}
           onAnimationComplete={handleAnimationComplete}
         />
       )}
@@ -241,13 +334,19 @@ export default function IntroScreen({ push }: { push: PushFn }) {
         onClose={handlePopupClose}
       />
 
+      {/* Empty Fragment Popup */}
+      <EmptyFragmentPopup
+        isOpen={isEmptySlotPopupOpen}
+        onClose={handleEmptySlotPopupClose}
+      />
+
       {/* Gatekeeper with dialog */}
       {showGatekeeper && (
         <Gatekeeper
           text={getGatekeeperMessage()}
           isVisible={true}
           onDismiss={
-            isFragmentPause || (!firstIntro && !animationComplete)
+            isFragmentPause
               ? () => {}
               : handleGatekeeperClick
           }

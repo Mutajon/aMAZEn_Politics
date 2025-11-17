@@ -3,6 +3,7 @@
  *
  * Modal popup showing details of a collected fragment
  * Displays player avatar, name, setting, and snapshot pills
+ * Uses flex centering pattern matching other working modals
  */
 
 import { motion, AnimatePresence } from "framer-motion";
@@ -40,19 +41,19 @@ export default function FragmentPopup({
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 pointer-events-auto">
           {/* Backdrop */}
           <motion.div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200]"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
 
-          {/* Popup Card - Mobile-optimized centering */}
+          {/* Popup Card - Properly Centered */}
           <motion.div
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[201] w-[90vw] max-w-md max-h-[85vh] overflow-y-auto"
+            className="relative w-full max-w-md max-h-[85vh] overflow-y-auto mx-4"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
@@ -89,7 +90,7 @@ export default function FragmentPopup({
 
                 {/* Name + Setting */}
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-xl md:text-2xl font-bold text-white mb-1 truncate">
+                  <h2 className="text-lg md:text-xl font-bold text-white mb-1 truncate">
                     {fragment.playerName}
                   </h2>
                   <p className="text-xs md:text-sm text-gray-400 line-clamp-2">
@@ -128,7 +129,7 @@ export default function FragmentPopup({
               </div>
             </div>
           </motion.div>
-        </>
+        </div>
       )}
     </AnimatePresence>
   );

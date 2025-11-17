@@ -283,8 +283,8 @@ const IMAGE_QUALITY = process.env.IMAGE_QUALITY || "low"; // low|medium|high
 // Note: "Cove" is not currently available in the public TTS API. If OpenAI
 // exposes it in the future, change TTS_VOICE to "cove".
 const TTS_URL = "https://api.openai.com/v1/audio/speech";
-const TTS_MODEL = process.env.TTS_MODEL || "tts-1";       // tts-1, tts-1-hd, or gpt-4o-mini-tts
-const TTS_VOICE = process.env.TTS_VOICE || "alloy";       // alloy|echo|fable|onyx|nova|shimmer
+const TTS_MODEL = process.env.TTS_MODEL || "gpt-4o-mini-tts ";       // tts-1, tts-1-hd, or gpt-4o-mini-tts
+const TTS_VOICE = process.env.TTS_VOICE || "onyx";       // alloy|echo|fable|onyx|nova|shimmer
 const TTS_INSTRUCTIONS = process.env.TTS_INSTRUCTIONS || undefined; // Optional: style/tone instructions (only for gpt-4o-mini-tts)
 const TTS_FORMAT = process.env.TTS_FORMAT || "mp3";       // mp3|opus|aac|flac
 // ---------------------------------------------------------------------------
