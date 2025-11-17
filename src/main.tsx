@@ -6,7 +6,7 @@ import "./index.css";
 import { useSettingsStore } from "./store/settingsStore";
 import { usePastGamesStore } from "./store/pastGamesStore";
 import { useFragmentsStore } from "./store/fragmentsStore";
-import { useLoggingStore } from "./store/loggingStore";
+import { useLoggingStore, resetLoggingStore } from "./store/loggingStore";
 import { useDilemmaStore } from "./store/dilemmaStore";
 import { useCompassStore } from "./store/compassStore";
 import { useRoleStore } from "./store/roleStore";
@@ -347,7 +347,7 @@ const useStrict = import.meta.env.MODE !== "development";
     useHighscoreStore.getState().reset();
 
     // User identity & treatment
-    useLoggingStore.getState().resetLoggingStore(); // Generates new userId
+    resetLoggingStore(); // Generates new userId
     useSettingsStore.getState().setTreatment('semiAutonomy'); // Reset to default
 
     // Manual cleanup
