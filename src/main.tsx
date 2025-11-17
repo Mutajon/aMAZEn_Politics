@@ -296,6 +296,29 @@ const useStrict = import.meta.env.MODE !== "development";
   }
 };
 
+// ========================================================================
+// Experiment Mode Management
+// ========================================================================
+(window as any).getExperimentProgress = () => {
+  const { experimentProgress } = useLoggingStore.getState();
+  console.log('📊 Experiment Progress:', {
+    completedRoles: experimentProgress.completedRoles,
+    activeRole: experimentProgress.activeRoleKey,
+    completedCount: Object.keys(experimentProgress.completedRoles || {}).length
+  });
+  return experimentProgress;
+};
+
+(window as any).resetExperimentProgress = () => {
+  if (confirm('⚠️ Reset all experiment progress? This will unlock all 3 experiment roles.')) {
+    useLoggingStore.getState().resetExperimentProgress();
+    console.log('✅ Experiment progress reset! All roles unlocked.');
+    console.log('💡 Refresh the page if you\'re on role selection screen.');
+  }
+};
+
+(window as any).clearExperimentProgress = (window as any).resetExperimentProgress;
+
 // HIDDEN FOR EXPERIMENTAL DISTRIBUTION
 // Console commands are still available but not advertised to users
 // Log available commands

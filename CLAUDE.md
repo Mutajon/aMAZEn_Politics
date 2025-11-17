@@ -55,6 +55,11 @@ exportPastGames()    # Export games as JSON (auto-copies to clipboard)
 getFragments()       # View fragment collection status
 clearFragments()     # Clear all collected fragments (with confirmation)
 resetIntro()         # Reset first intro flag (show full dialog again)
+
+// Experiment Mode Management
+getExperimentProgress()    # View completed roles and progress
+resetExperimentProgress()  # Reset all experiment progress (unlock all roles)
+clearExperimentProgress()  # Alias for resetExperimentProgress()
 ```
 
 ## Deployment
