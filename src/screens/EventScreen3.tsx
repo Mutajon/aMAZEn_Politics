@@ -14,6 +14,7 @@ import { useRoleStore } from "../store/roleStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useEventDataCollector } from "../hooks/useEventDataCollector";
 import { useEventNarration } from "../hooks/useEventNarration";
+import { useNarrator } from "../hooks/useNarrator";
 import { useLoadingProgress } from "../hooks/useLoadingProgress";
 import { presentEventData, buildSupportItems } from "../lib/eventDataPresenter";
 import { cleanAndAdvanceDay } from "../lib/eventDataCleaner";
@@ -113,6 +114,9 @@ export default function EventScreen3({ push }: Props) {
 
   // Narration integration - prepares TTS when dilemma loads, provides canShowDilemma flag
   const { canShowDilemma, startNarrationIfReady } = useEventNarration();
+
+  // Global narration stop (for stopping audio when navigating away or opening modals)
+  const { stop: stopNarration } = useNarrator();
 
   // Loading progress (auto-increments, smooth catchup animation)
   const { progress, start: startProgress, reset: resetProgress, notifyReady } = useLoadingProgress();
@@ -878,7 +882,10 @@ export default function EventScreen3({ push }: Props) {
                   </p>
                   {phase === 'interacting' && (
                     <button
-                      onClick={() => setShowSelfJudgmentModal(true)}
+                      onClick={() => {
+                        stopNarration(); // Stop any playing narration before opening modal
+                        setShowSelfJudgmentModal(true);
+                      }}
                       className="w-full px-6 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-amber-500/50"
                     >
                       View Aftermath
