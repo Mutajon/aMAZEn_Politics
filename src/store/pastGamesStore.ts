@@ -34,7 +34,22 @@ export const usePastGamesStore = create<PastGamesState>()(
         // Sort by timestamp (newest first)
         next.sort((a, b) => b.timestamp - a.timestamp);
 
-        // Keep only the most recent MAX_GAMES games (auto-prune oldest)
+        // Helper function to attempt saving with quota error handling
+        const attemptSave = (games: PastGameEntry[]): boolean => {
+          try {
+            set({ games });
+            return true;
+          } catch (error) {
+            // Detect QuotaExceededError
+            if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+              return false;
+            }
+            // Re-throw non-quota errors
+            throw error;
+          }
+        };
+
+        // ATTEMPT 1: Try to save with normal limit (MAX_GAMES = 10)
         if (next.length > MAX_GAMES) {
           const removed = next.slice(MAX_GAMES);
           next = next.slice(0, MAX_GAMES);
@@ -43,11 +58,38 @@ export const usePastGamesStore = create<PastGamesState>()(
           );
         }
 
-        set({ games: next });
+        if (attemptSave(next)) {
+          console.log(
+            `[PastGames] Saved game: "${entry.playerName}" in ${entry.roleTitle}. Total games: ${next.length}/${MAX_GAMES}`
+          );
+          return;
+        }
 
-        console.log(
-          `[PastGames] Saved game: "${entry.playerName}" in ${entry.roleTitle}. Total games: ${next.length}/${MAX_GAMES}`
-        );
+        // ATTEMPT 2: Quota exceeded - aggressively prune to 5 games
+        console.warn('[PastGames] ⚠️ Quota exceeded! Reducing to 5 most recent games...');
+        next = next.slice(0, 5);
+
+        if (attemptSave(next)) {
+          console.log(
+            `[PastGames] ✅ Saved after reducing to 5 games: "${entry.playerName}" in ${entry.roleTitle}`
+          );
+          return;
+        }
+
+        // ATTEMPT 3: Still failing - keep only newest game
+        console.warn('[PastGames] ⚠️ Still exceeded! Keeping only newest game...');
+        next = [entry];
+
+        if (attemptSave(next)) {
+          console.log(
+            `[PastGames] ✅ Saved only newest game: "${entry.playerName}" in ${entry.roleTitle}`
+          );
+          return;
+        }
+
+        // ATTEMPT 4: Critical failure - even single game won't fit
+        console.error('[PastGames] ❌ CRITICAL: Cannot save even single game - quota critically exceeded!');
+        console.error('[PastGames] Run clearPastGames() in console to free space, or clear other localStorage data');
       },
 
       getGames: () => {
@@ -75,11 +117,14 @@ export const usePastGamesStore = create<PastGamesState>()(
       },
     }),
     {
-      name: "amaze-politics-past-games-v1", // localStorage key
-      // Keep full avatars (user requested full base64 avatars)
-      // Warning: This will use ~500-800KB of localStorage quota for 10 games
+      name: "amaze-politics-past-games-v2", // localStorage key (v2 = strips avatars)
+      // Strip avatars to save 99.9% of storage (680 KB → ~0.5 KB for 10 games)
+      // Fragments display role background banners instead (thematic + space-efficient!)
       partialize: (state) => ({
-        games: state.games.slice(0, MAX_GAMES), // Keep only MAX_GAMES
+        games: state.games.slice(0, MAX_GAMES).map(entry => ({
+          ...entry,
+          avatarUrl: undefined, // Strip base64 avatars (save ~68KB per game)
+        })),
       }),
     }
   )

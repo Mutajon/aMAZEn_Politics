@@ -37,9 +37,10 @@ export interface PastGameEntry {
 
   // Player Info
   playerName: string; // Character name
-  avatarUrl?: string; // Base64 data URL for avatar image
+  avatarUrl?: string; // Base64 data URL for avatar image (DEPRECATED - use roleImageId)
 
   // Role/Setting
+  roleImageId?: string; // Image ID for predefined roles (e.g., "greece", "mars") - use for background thumbnails
   roleTitle: string; // e.g., "Athens — Shadows of War (-431)"
   roleDescription: string; // e.g., "Citizen in Athens"
   systemName: string; // e.g., "Democracy", "Stratocracy"

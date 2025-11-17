@@ -208,7 +208,10 @@ export default function AftermathScreen({ push }: Props) {
       }
     })();
 
-    // Save game to past games storage (localStorage)
+    // Extract gameId early - needed even if past game save fails
+    const currentGameId = useDilemmaStore.getState().gameId || `game-${Date.now()}`;
+
+    // TRY BLOCK 1: Save past game to localStorage (non-critical, allowed to fail)
     try {
       const pastGameEntry = buildPastGameEntry(data);
       addPastGame(pastGameEntry);
@@ -227,10 +230,23 @@ export default function AftermathScreen({ push }: Props) {
       );
 
       console.log('[AftermathScreen] 💾 Past game saved to localStorage');
+    } catch (error) {
+      console.error('[AftermathScreen] ❌ Failed to save past game:', error);
+      logger.logSystem(
+        'past_game_save_failed',
+        {
+          gameId: currentGameId,
+          error: error instanceof Error ? error.message : String(error)
+        },
+        'Failed to save past game (localStorage quota or other error)'
+      );
+      // Continue to fragment collection - past games are non-critical
+    }
 
-      // Collect fragment if less than 3 collected
-      if (fragmentCount < 3) {
-        addFragment(pastGameEntry.gameId);
+    // TRY BLOCK 2: Collect fragment (CRITICAL, must succeed even if past game failed)
+    if (fragmentCount < 3) {
+      try {
+        addFragment(currentGameId);
 
         // CRITICAL FIX: Force immediate localStorage write to prevent race condition
         // Zustand persist middleware is async and can fail silently if tab loses focus
@@ -250,7 +266,7 @@ export default function AftermathScreen({ push }: Props) {
           logger.logSystem(
             'fragment_persist_failed',
             {
-              gameId: pastGameEntry.gameId,
+              gameId: currentGameId,
               error: persistError instanceof Error ? persistError.message : String(persistError)
             },
             'Failed to persist fragment to localStorage'
@@ -266,23 +282,28 @@ export default function AftermathScreen({ push }: Props) {
           logger.logSystem(
             'fragment_addition_failed',
             {
-              gameId: pastGameEntry.gameId,
+              gameId: currentGameId,
               expectedCount: fragmentCount + 1,
               actualCount: updatedFragmentCount
             },
             'Fragment was not added to store'
           );
         } else {
+          // Get player info for logging (may not have past game if that save failed)
+          const roleStore = useRoleStore.getState();
+          const playerName = roleStore.character?.name || 'Leader';
+          const roleTitle = roleStore.roleTitle || roleStore.selectedRole || 'Unknown';
+
           logger.logSystem(
             'fragment_collected',
             {
-              gameId: pastGameEntry.gameId,
+              gameId: currentGameId,
               fragmentIndex: fragmentCount,
               totalFragments: updatedFragmentCount,
-              playerName: pastGameEntry.playerName,
-              roleTitle: pastGameEntry.roleTitle
+              playerName,
+              roleTitle
             },
-            `Fragment ${updatedFragmentCount}/3 collected: ${pastGameEntry.playerName} in ${pastGameEntry.roleTitle}`
+            `Fragment ${updatedFragmentCount}/3 collected: ${playerName} in ${roleTitle}`
           );
 
           console.log(`[AftermathScreen] 🧩 Fragment ${updatedFragmentCount}/3 collected (verified)`);
@@ -297,10 +318,17 @@ export default function AftermathScreen({ push }: Props) {
             console.log('[AftermathScreen] 🎉 All 3 fragments collected!');
           }
         }
+      } catch (fragmentError) {
+        console.error('[AftermathScreen] ❌ CRITICAL: Failed to collect fragment:', fragmentError);
+        logger.logSystem(
+          'fragment_collection_failed',
+          {
+            gameId: currentGameId,
+            error: fragmentError instanceof Error ? fragmentError.message : String(fragmentError)
+          },
+          'Critical failure: Fragment collection failed'
+        );
       }
-    } catch (error) {
-      console.error('[AftermathScreen] ❌ Failed to save past game:', error);
-      // Don't throw - saving past games should never block user experience
     }
   }, [data, isFirstVisit, inquiryHistory, customActionCount, selectedRole, day, score, addPastGame, addFragment, logger]);
 

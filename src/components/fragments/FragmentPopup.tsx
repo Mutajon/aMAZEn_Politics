@@ -71,9 +71,21 @@ export default function FragmentPopup({
 
               {/* Avatar + Name Section (Horizontal Layout) */}
               <div className="flex items-center gap-4 mb-6 pr-8">
-                {/* Avatar */}
+                {/* Avatar / Background Image */}
                 <div className="flex-shrink-0 w-20 h-20 rounded-full overflow-hidden bg-gray-800/50 flex items-center justify-center">
-                  {fragment.avatarUrl ? (
+                  {fragment.roleImageId ? (
+                    // Use role background banner for predefined roles (99.9% storage savings!)
+                    <img
+                      src={`/assets/images/BKGs/Roles/banners/${fragment.roleImageId}Banner.png`}
+                      alt={fragment.roleTitle}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Fallback to puzzle icon if banner fails to load
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  ) : fragment.avatarUrl ? (
+                    // Use custom avatar for custom roles (backward compatibility)
                     <img
                       src={fragment.avatarUrl}
                       alt={fragment.playerName}
@@ -84,6 +96,7 @@ export default function FragmentPopup({
                       }}
                     />
                   ) : (
+                    // Default: Puzzle icon
                     <Puzzle className="w-10 h-10 text-gray-400" />
                   )}
                 </div>

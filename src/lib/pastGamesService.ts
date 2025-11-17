@@ -15,6 +15,7 @@ import { COMPONENTS, type PropKey } from "../data/compass-data";
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
+import { getPredefinedRole } from "../data/predefinedRoles";
 
 /**
  * Extract top 2-3 compass values per dimension
@@ -115,9 +116,19 @@ export function buildPastGameEntry(
   const avatarUrl = roleStore.character?.avatarUrl;
 
   // Extract role/setting info
-  const roleTitle = roleStore.roleTitle || roleStore.selectedRole || "Unknown";
+  const selectedRole = roleStore.selectedRole;
+  const roleTitle = roleStore.roleTitle || selectedRole || "Unknown";
   const roleDescription = roleStore.roleDescription || "Unknown Role";
   const systemName = roleStore.analysis?.systemName || "Unknown System";
+
+  // Extract imageId from predefined role (if applicable)
+  let roleImageId: string | undefined;
+  if (selectedRole) {
+    const predefinedRole = getPredefinedRole(selectedRole);
+    if (predefinedRole) {
+      roleImageId = predefinedRole.imageId;
+    }
+  }
 
   // Extract final results
   const finalScore = dilemmaStore.score || 0;
@@ -144,9 +155,10 @@ export function buildPastGameEntry(
 
     // Player Info
     playerName,
-    avatarUrl,
+    avatarUrl: roleImageId ? undefined : avatarUrl, // Only store avatar if no imageId (custom roles)
 
     // Role/Setting
+    roleImageId, // Image reference for predefined roles (replaces 68KB avatar with ~50 bytes)
     roleTitle,
     roleDescription,
     systemName,
