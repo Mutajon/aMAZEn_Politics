@@ -36,6 +36,7 @@ import { useRoleProgressStore } from "../store/roleProgressStore";
 import { useMirrorTop3 } from "../hooks/useMirrorTop3";
 import { useAudioManager } from "../hooks/useAudioManager";
 import { useLogger } from "../hooks/useLogger";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import { loggingService } from "../lib/loggingService";
 import type { PushFn } from "../lib/router";
 import { useLang } from "../i18n/lang";
@@ -94,6 +95,14 @@ export default function FinalScoreScreen({ push }: Props) {
   const previousBestScoreRef = useRef<number | null>(roleProgress?.bestScore ?? null);
   const { playSfx } = useAudioManager();
   const logger = useLogger();
+
+  // Navigation guard - prevent back button during final score screen
+  useNavigationGuard({
+    enabled: true,
+    confirmationMessage: lang("CONFIRM_EXIT_GAMEPLAY"),
+    screenName: "final_score_screen"
+  });
+
   const breakdown: ScoreBreakdown =
     finalScoreCalculated && savedBreakdown ? savedBreakdown : liveBreakdown;
 

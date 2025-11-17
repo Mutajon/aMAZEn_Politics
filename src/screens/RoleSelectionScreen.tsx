@@ -7,6 +7,7 @@ import type { PushFn } from "../lib/router";
 import { validateRoleStrict, AIConnectionError } from "../lib/validation";
 import { useRoleStore } from "../store/roleStore";
 import { useLogger } from "../hooks/useLogger";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import { useLang } from "../i18n/lang";
 import { PREDEFINED_ROLES_ARRAY, getRoleImagePaths } from "../data/predefinedRoles";
 import { useSettingsStore } from "../store/settingsStore";
@@ -21,6 +22,14 @@ import RoleInfoBox from "../components/roleSelection/RoleInfoBox";
 export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const lang = useLang();
   const logger = useLogger();
+
+  // Navigation guard - prevent back button during role selection
+  useNavigationGuard({
+    enabled: true,
+    confirmationMessage: lang("CONFIRM_EXIT_SETUP"),
+    screenName: "role_selection_screen"
+  });
+
   const setRole = useRoleStore((s) => s.setRole);
   const setAnalysis = useRoleStore(s => s.setAnalysis);
   const setRoleBackgroundImage = useRoleStore(s => s.setRoleBackgroundImage);

@@ -9,6 +9,7 @@ import { useSettingsStore } from "../store/settingsStore";
 import { useRoleStore } from "../store/roleStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useLogger } from "../hooks/useLogger";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import { useLang } from "../i18n/lang";
 import { useReserveGameSlot } from "../hooks/useReserveGameSlot";
 
@@ -35,6 +36,13 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
 
   // Logging hook for data collection
   const logger = useLogger();
+
+  // Navigation guard - prevent back button during background intro
+  useNavigationGuard({
+    enabled: true,
+    confirmationMessage: lang("CONFIRM_EXIT_SETUP"),
+    screenName: "background_intro_screen"
+  });
 
   // Role data (forgiving shape)
   const selectedRoleRaw = useRoleStore((s: any) => s.selectedRole);
@@ -105,7 +113,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
     (async () => {
       try {
         if (narrationEnabled) {
-          const p = await narrator.prepare(DEFAULT_LINE, { voiceName: "alloy", format: "mp3" });
+          const p = await narrator.prepare(DEFAULT_LINE, { voiceName: "onyx", format: "mp3" });
           if (cancelled) { p.dispose(); return; }
           preparedDefaultRef.current = p;
         }
@@ -160,7 +168,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
 
           // Prepare the TTS for the paragraph ahead of time (only if narration enabled)
           if (narrationEnabled) {
-            const p = await narrator.prepare(paragraph, { voiceName: "alloy", format: "mp3" });
+            const p = await narrator.prepare(paragraph, { voiceName: "onyx", format: "mp3" });
             if (cancelled) { p.dispose(); return; }
             preparedIntroRef.current = p;
           }
@@ -319,7 +327,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
       }
 
       try {
-        const p = await narrator.prepare(para, { voiceName: "alloy", format: "mp3" });
+        const p = await narrator.prepare(para, { voiceName: "onyx", format: "mp3" });
         if (cancelled) { p.dispose(); return; }
         preparedIntroRef.current = p;
         setPhase("ready"); // will start playback on fade-in animation

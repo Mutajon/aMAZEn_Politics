@@ -43,6 +43,7 @@ import { useTimingLogger } from "../hooks/useTimingLogger";
 import { useReasoning } from "../hooks/useReasoning";
 import { useLogger } from "../hooks/useLogger";
 import { useSessionLogger } from "../hooks/useSessionLogger";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import ReasoningModal from "../components/event/ReasoningModal";
 
 type Props = {
@@ -146,6 +147,13 @@ export default function EventScreen3({ push }: Props) {
   const [isSubmittingReasoning, setIsSubmittingReasoning] = useState(false);
   const reasoningResolveRef = useRef<(() => void) | null>(null);
   const addReasoningEntry = useDilemmaStore((s) => s.addReasoningEntry);
+
+  // Navigation guard - prevent back button during gameplay
+  useNavigationGuard({
+    enabled: true,
+    confirmationMessage: lang("CONFIRM_EXIT_GAMEPLAY"),
+    screenName: "event_screen"
+  });
 
   // Timing tracker: time from dilemma presented to action confirmed
   const decisionTimingIdRef = useRef<string | null>(null);

@@ -33,6 +33,7 @@ import {
 import type { PushFn } from "../lib/router";
 import { useLang } from "../i18n/lang";
 import { useLogger } from "../hooks/useLogger";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
 
 type Props = {
   push: PushFn;
@@ -145,6 +146,13 @@ export default function GoalsSelectionScreen({ push }: Props) {
 
   // Logging hook for data collection
   const logger = useLogger();
+
+  // Navigation guard - prevent back button during goals selection
+  useNavigationGuard({
+    enabled: true,
+    confirmationMessage: lang("CONFIRM_EXIT_SETUP"),
+    screenName: "goals_selection_screen"
+  });
 
   // Initialize goals on mount
   useEffect(() => {

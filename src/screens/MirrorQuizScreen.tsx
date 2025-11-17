@@ -17,6 +17,7 @@ import { saveMirrorReturnRoute } from "../lib/eventScreenSnapshot";
 import MirrorBubbleTyping from "../components/MirrorBubbleTyping";
 import { COMPONENTS, PALETTE } from "../data/compass-data";
 import { useLogger } from "../hooks/useLogger";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import { useTimingLogger } from "../hooks/useTimingLogger";
 import { useLang } from "../i18n/lang";
 import { translateQuizQuestion, translateQuizAnswer } from "../i18n/translateGameData";
@@ -96,6 +97,13 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   // Logging hooks for data collection
   const logger = useLogger();
   const timingLogger = useTimingLogger();
+
+  // Navigation guard - prevent back button during mirror quiz
+  useNavigationGuard({
+    enabled: true,
+    confirmationMessage: lang("CONFIRM_EXIT_SETUP"),
+    screenName: "mirror_quiz_screen"
+  });
 
   // Track which questions have been logged to prevent duplicates
   const loggedQuestionsRef = useRef<Set<number>>(new Set());
@@ -240,6 +248,12 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
         setSelectedOption(null); // Reset selection
         if (idx + 1 >= quiz.length) {
           setDone();
+
+          // Capture initial compass snapshot for session summary
+          // This happens automatically after quiz completes, before any navigation
+          const { captureInitialSnapshot } = useCompassStore.getState();
+          captureInitialSnapshot();
+          console.log('[MirrorQuizScreen] ✅ Initial compass snapshot captured automatically after quiz completion');
 
           // Log quiz completion
           logger.log(
@@ -493,9 +507,8 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
           onClick={() => {
             logger.log('button_click_go_to_sleep', 'Go to sleep', 'User clicked Go to sleep button');
 
-            // Capture initial compass snapshot for session summary
-            const { captureInitialSnapshot } = useCompassStore.getState();
-            captureInitialSnapshot();
+            // Initial compass snapshot was already captured after quiz completion
+            // No need to capture again here
 
             push("/background-intro");
           }}

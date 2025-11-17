@@ -12,6 +12,7 @@ import { useSettingsStore } from "../store/settingsStore";
 import { useRoleStore } from "../store/roleStore";
 import { useTranslatedConst, createTranslatedConst } from "../i18n/useTranslatedConst";
 import { useLang } from "../i18n/lang";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
 
 type DifficultyLevel = {
   id: "baby-boss" | "freshman" | "tactician" | "old-fox";
@@ -60,6 +61,13 @@ const createDifficulties = createTranslatedConst((lang): DifficultyLevel[] => [
 export default function DifficultyScreen({ push }: { push: PushFn }) {
   const lang = useLang();
   const difficulties = useTranslatedConst(createDifficulties);
+
+  // Navigation guard - prevent back button during difficulty selection
+  useNavigationGuard({
+    enabled: true,
+    confirmationMessage: lang("CONFIRM_EXIT_SETUP"),
+    screenName: "difficulty_screen"
+  });
 
   const [selected, setSelected] = useState<DifficultyLevel["id"] | null>(null);
   const setDifficulty = useDilemmaStore((s) => s.setDifficulty);

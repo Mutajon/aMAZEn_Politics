@@ -8,6 +8,7 @@ import { useNarrator, type PreparedTTS } from "../hooks/useNarrator";
 import { motion, AnimatePresence } from "framer-motion";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { useLogger } from "../hooks/useLogger";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import { useLang } from "../i18n/lang";
 import { useTranslatedConst, createTranslatedConst } from "../i18n/useTranslatedConst";
 import { getPredefinedRole } from "../data/predefinedRoles";
@@ -103,6 +104,13 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
 
   // Logging hook for data collection
   const logger = useLogger();
+
+  // Navigation guard - prevent back button during compass intro
+  useNavigationGuard({
+    enabled: true,
+    confirmationMessage: lang("CONFIRM_EXIT_SETUP"),
+    screenName: "compass_intro_start_screen"
+  });
 
   /** The URL we actually display, factoring in settings + fallback. */
   const displayAvatar = useMemo(() => {
