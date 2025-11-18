@@ -2,6 +2,23 @@
 
 This file provides guidance to Claude Code when working with this political simulation game codebase.
 
+## ⚠️ CRITICAL: "Save All Changes" Means ALL Uncommitted Files
+
+**When the user asks to "save all changes" or "save changes across the project":**
+
+1. **Run `git status`** to see ALL uncommitted files (not just files from current conversation)
+2. **Commit ALL modified and untracked files** - the word "all" means everything, not just current conversation changes
+3. If user asks to push, push. If not, don't push.
+4. If user asks to merge branches, merge them.
+
+**NEVER selectively commit only the files you worked on in the current session when asked to save "all" changes.**
+
+This distinction is critical:
+- "Save the changes" or "commit this" = only current conversation changes
+- "Save ALL changes" or "save changes across the project" = EVERY uncommitted file
+
+---
+
 ## ⚠️ CRITICAL: Dev Server Management
 
 **ALWAYS kill the dev server after testing code changes!**

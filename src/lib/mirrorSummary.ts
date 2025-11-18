@@ -127,10 +127,17 @@ export async function generateMirrorQuizSummary(
       const systemPrompt = lang("MIRROR_QUIZ_SYSTEM_PROMPT");
       const userPromptTemplate = lang("MIRROR_QUIZ_USER_PROMPT");
       const userPrompt = userPromptTemplate
-        .replace("{what1}", whatTop[0].name)
-        .replace("{what2}", whatTop[1].name)
-        .replace("{whence1}", whenceTop[0].name)
-        .replace("{whence2}", whenceTop[1].name);
+        .replace("{what1}", whatTop[0].label)
+        .replace("{what2}", whatTop[1].label)
+        .replace("{whence1}", whenceTop[0].label)
+        .replace("{whence2}", whenceTop[1].label);
+
+      // Log payload for debugging
+      console.log("[Mirror Quiz Light] Sending payload:", {
+        topWhat: whatTop.map(minify),
+        topWhence: whenceTop.map(minify),
+        userPrompt: userPrompt,
+      });
 
       const resp = await fetch("/api/mirror-quiz-light", {
         method: "POST",

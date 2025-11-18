@@ -53,6 +53,8 @@ const AUDIO_FILES = {
     // Self-judgment and aftermath
     'time-is-up': '/assets/sounds/VO/gatekeeperIntro/timeIsUp.wav',
     'behold-fragment': '/assets/sounds/VO/gatekeeperIntro/beholdFragment.wav',
+    // Mirror intro (compass intro screen)
+    'mirror-intro': '/assets/sounds/VO/gatekeeperIntro/mirrorIntro.wav',
   },
 } as const;
 
