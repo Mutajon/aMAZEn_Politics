@@ -48,7 +48,7 @@ app.use(cors({
 app.use(bodyParser.json());
 
 
-const GAME_LIMIT = 100;
+const GAME_LIMIT = 200;
 
 /**
  * Adaptively assign treatment to ensure balanced distribution
