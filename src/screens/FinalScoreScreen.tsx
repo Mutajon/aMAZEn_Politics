@@ -207,7 +207,7 @@ export default function FinalScoreScreen({ push }: Props) {
       setRunning(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sequence.length, finalScoreCalculated]);
+  }, [sequence.length, finalScoreCalculated, savedBreakdown]);
 
   useEffect(() => {
     displayValuesRef.current = displayValues;
