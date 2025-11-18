@@ -126,7 +126,18 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   // New games are handled by resetAll() in SplashScreen
   useEffect(() => {
     if (quiz.length === 0) {
-      resetCompass();
+      // DEFENSIVE GUARD: Don't reset compass if initial snapshot already exists
+      // This prevents back button navigation from destroying the captured snapshot
+      const compassSnapshot = useCompassStore.getState().initialCompassSnapshot;
+      const loggingSnapshot = useLoggingStore.getState().initialCompassSnapshot;
+
+      if (!compassSnapshot && !loggingSnapshot) {
+        resetCompass();
+        console.log('[MirrorQuizScreen] No existing snapshot, resetting compass for new quiz');
+      } else {
+        console.log('[MirrorQuizScreen] Snapshot exists, preserving compass state');
+      }
+
       init(pickQuiz(3));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -517,11 +528,13 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
     {epilogueShown && (
       <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
         <button
-          onClick={() => {
+          onClick={async () => {
             logger.log('button_click_go_to_sleep', 'Go to sleep', 'User clicked Go to sleep button');
 
             // Initial compass snapshot was already captured after quiz completion
-            // No need to capture again here
+            // Wait 150ms to ensure Zustand persist middleware flushes to localStorage
+            // This prevents race condition where navigation happens before async persist completes
+            await new Promise(resolve => setTimeout(resolve, 150));
 
             push("/background-intro");
           }}

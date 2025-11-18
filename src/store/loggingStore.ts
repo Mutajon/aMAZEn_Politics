@@ -132,7 +132,7 @@ export const useLoggingStore = create<LoggingState>()(
       resetExperimentProgress: () => set({ experimentProgress: defaultExperimentProgress() }),
     }),
     {
-      name: "logging-v5",  // bumped from v4 to v5 to include initialCompassSnapshot
+      name: "logging-v4",  // v4: added sessionStartTime + initialCompassSnapshot fields
       partialize: (s) => ({
         // Only persist these fields
         userId: s.userId,
@@ -141,7 +141,7 @@ export const useLoggingStore = create<LoggingState>()(
         consented: s.consented,
         experimentProgress: s.experimentProgress,
         sessionStartTime: s.sessionStartTime,  // Persist session start time
-        initialCompassSnapshot: s.initialCompassSnapshot,  // Persist initial compass snapshot
+        initialCompassSnapshot: s.initialCompassSnapshot,  // Persist initial compass snapshot (defensive persistence)
         // DON'T persist: sessionId, isInitialized
         // NOTE: 'enabled' removed - now controlled by settingsStore.dataCollectionEnabled
       }),
