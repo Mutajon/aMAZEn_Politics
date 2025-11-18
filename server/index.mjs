@@ -1703,6 +1703,14 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
     const systemPrompt = req.body?.systemPrompt; // Get translated system prompt from client
     const userPrompt = req.body?.userPrompt; // Get translated user prompt from client
 
+    // Log received payload
+    console.log("[mirror-quiz-light] Received payload:", {
+      topWhat,
+      topWhence,
+      hasSystemPrompt: !!systemPrompt,
+      userPrompt: userPrompt || "(using default)",
+    });
+
     if (topWhat.length < 2 || topWhence.length < 2) {
       return res.status(400).json({ error: "Need at least 2 top values for both 'what' and 'whence'" });
     }
@@ -1735,9 +1743,15 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
       `Write ONE sentence (12–18 words) in the mirror's voice that plainly captures how these goals blend with these justifications.\n` +
       `Do not show numbers. Do not repeat labels verbatim; paraphrase them into natural language. Keep it dry with a faint smile—no metaphors.\n`;
 
+    // Log the prompt being sent to AI
+    console.log("[mirror-quiz-light] User prompt sent to AI:", user);
+
     const text = useAnthropic
       ? await aiTextAnthropic({ system, user, model: MODEL_MIRROR_ANTHROPIC })
       : await aiText({ system, user, model: MODEL_MIRROR });
+
+    // Log raw AI response
+    console.log("[mirror-quiz-light] Raw AI response:", text);
 
     // === Last-mile sanitizer: keep one sentence and clamp word count ===
     // Use appropriate fallback based on language (detect from prompt or default to English)
@@ -3374,6 +3388,10 @@ function buildGameMasterSystemPromptUnified(gameContext) {
     `  - ${dim.dimension}: ${dim.values.join(', ')}`
   ).join('\n');
 
+  // Log compass values for mirror advice debugging
+  console.log("[game-turn-v2] Player compass values received:", playerCompassTopValues);
+  console.log("[game-turn-v2] Formatted compassText for prompt:\n" + compassText);
+
   const prompt = `# GAME MASTER PERSONA
 
 You are a mysterious, amused Game Master who watches the player's journey through this political simulation.
@@ -3787,12 +3805,32 @@ Response:
 
 # MIRROR BRIEFING
 
-The mirror is a cynical, dry-witted observer that makes the player look inward, by bringing to light tensions between their values and the current dilemma.
+The mirror is a cynical, dry-witted observer speaking in FIRST PERSON. Its job is to surface tensions between the player's TOP VALUES and the current dilemma.
 
-Comment style:
-- **FIRST PERSON** - Mirror speaks directly to player
-- 1 sentence, playful (20-25 words)
-- Linked to compass values and current situation
+**Value Integration Rules:**
+1. **ALWAYS reference at least ONE specific value** from the player's top "what" or "how" values listed above
+2. **Create tension** - Show how the dilemma challenges, tests, or contradicts their stated values
+3. **Never preach** - Don't tell them what to do, just highlight the contradiction or irony
+4. **Use the actual value name** - Say "your precious Honor" or "that Truth you claim to value"
+
+**Format:**
+- 1 sentence, 20-25 words
+- First person, addressing "you"
+- Dry, slightly mocking tone
+
+**Examples with player values [what: Truth, Honor] [how: Law, Deliberation]:**
+
+Situation: Military crisis requiring quick decision
+- BAD: "I wonder how you'll handle this crisis."
+- GOOD: "Your beloved Deliberation might be a luxury when soldiers are dying by the minute."
+
+Situation: Ally asks player to lie for political gain
+- BAD: "Truth is complicated sometimes."
+- GOOD: "How convenient that your precious Truth has an exception for political survival."
+
+Situation: Legal loophole allows corruption
+- BAD: "The law isn't always just."
+- GOOD: "Your Law-abiding ways look a bit strained when the letter serves your ambition."
 
 # OUTPUT SCHEMAS
 
@@ -4071,6 +4109,9 @@ app.post("/api/game-turn-v2", async (req, res) => {
 
       console.log('[GAME-TURN-V2] Day 1 complete, conversation stored with unified system prompt');
 
+      // Log mirror advice for debugging
+      console.log("[game-turn-v2] Mirror advice generated (Day 1):", parsed.mirrorAdvice);
+
       // Return response (flattened for frontend compatibility)
       return res.json({
         title: parsed.dilemma?.title || '',
@@ -4205,6 +4246,9 @@ app.post("/api/game-turn-v2", async (req, res) => {
       storeConversation(gameId, gameId, conversation.provider, updatedMeta);
 
       console.log(`[GAME-TURN-V2] Day ${day} complete, conversation updated (${updatedMessages.length} total messages)`);
+
+      // Log mirror advice for debugging
+      console.log(`[game-turn-v2] Mirror advice generated (Day ${day}):`, parsed.mirrorAdvice);
 
       // Return response (flattened for frontend compatibility)
       return res.json({
@@ -4426,8 +4470,8 @@ Wait for SCENARIO CONTEXT, PLAYER ROLE, POLITICAL SYSTEM, and ACTION.`;
       { role: "system", content: systemPrompt }
     ];
 
-    // Store conversation (using gameId as both conversation key and provider identifier)
-    storeConversation(gameId, `compass-${gameId}`, "openai", {
+    // Store conversation (using compass-prefixed key for separate namespace from game-turn)
+    storeConversation(`compass-${gameId}`, `compass-${gameId}`, "openai", {
       messages,
       compassDefinitions: true, // Flag that definitions are stored
       gameContext: gameContext || null // Store context for reference
@@ -4584,7 +4628,7 @@ Return JSON in this shape:
 
     // Update conversation with assistant response
     messages.push({ role: "assistant", content });
-    storeConversation(gameId, `compass-${gameId}`, "openai", {
+    storeConversation(`compass-${gameId}`, `compass-${gameId}`, "openai", {
       messages,
       compassDefinitions: true,
       gameContext: gameContext || storedContext // Update stored context if provided
