@@ -19,9 +19,10 @@ type Props = {
   intro: string; // Death text ("After X years, [leader] died of Z.")
   snapshot: SnapshotEvent[]; // 6-10 extreme events
   avatarUrl?: string; // Player avatar
+  legacy: string; // How the player will be remembered ("You will be remembered as...")
 };
 
-export default function SnapshotSection({ intro, snapshot, avatarUrl }: Props) {
+export default function SnapshotSection({ intro, snapshot, avatarUrl, legacy }: Props) {
   const lang = useLang();
 
   return (
@@ -76,6 +77,18 @@ export default function SnapshotSection({ intro, snapshot, avatarUrl }: Props) {
             <SnapshotPill key={i} event={event} delay={0.6 + i * 0.1} />
           ))}
         </div>
+
+        {/* Legacy Sentence */}
+        <motion.div
+          className="mt-8 pt-6 border-t border-white/10"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.6 + snapshot.length * 0.1 + 0.2 }}
+        >
+          <p className="text-amber-400 text-xl font-semibold text-center italic leading-relaxed">
+            {legacy}
+          </p>
+        </motion.div>
       </div>
     </motion.div>
   );

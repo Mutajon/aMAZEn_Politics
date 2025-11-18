@@ -25,7 +25,6 @@ type TopValue = {
 type Props = {
   top3ByDimension: Record<PropKey, TopValue[]>;
   valuesSummary: string;
-  onExploreClick: () => void;
 };
 
 // Mirror styling constants from MirrorCard
@@ -39,7 +38,7 @@ const TYPEWRITER_DURATION_S = 2.0;
 
 const FADE_DURATION_S = 0.5;
 
-export default function ReflectionSection({ top3ByDimension, valuesSummary, onExploreClick }: Props) {
+export default function ReflectionSection({ top3ByDimension, valuesSummary }: Props) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -117,15 +116,6 @@ export default function ReflectionSection({ top3ByDimension, valuesSummary, onEx
 
           {/* Mirror image BEHIND the text */}
           <MirrorImage />
-
-          {/* Explore Values Button - Bottom Right Corner */}
-          <button
-            onClick={onExploreClick}
-            className="absolute bottom-4 right-4 z-20 px-3 py-2 bg-white/10 hover:bg-white/20 text-white/90 text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
-          >
-            <span>🔍</span>
-            <span>Explore Values</span>
-          </button>
         </div>
       </motion.div>
     );

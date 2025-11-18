@@ -70,8 +70,7 @@ export function useAftermathData() {
 
     try {
       // Collect data from stores
-      const { character } = useRoleStore.getState();
-      const { selectedRole, analysis } = useRoleStore.getState();
+      const { character, selectedRole, analysis, roleTitle } = useRoleStore.getState();
       const {
         gameId,
         dilemmaHistory,
@@ -84,8 +83,9 @@ export function useAftermathData() {
       // Extract player name (fallback to "Leader" if not set)
       const playerName = character?.name || "Leader";
 
-      // Extract role and system (fallback to generic values)
+      // Extract role, setting, and system (fallback to generic values)
       const role = selectedRole || "Unknown Role";
+      const setting = roleTitle || selectedRole || "Unknown Setting"; // roleTitle contains legacyKey (e.g., "Athens — Shadows of War (-431)")
       const systemName = analysis?.systemName || "Unknown System";
 
       // Extract top compass values (top 2 per dimension)
@@ -96,6 +96,7 @@ export function useAftermathData() {
         gameId: gameId || undefined, // Add gameId to get conversation history from backend (convert null to undefined)
         playerName,
         role,
+        setting,
         systemName,
         dilemmaHistory: dilemmaHistory || [],
         finalSupport: {

@@ -2,6 +2,44 @@
 
 This file provides guidance to Claude Code when working with this political simulation game codebase.
 
+## ⚠️ CRITICAL: "Save All Changes" Means ALL Uncommitted Files
+
+**When the user asks to "save all changes" or "save changes across the project":**
+
+1. **Run `git status`** to see ALL uncommitted files (not just files from current conversation)
+2. **Commit ALL modified and untracked files** - the word "all" means everything, not just current conversation changes
+3. If user asks to push, push. If not, don't push.
+4. If user asks to merge branches, merge them.
+
+**NEVER selectively commit only the files you worked on in the current session when asked to save "all" changes.**
+
+This distinction is critical:
+- "Save the changes" or "commit this" = only current conversation changes
+- "Save ALL changes" or "save changes across the project" = EVERY uncommitted file
+
+---
+
+## ⚠️ CRITICAL: Dev Server Management
+
+**ALWAYS kill the dev server after testing code changes!**
+
+When you run `npm run dev` (or any background server process) to test changes:
+1. ✅ Test your changes
+2. ✅ Verify compilation succeeds
+3. ✅ **IMMEDIATELY kill the server using `KillShell` tool**
+
+**Why:** The user needs to run the server on their side. Leaving it running blocks them from testing.
+
+**Example:**
+```bash
+# After running npm run dev in background with shell_id 163811
+KillShell(shell_id: "163811")
+```
+
+**Never forget this step. The user has requested this many times.**
+
+---
+
 ## Development Commands
 
 ### Terminal Commands
@@ -45,6 +83,26 @@ toggleCorruption()   # Toggle corruption tracking
 // Hidden Democracy Rating Access (after Aftermath screen)
 showDemocracy()      # Display hidden democracy rating (not shown in UI)
 getDemocracy()       # Alias for showDemocracy()
+
+// Past Games Storage (saved game history)
+getPastGames()       # View all stored past games (max 10)
+clearPastGames()     # Clear all past games from localStorage
+exportPastGames()    # Export games as JSON (auto-copies to clipboard)
+
+// Fragment Collection (progression system)
+getFragments()       # View fragment collection status
+clearFragments()     # Clear all collected fragments (with confirmation)
+resetIntro()         # Reset first intro flag (show full dialog again)
+
+// Experiment Mode Management
+getExperimentProgress()    # View completed roles and progress
+resetExperimentProgress()  # Reset experiment progress + clear past games/fragments
+clearExperimentProgress()  # Alias for resetExperimentProgress()
+
+// Complete Reset (First-Time Player Experience)
+resetAll()                 # FULL RESET: All data except user preferences (audio, language)
+                           # Resets: game state, progress, scores, user ID, treatment
+                           # Preserves: audio settings, language, display preferences
 ```
 
 ## Deployment
@@ -70,8 +128,10 @@ CHAT_MODEL=gpt-5-mini
 MODEL_DILEMMA=gpt-5
 MODEL_MIRROR=gpt-5
 IMAGE_MODEL=gpt-image-1
-TTS_MODEL=tts-1
-TTS_VOICE=alloy
+TTS_MODEL=gpt-4o-mini-tts
+TTS_VOICE=onyx
+TTS_INSTRUCTIONS=Speak in a mysterious and amused tone, with ethereal echo
+TTS_FORMAT=mp3
 ```
 
 **Render Configuration:**
@@ -112,6 +172,10 @@ TTS_VOICE=alloy
 - **mirrorQuizStore** - Compass assessment progress
 - **aftermathStore** - Aftermath data prefetching
 - **dilemmaPrefetchStore** - First dilemma prefetching
+- **pastGamesStore** - Completed game history (max 10 games, localStorage persisted)
+- **fragmentsStore** - Fragment collection progression (max 3 fragments, firstIntro flag)
+- **highscoreStore** - Top 50 highscores (without avatars to save storage)
+- **loggingStore** - User ID, treatment, consent, experiment progress
 
 ### Hosted State Architecture
 
@@ -123,10 +187,10 @@ TTS_VOICE=alloy
 ### AI Endpoints
 
 **Core Game Engine:**
-- `/api/game-turn` - Unified endpoint for all event screen data using conversation state
-  * Replaces legacy stateless endpoints
+- `/api/game-turn-v2` - Unified endpoint for all event screen data using stateful conversation
+  * Uses hosted conversation state with persistent gameId
   * Returns: dilemma, support shifts, mirror advice, dynamic params, compass hints
-  * ~50% token savings after Day 1, ~50% faster
+  * ~50% token savings after Day 1, ~50% faster than original implementation
 
 **Story System:**
 - `/api/narrative-seed` - One-time narrative scaffold generation (2-3 dramatic threads, climax candidates)
@@ -170,7 +234,7 @@ TTS_VOICE=alloy
 - **Immediate Consequences**: AI shows dramatic results of player actions, no re-questioning decisions
 - **Closure Allowance**: If storyline concludes (war ends, treaty signed), AI may show 1 closure dilemma before switching
 - **Forced Switching**: After 2 consecutive on same topic, AI MUST switch to different subject area
-- **Implementation**: Lines 5717-5744 in `server/index.mjs` - explicit topic tracking and enforcement
+- **Implementation**: Implemented in `/api/game-turn-v2` endpoint in `server/index.mjs`
 - **Goal**: Prevent "wobbling" around same decision, ensure varied gameplay experience
 
 **Dynamic Parameters:**
@@ -194,17 +258,17 @@ TTS_VOICE=alloy
 
 **Immediate Consequence System:**
 - **Goal**: Show immediate, dramatic results of player actions - no re-questioning or hesitation
-- **ALL Actions Get Consequences**: Every player decision triggers consequence directive (lines 5040-5060)
+- **ALL Actions Get Consequences**: Every player decision triggers consequence directive
 - **Explicit Examples**: War declared → battles begin; Treaties signed → implementation starts; Arrests → trials begin
 - **Specialized Detection**: Backend also detects votes, referendums, negotiations via regex for tailored result directives
-- **Implementation**: `server/index.mjs` lines 5040-5060 (general), lines 5033-5039 (vote/negotiation specific)
+- **Implementation**: Implemented in `/api/game-turn-v2` endpoint in `server/index.mjs`
 - **Directive Language**: "DO NOT ask them to confirm again - THEY ALREADY DECIDED"
 - **System Feel**: Results play differently across political systems (democracies implement, autocracies may override)
 
 **Faction Identity Mapping:**
 - **Challenge**: AI doesn't inherently know power holder names = faction profiles (e.g., "Coercive Force" = "Challenger")
 - **Solution**: Explicit identity mapping injected in Day 2+ prompts
-- **Implementation**: `server/index.mjs` lines 4569-4580 in `buildTurnUserPrompt`
+- **Implementation**: Implemented in `/api/game-turn-v2` endpoint via `buildGameMasterUserPrompt()`
 - **Effect**: AI understands when player engages respectfully with a power holder, that faction should respond positively
 - **Example**: Athens scenario - negotiating with Spartans makes Coercive Force (the Spartans) respond positively
 
@@ -215,8 +279,8 @@ TTS_VOICE=alloy
 
 **Custom Action Validation & Consequence System:**
 - **Philosophy**: Highly permissive, pro-player system - default to accepting player creativity
-- **Validation Endpoint**: `POST /api/validate-suggestion` (server/index.mjs, lines 3106-3168, 5383-5425)
-- **Validation Rules** (lines 5393-5418):
+- **Validation Endpoint**: `POST /api/validate-suggestion` in `server/index.mjs`
+- **Validation Rules**:
   - ✅ **ACCEPT**: Violent, unethical, immoral, manipulative, coercive suggestions (corruption penalties applied later)
   - ✅ **ACCEPT**: Risky actions with low probability (assassination, poisoning, coups, bribery)
   - ✅ **ACCEPT**: Actions that are difficult/unlikely but theoretically possible for the role
@@ -228,7 +292,7 @@ TTS_VOICE=alloy
   - Examples: King can issue any decree ✅, but cannot use internet in 1600 ❌ (anachronism)
 - **Constructive Rejections**: When rejecting, suggest feasible alternatives
   - Example: "Try 'Propose to Assembly that we declare war' or 'Attempt to assassinate the enemy commander'"
-- **Probability-Aware Consequences** (lines 5308-5326):
+- **Probability-Aware Consequences**:
   - Risky actions get realistic success/failure outcomes based on:
     * Historical context (surveillance tech, loyalty systems, security apparatus)
     * Role resources (budget, connections, authority)
@@ -236,7 +300,7 @@ TTS_VOICE=alloy
     * Action complexity (poisoning one person vs. overthrowing government)
   - Outcome types: High-risk failure, partial success, success with consequences, clean success (rare)
   - Historical realism: Ancient/Medieval (easier covert action, brutal if caught) vs. Modern (higher surveillance)
-- **Corruption Evaluation** (lines 5862-5965):
+- **Corruption Evaluation**:
   - ALL actions evaluated on 0-10 scale (including violent/unethical choices)
   - Rubric: Intent (0-4) + Method (0-3) + Impact (0-3)
   - Violence NOT automatically corruption - depends on intent/method/impact
@@ -244,8 +308,8 @@ TTS_VOICE=alloy
   - Examples: Coup for self-enrichment = 7-9; Coup to end tyranny = 2-4
   - Most normal governance scores 0-2 even if controversial
 - **Integration**: Custom actions flow through same pipeline as AI-generated options
-  - Frontend converts custom text to ActionCard (EventScreen3.tsx, lines 623-635)
-  - Sent to `/api/game-turn` as `playerChoice` parameter
+  - Frontend converts custom text to ActionCard
+  - Sent to `/api/game-turn-v2` as `playerChoice` parameter
   - Authority-filtered consequence generation (democracies vote, autocracies decree)
   - Support shifts, corruption penalties, compass changes all apply identically
 
@@ -293,7 +357,7 @@ if (config.inquiryTokensPerDilemma > 0) { /* Future feature */ }
 ```
 
 **Token Optimization:**
-When treatment is `fullAutonomy`, the `/api/game-turn` endpoint skips generating AI action options, saving ~40-50% of dilemma generation tokens. The `generateActions` flag is passed from frontend to backend automatically.
+When treatment is `fullAutonomy`, the `/api/game-turn-v2` endpoint skips generating AI action options, saving ~40-50% of dilemma generation tokens. The `generateActions` flag is passed from frontend to backend automatically.
 
 **Implementation Points:**
 - **Settings Store** (`settingsStore.ts`): Stores treatment assignment
@@ -324,6 +388,42 @@ When treatment is `fullAutonomy`, the `/api/game-turn` endpoint skips generating
 - TTS controlled by SFX toggle
 - When SFX muted, narration disabled (prevents API requests)
 - Used in EventScreen and AftermathScreen
+
+**Text-to-Speech (TTS) System:**
+- **Provider:** OpenAI TTS API
+- **Models:**
+  - `gpt-4o-mini-tts` (default, supports instructions for tone/style control)
+  - `tts-1` (basic, no instructions support)
+  - `tts-1-hd` (high quality, no instructions support)
+- **Voices:** alloy, echo, fable, onyx, nova, shimmer
+- **Instructions Support:**
+  - Only `gpt-4o-mini-tts` and newer models support the `instructions` parameter
+  - Use to control tone, style, emotion (e.g., "Speak in a mysterious and amused tone, with ethereal echo")
+  - Falls back gracefully if instructions not supported
+- **Per-Screen Customization:**
+  - **Dilemmas** (`useEventNarration.ts`): "Speak as a dramatic political narrator with gravitas and urgency"
+  - **Aftermath** (`useAftermathNarration.ts`): "Speak in a solemn, reflective tone with gravitas and reverence"
+  - **Environment Variable Default** (`TTS_INSTRUCTIONS`): Global fallback for all TTS requests
+- **Implementation Files:**
+  - Backend: `server/index.mjs` (lines 1773-1821) - API endpoint
+  - Core Hook: `src/hooks/useNarrator.ts` - TTS preparation & playback
+  - Dilemma Narration: `src/hooks/useEventNarration.ts`
+  - Aftermath Narration: `src/hooks/useAftermathNarration.ts`
+- **Configuration:**
+  - `TTS_MODEL` - Model name (default: `gpt-4o-mini-tts`)
+  - `TTS_VOICE` - Voice selection (default: `onyx`)
+  - `TTS_INSTRUCTIONS` - Optional global tone/style instructions
+  - `TTS_FORMAT` - Audio format: mp3, opus, aac, flac (default: `mp3`)
+- **Example Usage:**
+  ```typescript
+  const { prepare } = useNarrator();
+  const audio = await prepare("Your text here", {
+    voiceName: "onyx",
+    format: "mp3",
+    instructions: "Speak dramatically with urgency"
+  });
+  await audio.start();
+  ```
 
 ## Political Compass System
 
@@ -423,6 +523,119 @@ Power distribution analysis using Exception-12 framework - classifies political 
 - Status: 🚧 Under Construction
 - 7 achievements defined in `src/data/achievements.ts`
 - Display only, no tracking yet
+
+### Past Games Storage
+- **Purpose**: Save completed game history for future gallery/comparison screens
+- **Storage**: localStorage (max 10 games, auto-prunes oldest)
+- **Size**: ~50-80KB per game (includes full base64 avatars)
+
+**Stored Data Per Game:**
+- Player name, avatar (base64), role title, political system
+- Final score, support levels (people/middle/mom), corruption
+- Legacy string ("You will be remembered as...")
+- 3-6 snapshot highlights (dramatic aftermath events)
+- Top 2-3 compass values per dimension (8-12 total)
+- Democracy/autonomy/liberalism ratings
+
+**Architecture:**
+- **Store**: `src/store/pastGamesStore.ts` - Zustand store with localStorage persistence
+- **Types**: `src/lib/types/pastGames.ts` - TypeScript interfaces
+- **Service**: `src/lib/pastGamesService.ts` - Data collection helpers
+- **Integration**: `src/screens/AftermathScreen.tsx` - Saves after session summary
+
+**Console Commands:**
+```javascript
+getPastGames()      // View all stored games (formatted table)
+clearPastGames()    // Clear all stored games (with confirmation)
+exportPastGames()   // Export as JSON (auto-copies to clipboard)
+```
+
+**Key Functions:**
+- `buildPastGameEntry(aftermathData)` - Collects data from all stores
+- `getTopCompassValues(compassValues, topN)` - Extracts top compass values
+- `selectSnapshotHighlights(snapshot, maxCount)` - Prioritizes dramatic events
+- `addGame(entry)` - Saves game with duplicate detection & auto-pruning
+
+**Auto-Pruning:**
+- Keeps only 10 most recent games
+- Sorted by timestamp (newest first)
+- Oldest games automatically removed when limit exceeded
+
+**Logging:**
+- Logs `past_game_saved` event with game metadata
+- Integrates with existing logging system
+- Saved only on first aftermath visit (not on snapshot restoration)
+
+**Future Use Cases:**
+- Gallery screen displaying all past games
+- Side-by-side comparison of playthroughs
+- Personal statistics across games
+- Export/share game summaries
+
+### Fragment Collection System
+- **Purpose**: Progressive narrative system where players collect 3 fragments to "remember who they are"
+- **Storage**: localStorage (max 3 fragments, firstIntro flag)
+- **Integration**: Intro screen adapts based on fragment collection progress
+
+**Fragment Lifecycle:**
+1. **First Visit**: Full gatekeeper dialog (26 lines), fragments appear at line 20
+2. **Game Completion**: Fragment automatically collected when reaching aftermath screen
+3. **Return Visits**: Abbreviated gatekeeper message, fragment slots immediately visible
+4. **3 Fragments**: Special completion message from gatekeeper
+
+**Fragment Data:**
+- Links to `pastGamesStore` via `gameId`
+- Displays: Player avatar, name, setting, legacy, snapshot pills
+- Click fragment → popup with full game details
+
+**First Intro Flag:**
+- `firstIntro: true` → Show full 26-line dialog
+- `firstIntro: false` → Show abbreviated message + fragment slots
+- Automatically set to `false` after first "I'm ready" click
+
+**Gatekeeper Messages:**
+- **First visit**: Original 26-line narrative
+- **Returning (< 3 fragments)**: "Are you ready for another trip to the world of the living?"
+- **Returning (3 fragments)**: "You've collected all the required fragments. You're ready to move on to your eternal rest."
+
+**Architecture:**
+- **Store**: `src/store/fragmentsStore.ts` - Tracks fragments and firstIntro flag
+- **Components**:
+  - `src/components/fragments/FragmentSlots.tsx` - Visual display (3 slots)
+  - `src/components/fragments/FragmentPopup.tsx` - Details modal
+- **Integration Points**:
+  - `src/screens/IntroScreen.tsx` - Conditional dialog + fragment display
+  - `src/screens/AftermathScreen.tsx` - Fragment collection (lines 223-250)
+  - `src/screens/FinalScoreScreen.tsx` - Routes to `/intro` (not `/role`)
+
+**Visual Design:**
+- Empty slots: Puzzle icon (Lucide React), 50% opacity
+- Filled slots: Player avatar, clickable
+- Sizes: 50x50px (desktop), 35x35px (mobile)
+- Layout: Horizontal row at top center of intro screen
+- Animation: Fade-in, scale transitions (Framer Motion)
+
+**Console Commands:**
+```javascript
+getFragments()       // View collection status
+clearFragments()     // Reset for testing
+resetIntro()         // Reset first intro flag
+```
+
+**Logging Events:**
+- `intro_first_visit_completed` - First intro dialog completed
+- `intro_return_visit` - Subsequent visits
+- `fragment_collected` - Fragment added (includes index, player name, role)
+- `fragments_all_collected` - All 3 fragments collected
+- `fragment_popup_opened` - User clicked fragment for details
+
+**localStorage Key:**
+- `amaze-politics-fragments-v1`
+
+**Future Enhancements:**
+- Special reward/ending when 3 fragments collected
+- Fragment-specific achievements
+- "True Name" reveal system
 
 ## Code Patterns & Architecture
 

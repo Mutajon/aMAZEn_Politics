@@ -55,7 +55,8 @@ function validateQuestion(q: string): { valid: boolean; message: string } {
     return { valid: false, message: "Question must be 200 characters or less" };
   }
 
-  const letterCount = (trimmed.match(/[a-zA-Z]/g) || []).length;
+  // Support both English and Hebrew letters
+  const letterCount = (trimmed.match(/[a-zA-Z\u0590-\u05FF]/g) || []).length;
   if (letterCount < 3) {
     return { valid: false, message: "Question must contain at least 3 letters" };
   }
@@ -262,9 +263,20 @@ export default function InquiringModal({
                 Type your inquiry:
               </label>
 
+              <p className="text-sm text-yellow-400/70 mb-2" dir="rtl">
+                אפשר להקליד בעברית
+              </p>
+
               <textarea
                 value={currentQuestion}
-                onChange={(e) => setCurrentQuestion(e.target.value)}
+                onChange={(e) => {
+                  setCurrentQuestion(e.target.value);
+                  // Ensure cursor stays visible while typing
+                  requestAnimationFrame(() => {
+                    const pos = e.target.selectionStart;
+                    e.target.setSelectionRange(pos, pos);
+                  });
+                }}
                 onKeyPress={handleKeyPress}
                 placeholder="What would you like to know about this situation?"
                 className="w-full h-24 px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-yellow-500/50 transition-all resize-none"

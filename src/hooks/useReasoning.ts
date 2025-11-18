@@ -71,11 +71,17 @@ export function getReasoningPromptType(
 /**
  * Validates reasoning text to prevent gibberish submissions.
  *
- * Checks:
- * 1. Minimum 10 characters
- * 2. Not all the same character
- * 3. Contains at least some letters
- * 4. Not just numbers and symbols
+ * Comprehensive validation checks:
+ * 1. Length: 10-500 characters
+ * 2. Not all the same character (e.g., "aaaaaaa")
+ * 3. No repeated 2-character patterns (e.g., "ababababab")
+ * 4. No keyboard mashing (same char >5 times)
+ * 5. Contains letters (English or Hebrew)
+ * 6. Not only numbers and symbols
+ * 7. Minimum 3 words
+ * 8. Not all single-character words (gibberish)
+ * 9. No profanity (common English curse words)
+ * 10. Not mostly numbers (>80%)
  */
 export function validateReasoningText(text: string): ValidationResult {
   const trimmed = text.trim();
@@ -89,6 +95,15 @@ export function validateReasoningText(text: string): ValidationResult {
     };
   }
 
+  // Check maximum length
+  if (trimmed.length > 500) {
+    return {
+      isValid: false,
+      reason: 'too_long',
+      message: 'Please keep your reasoning under 500 characters.',
+    };
+  }
+
   // Check if all same character
   const uniqueChars = new Set(trimmed.split(''));
   if (uniqueChars.size === 1) {
@@ -99,8 +114,28 @@ export function validateReasoningText(text: string): ValidationResult {
     };
   }
 
-  // Check if contains letters
-  const hasLetters = /[a-zA-Z]/.test(trimmed);
+  // Check for repeated 2-character patterns (e.g., "ababababab", "121212")
+  const repeatedPairPattern = /(.{2})\1{4,}/;
+  if (repeatedPairPattern.test(trimmed)) {
+    return {
+      isValid: false,
+      reason: 'repeated_pattern',
+      message: 'Please provide meaningful text without repeated patterns.',
+    };
+  }
+
+  // Check for keyboard mashing (same character repeated >5 times)
+  const keyboardMashing = /(.)\1{5,}/;
+  if (keyboardMashing.test(trimmed)) {
+    return {
+      isValid: false,
+      reason: 'keyboard_mashing',
+      message: 'Please provide thoughtful reasoning.',
+    };
+  }
+
+  // Check if contains letters (support English and Hebrew)
+  const hasLetters = /[a-zA-Z\u0590-\u05FF]/.test(trimmed);
   if (!hasLetters) {
     return {
       isValid: false,
@@ -110,12 +145,66 @@ export function validateReasoningText(text: string): ValidationResult {
   }
 
   // Check if only numbers (allow some numbers, but not ONLY numbers)
-  const onlyNumbersAndSymbols = /^[0-9\s\W]+$/.test(trimmed);
+  // Use negative character class to avoid treating Hebrew as \W (non-word)
+  const onlyNumbersAndSymbols = /^[^a-zA-Z\u0590-\u05FF]+$/.test(trimmed);
   if (onlyNumbersAndSymbols) {
     return {
       isValid: false,
       reason: 'only_numbers',
       message: 'Please explain your reasoning in words.',
+    };
+  }
+
+  // Check for minimum word count (at least 3 words)
+  const words = trimmed.split(/\s+/).filter(word => word.length > 0);
+  if (words.length < 3) {
+    return {
+      isValid: false,
+      reason: 'too_few_words',
+      message: 'Please write at least 3 words.',
+    };
+  }
+
+  // Check for gibberish: ensure not all words are single characters
+  const singleCharWords = words.filter(word => word.length === 1);
+  if (singleCharWords.length === words.length && words.length > 2) {
+    return {
+      isValid: false,
+      reason: 'gibberish',
+      message: 'Please provide meaningful text.',
+    };
+  }
+
+  // Basic profanity check (common English curse words)
+  const profanityList = [
+    'fuck', 'shit', 'damn', 'bitch', 'ass', 'asshole', 'bastard',
+    'crap', 'piss', 'dick', 'cock', 'pussy', 'whore', 'slut',
+    'motherfucker', 'fag', 'faggot', 'retard', 'nigger', 'cunt'
+  ];
+
+  const lowerText = trimmed.toLowerCase();
+  const hasProfanity = profanityList.some(word => {
+    // Use word boundaries to avoid false positives (e.g., "assess" contains "ass")
+    const regex = new RegExp(`\\b${word}\\b`, 'i');
+    return regex.test(lowerText);
+  });
+
+  if (hasProfanity) {
+    return {
+      isValid: false,
+      reason: 'profanity',
+      message: 'Please keep your language respectful.',
+    };
+  }
+
+  // Check if text is mostly numbers (>80%)
+  const numberChars = trimmed.match(/[0-9]/g)?.length || 0;
+  const letterChars = trimmed.match(/[a-zA-Z\u0590-\u05FF]/g)?.length || 0;
+  if (numberChars > letterChars * 4) {
+    return {
+      isValid: false,
+      reason: 'mostly_numbers',
+      message: 'Please explain your reasoning in words, not numbers.',
     };
   }
 

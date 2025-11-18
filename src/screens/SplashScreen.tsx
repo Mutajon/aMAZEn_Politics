@@ -17,6 +17,7 @@ import { useLanguage } from "../i18n/LanguageContext";
 import LanguageSelector from "../components/LanguageSelector";
 import IDCollectionModal from "../components/IDCollectionModal";
 import { useLogger } from "../hooks/useLogger";
+import { audioManager } from "../lib/audioManager";
 
 const SUBTITLES = [
   "Choose your path. Discover yourself."
@@ -182,6 +183,9 @@ export default function SplashScreen({
 
   // Handle start button click (when not in experiment mode, skip ID modal)
   const handleStartClick = async () => {
+    // Play click sound
+    audioManager.playSfx('click-soft');
+
     if (experimentMode) {
       // In experiment mode, show ID modal
       setShowIDModal(true);

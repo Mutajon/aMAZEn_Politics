@@ -10,6 +10,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { CompassValues } from "./compassStore";
 
 // ===== DATA LOGGING VARIABLES =====
 
@@ -21,6 +22,8 @@ type LoggingState = {
   // --- Session tracking ---
   sessionId: string | null;          // Current game session UUID
   setSessionId: (id: string | null) => void;
+  sessionStartTime: number | null;   // Session start timestamp (persisted to localStorage)
+  setSessionStartTime: (time: number | null) => void;
 
   // --- Game version (from package.json) ---
   gameVersion: string;               // Semantic version string
@@ -37,6 +40,10 @@ type LoggingState = {
   // --- Initialization ---
   isInitialized: boolean;            // Has logging service been initialized?
   setInitialized: (v: boolean) => void;
+
+  // --- Initial compass snapshot (for session summary) ---
+  initialCompassSnapshot: CompassValues | null;  // Snapshot of initial compass values after quiz
+  setInitialCompassSnapshot: (snapshot: CompassValues) => void;
 
   // --- Experiment mode progress (sequential role runs) ---
   experimentProgress: ExperimentProgress;
@@ -77,6 +84,8 @@ export const useLoggingStore = create<LoggingState>()(
       // --- Session tracking ---
       sessionId: null,  // Generated when game starts
       setSessionId: (id) => set({ sessionId: id }),
+      sessionStartTime: null,  // Session start timestamp
+      setSessionStartTime: (time) => set({ sessionStartTime: time }),
 
       // --- Game version ---
       gameVersion: '0.0.0',  // Will be set from package.json
@@ -93,6 +102,13 @@ export const useLoggingStore = create<LoggingState>()(
       // --- Initialization ---
       isInitialized: false,
       setInitialized: (v) => set({ isInitialized: v }),
+
+      // --- Initial compass snapshot ---
+      initialCompassSnapshot: null,
+      setInitialCompassSnapshot: (snapshot) => {
+        set({ initialCompassSnapshot: snapshot });
+        console.log('[loggingStore] Initial compass snapshot saved (defensive persistence)');
+      },
 
       // --- Experiment mode progress ---
       experimentProgress: defaultExperimentProgress(),
@@ -116,7 +132,7 @@ export const useLoggingStore = create<LoggingState>()(
       resetExperimentProgress: () => set({ experimentProgress: defaultExperimentProgress() }),
     }),
     {
-      name: "logging-v3",  // bumped from v2 to v3 to include experiment progress
+      name: "logging-v4",  // v4: added sessionStartTime + initialCompassSnapshot fields
       partialize: (s) => ({
         // Only persist these fields
         userId: s.userId,
@@ -124,6 +140,8 @@ export const useLoggingStore = create<LoggingState>()(
         treatment: s.treatment,
         consented: s.consented,
         experimentProgress: s.experimentProgress,
+        sessionStartTime: s.sessionStartTime,  // Persist session start time
+        initialCompassSnapshot: s.initialCompassSnapshot,  // Persist initial compass snapshot (defensive persistence)
         // DON'T persist: sessionId, isInitialized
         // NOTE: 'enabled' removed - now controlled by settingsStore.dataCollectionEnabled
       }),
@@ -156,10 +174,12 @@ export function resetLoggingStore() {
   useLoggingStore.setState({
     userId: null,
     sessionId: null,
+    sessionStartTime: null,
     gameVersion: '0.0.0',
     treatment: 'control',
     consented: false,
     isInitialized: false,
+    initialCompassSnapshot: null,
     experimentProgress: defaultExperimentProgress(),
   });
 }

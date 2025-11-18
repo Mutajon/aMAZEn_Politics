@@ -49,6 +49,8 @@ export type DynamicParam = {
 export type CorruptionShift = {
   score: number;       // Raw AI judgment (0-10 scale)
   reason: string;      // AI's explanation
+  delta: number;       // Change from previous level
+  newLevel: number;    // New corruption level (0-100 scale)
 };
 
 // PHASE 1: Critical data - must load before showing anything
@@ -155,8 +157,6 @@ async function fetchGameTurn(): Promise<{
   supportEffects: SupportEffect[] | null;
   newsItems: TickerItem[];
   corruptionShift: CorruptionShift | null;
-  corruptionDelta: number;
-  corruptionNewLevel: number;
   compassPills: CompassPill[] | null;
   dynamicParams: DynamicParam[] | null;
   mirrorText: string;
@@ -276,7 +276,41 @@ async function fetchGameTurn(): Promise<{
   const useXAI = useSettingsStore.getState().useXAI;
   payload.useXAI = useXAI;
 
+  // Day 1: Initialize compass conversation with game context
+  if (day === 1 && payload.gameContext) {
+    try {
+      console.log(`[fetchGameTurn] Initializing compass conversation for gameId=${currentGameId}`);
+      const compassInitResponse = await fetch("/api/compass-conversation/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gameId: currentGameId,
+          gameContext: {
+            setting: payload.gameContext.setting,
+            role: payload.gameContext.role,
+            systemName: payload.gameContext.systemName
+          },
+          debugMode
+        })
+      });
+
+      if (!compassInitResponse.ok) {
+        console.warn(`[fetchGameTurn] Compass conversation init failed (${compassInitResponse.status}) - will fallback to non-stateful analysis`);
+      } else {
+        console.log(`[fetchGameTurn] ✅ Compass conversation initialized successfully`);
+      }
+    } catch (error) {
+      console.warn(`[fetchGameTurn] Compass conversation init error:`, error);
+      // Non-fatal - compass analysis will fall back to non-stateful mode
+    }
+  }
+
   console.log(`[fetchGameTurn] Calling /api/game-turn-v2 for Day ${day}, gameId=${currentGameId}, treatment=${treatment}, generateActions=${payload.generateActions}, useXAI=${useXAI}`);
+
+  // Log compass values being sent for mirror advice debugging
+  if (payload.gameContext?.playerCompassTopValues) {
+    console.log("[fetchGameTurn] Player compass top values:", payload.gameContext.playerCompassTopValues);
+  }
 
   const response = await fetch("/api/game-turn-v2", {
     method: "POST",
@@ -416,9 +450,6 @@ async function fetchGameTurn(): Promise<{
 
   // Extract corruption shift (Day 2+ only) - Frontend calculates blended level
   let corruptionShift: CorruptionShift | null = null;
-  let corruptionDelta = 0;
-  let corruptionNewLevel = 0;
-
   if (data.corruptionShift && day > 1) {
     const {
       savePreviousCorruption,
@@ -439,10 +470,6 @@ async function fetchGameTurn(): Promise<{
     const newLevel = Number((prevCorruption * 0.9 + newScoreScaled * 0.1).toFixed(2));
     const delta = Number((newLevel - prevCorruption).toFixed(2));
 
-    // Store for logging
-    corruptionDelta = delta;
-    corruptionNewLevel = newLevel;
-
     // STEP 2: Apply new corruption level
     setCorruptionLevel(newLevel);
 
@@ -459,10 +486,12 @@ async function fetchGameTurn(): Promise<{
       ].slice(-3)  // Keep last 3
     });
 
-    // STEP 4: Prepare for logging
+    // STEP 4: Prepare for UI and logging
     corruptionShift = {
       score: rawScore,
-      reason: String(data.corruptionShift.reason || '').slice(0, 150)
+      reason: String(data.corruptionShift.reason || '').slice(0, 150),
+      delta: delta,
+      newLevel: newLevel
     };
 
     // COMPREHENSIVE DEBUG LOGGING
@@ -526,8 +555,6 @@ async function fetchGameTurn(): Promise<{
     supportEffects,
     newsItems: [], // Empty array (disabled)
     corruptionShift,
-    corruptionDelta,
-    corruptionNewLevel,
     compassPills,
     dynamicParams,
     mirrorText
@@ -577,10 +604,32 @@ export async function fetchCompassHintsForAction(
   action: { title: string; summary: string }
 ): Promise<CompassPill[]> {
   try {
-    const response = await fetch("/api/compass-hints", {
+    // Get game context and debug mode from stores
+    const roleState = useRoleStore.getState();
+    const debugMode = useSettingsStore.getState().debugMode;
+
+    // Build context for compass analysis
+    const setting = roleState.roleIntro
+      ? roleState.roleIntro.split('.')[0]
+      : `${roleState.selectedRole || "Unknown role"}, ${roleState.roleYear || "Unknown era"}`;
+
+    const gameContext = {
+      setting,
+      role: roleState.roleScope,
+      systemName: roleState.analysis?.systemName || "Divine Right Monarchy"
+    };
+
+    console.log(`[fetchCompassHintsForAction] Calling /api/compass-conversation/analyze for gameId=${gameId}`);
+
+    const response = await fetch("/api/compass-conversation/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gameId, action })
+      body: JSON.stringify({
+        gameId,
+        action,
+        gameContext,
+        debugMode
+      })
     });
 
     if (!response.ok) {
@@ -591,7 +640,7 @@ export async function fetchCompassHintsForAction(
     const data = await response.json();
     return transformCompassHints(data?.compassHints);
   } catch (error) {
-    console.error("[fetchGameTurn] ⚠️ Compass hints request failed:", error);
+    console.error("[fetchCompassHintsForAction] ⚠️ Compass hints request failed:", error);
     return [];
   }
 }

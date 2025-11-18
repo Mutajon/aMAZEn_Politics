@@ -4,6 +4,10 @@
 
 html, body, #root { height: 100%; }
 body {
+  background-color: #000000;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+#root {
+  background-color: #000000;
 }

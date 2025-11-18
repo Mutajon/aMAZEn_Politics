@@ -50,7 +50,11 @@ export function useAftermathNarration(remembranceText: string | undefined) {
         }
 
         console.log('[AftermathNarration] Preparing narration...');
-        const p = await narrator.prepare(remembranceText, { voiceName: "alloy", format: "mp3" });
+        const p = await narrator.prepare(remembranceText, {
+          voiceName: "onyx",
+          format: "mp3"
+          // No instructions - will use .env TTS_INSTRUCTIONS
+        });
         if (cancelled) {
           p.dispose();
           return;

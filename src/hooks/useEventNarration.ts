@@ -49,7 +49,11 @@ export function useEventNarration() {
         }
         skipNarrationLogRef.current = false;
 
-        const p = await prepareNarration(speech, { voiceName: "alloy", format: "mp3" });
+        const p = await prepareNarration(speech, {
+          voiceName: "onyx",
+          format: "mp3"
+          // No instructions - will use .env TTS_INSTRUCTIONS
+        });
         if (cancelled) {
           p.dispose();
           return;

@@ -14,12 +14,13 @@
 // Usage: Call collectSessionSummary() in AftermathScreen after data loads
 
 import { useDilemmaStore } from "../store/dilemmaStore";
-import { useCompassStore } from "../store/compassStore";
+import { useCompassStore, type CompassValues } from "../store/compassStore";
 import { useLoggingStore } from "../store/loggingStore";
 import { useSettingsStore } from "../store/settingsStore";
-import { useSessionLogger } from "./useSessionLogger";
+import { useRoleStore } from "../store/roleStore";
 import { calculateLiveScoreBreakdown } from "../lib/scoring";
 import type { AftermathResponse } from "../lib/aftermath";
+import { COMPONENTS } from "../data/compass-data";
 
 export type SessionSummary = {
   timestamp: Date;
@@ -28,32 +29,40 @@ export type SessionSummary = {
   gameVersion: string;           // From package.json
   treatment: string;             // Experiment treatment assignment
   role: string;                  // Selected role name
-  totalPlayTime: number;         // Session duration in milliseconds
-  averageDecisionTime: number;   // Mean decision time in milliseconds
-  totalInquiries: number;        // Total inquiry feature usage
-  totalReasoningSubmissions: number; // Total reasoning modal submissions
-  totalCustomActions: number;    // Total custom action submissions
-  initialCompass: {              // Compass values after quiz
-    what: number[];
-    whence: number[];
-    how: number[];
-    whither: number[];
+  totalPlayTime: number;         // Session duration in SECONDS
+  averageDecisionTime: number;   // Mean decision time in SECONDS
+  averageReasoningTime: number;  // Mean reasoning time in SECONDS
+  inquiries: {                   // Inquiry feature usage
+    count: number;
+    texts: string[];
+  };
+  reasoning: {                   // Reasoning modal submissions
+    count: number;
+    texts: string[];
+  };
+  customActions: {               // Custom action submissions
+    count: number;
+    texts: string[];
+  };
+  initialCompass: {              // Compass values after quiz (named components)
+    what: Record<string, number>;
+    whence: Record<string, number>;
+    how: Record<string, number>;
+    whither: Record<string, number>;
   } | null;
-  finalCompass: {                // Compass values at game end
-    what: number[];
-    whence: number[];
-    how: number[];
-    whither: number[];
+  finalCompass: {                // Compass values at game end (named components)
+    what: Record<string, number>;
+    whence: Record<string, number>;
+    how: Record<string, number>;
+    whither: Record<string, number>;
+  };
+  supportBreakdown: {            // Final support values (0-100)
+    people: number;
+    middle: number;
+    mom: number;
   };
   finalScore: number;            // Total final score
-  scoreBreakdown: {              // Score components
-    supportPeople: { percent: number; points: number; maxPoints: number };
-    supportMiddle: { percent: number; points: number; maxPoints: number };
-    supportMom: { percent: number; points: number; maxPoints: number };
-    supportTotal: number;
-    corruptionPenalty: number;
-    finalScore: number;
-  };
+  selfJudgment: string | null;   // Player's self-assessment (Day 8)
   ideologyRatings: {             // From aftermath API
     autonomy: string;            // "very-low" | "low" | "medium" | "high" | "very-high"
     liberalism: string;          // Same scale
@@ -61,6 +70,33 @@ export type SessionSummary = {
   } | null;
   incomplete: boolean;           // True if session ended early
 };
+
+/**
+ * Convert compass values from arrays to named objects
+ * Maps array indexes to component names from compass-data.ts
+ * Example: [2, 5, 1, ...] → { "Truth/Trust": 2, "Liberty/Agency": 5, "Equality/Equity": 1, ... }
+ */
+function mapCompassToNamed(compassValues: CompassValues): {
+  what: Record<string, number>;
+  whence: Record<string, number>;
+  how: Record<string, number>;
+  whither: Record<string, number>;
+} {
+  return {
+    what: Object.fromEntries(
+      compassValues.what.map((value: number, idx: number) => [COMPONENTS.what[idx].short, value])
+    ),
+    whence: Object.fromEntries(
+      compassValues.whence.map((value: number, idx: number) => [COMPONENTS.whence[idx].short, value])
+    ),
+    how: Object.fromEntries(
+      compassValues.how.map((value: number, idx: number) => [COMPONENTS.how[idx].short, value])
+    ),
+    whither: Object.fromEntries(
+      compassValues.whither.map((value: number, idx: number) => [COMPONENTS.whither[idx].short, value])
+    ),
+  };
+}
 
 /**
  * Extract democracy rating from per-decision ratings
@@ -104,26 +140,61 @@ function extractDemocracyRating(decisions: AftermathResponse['decisions']): stri
  * Collect all session summary data
  * @param aftermathData - Aftermath API response (null if incomplete session)
  * @param incomplete - Whether session ended early
+ * @param sessionDuration - Session duration in milliseconds (from sessionLogger.getSessionDuration())
  */
 export function collectSessionSummary(
   aftermathData: AftermathResponse | null,
-  incomplete: boolean
+  incomplete: boolean,
+  sessionDuration: number | null
 ): SessionSummary {
   // Get store states
   const dilemmaStore = useDilemmaStore.getState();
   const compassStore = useCompassStore.getState();
   const loggingStore = useLoggingStore.getState();
   const settingsStore = useSettingsStore.getState();
+  const roleStore = useRoleStore.getState();
 
-  // Calculate average decision time
-  const { decisionTimes } = dilemmaStore;
+  // Defensive validation - ensure critical fields exist
+  if (!loggingStore.userId || !loggingStore.sessionId) {
+    console.warn('[useSessionSummary] ⚠️ Missing critical fields:', {
+      userId: loggingStore.userId,
+      sessionId: loggingStore.sessionId
+    });
+  }
+
+  // Calculate average decision time (convert from milliseconds to seconds)
+  const { decisionTimes, reasoningTimes, reasoningHistory, customActionTexts } = dilemmaStore;
   const averageDecisionTime = decisionTimes.length > 0
-    ? decisionTimes.reduce((sum, time) => sum + time, 0) / decisionTimes.length
+    ? (decisionTimes.reduce((sum, time) => sum + time, 0) / decisionTimes.length) / 1000
     : 0;
 
-  // Get session duration from sessionLogger
-  const sessionLogger = useSessionLogger.getState();
-  const totalPlayTime = sessionLogger.getSessionDuration();
+  // Calculate average reasoning time (convert from milliseconds to seconds)
+  const averageReasoningTime = reasoningTimes.length > 0
+    ? (reasoningTimes.reduce((sum, time) => sum + time, 0) / reasoningTimes.length) / 1000
+    : 0;
+
+  // Use passed session duration (convert from milliseconds to seconds)
+  const totalPlayTime = sessionDuration ? sessionDuration / 1000 : 0;
+
+  // Defensive logging for critical timing issue
+  if (!sessionDuration || sessionDuration === 0) {
+    console.warn('[useSessionSummary] ⚠️ CRITICAL: sessionDuration is null or 0!', {
+      sessionDuration,
+      sessionStartTime: loggingStore.sessionStartTime,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  // Extract inquiry texts from Map
+  const inquiryTexts: string[] = [];
+  dilemmaStore.inquiryHistory.forEach((dayInquiries) => {
+    dayInquiries.forEach((entry) => {
+      inquiryTexts.push(entry.question);
+    });
+  });
+
+  // Extract reasoning texts from array
+  const reasoningTexts = reasoningHistory.map(entry => entry.reasoningText);
 
   // Calculate score breakdown
   const scoreBreakdown = calculateLiveScoreBreakdown({
@@ -140,49 +211,82 @@ export function collectSessionSummary(
     democracy: extractDemocracyRating(aftermathData.decisions)
   } : null;
 
+  // Get initial compass snapshot with fallback chain: loggingStore → compassStore → null
+  // loggingStore has more reliable localStorage persistence (proven working)
+  const initialCompassSnapshot =
+    loggingStore.initialCompassSnapshot ||
+    compassStore.initialCompassSnapshot ||
+    null;
+
   const summary: SessionSummary = {
     timestamp: new Date(),
-    userId: loggingStore.userId,
-    sessionId: loggingStore.sessionId,
+    userId: loggingStore.userId || 'unknown',
+    sessionId: loggingStore.sessionId || 'unknown',
     gameVersion: loggingStore.gameVersion,
     treatment: settingsStore.treatment,
-    role: dilemmaStore.role || 'Unknown',
+    role: roleStore.selectedRole || 'Unknown',
     totalPlayTime,
     averageDecisionTime,
-    totalInquiries: dilemmaStore.inquiryHistory.size,
-    totalReasoningSubmissions: dilemmaStore.reasoningSubmissionCount,
-    totalCustomActions: dilemmaStore.customActionCount,
-    initialCompass: compassStore.initialCompassSnapshot,
-    finalCompass: {
-      what: [...compassStore.values.what],
-      whence: [...compassStore.values.whence],
-      how: [...compassStore.values.how],
-      whither: [...compassStore.values.whither],
+    averageReasoningTime,
+    inquiries: {
+      count: inquiryTexts.length,
+      texts: inquiryTexts,
+    },
+    reasoning: {
+      count: reasoningTexts.length,
+      texts: reasoningTexts,
+    },
+    customActions: {
+      count: customActionTexts.length,
+      texts: customActionTexts,
+    },
+    initialCompass: initialCompassSnapshot
+      ? mapCompassToNamed(initialCompassSnapshot)
+      : null,
+    finalCompass: mapCompassToNamed(compassStore.values),
+    supportBreakdown: {
+      people: dilemmaStore.supportPeople,
+      middle: dilemmaStore.supportMiddle,
+      mom: dilemmaStore.supportMom,
     },
     finalScore: scoreBreakdown.final,
-    scoreBreakdown: {
-      supportPeople: scoreBreakdown.support.people,
-      supportMiddle: scoreBreakdown.support.middle,
-      supportMom: scoreBreakdown.support.mom,
-      supportTotal: scoreBreakdown.support.total,
-      corruptionPenalty: scoreBreakdown.corruption.points,
-      finalScore: scoreBreakdown.final,
-    },
+    selfJudgment: dilemmaStore.selfJudgment || null,
     ideologyRatings,
     incomplete,
   };
+
+  // Defensive logging for critical compass issue
+  if (!summary.initialCompass) {
+    console.warn('[useSessionSummary] ⚠️ CRITICAL: initialCompass is null!', {
+      loggingStoreSnapshot: loggingStore.initialCompassSnapshot,
+      compassStoreSnapshot: compassStore.initialCompassSnapshot,
+      compassValues: compassStore.values,
+      timestamp: new Date().toISOString()
+    });
+  } else {
+    // Success logging - show which source was used
+    const source = loggingStore.initialCompassSnapshot
+      ? 'loggingStore (primary)'
+      : compassStore.initialCompassSnapshot
+      ? 'compassStore (fallback)'
+      : 'unknown';
+    console.log(`[useSessionSummary] ✅ Initial compass loaded from: ${source}`);
+  }
 
   console.log('[useSessionSummary] Session summary collected:', {
     userId: summary.userId,
     sessionId: summary.sessionId,
     role: summary.role,
-    totalPlayTime: `${Math.round(summary.totalPlayTime / 1000)}s`,
-    averageDecisionTime: `${Math.round(summary.averageDecisionTime / 1000)}s`,
-    totalInquiries: summary.totalInquiries,
-    totalReasoningSubmissions: summary.totalReasoningSubmissions,
-    totalCustomActions: summary.totalCustomActions,
+    totalPlayTime: `${Math.round(summary.totalPlayTime)}s`,
+    averageDecisionTime: `${Math.round(summary.averageDecisionTime)}s`,
+    averageReasoningTime: `${Math.round(summary.averageReasoningTime)}s`,
+    inquiries: summary.inquiries.count,
+    reasoning: summary.reasoning.count,
+    customActions: summary.customActions.count,
     finalScore: summary.finalScore,
+    supportBreakdown: summary.supportBreakdown,
     incomplete: summary.incomplete,
+    hasInitialCompass: !!summary.initialCompass,
   });
 
   return summary;
@@ -202,14 +306,27 @@ export async function sendSessionSummary(summary: SessionSummary): Promise<void>
     });
 
     if (!response.ok) {
-      console.error('[useSessionSummary] Failed to send summary:', response.status, response.statusText);
+      console.error('[useSessionSummary] ❌ HTTP error sending summary:', response.status, response.statusText);
+      // Don't throw - we don't want to block the user experience
+      return;
+    }
+
+    // Check if backend returned success: false
+    const result = await response.json();
+    if (!result.success) {
+      console.error('[useSessionSummary] ❌ Backend validation failed:', result.error);
+      console.error('[useSessionSummary] Summary that failed validation:', {
+        userId: summary.userId,
+        sessionId: summary.sessionId,
+        gameVersion: summary.gameVersion
+      });
       // Don't throw - we don't want to block the user experience
       return;
     }
 
     console.log('[useSessionSummary] ✅ Session summary sent successfully');
   } catch (error) {
-    console.error('[useSessionSummary] Error sending summary:', error);
+    console.error('[useSessionSummary] ❌ Error sending summary:', error);
     // Don't throw - we don't want to block the user experience
   }
 }

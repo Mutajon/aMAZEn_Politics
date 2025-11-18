@@ -1610,7 +1610,7 @@ index 98b818d..f654da5 100644
          }
 +        skipNarrationLogRef.current = false;
  
-         const p = await narrator.prepare(speech, { voiceName: "alloy", format: "mp3" });
+         const p = await narrator.prepare(speech, { voiceName: "onyx", format: "mp3" });
          if (cancelled) {
 @@ -100,4 +105,4 @@ export function useEventNarration() {
      narrationEnabled,

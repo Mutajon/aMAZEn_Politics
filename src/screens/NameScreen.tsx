@@ -11,6 +11,8 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import { motion } from "framer-motion";
 import { getPredefinedRole } from "../data/predefinedRoles";
 import { useLogger } from "../hooks/useLogger";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
+import { audioManager } from "../lib/audioManager";
 
 /** Small built-in placeholder (no asset file needed). */
 const DEFAULT_AVATAR_DATA_URL =
@@ -144,6 +146,14 @@ export default function NameScreen({ push }: { push: PushFn }) {
   const overlayTitle = useTranslatedConst(OVERLAY_TITLE);
 
   const logger = useLogger();
+
+  // Navigation guard - prevent back button during name/character creation
+  useNavigationGuard({
+    enabled: true,
+    confirmationMessage: lang("CONFIRM_EXIT_SETUP"),
+    screenName: "name_screen"
+  });
+
   const selectedRole = useRoleStore((s) => s.selectedRole);
   const character = useRoleStore((s) => s.character);
   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
@@ -277,6 +287,9 @@ export default function NameScreen({ push }: { push: PushFn }) {
   }, [avatarUrl, generateImages]);
 
   const onContinue = () => {
+    // Play click sound
+    audioManager.playSfx('click-soft');
+
     if (phase === "input") {
       // Phase 1: Clear any existing avatar and save character data, then move to avatar generation
       logger.log('button_click', 'Create Character', 'User clicked Create Character button');

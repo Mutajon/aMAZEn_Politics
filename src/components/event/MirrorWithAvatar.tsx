@@ -65,7 +65,6 @@ export default function MirrorWithAvatar({
           style={{ width: 100, height: 100, minWidth: 100 }}
           aria-label={`View ${playerName}'s character information`}
           title="Click to view your character details"
-          data-tutorial-target="avatar"
         >
           {resolvedSrc && !imgError ? (
             <img

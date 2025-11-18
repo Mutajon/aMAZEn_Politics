@@ -13,7 +13,7 @@ import { mirrorBubbleTheme as T } from "../../theme/mirrorBubbleTheme";
 const CARD_BG         = T.bg;
 const CARD_TEXT_COLOR = T.textColor;
 const CARD_FONT_FF    = T.fontFamily;
-const CARD_FONT_PX    = 13; // simple font size in px
+const CARD_FONT_PX    = 12; // Reduced for mobile (was 13, now 12)
 const CARD_PAD_X      = T.paddingX;
 const CARD_PAD_Y      = T.paddingY;
 const CARD_SHADOW     = T.shadow;
@@ -22,15 +22,15 @@ const RADIUS_TR       = T.cornerTR;
 const RADIUS_BL       = T.cornerBL;
 const RADIUS_BR       = T.cornerBR;
 
-// Mirror art (served from /public)
+// Mirror art (served from /public) - Responsive sizing for mobile
 const MIRROR_IMG_SRC  = "/assets/images/mirror.png";
-const IMG_WIDTH_PX    = 80;   // Slightly larger to match speaker avatar prominence
+const IMG_WIDTH_PX    = 55;   // Smaller for mobile (was 80, reduced to 55)
 const IMG_OPACITY     = 0.95;
-const IMG_OFFSET_X    = -40;  // Protrudes 40px to the left (matches speaker avatar)
-const IMG_OFFSET_Y    = -20;  // Protrudes 20px above the card (matches speaker avatar)
+const IMG_OFFSET_X    = -20;  // Less protrusion for mobile (was -40, now -20)
+const IMG_OFFSET_Y    = -10;  // Less protrusion above (was -20, now -10)
 
 // Card left padding to compensate for protruding mirror
-const CARD_PAD_LEFT   = 60;   // Space for protruding mirror image
+const CARD_PAD_LEFT   = 40;   // Reduced space for smaller mirror (was 60, now 40)
 
 // Keep text away from the image
 const TEXT_INSET_LEFT_PX  = 0;  // No longer needed, card padding handles spacing

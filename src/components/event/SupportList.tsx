@@ -11,15 +11,15 @@ import { useLogger } from "../../hooks/useLogger";
 import SupportEntityPopover from "./SupportEntityPopover";
 
 /* ====================== TUNABLES (EDIT HERE) ====================== */
-// Sizing
-const EMOJI_SIZE_CLASS = "text-[24px]";
-const PERCENT_FONT_CLASS = "text-[15px]";
-const DELTA_FONT_CLASS = "text-[13px]";
-const ARROW_SIZE_CLASS = "w-7 h-7";
+// Sizing (Mobile-first responsive: smaller on mobile, larger on desktop)
+const EMOJI_SIZE_CLASS = "text-[18px] md:text-[24px]";           // 18px mobile → 24px desktop
+const PERCENT_FONT_CLASS = "text-[13px] md:text-[15px]";         // 13px mobile → 15px desktop
+const DELTA_FONT_CLASS = "text-[11px] md:text-[13px]";           // 11px mobile → 13px desktop
+const ARROW_SIZE_CLASS = "w-5 h-5 md:w-7 md:h-7";                // 20px mobile → 28px desktop
 
 // Badge look
 const ICON_BADGE_SHAPE = "rounded-xl";       // e.g., rounded-lg | rounded-2xl
-const ICON_BADGE_PADDING = "p-2";            // e.g., p-1.5 | p-2.5
+const ICON_BADGE_PADDING = "p-1.5 md:p-2";  // 6px mobile → 8px desktop
 const ICON_BADGE_RING = "ring-1 ring-white/15 shadow-sm";
 
 // Icon stroke color (white lines)
@@ -63,8 +63,8 @@ export default function SupportList({
   const logger = useLogger();
 
   return (
-    <div className="border-slate-400/30 bg-slate-900/60 backdrop-blur-sm rounded-2xl p-4" data-tutorial-target="support-list">
-      <div className="space-y-2">
+    <div className="border-slate-400/30 bg-slate-900/60 backdrop-blur-sm rounded-2xl p-3 md:p-4">
+      <div className="space-y-2 md:space-y-2">
         {items.map((it, index) => (
           <SupportCard
             key={it.id}
@@ -226,7 +226,7 @@ function SupportCard({
   return (
     <motion.div
       className={[
-        "rounded-xl px-3 py-2.5 text-white relative",
+        "rounded-xl px-2 py-2 md:px-3 md:py-2.5 text-white relative",
         isCrisis
           ? "bg-red-500/15 border-2 border-red-500/60" // Crisis: red background + thicker red border
           : "bg-white/3 border border-white/5", // Normal: subtle background + border
@@ -258,7 +258,7 @@ function SupportCard({
     >
       <div className="flex items-start">
         {/* Left icon badge — colored background + white lines */}
-        <div className={`mr-3 inline-flex items-center justify-center shrink-0 ${ICON_BADGE_SHAPE} ${ICON_BADGE_PADDING} ${badgeBg} ${ICON_BADGE_RING}`}>
+        <div className={`mr-2 md:mr-3 inline-flex items-center justify-center shrink-0 ${ICON_BADGE_SHAPE} ${ICON_BADGE_PADDING} ${badgeBg} ${ICON_BADGE_RING}`}>
           <span className={ICON_STROKE_CLASS}>
             {icon ?? <DefaultSupportIcons.PeopleIcon className="w-4 h-4" />}
           </span>
@@ -266,8 +266,8 @@ function SupportCard({
 
         {/* Main info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <div className="font-semibold">{name}</div>
+          <div className="flex items-center gap-1.5 md:gap-2">
+            <div className="font-semibold text-sm md:text-base">{name}</div>
 
             {/* mood emoji (left of percent), tween-pop when bucket changes */}
             <MoodEmojiTween percent={pctDisplay} variant={moodVariant} />
@@ -320,7 +320,7 @@ function SupportCard({
                     transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut", type: "tween" }}
                     className="inline-block will-change-transform"
                   >
-                    <ArrowUp className={`${ARROW_SIZE_CLASS}`} strokeWidth={3} color="#86efac" />
+                    <ArrowUp className={`${ARROW_SIZE_CLASS}`} strokeWidth={2.5} color="#86efac" />
                   </motion.span>
                 ) : (
                   <motion.span
@@ -330,7 +330,7 @@ function SupportCard({
                     transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut", type: "tween" }}
                     className="inline-block will-change-transform"
                   >
-                    <ArrowDown className={`${ARROW_SIZE_CLASS}`} strokeWidth={3} color="#fca5a5"/>
+                    <ArrowDown className={`${ARROW_SIZE_CLASS}`} strokeWidth={2.5} color="#fca5a5"/>
                   </motion.span>
                 )}
               </div>
@@ -339,7 +339,7 @@ function SupportCard({
 
           {/* note (only when provided) */}
           {showNote && (
-            <div className="mt-1 text-[13px] text-white/80 leading-snug">
+            <div className="mt-1 text-[11px] md:text-[13px] text-white/80 leading-snug">
               {note}
             </div>
           )}

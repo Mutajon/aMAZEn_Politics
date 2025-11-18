@@ -14,6 +14,7 @@ import { useRoleStore } from "../store/roleStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useEventDataCollector } from "../hooks/useEventDataCollector";
 import { useEventNarration } from "../hooks/useEventNarration";
+import { useNarrator } from "../hooks/useNarrator";
 import { useLoadingProgress } from "../hooks/useLoadingProgress";
 import { presentEventData, buildSupportItems } from "../lib/eventDataPresenter";
 import { cleanAndAdvanceDay } from "../lib/eventDataCleaner";
@@ -23,7 +24,7 @@ import ResourceBar, { type ResourceBarScoreDetails } from "../components/event/R
 import SupportList from "../components/event/SupportList";
 import { DynamicParameters, buildDynamicParamsItems } from "../components/event/DynamicParameters";
 import DilemmaCard from "../components/event/DilemmaCard";
-import MirrorWithAvatar from "../components/event/MirrorWithAvatar";
+import MirrorCard from "../components/event/MirrorCard";
 import CompassPillsOverlay from "../components/event/CompassPillsOverlay";
 import CorruptionPill from "../components/event/CorruptionPill";
 import ActionDeck, { type ActionCard } from "../components/event/ActionDeck";
@@ -42,9 +43,10 @@ import { useRoleProgressStore } from "../store/roleProgressStore";
 import { useTimingLogger } from "../hooks/useTimingLogger";
 import { useReasoning } from "../hooks/useReasoning";
 import { useLogger } from "../hooks/useLogger";
+import { useSessionLogger } from "../hooks/useSessionLogger";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import ReasoningModal from "../components/event/ReasoningModal";
-import { useTutorialStore } from "../store/tutorialStore";
-import { TutorialOverlay } from "../components/tutorial/TutorialOverlay";
+import SelfJudgmentModal from "../components/event/SelfJudgmentModal";
 
 type Props = {
   push: (path: string) => void;
@@ -62,9 +64,6 @@ export default function EventScreen3({ push }: Props) {
   );
   const showBudget = useSettingsStore((s) => s.showBudget);
   const debugMode = useSettingsStore((s) => s.debugMode);
-
-  // Tutorial state
-  const { hasPlayedBefore, day1TipShown, day2TipShown, markDay1TipShown, markDay2TipShown, markHasPlayedBefore } = useTutorialStore();
 
   // Create role-based background style
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
@@ -116,11 +115,14 @@ export default function EventScreen3({ push }: Props) {
   // Narration integration - prepares TTS when dilemma loads, provides canShowDilemma flag
   const { canShowDilemma, startNarrationIfReady } = useEventNarration();
 
+  // Global narration stop (for stopping audio when navigating away or opening modals)
+  const { stop: stopNarration } = useNarrator();
+
   // Loading progress (auto-increments, smooth catchup animation)
   const { progress, start: startProgress, reset: resetProgress, notifyReady } = useLoadingProgress();
 
   // Phase tracking
-  const [phase, setPhase] = useState<'collecting' | 'presenting' | 'interacting' | 'reasoning' | 'cleaning'>('collecting');
+  const [phase, setPhase] = useState<'collecting' | 'presenting' | 'interacting' | 'reasoning' | 'cleaning' | 'confirming'>('collecting');
 
   // Presentation step tracking (controls what's visible)
   const [presentationStep, setPresentationStep] = useState<number>(-1);
@@ -136,11 +138,12 @@ export default function EventScreen3({ push }: Props) {
   // Coin flight system (persists across all phases)
   const { flights, triggerCoinFlight, clearFlights } = useCoinFlights();
 
-  // Data logging hooks (Timing, Player actions)
+  // Data logging hooks (Timing, Player actions, Session lifecycle)
   // Note: State change tracking is handled globally in App.tsx via useStateChangeLogger
   // Note: AI output logging is handled in useEventDataCollector.ts at the source
   const timingLogger = useTimingLogger();
   const logger = useLogger();
+  const sessionLogger = useSessionLogger();
 
   // Reasoning feature (treatment-based)
   const reasoning = useReasoning();
@@ -149,6 +152,16 @@ export default function EventScreen3({ push }: Props) {
   const [isSubmittingReasoning, setIsSubmittingReasoning] = useState(false);
   const reasoningResolveRef = useRef<(() => void) | null>(null);
   const addReasoningEntry = useDilemmaStore((s) => s.addReasoningEntry);
+
+  // Self-judgment modal (Day 8 only)
+  const [showSelfJudgmentModal, setShowSelfJudgmentModal] = useState(false);
+
+  // Navigation guard - prevent back button during gameplay
+  useNavigationGuard({
+    enabled: true,
+    confirmationMessage: lang("CONFIRM_EXIT_GAMEPLAY"),
+    screenName: "event_screen"
+  });
 
   // Timing tracker: time from dilemma presented to action confirmed
   const decisionTimingIdRef = useRef<string | null>(null);
@@ -285,6 +298,30 @@ export default function EventScreen3({ push }: Props) {
       notifyReady();
     });
   }, [registerOnReady, notifyReady]);
+
+  // ========================================================================
+  // EFFECT 0C: Start session timing on first mount (not on snapshot restore)
+  // Session timing: EventScreen first load → AftermathScreen load
+  // ========================================================================
+  const sessionStartedRef = useRef(false);
+
+  useEffect(() => {
+    // Only start session once, and only if NOT restored from snapshot
+    if (!sessionStartedRef.current && !restoredFromSnapshot) {
+      const { selectedRole } = useRoleStore.getState();
+      const { character } = useRoleStore.getState();
+
+      sessionLogger.start({
+        role: selectedRole || 'Unknown',
+        playerName: character?.name || 'Unknown',
+        day,
+        totalDays
+      });
+
+      sessionStartedRef.current = true;
+      console.log('[EventScreen3] ⏱️ Session timing started');
+    }
+  }, [restoredFromSnapshot, day, totalDays, sessionLogger]);
 
   // ========================================================================
   // EFFECT 1: Trigger collection when phase changes TO 'collecting'
@@ -425,18 +462,6 @@ export default function EventScreen3({ push }: Props) {
   }, [collectedData, storedCrisisMode, phase, push]);
 
   // ========================================================================
-  // EFFECT 5: Mark player as having played before on first interaction
-  // ========================================================================
-  useEffect(() => {
-    if (!hasPlayedBefore && day === 1 && phase === 'interacting') {
-      markHasPlayedBefore();
-      logger.logSystem('first_time_player_detected', {
-        timestamp: Date.now()
-      }, 'First-time player detected, tutorial enabled');
-    }
-  }, [hasPlayedBefore, day, phase, markHasPlayedBefore, logger]);
-
-  // ========================================================================
   // ACTION HANDLERS
   // ========================================================================
 
@@ -519,6 +544,9 @@ export default function EventScreen3({ push }: Props) {
    * Handle action confirmation - delegates ALL logic to EventDataCleaner
    */
   const handleConfirm = async (id: string) => {
+    // Set phase to confirming immediately to show loading overlay
+    setPhase('confirming');
+
     // Find the action card
     const actionsForDeck = collectedData?.dilemma
       ? actionsToDeckCards(collectedData.dilemma.actions)
@@ -582,6 +610,9 @@ export default function EventScreen3({ push }: Props) {
    * Handle custom action suggestion
    */
   const handleSuggest = async (text?: string) => {
+    // Set phase to confirming immediately to show loading overlay
+    setPhase('confirming');
+
     if (!text || !text.trim()) {
       console.warn('[EventScreen3] ❌ handleSuggest called with empty text');
       return;
@@ -724,10 +755,10 @@ export default function EventScreen3({ push }: Props) {
   // };
 
   // ========================================================================
-  // RENDER: Loading State (collecting phase)
+  // RENDER: Loading State (confirming or collecting phase)
   // ========================================================================
   // Don't show loading overlay if we're restoring from snapshot
-  if ((phase === 'collecting' || isCollecting) && !restoredFromSnapshot) {
+  if ((phase === 'confirming' || phase === 'collecting' || isCollecting) && !restoredFromSnapshot) {
     return (
       <AnimatePresence mode="wait">
         <CollectorLoadingOverlay
@@ -792,7 +823,7 @@ export default function EventScreen3({ push }: Props) {
     );
 
     return (
-      <div className="min-h-screen p-6 pb-24" style={roleBgStyle}>
+      <div className="min-h-screen p-4 pb-20 md:p-6 md:pb-24" style={roleBgStyle}>
         {/* Debug: Jump to Final Day button */}
         {debugMode && day < 7 && phase === 'interacting' && (
           <button
@@ -804,7 +835,7 @@ export default function EventScreen3({ push }: Props) {
           </button>
         )}
 
-        <div className="max-w-3xl mx-auto space-y-3">
+        <div className="max-w-3xl mx-auto space-y-2 md:space-y-3">
           {/* Step 0+: ResourceBar (always visible) */}
           {presentationStep >= 0 && (
             <ResourceBar
@@ -815,6 +846,7 @@ export default function EventScreen3({ push }: Props) {
               goalStatus={roleProgress?.status ?? "uncompleted"}
               score={score}
               scoreDetails={scoreDetails}
+              avatarSrc={character?.avatarUrl || null}
             />
           )}
 
@@ -850,7 +882,10 @@ export default function EventScreen3({ push }: Props) {
                   </p>
                   {phase === 'interacting' && (
                     <button
-                      onClick={() => push('/aftermath')}
+                      onClick={() => {
+                        stopNarration(); // Stop any playing narration before opening modal
+                        setShowSelfJudgmentModal(true);
+                      }}
                       className="w-full px-6 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-amber-500/50"
                     >
                       View Aftermath
@@ -869,12 +904,11 @@ export default function EventScreen3({ push }: Props) {
             </>
           )}
 
-          {/* Step 5+: MirrorWithAvatar with Compass Pills Overlay (skip if game end) */}
+          {/* Step 5+: MirrorCard with Compass Pills Overlay (skip if game end) */}
           {!isGameEnd && presentationStep >= 5 && collectedData && (
             <div className="relative">
-              <MirrorWithAvatar
+              <MirrorCard
                 text={collectedData.mirrorText}
-                avatarSrc={character?.avatarUrl || null}
                 // onExploreClick temporarily removed - navigation bugs prevent safe return to EventScreen
               />
               {/* Compass Pills Overlay - appears at Step 4A (Day 2+) */}
@@ -940,28 +974,28 @@ export default function EventScreen3({ push }: Props) {
           />
         )}
 
-        {/* Tutorial Overlays - First-time player guidance */}
-        {!hasPlayedBefore && !debugMode && !restoredFromSnapshot && (
-          <>
-            {/* Day 1: Avatar tutorial */}
-            {day === 1 && !day1TipShown && phase === 'interacting' && presentationStep >= 5 && (
-              <TutorialOverlay
-                target="avatar"
-                message="Click your avatar to see your current values"
-                onDismiss={markDay1TipShown}
-              />
-            )}
+        {/* Self-Judgment Modal - appears on Day 8 before aftermath */}
+        <SelfJudgmentModal
+          isOpen={showSelfJudgmentModal}
+          onClose={() => setShowSelfJudgmentModal(false)}
+          onSubmit={(judgment) => {
+            // Store judgment in dilemmaStore
+            useDilemmaStore.getState().addSelfJudgment(judgment);
 
-            {/* Day 2: Support tutorial */}
-            {day === 2 && !day2TipShown && phase === 'interacting' && presentationStep >= 1 && (
-              <TutorialOverlay
-                target="support"
-                message="Click on support entities to learn more about them - so you can make more educated decisions"
-                onDismiss={markDay2TipShown}
-              />
-            )}
-          </>
-        )}
+            // Log self-judgment selection
+            logger.log(
+              'self_judgment_selected',
+              {
+                day: 8,
+                judgment,
+              },
+              `Player selected self-judgment: ${judgment}`
+            );
+
+            // Navigate to aftermath
+            push('/aftermath');
+          }}
+        />
       </div>
     );
   }

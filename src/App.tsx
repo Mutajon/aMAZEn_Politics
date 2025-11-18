@@ -47,6 +47,7 @@ import { useStateChangeLogger } from "./hooks/useStateChangeLogger";
 import { useSessionLogger } from "./hooks/useSessionLogger";
 import { usePartialSummaryLogger } from "./hooks/usePartialSummaryLogger";
 import GameCappedScreen from "./screens/GameCappedScreen";
+import { AnimatePresence, motion } from "framer-motion";
 
 if (import.meta.env.DEV) {
   import("./dev/storesDebug").then(m => m.attachStoresDebug());
@@ -177,61 +178,86 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
     return <LoadingScreen />;
   }
 
+  // Animation variants for smooth screen transitions
+  const pageVariants = {
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 }
+  };
+
+  const pageTransition = {
+    duration: 0.3,
+    ease: "easeInOut"
+  };
+
   return (
     <>
       {/* Global audio controls - visible on all screens */}
       <AudioControls />
 
-      {route === "/intro" && <IntroScreen push={push} />}
-      {route === "/role" && <RoleSelectionScreen push={push} />}
-      {route === "/campaign" && <CampaignScreen />}
-      {route === "/power" && <PowerDistributionScreen push={push} />}
-      {enableModifiers && route === "/difficulty" && <DifficultyScreen push={push} />}
+      {/* AnimatePresence for smooth screen crossfade transitions */}
+      <AnimatePresence initial={false}>
+        <motion.div
+          key={route}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          variants={pageVariants}
+          transition={pageTransition}
+          className="absolute inset-0 min-h-screen bg-black"
+          style={{ width: '100%', height: '100%' }}
+        >
+          {route === "/intro" && <IntroScreen push={push} />}
+          {route === "/role" && <RoleSelectionScreen push={push} />}
+          {route === "/campaign" && <CampaignScreen />}
+          {route === "/power" && <PowerDistributionScreen push={push} />}
+          {enableModifiers && route === "/difficulty" && <DifficultyScreen push={push} />}
 
-      {/* NEW split screens */}
-      {route === "/compass-intro" && (() => {
-        console.log("[App] 🎯 Rendering CompassIntroStart");
-        return <CompassIntroStart push={push} />;
-      })()}
-      {route === "/compass-mirror" && <MirrorDialogueScreen push={push} />}
-      {route === "/compass-quiz" && <MirrorQuizScreen push={push} />}
+          {/* NEW split screens */}
+          {route === "/compass-intro" && (() => {
+            console.log("[App] 🎯 Rendering CompassIntroStart");
+            return <CompassIntroStart push={push} />;
+          })()}
+          {route === "/compass-mirror" && <MirrorDialogueScreen push={push} />}
+          {route === "/compass-quiz" && <MirrorQuizScreen push={push} />}
 
-      {route === "/name" && <NameScreen push={push} />}
-      {route === "/compass-vis" && <CompassVisScreen />}
-      {route === "/mirror" && <MirrorScreen push={push} />}
-      {route === "/debug-mini" && <MiniCompassDebugScreen push={push} />}
-      {route === "/background-intro" && <BackgroundIntroScreen push={push} />}
-      {enableModifiers && route === "/goals" && (() => {
-        console.log("[App] 🎯 Rendering GoalsSelectionScreen");
-        return <GoalsSelectionScreen push={push} />;
-      })()}
-      {route === "/event" && <EventScreen3 push={push} />}
-      {route === "/downfall" && <DownfallScreen push={push} />}
-      {route.startsWith("/highscores") && <HighscoreScreen />}
-      {route === "/achievements" && <AchievementsScreen />}
-      {route === "/aftermath" && <AftermathScreen push={push} />}
-      {route === "/final-score" && <FinalScoreScreen push={push} />}
-      {route === "/capped" && <GameCappedScreen push={push} />}
+          {route === "/name" && <NameScreen push={push} />}
+          {route === "/compass-vis" && <CompassVisScreen />}
+          {route === "/mirror" && <MirrorScreen push={push} />}
+          {route === "/debug-mini" && <MiniCompassDebugScreen push={push} />}
+          {route === "/background-intro" && <BackgroundIntroScreen push={push} />}
+          {enableModifiers && route === "/goals" && (() => {
+            console.log("[App] 🎯 Rendering GoalsSelectionScreen");
+            return <GoalsSelectionScreen push={push} />;
+          })()}
+          {route === "/event" && <EventScreen3 push={push} />}
+          {route === "/downfall" && <DownfallScreen push={push} />}
+          {route.startsWith("/highscores") && <HighscoreScreen />}
+          {route === "/achievements" && <AchievementsScreen />}
+          {route === "/aftermath" && <AftermathScreen push={push} />}
+          {route === "/final-score" && <FinalScoreScreen push={push} />}
+          {route === "/capped" && <GameCappedScreen push={push} />}
 
+          {/* Backstage route - Development mode (bypasses experiments) */}
+          {route === "/backstage" && (
+            <BackstageScreen
+              onStart={() => push("/intro")}
+              onHighscores={() => push("/highscores")}
+              onAchievements={() => push("/achievements")}
+            />
+          )}
 
-      {/* Backstage route - Development mode (bypasses experiments) */}
-      {route === "/backstage" && (
-        <BackstageScreen
-          onStart={() => push("/intro")}
-          onHighscores={() => push("/highscores")}
-          onAchievements={() => push("/achievements")}
-        />
-      )}
-
-      {/* Default route - SplashScreen */}
-      {route === "/" && (
-        <SplashScreen
-          onStart={() => push("/intro")}
-          onHighscores={() => push("/highscores")}
-          onAchievements={() => push("/achievements")}
-          push={push}
-        />
-      )}
+          {/* Default route - SplashScreen */}
+          {route === "/" && (
+            <SplashScreen
+              onStart={() => push("/intro")}
+              onHighscores={() => push("/highscores")}
+              onAchievements={() => push("/achievements")}
+              push={push}
+            />
+          )}
+        </motion.div>
+      </AnimatePresence>
     </>
   );
 }

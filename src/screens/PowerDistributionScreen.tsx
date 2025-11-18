@@ -18,10 +18,19 @@ import { usePowerDistributionAnalysis } from "../hooks/usePowerDistributionAnaly
 import { useSettingsStore } from "../store/settingsStore";
 import { useRoleStore } from "../store/roleStore";
 import { useLang } from "../i18n/lang";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import { useTranslatedConst, createTranslatedConst } from "../i18n/useTranslatedConst";
 
 export default function PowerDistributionScreen({ push }: { push: PushFn }) {
   const lang = useLang();
+
+  // Navigation guard - prevent back button during power distribution setup
+  useNavigationGuard({
+    enabled: true,
+    confirmationMessage: lang("CONFIRM_EXIT_SETUP"),
+    screenName: "power_distribution_screen"
+  });
+
   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
   
@@ -95,7 +104,7 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
   };
 
   return (
-    <div className="min-h-dvh w-full" style={roleBgStyle}>
+    <div className="min-h-dvh w-full safe-top safe-bottom" style={roleBgStyle}>
       <LoadingOverlay visible={fetchState === "loading"} title={lang("ANALYZING_YOUR_WORLD")} quotes={quotes} />
 
       <PowerDistributionContent

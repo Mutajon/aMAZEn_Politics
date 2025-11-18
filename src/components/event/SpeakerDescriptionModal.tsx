@@ -62,7 +62,7 @@ export function SpeakerDescriptionModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="relative w-full max-w-2xl mx-4 bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl border border-white/20 shadow-2xl overflow-hidden"
+          className="relative w-full max-w-md sm:max-w-lg md:max-w-xl mx-4 max-h-[85vh] overflow-y-auto bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl border border-white/20 shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Close Button */}
@@ -75,13 +75,13 @@ export function SpeakerDescriptionModal({
           </button>
 
           {/* Content - Horizontal Layout */}
-          <div className="flex gap-6 p-6">
+          <div className="flex gap-3 sm:gap-4 md:gap-6 p-4 sm:p-5 md:p-6">
             {/* Speaker Portrait - Left Side */}
             <div className="flex-shrink-0">
               <img
                 src={imagePath}
                 alt={speakerName}
-                className="w-48 h-auto object-contain rounded-lg"
+                className="w-16 sm:w-32 md:w-40 h-auto object-contain rounded-lg"
                 onError={(e) => {
                   // Fallback to default image if specific image fails to load
                   const target = e.target as HTMLImageElement;
@@ -93,7 +93,7 @@ export function SpeakerDescriptionModal({
             </div>
 
             {/* Text Content - Right Side */}
-            <div className="flex-1 flex flex-col gap-3 pr-8">
+            <div className="flex-1 flex flex-col gap-3 pr-6 sm:pr-8">
               {/* Speaker Name */}
               <h2 className="text-2xl font-bold text-white">
                 {speakerName}

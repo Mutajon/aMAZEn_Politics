@@ -21,6 +21,7 @@ export type AftermathRequest = {
   gameId?: string; // optional gameId to retrieve conversation history from backend
   playerName: string; // from roleStore.character.name
   role: string; // from roleStore.selectedRole
+  setting: string; // from roleStore.roleTitle (legacyKey, e.g., "Athens — Shadows of War (-431)")
   systemName: string; // from roleStore.analysis.systemName
   dilemmaHistory: DilemmaHistoryEntry[]; // full game history (7 days)
   finalSupport: {
@@ -65,6 +66,7 @@ export type AftermathResponse = {
     democracy: RatingLevel; // NOW INCLUDED (was hidden before)
   };
   valuesSummary: string; // one sentence summary
+  legacy: string; // how the player will be remembered ("You will be remembered as...")
   haiku: string; // 3-line poetic summary
 };
 

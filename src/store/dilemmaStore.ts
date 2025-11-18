@@ -1,7 +1,7 @@
 // src/store/dilemmaStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Dilemma, DilemmaAction, DilemmaHistoryEntry, SubjectStreak, DilemmaScope, ScopeStreak, LightDilemmaRequest, LightDilemmaResponse } from "../lib/dilemma";
+import type { Dilemma, DilemmaAction, DilemmaHistoryEntry, SubjectStreak, DilemmaScope, ScopeStreak, LightDilemmaRequest } from "../lib/dilemma";
 import type { ScoreBreakdown } from "../lib/scoring";
 import type { Goal, SelectedGoal } from "../data/goals";
 import type { CompassPill } from "../hooks/useEventDataCollector";
@@ -11,9 +11,6 @@ import { useRoleStore } from "./roleStore";
 import { useCompassStore } from "./compassStore"; // <-- A) use compass values (0..10)
 import { COMPONENTS } from "../data/compass-data"; // <-- B) component definitions for value names
 import { getTreatmentConfig, type TreatmentType } from "../data/experimentConfig"; // <-- Inquiry system config
-
-// Prevent duplicate fetches (React StrictMode or fast double click)
-let loadNextInFlight = false;
 
 // gated debug logger
 function dlog(...args: any[]) {
@@ -75,6 +72,15 @@ type DilemmaState = {
 
   // Decision timing tracking (for session summary statistics)
   decisionTimes: number[];  // Array of decision durations in milliseconds
+
+  // Reasoning timing tracking (for session summary statistics)
+  reasoningTimes: number[];  // Array of reasoning durations in milliseconds
+
+  // Custom action text tracking (for session summary)
+  customActionTexts: string[];  // Array of custom action text submissions
+
+  // Self-judgment (Day 8 aftermath questionnaire)
+  selfJudgment: string | null;  // Player's self-assessment of their choices
 
   current: Dilemma | null;
   history: Dilemma[];
@@ -150,7 +156,6 @@ type DilemmaState = {
   // Pending compass pills (applied in cleaner phase, displayed in EventScreen)
   pendingCompassPills: CompassPill[] | null;
 
-  loadNext: () => Promise<void>;
   nextDay: () => void;
   setTotalDays: (n: number) => void;
   applyChoice: (id: "a" | "b" | "c") => void;
@@ -220,6 +225,15 @@ type DilemmaState = {
   // Decision timing methods (for session summary)
   addDecisionTime: (duration: number) => void;                  // Store decision duration
 
+  // Reasoning timing methods (for session summary)
+  addReasoningTime: (duration: number) => void;                 // Store reasoning duration
+
+  // Custom action text methods (for session summary)
+  addCustomActionText: (text: string) => void;                  // Store custom action text
+
+  // Self-judgment methods (Day 8 aftermath questionnaire)
+  addSelfJudgment: (judgment: string) => void;                  // Store player self-assessment
+
   // Crisis detection methods (NEW)
   detectAndSetCrisis: () => "downfall" | "people" | "challenger" | "caring" | null;  // Detect crisis after support updates, returns crisis mode
   clearCrisis: () => void;          // Clear crisis state after handling
@@ -260,6 +274,15 @@ export const useDilemmaStore = create<DilemmaState>()(
 
   // Decision timing (initialized empty, populated as player makes decisions)
   decisionTimes: [],
+
+  // Reasoning timing (initialized empty, populated as player provides reasoning)
+  reasoningTimes: [],
+
+  // Custom action texts (initialized empty, populated as player submits custom actions)
+  customActionTexts: [],
+
+  // Self-judgment (null until day 8 aftermath questionnaire)
+  selfJudgment: null,
 
   current: null,
   history: [],
@@ -332,43 +355,6 @@ export const useDilemmaStore = create<DilemmaState>()(
   corruptionHistory: [],
   pendingCompassPills: null,
 
-  async loadNext() {
-    // If something is already loading, bail early
-    if (get().loading || loadNextInFlight) {
-      dlog("loadNext: skipped (already in flight)");
-      return;
-    }
-
-    loadNextInFlight = true;
-    set({ loading: true, error: null });
-
-    try {
-      console.log("[dilemmaStore.loadNext] Calling light API via loadNextLight()");
-      dlog("loadNext: using light API");
-      const d = await loadNextLight();
-
-      // If API failed, propagate error to UI
-      if (!d) {
-        const errorMsg = "Unable to generate your next challenge. The AI service failed after multiple attempts. Please start a new game.";
-        dlog("API failed, setting error:", errorMsg);
-        set({ loading: false, error: errorMsg, current: null });
-        return;
-      }
-
-      const prev = get().current;
-      set((s) => ({
-        current: d!,
-        history: prev ? [...s.history, prev] : s.history,
-        loading: false,
-      }));
-    } catch (err: any) {
-      const msg = err?.message || "Failed to load dilemma";
-      set({ loading: false, error: msg });
-      dlog("ERROR:", msg);
-    } finally {
-      loadNextInFlight = false;
-    }
-  },
   
 
   nextDay() {
@@ -468,6 +454,9 @@ export const useDilemmaStore = create<DilemmaState>()(
       inquiryCreditsRemaining: 0,
       reasoningSubmissionCount: 0,
       decisionTimes: [],
+      reasoningTimes: [],
+      customActionTexts: [],
+      selfJudgment: null,
     });
   },
 
@@ -901,6 +890,37 @@ export const useDilemmaStore = create<DilemmaState>()(
   },
 
   // ========================================================================
+  // REASONING TIMING METHODS
+  // ========================================================================
+
+  addReasoningTime(duration) {
+    const { reasoningTimes } = get();
+    const newTimes = [...reasoningTimes, duration];
+    dlog("addReasoningTime ->", duration, "ms | total reasonings:", newTimes.length);
+    set({ reasoningTimes: newTimes });
+  },
+
+  // ========================================================================
+  // CUSTOM ACTION TEXT METHODS
+  // ========================================================================
+
+  addCustomActionText(text) {
+    const { customActionTexts } = get();
+    const newTexts = [...customActionTexts, text];
+    dlog("addCustomActionText ->", text.length, "chars | total custom actions:", newTexts.length);
+    set({ customActionTexts: newTexts });
+  },
+
+  // ========================================================================
+  // SELF-JUDGMENT METHODS
+  // ========================================================================
+
+  addSelfJudgment(judgment) {
+    dlog("addSelfJudgment ->", judgment);
+    set({ selfJudgment: judgment });
+  },
+
+  // ========================================================================
   // CRISIS DETECTION METHODS
   // ========================================================================
 
@@ -1147,99 +1167,4 @@ export function buildLightSnapshot(): LightDilemmaRequest {
   }
 
   return request;
-}
-
-/**
- * Load next dilemma using the light API (fast, minimal payload)
- * Includes integrated support shift analysis in the response
- */
-async function loadNextLight(): Promise<Dilemma | null> {
-  const { debugMode } = useSettingsStore.getState();
-  const { day, supportPeople, supportMiddle, supportMom, setSupportPeople, setSupportMiddle, setSupportMom, updateSubjectStreak, updateScopeStreak, addDilemmaTitle } = useDilemmaStore.getState();
-
-  try {
-    const snapshot = buildLightSnapshot();
-
-    const r = await fetch("/api/dilemma-light", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(snapshot),
-    });
-
-    if (!r.ok) {
-      const t = await r.text();
-      console.error("[loadNextLight] API failed:", r.status, t);
-      return null;
-    }
-
-    const raw: LightDilemmaResponse = await r.json();
-
-    // DIAGNOSTIC: Log what API actually returned (always visible for debugging)
-    console.log('[loadNextLight] Raw API response - scope:', raw.scope, '| topic:', raw.topic);
-
-    if (debugMode) {
-      console.log("[loadNextLight] Response received:", raw);
-    }
-
-    // Store the new dilemma title for semantic variety tracking
-    if (raw.title) {
-      console.log('[loadNextLight] 📝 Storing dilemma title:', raw.title);
-      addDilemmaTitle(raw.title);
-      console.log('[loadNextLight] ✅ Title stored. Current titles:', useDilemmaStore.getState().recentDilemmaTitles);
-    }
-
-    // Apply support shifts if they exist (Day 2+)
-    if (raw.supportShift && day > 1) {
-      const { people, mom, holders } = raw.supportShift;
-
-      // Apply deltas with clamping to 0-100
-      const newPeople = Math.max(0, Math.min(100, supportPeople + people.delta));
-      const newMom = Math.max(0, Math.min(100, supportMom + mom.delta));
-      const newMiddle = Math.max(0, Math.min(100, supportMiddle + holders.delta)); // KEY: holders → middle
-
-      setSupportPeople(newPeople);
-      setSupportMom(newMom);
-      setSupportMiddle(newMiddle);
-
-      if (debugMode) {
-        console.log("[loadNextLight] Support shifts applied:", {
-          people: `${supportPeople} → ${newPeople} (${people.delta > 0 ? '+' : ''}${people.delta})`,
-          mom: `${supportMom} → ${newMom} (${mom.delta > 0 ? '+' : ''}${mom.delta})`,
-          middle: `${supportMiddle} → ${newMiddle} (${holders.delta > 0 ? '+' : ''}${holders.delta})`
-        });
-        console.log("[loadNextLight] Support reasons:", {
-          people: people.why,
-          mom: mom.why,
-          holders: holders.why
-        });
-      }
-    }
-
-    // Update subject streak tracking
-    if (raw.topic) {
-      updateSubjectStreak(raw.topic);
-    }
-
-    // Update scope streak tracking
-    if (raw.scope) {
-      updateScopeStreak(raw.scope);
-    }
-
-    // Build Dilemma object (same format as standard API)
-    const dilemma: Dilemma = {
-      title: raw.title,
-      description: raw.description,
-      actions: raw.actions
-    };
-
-    if (debugMode) {
-      console.log("[loadNextLight] Dilemma created:", dilemma);
-    }
-
-    return dilemma;
-
-  } catch (e: any) {
-    console.error("[loadNextLight] Error:", e?.message || e);
-    return null;
-  }
 }

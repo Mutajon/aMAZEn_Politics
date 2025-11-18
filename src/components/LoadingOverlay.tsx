@@ -144,7 +144,7 @@ export default function LoadingOverlay({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 6 }}
             transition={{ type: "spring", stiffness: 260, damping: 24 }}
-            className="relative w-[min(92vw,640px)] rounded-3xl border border-white/10 bg-[rgba(18,22,45,0.85)] shadow-xl p-6 text-center select-none"
+            className="relative w-[min(92vw,640px)] rounded-2xl sm:rounded-3xl border border-white/10 bg-[rgba(18,22,45,0.85)] shadow-xl p-4 sm:p-6 text-center select-none"
           >
             {/* Subtle spinner */}
             <div
@@ -166,10 +166,10 @@ export default function LoadingOverlay({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
                   transition={{ duration: 0.25 }}
-                  className="mt-4 text-lg md:text-xl italic text-white/85"
+                  className="mt-4 text-base sm:text-lg md:text-xl italic text-white/85"
                   style={{ fontFamily: "Inter, ui-sans-serif, system-ui" }}
                 >
-                  “{currentRich.text}”
+                  "{currentRich.text}"
                 </motion.p>
                 <motion.div
                   key={`${order[idx]}-author`}
@@ -189,7 +189,7 @@ export default function LoadingOverlay({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.25 }}
-                className="mt-4 text-lg md:text-xl italic text-white/85"
+                className="mt-4 text-base sm:text-lg md:text-xl italic text-white/85"
                 style={{ fontFamily: "Inter, ui-sans-serif, system-ui" }}
               >
                 {legacyQuote}

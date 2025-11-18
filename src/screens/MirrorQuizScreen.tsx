@@ -17,9 +17,11 @@ import { saveMirrorReturnRoute } from "../lib/eventScreenSnapshot";
 import MirrorBubbleTyping from "../components/MirrorBubbleTyping";
 import { COMPONENTS, PALETTE } from "../data/compass-data";
 import { useLogger } from "../hooks/useLogger";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import { useTimingLogger } from "../hooks/useTimingLogger";
 import { useLang } from "../i18n/lang";
 import { translateQuizQuestion, translateQuizAnswer } from "../i18n/translateGameData";
+import { useLoggingStore } from "../store/loggingStore";
 
 
 /** placeholder avatar for images OFF */
@@ -97,6 +99,13 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   const logger = useLogger();
   const timingLogger = useTimingLogger();
 
+  // Navigation guard - prevent back button during mirror quiz
+  useNavigationGuard({
+    enabled: true,
+    confirmationMessage: lang("CONFIRM_EXIT_SETUP"),
+    screenName: "mirror_quiz_screen"
+  });
+
   // Track which questions have been logged to prevent duplicates
   const loggedQuestionsRef = useRef<Set<number>>(new Set());
 
@@ -117,7 +126,18 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   // New games are handled by resetAll() in SplashScreen
   useEffect(() => {
     if (quiz.length === 0) {
-      resetCompass();
+      // DEFENSIVE GUARD: Don't reset compass if initial snapshot already exists
+      // This prevents back button navigation from destroying the captured snapshot
+      const compassSnapshot = useCompassStore.getState().initialCompassSnapshot;
+      const loggingSnapshot = useLoggingStore.getState().initialCompassSnapshot;
+
+      if (!compassSnapshot && !loggingSnapshot) {
+        resetCompass();
+        console.log('[MirrorQuizScreen] No existing snapshot, resetting compass for new quiz');
+      } else {
+        console.log('[MirrorQuizScreen] Snapshot exists, preserving compass state');
+      }
+
       init(pickQuiz(3));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -240,6 +260,24 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
         setSelectedOption(null); // Reset selection
         if (idx + 1 >= quiz.length) {
           setDone();
+
+          // Capture initial compass snapshot for session summary
+          // This happens automatically after quiz completes, before any navigation
+          const { captureInitialSnapshot, values } = useCompassStore.getState();
+          captureInitialSnapshot();
+
+          // DEFENSIVE DOUBLE-PERSISTENCE: Also save to loggingStore
+          // This provides redundant storage in case compassStore localStorage fails
+          const { setInitialCompassSnapshot } = useLoggingStore.getState();
+          const snapshot = {
+            what: [...values.what],
+            whence: [...values.whence],
+            how: [...values.how],
+            whither: [...values.whither],
+          };
+          setInitialCompassSnapshot(snapshot);
+
+          console.log('[MirrorQuizScreen] ✅ Initial compass snapshot captured and persisted to both stores');
 
           // Log quiz completion
           logger.log(
@@ -490,12 +528,13 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
     {epilogueShown && (
       <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
         <button
-          onClick={() => {
+          onClick={async () => {
             logger.log('button_click_go_to_sleep', 'Go to sleep', 'User clicked Go to sleep button');
 
-            // Capture initial compass snapshot for session summary
-            const { captureInitialSnapshot } = useCompassStore.getState();
-            captureInitialSnapshot();
+            // Initial compass snapshot was already captured after quiz completion
+            // Wait 150ms to ensure Zustand persist middleware flushes to localStorage
+            // This prevents race condition where navigation happens before async persist completes
+            await new Promise(resolve => setTimeout(resolve, 150));
 
             push("/background-intro");
           }}

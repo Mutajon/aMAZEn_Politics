@@ -112,12 +112,12 @@ export async function cleanAndAdvanceDay(
   await delay(1200);
 
   // ========================================================================
-  // STEP 3.5: Fetch and apply compass deltas IMMEDIATELY (Day 2+ only)
+  // STEP 3.5: Fetch and apply compass deltas IMMEDIATELY (Day 1+ with gameId)
   // This ensures compass values are updated BEFORE day advances
   // ========================================================================
   const { day, gameId } = useDilemmaStore.getState();
 
-  if (day > 1 && gameId) {
+  if (day >= 1 && gameId) {
     console.log('[Cleaner] Fetching compass deltas for current action...');
 
     try {
@@ -159,7 +159,7 @@ export async function cleanAndAdvanceDay(
       useDilemmaStore.setState({ pendingCompassPills: null });
     }
   } else {
-    // Day 1 or no gameId - skip compass pills
+    // No gameId - skip compass pills
     useDilemmaStore.setState({ pendingCompassPills: null });
   }
 

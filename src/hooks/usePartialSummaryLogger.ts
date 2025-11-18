@@ -23,8 +23,8 @@ export function usePartialSummaryLogger() {
       }
 
       try {
-        // Collect partial summary (aftermathData = null, incomplete = true)
-        const summary = collectSessionSummary(null, true);
+        // Collect partial summary (aftermathData = null, incomplete = true, sessionDuration = null)
+        const summary = collectSessionSummary(null, true, null);
 
         // Convert to JSON
         const payload = JSON.stringify(summary);

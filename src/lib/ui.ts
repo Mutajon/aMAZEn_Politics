@@ -53,6 +53,31 @@ export const bgStyleWithMaze: CSSProperties = {
 };
 
 /**
+ * Background for role selection screen with custom role selection image.
+ * - Layer 1: Role selection background image
+ * - Layer 2: Light dark overlay for text readability (lighter than before)
+ * - Layer 3: Subtle glow for depth
+ */
+export const bgStyleRoleSelection: CSSProperties = {
+  // Solid fallback
+  backgroundColor: "#0b1335",
+
+  // Three stacked backgrounds: subtle glow + light overlay + image
+  backgroundImage: [
+    // subtle glow for depth
+    "radial-gradient(1000px 600px at 50% -10%, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0) 60%)",
+    // light dark overlay for text readability (20-30% opacity, lighter than before)
+    "linear-gradient(to bottom, rgba(11, 19, 53, 0.2), rgba(11, 19, 53, 0.3))",
+    // role selection image
+    "url(/assets/images/BKGs/roleSelectionBKG.png)",
+  ].join(", "),
+
+  backgroundRepeat: "no-repeat, no-repeat, no-repeat",
+  backgroundSize: "cover, cover, cover",
+  backgroundPosition: "center, center, center",
+};
+
+/**
  * Background for splash screen with main maze image.
  * - Layer 1: Main maze background image
  * - Layer 2: Light dark overlay for text readability (lighter than before)

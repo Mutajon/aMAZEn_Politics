@@ -8,6 +8,7 @@ import { useSettingsStore } from "../store/settingsStore";
 import MirrorBubble from "../components/MirrorBubble";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLogger } from "../hooks/useLogger";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import { useLang } from "../i18n/lang";
 
 /** Built-in placeholder (no file asset needed) */
@@ -72,6 +73,13 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
 
   // Logging hook for data collection
   const logger = useLogger();
+
+  // Navigation guard - prevent back button during mirror dialogue
+  useNavigationGuard({
+    enabled: true,
+    confirmationMessage: lang("CONFIRM_EXIT_SETUP"),
+    screenName: "mirror_dialogue_screen"
+  });
 
   // Get gender-aware translation keys
   const getGenderKey = (baseKey: string): string => {

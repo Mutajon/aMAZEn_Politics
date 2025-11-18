@@ -23,6 +23,7 @@ import DecisionBreakdownSection from "./DecisionBreakdownSection";
 import ReflectionSection from "./ReflectionSection";
 import TombstoneSection from "./TombstoneSection";
 import { useLogger } from "../../hooks/useLogger";
+import { audioManager } from "../../lib/audioManager";
 
 type TopValue = {
   short: string;
@@ -32,7 +33,6 @@ type Props = {
   data: AftermathResponse;
   avatarUrl?: string;
   top3ByDimension: Record<PropKey, TopValue[]>;
-  onExploreClick: () => void;
   onRevealScoreClick: () => void;
 };
 
@@ -40,7 +40,6 @@ export default function AftermathContent({
   data,
   avatarUrl,
   top3ByDimension,
-  onExploreClick,
   onRevealScoreClick,
 }: Props) {
   const logger = useLogger();
@@ -81,6 +80,7 @@ export default function AftermathContent({
         intro={data.intro}
         snapshot={data.snapshot}
         avatarUrl={avatarUrl}
+        legacy={data.legacy}
       />
 
       {/* Final Scores Section - Democracy/Autonomy/Liberalism pills */}
@@ -93,7 +93,6 @@ export default function AftermathContent({
       <ReflectionSection
         top3ByDimension={top3ByDimension}
         valuesSummary={data.valuesSummary}
-        onExploreClick={onExploreClick}
       />
 
       {/* Tombstone Section */}
@@ -102,7 +101,10 @@ export default function AftermathContent({
       {/* Reveal Final Score Button */}
       <div className="pt-4">
         <button
-          onClick={onRevealScoreClick}
+          onClick={() => {
+            audioManager.playSfx('click-soft');
+            onRevealScoreClick();
+          }}
           className="w-full px-6 py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white text-lg font-bold rounded-xl transition-all duration-200 shadow-lg hover:shadow-amber-500/50"
         >
           Reveal final score

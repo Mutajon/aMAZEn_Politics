@@ -36,9 +36,11 @@ import { useRoleProgressStore } from "../store/roleProgressStore";
 import { useMirrorTop3 } from "../hooks/useMirrorTop3";
 import { useAudioManager } from "../hooks/useAudioManager";
 import { useLogger } from "../hooks/useLogger";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import { loggingService } from "../lib/loggingService";
 import type { PushFn } from "../lib/router";
 import { useLang } from "../i18n/lang";
+import { audioManager } from "../lib/audioManager";
 
 type Props = {
   push: PushFn;
@@ -94,6 +96,13 @@ export default function FinalScoreScreen({ push }: Props) {
   const previousBestScoreRef = useRef<number | null>(roleProgress?.bestScore ?? null);
   const { playSfx } = useAudioManager();
   const logger = useLogger();
+
+  // Navigation guard disabled - game is complete, no progress to protect
+  useNavigationGuard({
+    enabled: false,
+    screenName: "final_score_screen"
+  });
+
   const breakdown: ScoreBreakdown =
     finalScoreCalculated && savedBreakdown ? savedBreakdown : liveBreakdown;
 
@@ -198,7 +207,7 @@ export default function FinalScoreScreen({ push }: Props) {
       setRunning(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sequence.length, finalScoreCalculated]);
+  }, [sequence.length, finalScoreCalculated, savedBreakdown]);
 
   useEffect(() => {
     displayValuesRef.current = displayValues;
@@ -346,6 +355,7 @@ export default function FinalScoreScreen({ push }: Props) {
   };
 
   const handleBackToAftermath = () => {
+    audioManager.playSfx('click-soft');
     logger.log(
       "button_click_back_to_aftermath",
       {},
@@ -355,6 +365,7 @@ export default function FinalScoreScreen({ push }: Props) {
   };
 
   const handlePlayAgain = () => {
+    audioManager.playSfx('click-soft');
     logger.log(
       "button_click_play_again",
       {
@@ -368,10 +379,11 @@ export default function FinalScoreScreen({ push }: Props) {
     useCompassStore.getState().reset();
     useMirrorQuizStore.getState().resetAll();
     clearAllSnapshots();
-    push("/role");
+    push("/intro"); // Route to intro screen (to show fragment collection)
   };
 
   const handleVisitHallOfFame = () => {
+    audioManager.playSfx('click-soft');
     logger.log(
       "button_click_visit_hall_of_fame",
       {

@@ -36,6 +36,11 @@ import { EXPERIMENT_PREDEFINED_ROLE_KEYS } from "../data/predefinedRoles";
 import { useSessionLogger } from "../hooks/useSessionLogger";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useLogger } from "../hooks/useLogger";
+import { useNavigationGuard } from "../hooks/useNavigationGuard";
+import { usePastGamesStore } from "../store/pastGamesStore";
+import { buildPastGameEntry } from "../lib/pastGamesService";
+import { useFragmentsStore } from "../store/fragmentsStore";
+import { audioManager } from "../lib/audioManager";
 
 type Props = {
   push: PushFn;
@@ -62,6 +67,20 @@ export default function AftermathScreen({ push }: Props) {
   const selectedRole = useRoleStore((s) => s.selectedRole);
   const day = useDilemmaStore((s) => s.day);
   const score = useDilemmaStore((s) => s.score);
+
+  // Past games store for saving completed game data
+  const addPastGame = usePastGamesStore((s) => s.addGame);
+
+  // Fragments store for fragment collection
+  const addFragment = useFragmentsStore((s) => s.addFragment);
+  const fragmentCount = useFragmentsStore((s) => s.getFragmentCount());
+
+  // Navigation guard - prevent back button during aftermath
+  useNavigationGuard({
+    enabled: true,
+    confirmationMessage: lang("CONFIRM_EXIT_AFTERMATH"),
+    screenName: "aftermath_screen"
+  });
 
   // ========================================================================
   // SNAPSHOT RESTORATION (synchronous, before first render)
@@ -98,8 +117,11 @@ export default function AftermathScreen({ push }: Props) {
   // ========================================================================
   // EFFECT: NOTIFY PROGRESS (only if not restored from snapshot)
   // ========================================================================
+  const hasNotifiedReadyRef = useRef(false);
+
   useEffect(() => {
-    if (data && !initializedFromSnapshot) {
+    if (data && !initializedFromSnapshot && !hasNotifiedReadyRef.current) {
+      hasNotifiedReadyRef.current = true;
       notifyReady();
     }
   }, [data, notifyReady, initializedFromSnapshot]);
@@ -131,6 +153,9 @@ export default function AftermathScreen({ push }: Props) {
 
     // Mark as logged immediately to prevent any re-fires
     hasLoggedAftermathRef.current = true;
+
+    // Play beholdFragment voiceover (first visit only)
+    audioManager.playVoiceover('behold-fragment');
 
     // Calculate total inquiries across all days
     let totalInquiries = 0;
@@ -178,7 +203,7 @@ export default function AftermathScreen({ push }: Props) {
     (async () => {
       try {
         const { collectSessionSummary, sendSessionSummary } = await import('../hooks/useSessionSummary');
-        const summary = collectSessionSummary(data, false); // false = complete session
+        const summary = collectSessionSummary(data, false, sessionDuration); // Pass session duration
         await sendSessionSummary(summary);
         console.log('[AftermathScreen] ✅ Session summary sent to MongoDB');
       } catch (error) {
@@ -186,7 +211,132 @@ export default function AftermathScreen({ push }: Props) {
         // Don't throw - logging should never block user experience
       }
     })();
-  }, [data, isFirstVisit, inquiryHistory, customActionCount, selectedRole, day, score, sessionLogger, logger]);
+
+    // Extract gameId early - needed even if past game save fails
+    const currentGameId = useDilemmaStore.getState().gameId || `game-${Date.now()}`;
+
+    // TRY BLOCK 1: Save past game to localStorage (non-critical, allowed to fail)
+    try {
+      const pastGameEntry = buildPastGameEntry(data);
+      addPastGame(pastGameEntry);
+
+      // Log that we saved the game
+      logger.logSystem(
+        'past_game_saved',
+        {
+          gameId: pastGameEntry.gameId,
+          playerName: pastGameEntry.playerName,
+          roleTitle: pastGameEntry.roleTitle,
+          finalScore: pastGameEntry.finalScore,
+          timestamp: pastGameEntry.timestamp
+        },
+        `Past game saved: ${pastGameEntry.playerName} in ${pastGameEntry.roleTitle} (Score: ${pastGameEntry.finalScore})`
+      );
+
+      console.log('[AftermathScreen] 💾 Past game saved to localStorage');
+    } catch (error) {
+      console.error('[AftermathScreen] ❌ Failed to save past game:', error);
+      logger.logSystem(
+        'past_game_save_failed',
+        {
+          gameId: currentGameId,
+          error: error instanceof Error ? error.message : String(error)
+        },
+        'Failed to save past game (localStorage quota or other error)'
+      );
+      // Continue to fragment collection - past games are non-critical
+    }
+
+    // TRY BLOCK 2: Collect fragment (CRITICAL, must succeed even if past game failed)
+    if (fragmentCount < 3) {
+      try {
+        addFragment(currentGameId);
+
+        // CRITICAL FIX: Force immediate localStorage write to prevent race condition
+        // Zustand persist middleware is async and can fail silently if tab loses focus
+        try {
+          const fragmentsState = useFragmentsStore.getState();
+          const persistData = {
+            state: {
+              firstIntro: fragmentsState.firstIntro,
+              fragmentGameIds: fragmentsState.fragmentGameIds.slice(0, 3)
+            },
+            version: 0
+          };
+          localStorage.setItem('amaze-politics-fragments-v1', JSON.stringify(persistData));
+          console.log('[AftermathScreen] ✅ Fragment manually persisted to localStorage');
+        } catch (persistError) {
+          console.error('[AftermathScreen] ❌ Failed to persist fragment to localStorage:', persistError);
+          logger.logSystem(
+            'fragment_persist_failed',
+            {
+              gameId: currentGameId,
+              error: persistError instanceof Error ? persistError.message : String(persistError)
+            },
+            'Failed to persist fragment to localStorage'
+          );
+        }
+
+        // Verify fragment was actually added by re-reading from store
+        const updatedFragmentCount = useFragmentsStore.getState().getFragmentCount();
+        const fragmentWasAdded = updatedFragmentCount > fragmentCount;
+
+        if (!fragmentWasAdded) {
+          console.error('[AftermathScreen] ⚠️ WARNING: Fragment was not added to store!');
+          logger.logSystem(
+            'fragment_addition_failed',
+            {
+              gameId: currentGameId,
+              expectedCount: fragmentCount + 1,
+              actualCount: updatedFragmentCount
+            },
+            'Fragment was not added to store'
+          );
+        } else {
+          // Play fragment collected sound
+          audioManager.playSfx('fragment-collected');
+          // Get player info for logging (may not have past game if that save failed)
+          const roleStore = useRoleStore.getState();
+          const playerName = roleStore.character?.name || 'Leader';
+          const roleTitle = roleStore.roleTitle || roleStore.selectedRole || 'Unknown';
+
+          logger.logSystem(
+            'fragment_collected',
+            {
+              gameId: currentGameId,
+              fragmentIndex: fragmentCount,
+              totalFragments: updatedFragmentCount,
+              playerName,
+              roleTitle
+            },
+            `Fragment ${updatedFragmentCount}/3 collected: ${playerName} in ${roleTitle}`
+          );
+
+          console.log(`[AftermathScreen] 🧩 Fragment ${updatedFragmentCount}/3 collected (verified)`);
+
+          // Log if all 3 fragments now collected
+          if (updatedFragmentCount === 3) {
+            logger.logSystem(
+              'fragments_all_collected',
+              { totalFragments: 3 },
+              'All 3 fragments collected!'
+            );
+            console.log('[AftermathScreen] 🎉 All 3 fragments collected!');
+          }
+        }
+      } catch (fragmentError) {
+        console.error('[AftermathScreen] ❌ CRITICAL: Failed to collect fragment:', fragmentError);
+        logger.logSystem(
+          'fragment_collection_failed',
+          {
+            gameId: currentGameId,
+            error: fragmentError instanceof Error ? fragmentError.message : String(fragmentError)
+          },
+          'Critical failure: Fragment collection failed'
+        );
+      }
+    }
+  }, [data, isFirstVisit, inquiryHistory, customActionCount, selectedRole, day, score, addPastGame, addFragment, logger]);
 
   // ========================================================================
   // RENDER: Loading State
@@ -236,18 +386,6 @@ export default function AftermathScreen({ push }: Props) {
         data={data}
         avatarUrl={character?.avatarUrl}
         top3ByDimension={top3ByDimension}
-        onExploreClick={() => {
-          // Save snapshot before navigating
-          if (data) {
-            saveAftermathScreenSnapshot({
-              data,
-              timestamp: Date.now()
-            });
-          }
-          // Save return route
-          saveAftermathReturnRoute('/aftermath');
-          push('/mirror');
-        }}
         onRevealScoreClick={() => {
           // Save snapshot with ratings before navigating to FinalScoreScreen
           // This ensures ideology ratings persist when navigating back

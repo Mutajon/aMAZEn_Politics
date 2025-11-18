@@ -384,6 +384,7 @@ router.post('/summary', ipRateLimiter, async (req, res) => {
   try {
     // Check if data collection is enabled
     if (!DATA_COLLECTION_ENABLED) {
+      console.error('[Logging] ❌ Summary rejected: Data collection not enabled');
       return res.status(400).json({
         success: false,
         error: 'Data collection is not enabled on this server'
@@ -394,9 +395,23 @@ router.post('/summary', ipRateLimiter, async (req, res) => {
 
     // Basic validation - ensure required fields exist
     if (!summary.userId || !summary.sessionId || !summary.gameVersion) {
+      const missing = [];
+      if (!summary.userId) missing.push('userId');
+      if (!summary.sessionId) missing.push('sessionId');
+      if (!summary.gameVersion) missing.push('gameVersion');
+
+      console.error('[Logging] ❌ Summary validation failed: Missing fields:', missing.join(', '));
+      console.error('[Logging] Received summary:', {
+        hasUserId: !!summary.userId,
+        hasSessionId: !!summary.sessionId,
+        hasGameVersion: !!summary.gameVersion,
+        role: summary.role,
+        incomplete: summary.incomplete
+      });
+
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields (userId, sessionId, or gameVersion)'
+        error: `Missing required fields: ${missing.join(', ')}`
       });
     }
 
@@ -413,15 +428,19 @@ router.post('/summary', ipRateLimiter, async (req, res) => {
       writeConcern: { w: 'majority', j: true, wtimeout: 10000 }
     });
 
-    console.log(`[Logging] ✅ Session summary inserted: ${summary.sessionId} (user: ${summary.userId}, incomplete: ${summary.incomplete})`);
+    console.log(`[Logging] ✅ Session summary inserted: ${summary.sessionId} (user: ${summary.userId}, role: ${summary.role}, incomplete: ${summary.incomplete})`);
 
-    // Always return success (don't block user on logging errors)
+    // Return success
     res.json({
       success: true
     });
 
   } catch (error) {
     console.error('[Logging] ❌ Summary insert failed:', error);
+    console.error('[Logging] Error details:', {
+      message: error.message,
+      stack: error.stack
+    });
 
     // Return 200 OK even on error (don't block user experience)
     // But log the error for debugging
