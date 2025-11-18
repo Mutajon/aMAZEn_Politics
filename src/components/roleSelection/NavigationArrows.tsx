@@ -9,6 +9,7 @@
 // - Amber gradient styling
 
 import { motion } from "framer-motion";
+import { audioManager } from "../../lib/audioManager";
 
 interface NavigationArrowsProps {
   onPrev: () => void;
@@ -27,7 +28,10 @@ export default function NavigationArrows({
     <>
       {/* Left Arrow */}
       <motion.button
-        onClick={onPrev}
+        onClick={() => {
+          audioManager.playSfx('role-switch');
+          onPrev();
+        }}
         disabled={!canNavigatePrev}
         className={`
           fixed left-4 md:left-8 top-[35%] -translate-y-1/2 z-30
@@ -83,7 +87,10 @@ export default function NavigationArrows({
 
       {/* Right Arrow */}
       <motion.button
-        onClick={onNext}
+        onClick={() => {
+          audioManager.playSfx('role-switch');
+          onNext();
+        }}
         disabled={!canNavigateNext}
         className={`
           fixed right-4 md:right-8 top-[35%] -translate-y-1/2 z-30

@@ -40,6 +40,7 @@ import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import { loggingService } from "../lib/loggingService";
 import type { PushFn } from "../lib/router";
 import { useLang } from "../i18n/lang";
+import { audioManager } from "../lib/audioManager";
 
 type Props = {
   push: PushFn;
@@ -96,10 +97,9 @@ export default function FinalScoreScreen({ push }: Props) {
   const { playSfx } = useAudioManager();
   const logger = useLogger();
 
-  // Navigation guard - prevent back button during final score screen
+  // Navigation guard disabled - game is complete, no progress to protect
   useNavigationGuard({
-    enabled: true,
-    confirmationMessage: lang("CONFIRM_EXIT_GAMEPLAY"),
+    enabled: false,
     screenName: "final_score_screen"
   });
 
@@ -355,6 +355,7 @@ export default function FinalScoreScreen({ push }: Props) {
   };
 
   const handleBackToAftermath = () => {
+    audioManager.playSfx('click-soft');
     logger.log(
       "button_click_back_to_aftermath",
       {},
@@ -364,6 +365,7 @@ export default function FinalScoreScreen({ push }: Props) {
   };
 
   const handlePlayAgain = () => {
+    audioManager.playSfx('click-soft');
     logger.log(
       "button_click_play_again",
       {
@@ -381,6 +383,7 @@ export default function FinalScoreScreen({ push }: Props) {
   };
 
   const handleVisitHallOfFame = () => {
+    audioManager.playSfx('click-soft');
     logger.log(
       "button_click_visit_hall_of_fame",
       {

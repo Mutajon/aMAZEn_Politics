@@ -10,13 +10,14 @@
 // Used by: EventScreen3 during data collection
 // Props: progress
 
-import { useMemo } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { useRoleStore } from "../../store/roleStore";
 import { useRotatingTips } from "../../hooks/useRotatingTips";
 import { VideoBackground } from "./VideoBackground";
 import { getRoleVideoPath } from "../../data/predefinedRoles";
 import { motion } from "framer-motion";
+import { audioManager } from "../../lib/audioManager";
 
 type Props = {
   progress: number; // 0-100 real-time progress percentage (REQUIRED)
@@ -27,6 +28,15 @@ export default function CollectorLoadingOverlay({
   progress,
 }: Props) {
   const { currentTip, fadeState } = useRotatingTips();
+  const soundPlayedRef = useRef(false);
+
+  // Play zoom woosh sound when overlay appears
+  useEffect(() => {
+    if (!soundPlayedRef.current) {
+      soundPlayedRef.current = true;
+      audioManager.playSfx('zoom-woosh');
+    }
+  }, []);
 
   // Get role background image from store
   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);

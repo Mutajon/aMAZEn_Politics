@@ -15,6 +15,7 @@ import type { EnhancedPowerHolder, FetchState } from "../hooks/usePowerDistribut
 import { useRoleStore } from "../store/roleStore";
 import { useLogger } from "../hooks/useLogger";
 import { useLang } from "../i18n/lang";
+import { audioManager } from "../lib/audioManager";
 
 interface PowerDistributionContentProps {
   // State
@@ -275,6 +276,7 @@ export default function PowerDistributionContent({
 
               <button
                 onClick={() => {
+                  audioManager.playSfx('click-soft');
                   logger.log('button_click_power_looks_good', {
                     finalHolders: holders.map(h => ({ name: h.name, percent: h.percent }))
                   }, 'User confirmed power distribution and clicked "Looks good"');

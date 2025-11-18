@@ -21,6 +21,10 @@ const AUDIO_FILES = {
     'coins': '/assets/sounds/coins.mp3',
     'click-soft': '/assets/sounds/click soft.mp3', // Note: filename has space
     'drumroll': '/assets/sounds/Drum Roll Medium.mp3', // Note: filename has spaces
+    'fragments-appear': '/assets/sounds/fragmentsAppear.mp3',
+    'fragment-collected': '/assets/sounds/fragmentCollected.mp3',
+    'role-switch': '/assets/sounds/roleSwitch.mp3',
+    'zoom-woosh': '/assets/sounds/zoomWoosh.mp3',
   },
   vo: {
     // First-visit dialogue (19 lines total)

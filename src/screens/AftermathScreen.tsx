@@ -293,6 +293,8 @@ export default function AftermathScreen({ push }: Props) {
             'Fragment was not added to store'
           );
         } else {
+          // Play fragment collected sound
+          audioManager.playSfx('fragment-collected');
           // Get player info for logging (may not have past game if that save failed)
           const roleStore = useRoleStore.getState();
           const playerName = roleStore.character?.name || 'Leader';

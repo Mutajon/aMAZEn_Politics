@@ -260,6 +260,9 @@ export default function IntroScreen({ push }: { push: PushFn }) {
 
   // Handle "I'm ready" button
   const handleReady = () => {
+    // Play click sound
+    audioManager.playSfx('click-soft');
+
     // Mark intro as completed on first visit
     if (firstIntro) {
       markIntroCompleted();
@@ -321,6 +324,18 @@ export default function IntroScreen({ push }: { push: PushFn }) {
       setCurrentLineIndex((prev) => prev + 1); // Advance to next line
       setIsFragmentPause(false);
 
+      // Play voiceover for next line
+      const nextIndex = currentLineIndex + 1;
+      const voKey = getVoiceoverKey(nextIndex);
+      if (voKey) {
+        audioManager.playVoiceover(voKey);
+        logger.logSystem(
+          "gatekeeper_voiceover_started",
+          { lineIndex: nextIndex, voiceoverKey: voKey },
+          `Started voiceover for line ${nextIndex}`
+        );
+      }
+
       logger.log(
         "fragment_reveal_completed",
         { fragmentLineIndex: FRAGMENT_LINE_INDEX, nextLine: currentLineIndex + 1 },
@@ -328,6 +343,22 @@ export default function IntroScreen({ push }: { push: PushFn }) {
       );
     }
   }, [isFragmentPause, animationComplete, currentLineIndex, logger]);
+
+  // Fallback: Auto-advance if animation callback doesn't fire within 3 seconds
+  useEffect(() => {
+    if (isFragmentPause && !animationComplete) {
+      const fallbackTimer = setTimeout(() => {
+        // Only trigger if still paused
+        setAnimationComplete(true);
+        logger.logSystem(
+          "fragment_animation_fallback",
+          { fragmentLineIndex: FRAGMENT_LINE_INDEX },
+          "Fragment animation fallback triggered after 3s timeout"
+        );
+      }, 3000);
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [isFragmentPause, animationComplete, logger]);
 
   // Cleanup: Stop voiceover on unmount
   useEffect(() => {
@@ -348,6 +379,7 @@ export default function IntroScreen({ push }: { push: PushFn }) {
           onFragmentClick={handleFragmentClick}
           onEmptySlotClick={handleEmptySlotClick}
           onAnimationComplete={handleAnimationComplete}
+          playAppearSound={firstIntro}
         />
       )}
 

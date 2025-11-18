@@ -18,6 +18,7 @@ import RoleCarouselContent from "../components/roleSelection/RoleCarouselContent
 import NavigationArrows from "../components/roleSelection/NavigationArrows";
 import PositionIndicator from "../components/roleSelection/PositionIndicator";
 import RoleInfoBox from "../components/roleSelection/RoleInfoBox";
+import { audioManager } from "../lib/audioManager";
 
 export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const lang = useLang();
@@ -246,6 +247,9 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
 
   const handleRoleConfirm = () => {
     const item = currentItem;
+
+    // Play click sound
+    audioManager.playSfx('click-soft');
 
     // Handle special carousel items
     if (item.type === 'customRole') {

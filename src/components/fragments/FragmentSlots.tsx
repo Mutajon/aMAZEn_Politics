@@ -11,24 +11,28 @@ import { Puzzle } from "lucide-react";
 import { useFragmentsStore } from "../../store/fragmentsStore";
 import { usePastGamesStore } from "../../store/pastGamesStore";
 import type { PastGameEntry } from "../../lib/types/pastGames";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { audioManager } from "../../lib/audioManager";
 
 interface FragmentSlotsProps {
   onFragmentClick?: (fragment: PastGameEntry, index: number) => void;
   onEmptySlotClick?: () => void;
   onAnimationComplete?: () => void;
+  playAppearSound?: boolean; // Play fragmentsAppear sound when falling animation starts
 }
 
 export default function FragmentSlots({
   onFragmentClick,
   onEmptySlotClick,
   onAnimationComplete,
+  playAppearSound = false,
 }: FragmentSlotsProps) {
   const fragmentGameIds = useFragmentsStore((s) => s.fragmentGameIds);
   const pastGames = usePastGamesStore((s) => s.getGames());
   const [animationPhase, setAnimationPhase] = useState<
     "initial" | "falling" | "bobbing" | "complete"
   >("initial");
+  const soundPlayedRef = useRef(false);
 
   // Get fragment data for each slot (max 3 slots)
   const slots = [0, 1, 2].map((index) => {
@@ -52,10 +56,15 @@ export default function FragmentSlots({
     // Start falling animation after brief delay
     const fallTimer = setTimeout(() => {
       setAnimationPhase("falling");
+      // Play sound when fragments appear for the first time
+      if (playAppearSound && !soundPlayedRef.current) {
+        soundPlayedRef.current = true;
+        audioManager.playSfx('fragments-appear');
+      }
     }, 100);
 
     return () => clearTimeout(fallTimer);
-  }, []);
+  }, [playAppearSound]);
 
   // After fall-in completes, trigger bob animation
   const handleFallInComplete = () => {
@@ -74,6 +83,18 @@ export default function FragmentSlots({
       onAnimationComplete?.();
     }
   };
+
+  // Handle case when all slots are empty - no fall animation will trigger
+  useEffect(() => {
+    if (animationPhase === "falling" && newestFragmentIndex === -1) {
+      // No fragments to animate, complete immediately after brief delay
+      const timer = setTimeout(() => {
+        setAnimationPhase("complete");
+        onAnimationComplete?.();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [animationPhase, newestFragmentIndex, onAnimationComplete]);
 
   return (
     <div className="absolute top-[232px] left-1/2 -translate-x-1/2 z-40">
