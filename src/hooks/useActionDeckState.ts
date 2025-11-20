@@ -141,7 +141,8 @@ export function useActionDeckState(actions: ActionCard[]) {
   };
 
   const startSuggestConfirmationFlow = async () => {
-    closeSuggestModal();
+    // DON'T close modal immediately - keep it open to show loading/errors
+    // Modal will be closed by parent after successful day advance
 
     // Ensure we know sizes and lock height before animations
     if (!deckHeight && deckRef.current) {
@@ -149,9 +150,11 @@ export function useActionDeckState(actions: ActionCard[]) {
     }
     setLockHeight(true);
 
-    // Disable interactions, animate THREE cards down (suggest stays)
+    // Disable interactions using atomic state update
+    // This prevents race condition where confirmingId might not be set
     setConfirmingId("suggest");
     setOthersDown(true);
+
     await waitNextFrame(2);
 
     const springDown = { type: "spring" as const, stiffness: 380, damping: 32 };
@@ -165,6 +168,11 @@ export function useActionDeckState(actions: ActionCard[]) {
     setSuggestOpen(false);
     setSuggestError(null);
     setValidatingSuggest(false);
+  };
+
+  const closeModalAfterSuccess = () => {
+    // Called by parent after successful day advance
+    setSuggestOpen(false);
   };
 
   // Log suggestion submission with timing
@@ -206,6 +214,7 @@ export function useActionDeckState(actions: ActionCard[]) {
     setSuggestError,
     openSuggestModal,
     closeSuggestModal,
+    closeModalAfterSuccess,
 
     // Confirmation flow state
     confirmingId,

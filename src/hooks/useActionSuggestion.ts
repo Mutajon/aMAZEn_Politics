@@ -8,7 +8,7 @@
  * Uses: validation.ts for AI validation, dilemmaStore for context
  */
 
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { validateSuggestionStrict, AIConnectionError } from "../lib/validation";
 import { useSettingsStore } from "../store/settingsStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
@@ -38,8 +38,8 @@ function getRoleContext(): {
   const era = roleStore.analysis?.grounding?.era || "";
   const settingType = roleStore.analysis?.grounding?.settingType || "unclear";
   const year = roleStore.roleYear || "";
-  const politicalSystem = roleStore.analysis?.polityType || roleStore.systemName || "";
-  const roleName = roleStore.selectedRole || roleStore.customRole || "";
+  const politicalSystem = roleStore.analysis?.systemName || "";
+  const roleName = roleStore.selectedRole || "";
   const roleScope = roleStore.roleScope || roleStore.analysis?.roleScope || "";
   return { era, settingType, year, politicalSystem, roleName, roleScope };
 }
@@ -74,6 +74,9 @@ export function useActionSuggestion({
   onConfirmSuggestion,
 }: UseSuggestionParams) {
 
+  // Submission lock to prevent concurrent validation requests
+  const submittingRef = useRef(false);
+
   const canAffordSuggestion = useCallback(() => {
     return !showBudget || budget >= Math.abs(suggestCost);
   }, [showBudget, budget, suggestCost]);
@@ -81,6 +84,12 @@ export function useActionSuggestion({
   const validateAndConfirmSuggestion = useCallback(async (text: string) => {
     const trimmedText = text.trim();
     debugLog("validateAndConfirmSuggestion: click", { textLength: trimmedText.length });
+
+    // Check if already submitting (prevent double-click)
+    if (submittingRef.current) {
+      debugLog("validateAndConfirmSuggestion: BLOCKED - already submitting");
+      return false;
+    }
 
     if (!trimmedText) {
       debugLog("validateAndConfirmSuggestion: early return (empty text)");
@@ -91,6 +100,10 @@ export function useActionSuggestion({
       debugLog("validateAndConfirmSuggestion: early return (budget lock)", { budget, suggestCost });
       return false;
     }
+
+    // Set submission lock
+    submittingRef.current = true;
+    debugLog("validateAndConfirmSuggestion: LOCK ACQUIRED");
 
     try {
       setSuggestError(null);
@@ -123,21 +136,43 @@ export function useActionSuggestion({
       debugLog("Full response:", result);
 
       if (!result.valid) {
+        debugLog("validateAndConfirmSuggestion: validation REJECTED");
         setSuggestError(result.reason || "Please refine your suggestion so it clearly relates to the dilemma.");
         setValidatingSuggest(false);
+        submittingRef.current = false; // Release lock on rejection
+        debugLog("validateAndConfirmSuggestion: LOCK RELEASED (rejected)");
         return false;
       }
 
       // Success - trigger confirmation flow
-      onConfirmSuggestion();
-      setValidatingSuggest(false);
-      return true;
+      debugLog("validateAndConfirmSuggestion: validation ACCEPTED, calling onConfirmSuggestion");
+
+      try {
+        // CRITICAL: Await the confirmation callback to detect failures
+        await onConfirmSuggestion();
+        debugLog("validateAndConfirmSuggestion: onConfirmSuggestion completed successfully");
+        setValidatingSuggest(false);
+        // Keep lock until day advances (released by parent reset)
+        return true;
+
+      } catch (callbackErr: any) {
+        // CRITICAL: If confirmation callback fails, show error to user
+        debugLog("validateAndConfirmSuggestion: onConfirmSuggestion FAILED", callbackErr);
+        const callbackMsg = callbackErr?.message || "Failed to process confirmation";
+        setSuggestError(`Confirmation failed: ${callbackMsg}`);
+        // Keep validatingSuggest true to prevent button re-enable
+        setValidatingSuggest(true);
+        // Don't release lock - force page refresh or error recovery
+        return false;
+      }
 
     } catch (err: any) {
       const msg = err instanceof AIConnectionError ? err.message : "Cannot reach validator";
-      debugLog("validateAndConfirmSuggestion: error", msg, err);
+      debugLog("validateAndConfirmSuggestion: validation error", msg, err);
       setSuggestError(msg);
       setValidatingSuggest(false);
+      submittingRef.current = false; // Release lock on error
+      debugLog("validateAndConfirmSuggestion: LOCK RELEASED (error)");
       return false;
     }
   }, [
@@ -155,9 +190,16 @@ export function useActionSuggestion({
     return validatingSuggest || !canAffordSuggestion() || textLength < 4;
   }, [validatingSuggest, canAffordSuggestion]);
 
+  // Reset submission lock (call when new dilemma starts)
+  const resetSubmissionLock = useCallback(() => {
+    submittingRef.current = false;
+    debugLog("resetSubmissionLock: lock released");
+  }, []);
+
   return {
     canAffordSuggestion,
     validateAndConfirmSuggestion,
     isDisabled,
+    resetSubmissionLock,
   };
 }

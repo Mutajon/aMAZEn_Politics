@@ -594,118 +594,6 @@ function formatE12ForPrompt(e12, powerHolders) {
   return text;
 }
 
-/**
- * Helper: Generate role-specific authority boundaries ("Cannot Do" list)
- * Creates explicit examples of actions beyond the player's authority
- */
-function generateAuthorityBoundaries(gameContext) {
-  const {
-    powerHolders = [],
-    systemName = "",
-    role = "",
-    e12 = null
-  } = gameContext;
-
-  // Find player's power percentage
-  const playerHolder = powerHolders.find(h =>
-    h.note?.toLowerCase().includes("you") ||
-    h.name?.toLowerCase().includes("player")
-  );
-  const playerPower = playerHolder?.percent || 0;
-
-  const boundaries = [];
-
-  // Generic low-power boundaries
-  if (playerPower < 30) {
-    boundaries.push("• Unilaterally command military forces (requires military leadership approval)");
-    boundaries.push("• Override institutional decisions without negotiation or coalition-building");
-    boundaries.push("• Make binding treaties with foreign powers (requires council/assembly approval)");
-  }
-
-  // System-specific boundaries
-  const systemLower = systemName.toLowerCase();
-
-  if (systemLower.includes("democracy")) {
-    boundaries.push("• Act without assembly/council vote on major policy changes");
-    boundaries.push("• Imprison citizens without due process or judicial approval");
-    boundaries.push("• Change constitutional rules unilaterally");
-    boundaries.push("• Ignore referendum results or bypass public consultation");
-  }
-
-  if (systemLower.includes("oligarchy")) {
-    boundaries.push("• Make major decisions without consulting the oligarchic council");
-    boundaries.push("• Redistribute wealth from oligarchs without their collective consent");
-    boundaries.push("• Appoint officials to key positions without council approval");
-  }
-
-  if (systemLower.includes("republic") && !systemLower.includes("oligarchy")) {
-    boundaries.push("• Bypass legislative processes or ignore senate/parliament decisions");
-    boundaries.push("• Act outside constitutional constraints");
-  }
-
-  if ((systemLower.includes("monarchy") || systemLower.includes("autocracy")) && playerPower < 70) {
-    boundaries.push("• Challenge or override the monarch's/autocrat's direct authority");
-    boundaries.push("• Make succession decisions or interfere with royal prerogatives");
-    boundaries.push("• Act independently in domains the monarch has reserved");
-  }
-
-  if (systemLower.includes("theocracy") || systemLower.includes("theocratic")) {
-    boundaries.push("• Violate or contradict religious law and clerical authority");
-    boundaries.push("• Act without consultation or blessing from religious leadership");
-    boundaries.push("• Implement secular policies that conflict with sacred doctrine");
-  }
-
-  if (systemLower.includes("technocracy")) {
-    boundaries.push("• Override expert consensus or scientific recommendations without justification");
-    boundaries.push("• Make decisions in technical domains without expert panel approval");
-  }
-
-  if (systemLower.includes("stratocracy") || systemLower.includes("military")) {
-    boundaries.push("• Act against military chain of command or operational authority");
-    boundaries.push("• Weaken military capabilities without military leadership approval");
-  }
-
-  // E-12 specific boundaries (if available)
-  if (e12 && Array.isArray(e12.decisive) && e12.decisive.length > 0) {
-    const playerIsDecisive = e12.decisive.some(seat =>
-      seat.toLowerCase().includes("you") ||
-      seat.toLowerCase().includes("player") ||
-      seat.toLowerCase().includes(role.toLowerCase())
-    );
-
-    if (!playerIsDecisive) {
-      boundaries.push("• Make final decisions on existential matters (Security, Civil Liberties, Information Order) - these require approval from decisive authority");
-      boundaries.push("• Unilaterally appoint or remove officials in positions controlled by other institutions");
-    }
-
-    // Check for autocratization flags
-    if (e12.stopA) {
-      boundaries.push("• Ignore or defy military authority - military holds autocratic veto power");
-    }
-    if (e12.stopB) {
-      boundaries.push("• Violate religious or ideological orthodoxy - theocratic authorities have final say");
-    }
-  }
-
-  // If player has high power, note what they CAN do instead of cannot
-  if (playerPower >= 70) {
-    return "⚠️ PLAYER AUTHORITY LEVEL: HIGH\n" +
-           "You hold significant unilateral authority in most domains. However:\n" +
-           (boundaries.length > 0 ? boundaries.join("\n") : "• Still constrained by political system norms and institutional structures\n• Actions that violate system legitimacy may trigger opposition or crisis");
-  }
-
-  // If player has moderate power
-  if (playerPower >= 40 && playerPower < 70) {
-    return "⚠️ PLAYER AUTHORITY LEVEL: MODERATE\n" +
-           "You can act independently in some areas but require cooperation/approval for:\n" +
-           (boundaries.length > 0 ? boundaries.join("\n") : "• Major policy changes that affect other power holders\n• Actions outside your direct institutional mandate");
-  }
-
-  // Low power
-  return "⚠️ PLAYER AUTHORITY LEVEL: LIMITED\n" +
-         "Your role has constrained authority. You CANNOT:\n" +
-         (boundaries.length > 0 ? boundaries.join("\n") : "• Act unilaterally on major decisions - requires institutional approval\n• Command institutions or officials you don't directly control");
-}
 // Helper: call Chat Completions and try to parse JSON from the reply
 // Automatically falls back to gpt-4o if quota error (429) is encountered
 async function aiJSON({ system, user, model = CHAT_MODEL_DEFAULT, temperature = undefined, fallback = null }) {
@@ -980,25 +868,58 @@ app.post("/api/intro-paragraph", async (req, res) => {
   try {
     if (!OPENAI_KEY) return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
 
-    const { role, gender } = req.body || {};
+    const {
+      role,
+      gender,
+      systemName,
+      setting,
+      authorityLevel,
+      challengerName,
+    } = req.body || {};
+
     const roleText = String(role || "").slice(0, 200).trim();
     const genderText = ["male", "female", "any"].includes(String(gender || "").toLowerCase())
       ? String(gender).toLowerCase()
       : "any";
 
+    const systemNameText = String(systemName || "").slice(0, 200).trim();
+    const settingText = String(setting || "").slice(0, 300).trim();
+    const authorityLevelText = String(authorityLevel || "").slice(0, 50).trim();
+    const challengerText = String(challengerName || "").slice(0, 200).trim();
+
     if (!roleText) return res.status(400).json({ error: "Missing role" });
 
     const system =
-      "You write vivid, historically aware, second-person micro-intros for a role-playing game.\n" +
-      "Tone: welcoming, intriguing, not florid. 2–3 sentences, 45–75 words total.\n" +
-      "Speak to the player as 'you'. Avoid lists, avoid anachronisms. Keep names generic unless iconic to the role.\n" +
-      "If gender is male/female, you may subtly reflect it (titles, forms of address); otherwise keep it neutral.";
+      "You are the same mysterious, amused Game Master who narrates the player's political simulation.\n" +
+      "\n" +
+      "Style:\n" +
+      "- Welcoming, intriguing, slightly teasing\n" +
+      "- Speak to the player as 'you' in second person\n" +
+      "- Use clear, simple English suitable for non-native speakers (CEFR B1–B2)\n" +
+      "- Prefer short sentences (about 8–18 words) and concrete wording\n" +
+      "- Avoid idioms, slang, complex metaphors, and very rare or academic words\n" +
+      "\n" +
+      "Content rules:\n" +
+      "- 2–3 sentences, 40–70 words total\n" +
+      "- Present tense\n" +
+      "- Vivid but not florid; no lists, no headings, no bullet points\n" +
+      "- Avoid anachronisms; respect the historical setting and political system\n" +
+      "- Keep names generic unless iconic to the role or setting\n" +
+      "- If gender is male or female, you may subtly reflect it in titles or forms of address; otherwise use gender-neutral language.";
 
     const user =
       `ROLE: ${roleText}\n` +
       `GENDER: ${genderText}\n` +
-      "TASK: Write one short paragraph that sets the scene on the player's **first day** in this role. " +
-      "Welcome them, mention immediate tensions and ambient details. Present tense. No bullet points. No headings.";
+      `POLITICAL_SYSTEM: ${systemNameText}\n` +
+      `SETTING: ${settingText}\n` +
+      `AUTHORITY_LEVEL: ${authorityLevelText} (high = dictator/monarch, medium = oligarch/executive, low = citizen/weak)\n` +
+      `MAIN_CHALLENGER: ${challengerText}\n` +
+      "\n" +
+      "TASK: Write one short paragraph that sets the scene on the player's first day in this role within this political world.\n" +
+      "- Welcome them in the Game Master voice, as if you are watching their arrival.\n" +
+      "- Hint at immediate tensions and power struggles around them, grounded in this system, setting, and authority level.\n" +
+      "- Include one or two concrete ambient details from the setting (sounds, places, people, or objects).\n" +
+      "- Use present tense. No bullet points. No headings.";
 
     // tiny retry wrapper (handles occasional upstream 503s)
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1009,22 +930,31 @@ app.post("/api/intro-paragraph", async (req, res) => {
     let paragraph = "";
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        console.log(`[server] intro-paragraph attempt ${attempt} starting for role: ${roleText.slice(0, 40)}...`);
+        console.log(
+          `[server] intro-paragraph attempt ${attempt} starting for role: ${roleText.slice(0, 40)}...`
+        );
         paragraph = await getParagraphOnce();
-        console.log(`[server] intro-paragraph attempt ${attempt} completed: got ${paragraph.length} chars`);
+        console.log(
+          `[server] intro-paragraph attempt ${attempt} completed: got ${paragraph.length} chars`
+        );
         if (paragraph) break;
-        console.log(`[server] intro-paragraph attempt ${attempt} returned empty, will retry`);
+        console.log(
+          `[server] intro-paragraph attempt ${attempt} returned empty, will retry`
+        );
       } catch (err) {
-        console.warn(`[server] intro-paragraph attempt ${attempt} failed:`, err?.message || err);
+        console.warn(
+          `[server] intro-paragraph attempt ${attempt} failed:`,
+          err?.message || err
+        );
       }
       if (attempt === 1) await sleep(600); // simple backoff before the second try
     }
 
     if (!paragraph) {
-      console.error('[server] intro-paragraph: ALL attempts exhausted, returning 503');
+      console.error("[server] intro-paragraph: ALL attempts exhausted, returning 503");
       return res.status(503).json({ error: "No content returned" });
     }
-    console.log('[server] intro-paragraph: SUCCESS, sending response');
+    console.log("[server] intro-paragraph: SUCCESS, sending response");
     return res.json({ paragraph });
   } catch (e) {
     console.error("Error in /api/intro-paragraph:", e?.message || e);
@@ -3247,8 +3177,26 @@ function extractChallengerName(challengerSeat) {
 /**
  * Calculate authority level from E-12 analysis
  * Maps detailed E-12 to simple high/medium/low classification
+ *
+ * @param {Object} e12 - E-12 framework data
+ * @param {Array} powerHolders - Array of power holders
+ * @param {number} playerIndex - Index of player in powerHolders
+ * @param {string} roleScope - Optional role description for semantic override
+ * @returns {string} 'high' | 'medium' | 'low'
  */
-function calculateAuthorityLevel(e12, powerHolders, playerIndex) {
+function calculateAuthorityLevel(e12, powerHolders, playerIndex, roleScope = null) {
+  // SEMANTIC OVERRIDE: Citizen roles are always LOW authority
+  // Citizens can only propose, not decree - they need votes/approval
+  if (roleScope) {
+    const scope = roleScope.toLowerCase();
+    if (scope.includes('citizen') ||
+        scope.includes('you may propose') ||
+        scope.includes('assembly will vote')) {
+      console.log('[calculateAuthorityLevel] Citizen role detected via roleScope - forcing LOW authority');
+      return 'low';
+    }
+  }
+
   // Fallback if missing data
   if (!powerHolders || !Array.isArray(powerHolders) || playerIndex === null || playerIndex === undefined) {
     return 'medium';
@@ -3400,6 +3348,10 @@ Style:
 - Knowledgeable, playful, slightly teasing
 - Always aware of player's past decisions
 - In dilemma descriptions, speaks directly to the player in second person ("you")
+- Use clear, simple English suitable for non-native speakers (CEFR B1–B2 level)
+- Prefer short sentences (about 8–18 words) and concrete wording
+- Avoid idioms, slang, complex metaphors, and very rare or academic words
+
 
 # ROLE & SETTING
 
@@ -3412,6 +3364,30 @@ Top Power Holders:
 ${top5PowerHolders.map(ph => `  - ${ph.name} (${ph.type}, power: ${ph.power}%)`).join('\n')}
 
 Main Challenger: ${challengerName}
+
+# HISTORICAL GROUNDING (CRITICAL)
+
+This game is counterfactual history, but the world reactions must still be grounded in real historical context.
+
+- Treat Political System (${systemName}) and Setting (${setting}) as pointers to a real time and place in history.
+- Use your knowledge of actual events, norms, and actors from that context as the default baseline.
+- Reactions from factions, leaders, and the population should feel like realistic extensions of how they behaved or could have behaved historically.
+- Counterfactual outcomes (what happens after the player's action) must still respect:
+  - What resources, institutions, and technologies existed at that time
+  - What attitudes, fears, and ambitions were common for that society
+  - The real power and constraints of the player's ${role} and ${authorityLevel}
+
+MORAL & CULTURAL CONTEXT (CRITICAL):
+
+- Always judge actions by the moral, religious, social, and political values of that specific culture and era — NOT by modern-day Western liberal norms.
+- Ask: in this time and place, would most people see this act as normal, admirable, shameful, terrifying, sacred, or dishonourable?
+- Practices that were common or accepted in that culture (for example, harsh corporal punishment, ritual sacrifice, public executions, or brutal warfare) should not automatically trigger extreme moral outrage unless they clearly cross the lines of that culture itself.
+- When a player does something that fits within that culture's accepted range of behaviour, reactions should focus more on strategic, spiritual, or social consequences than on moral shock.
+- Reserve strong moral horror for actions that would be seen as extreme or taboo even inside that historical culture (for example, betraying sacred duties, breaking core kinship rules, or violating oaths that everyone takes seriously).
+
+If a player suggestion is historically possible in that world, treat it as a valid option. The world may accept, reject, or twist it, but it must react in ways that match the historical actors, values, and stakes, not generic or modern attitudes.
+
+
 
 # STARTING SUPPORT (Day 1)
 
@@ -3448,6 +3424,9 @@ perform all the following steps. for each step, start by going over the step ins
 - Generate a new dilemma, based on the player previous choice and the support shifts, dynamic parameters and corruption change. (see DILEMMA GENERATION RULES below)
 - Generate a new mirror brief, based on the newly generated dilemma. (see MIRROR BRIEFING below)
 - When generating the new dilemma, always incorporate the fully realized consequences of the previous action. Treat every player action as already producing a meaningful event.
+- Assume that several days (around one week) have passed since the previous decision.
+  - Do NOT state this passage of time to the player.
+  - Show it indirectly through the scale of consequences (e.g., new laws in effect, battles already fought, rebuilding started, rumours turning into real actions).
 
 ## DAY 7 (Final Day):
 - Follow the same steps as Day 2-6, BUT:
@@ -3456,7 +3435,7 @@ perform all the following steps. for each step, start by going over the step ins
   - In the dilemma description, the Game Master must clearly remind the player that their borrowed time in this world is almost over and this is their final act.
   - The final question must highlight the weight of this last decision before their time runs out.
 
-  ## DAY 8 (Last consequences):
+## DAY 8 (Last consequences):
 perform all the following steps. for each step, start by going over the step instructions which are detailed in the sections below:
 - Analyze previous action for support shifts (see SUPPORT SHIFT RULES below)
 - Generate 1-3 dynamic parameters showing consequences (see DYNAMIC PARAMETERS RULES below)
@@ -3484,16 +3463,26 @@ For each entity, determine its reaction using the following contextual elements:
 Every support shift must reflect what is realistically likely to happen in this specific political world, given who the player is and how much power they hold.
 
 STEP 1 — Infer Attitude Realistically
+
 When determining each entity's stance:
 
+- Start from the real historical context implied by ${systemName} and ${setting}.
+  - Ask: in this time and place, how did similar groups usually react?
+  - Ask: what did they consider honourable, cruel, just, or shameful?
 - Consider whether the player's action helps, harms, threatens, or empowers that entity in this specific historical or political context.
 - Consider how much influence the player realistically holds (Authority Level) in this system.
 - Consider what each entity fundamentally cares about:
-  - People: stability, fairness, safety, dignity, daily conditions
-  - Holders (${challengerName}): political leverage, future power, strategy, reputation
-  - Mom: moral consequences, emotional well-being, compassion, integrity
+  - People: stability, fairness, safety, dignity, daily conditions – as they are understood in that culture.
+  - Holders (${challengerName}): political leverage, future power, strategy, reputation, and how those are defined in that era.
+  - Mom: moral consequences, emotional well-being, compassion, integrity – but always expressed through the values, fears, and myths of this setting.
 
-Do not mirror the player's intent; react to the realistic outcome in-world.
+Do NOT react as if you are a modern outsider judging the past.
+- Do not assume that the People or Mom share modern human-rights standards unless the setting is actually modern.
+- If an action (for example, harsh punishment or ritual killing) is widely accepted or even admired in that culture, People and Mom should react accordingly: perhaps concerned about risks or excess, but not shocked in a modern Western way.
+
+Do not mirror the player's intent; react to the realistic outcome in-world, based on historical norms and plausible counterfactuals for this setting.
+
+
 
 STEP 2 — Assign a Reaction Level
 Choose ONE of six levels for the attitudeLevel field, based on the strength of approval or disapproval:
@@ -3539,6 +3528,8 @@ Requirements:
 - **NEVER about support levels** (handled separately)
 - Each parameter: emoji icon + brief text (2-4 words)
 - Include numbers in text when dramatically impactful
+- Reflect consequences that could plausibly emerge over several days (not just the next hour).
+
 
 Format:
 - icon: Single emoji representing consequence
@@ -3554,7 +3545,10 @@ Examples:
 # DILEMMA GENERATION RULES
 
 **Universal (All Days):**
-1. Keep short, engaging, high-school-level language.
+1. Use clear, simple English that is easy for non-native speakers:
+   - Short sentences (about 8–18 words)
+   - Common words, no rare vocabulary
+   - No idioms, fancy metaphors, or poetic language
 2. Never use the word "dilemma".
 3. Write the dilemma description in the Game Master voice:
    - playful, slightly teasing
@@ -3581,12 +3575,23 @@ Never present the player with a choice like:
 - “How will you handle the same tension you just handled?”
 
 Every new choice must be about a NEW concrete development, escalation, opportunity, crisis, or twist that only exists BECAUSE the last decision is fully resolved in the world.
+TIME & ANGLE SHIFT (Day 2+):
+
+- Each new day should feel like events have moved on:
+  - Yesterday's choice is settled; today you face what came after.
+- If a war, crisis, or conflict continues across multiple days, change the angle:
+  - Example: from preparing for invasion → famine in the city → political blame → peace offer → trials of collaborators.
+- Never frame the new situation as "the same battle again" or "preparing again in the same way".
+- Avoid describing the same confrontation (e.g., Spartans at the gates) in more than one day without changing its nature and focus.
 
 
 # PLOT PROGRESSION (CRITICAL REQUIREMENT)
 
-The story must advance rapidly. The player's previous action MUST produce a concrete, immediate outcome by the next day.
+The story must advance rapidly in in-world time. From Day 2 onwards, treat each new day as if several days have passed since the last decision.
+
+The player's previous action MUST produce a concrete outcome that could plausibly happen over that time span.
 Never say that something "hasn't happened yet," "results are still pending," or "the situation is unchanged."
+
 
 CONCRETE EVENT RULE:
 Every new day must be centered on at least one specific event that has already happened and now demands a response.
@@ -3596,6 +3601,11 @@ Examples of concrete events (style only):
 - a riot, assassination, sabotage, or coup attempt occurs
 - a key figure defects, is arrested, or makes a public speech
 - a famine, plague, scandal, or military setback is revealed
+Use the time gap to justify deeper or wider consequences:
+- Policies already implemented and their side-effects
+- Battles already fought, not just announced
+- Public opinion forming into protests, boycotts, or support movements
+- Personal stories emerging (a sick neighbour, a ruined merchant, a celebrated hero)
 
 Do not base dilemmas only on vague moods or rumours ("whispers of dissent," "tensions rise") without a clear triggering incident.
 If you mention dissent, unrest, or anxiety, tie it to a concrete action: protests, sabotage, public denouncement, walkouts, desertions, and similar visible events.
@@ -3624,8 +3634,18 @@ Reflect political system, setting, and player role realistically. The player can
 - Every generated action MUST strictly respect these constraints. Never give the player abilities outside their realistic authority for that role and setting.
 
 **Topic Variety (Day 2+ Only):**
-- Avoid >2 consecutive dilemmas on same broad topic
+
+- Hard rule: Do NOT stay on the same broad topic label for more than 2 consecutive days.
 - Topics: Military, Economy, Religion, Diplomacy, Justice, Infrastructure, Politics, Social, Health, Education
+- If a long-running crisis exists (e.g., war with Sparta), shift the focus:
+  - Day 1: Military decision about defense
+  - Day 2: Economic strain and food shortages
+  - Day 3: Justice and punishment of deserters
+  - Day 4: Diplomacy and peace offers
+- Vary the **scope** and level across days:
+  - Mix personal/community-level dilemmas (a sick neighbour, a local riot) with large-scale ones (national policy, international treaties).
+  - Avoid more than 2 consecutive dilemmas with the same scope when alternatives are plausible.
+
 
 # ADDRESSING PLAYER INQUIRIES (Day 2+ Only)
 
@@ -3711,9 +3731,15 @@ Do not assume corruption without explicit or implied self-benefit or abuse of po
 
 **Context Handling**
 
-- Judge in light of ${systemName} and ${setting}: what counts as abuse may differ by era or regime.
+- Always judge in light of ${systemName}, ${setting}, and the dominant moral code of that culture and era.
+  - What counts as abuse in a modern liberal democracy may be normal in an absolute monarchy or warrior society.
 - High ${authorityLevel} expands potential for corruption, but does not imply it.
-- Violence or force alone is not automatically corruption — motive and legitimacy matter.
+- Violence or force alone is not automatically corruption — motive, legitimacy, and cultural norms matter.
+- Focus on misuse of entrusted power relative to that system's own laws, customs, and sacred duties:
+  - Breaking oaths that everyone takes seriously
+  - Diverting communal or sacred resources for private gain
+  - Betraying allies or kin in ways that even that culture condemns
+
 
 **Examples:**
 - Assassination for personal gain → 6–8
@@ -3812,6 +3838,7 @@ The mirror is a cynical, dry-witted observer speaking in FIRST PERSON. Its job i
 2. **Create tension** - Show how the dilemma challenges, tests, or contradicts their stated values
 3. **Never preach** - Don't tell them what to do, just highlight the contradiction or irony
 4. **Use the actual value name** - Say "your precious Honor" or "that Truth you claim to value"
+5. Ground your comments in the moral language and priorities of this specific culture and era, not in modern outside judgment.
 
 **Format:**
 - 1 sentence, 20-25 words
@@ -4007,7 +4034,8 @@ app.post("/api/game-turn-v2", async (req, res) => {
       const authorityLevel = calculateAuthorityLevel(
         gameContext.e12,
         gameContext.powerHolders,
-        gameContext.playerIndex
+        gameContext.playerIndex,
+        gameContext.roleScope
       );
 
       // Build enriched context (minimal - only what's needed for system prompt)
@@ -4027,16 +4055,35 @@ app.post("/api/game-turn-v2", async (req, res) => {
       // Build minimal Day 1 user prompt
       const userPrompt = buildGameMasterUserPrompt(day);
 
-      // Debug logging (Day 1 prompts)
+      // Debug logging (Day 1 request payload)
       if (debugMode) {
         console.log("\n" + "=".repeat(80));
-        console.log("🐛 [DEBUG] Day 1 System Prompt:");
+        console.log("🐛 [DEBUG] Day 1 - Request Payload:");
         console.log("=".repeat(80));
-        console.log(systemPrompt);
-        console.log("\n" + "=".repeat(80));
-        console.log("🐛 [DEBUG] Day 1 User Prompt:");
-        console.log("=".repeat(80));
-        console.log(userPrompt);
+        console.log(JSON.stringify({
+          gameId: currentGameId,
+          day,
+          totalDays,
+          isFirstDilemma: true,
+          generateActions: payload.generateActions,
+          useXAI,
+          gameContext: {
+            role: enrichedContext.role,
+            systemName: enrichedContext.systemName,
+            setting: enrichedContext.setting,
+            challengerName: enrichedContext.challengerName,
+            authorityLevel: enrichedContext.authorityLevel,
+            powerHoldersCount: enrichedContext.powerHolders?.length || 0,
+            topPowerHolders: enrichedContext.powerHolders?.slice(0, 3).map(ph => `${ph.name} (${ph.power}%)`),
+            playerCompassTopValues: enrichedContext.playerCompassTopValues,
+          },
+          promptMetadata: {
+            systemPromptLength: systemPrompt.length,
+            systemPromptTokens: Math.ceil(systemPrompt.length / 4),
+            userPromptLength: userPrompt.length,
+            userPromptTokens: Math.ceil(userPrompt.length / 4)
+          }
+        }, null, 2));
         console.log("=".repeat(80) + "\n");
       }
 
@@ -4147,20 +4194,33 @@ app.post("/api/game-turn-v2", async (req, res) => {
         { role: "user", content: userPrompt }
       ];
 
-      // Debug logging (Day 2+ prompts)
+      // Debug logging (Day 2+ request payload)
       if (debugMode) {
+        const daysLeft = totalDays - day;
         console.log("\n" + "=".repeat(80));
-        console.log(`🐛 [DEBUG] Day ${day} User Prompt:`);
+        console.log(`🐛 [DEBUG] Day ${day} - Request Payload:`);
         console.log("=".repeat(80));
-        console.log(userPrompt);
-        console.log("\n" + "=".repeat(80));
-        console.log(`🐛 [DEBUG] Conversation History (${messages.length} messages):`);
-        console.log("=".repeat(80));
-        messages.forEach((msg, idx) => {
-          console.log(`\n--- Message ${idx + 1} (${msg.role}) ---`);
-          const preview = msg.content.substring(0, 500);
-          console.log(preview + (msg.content.length > 500 ? '...' : ''));
-        });
+        console.log(JSON.stringify({
+          gameId: payload.gameId,
+          day,
+          totalDays,
+          daysLeft,
+          isFollowUp: true,
+          generateActions: payload.generateActions,
+          useXAI,
+          playerChoice: {
+            title: playerChoice?.title,
+            description: playerChoice?.description,
+            cost: playerChoice?.cost,
+            iconHint: playerChoice?.iconHint
+          },
+          conversationMetadata: {
+            messageCount: messages.length,
+            userPromptLength: userPrompt.length,
+            userPromptTokens: Math.ceil(userPrompt.length / 4),
+            totalConversationTokens: Math.ceil(messages.reduce((sum, msg) => sum + msg.content.length, 0) / 4)
+          }
+        }, null, 2));
         console.log("=".repeat(80) + "\n");
       }
 
@@ -4456,12 +4516,24 @@ ACTION: "Fund public education"
 
 Wait for SCENARIO CONTEXT, PLAYER ROLE, POLITICAL SYSTEM, and ACTION.`;
 
-    // Debug logging
+    // Debug logging (compass init request payload)
     if (debugMode) {
       console.log("\n" + "=".repeat(80));
-      console.log("🐛 [DEBUG] Compass Conversation Init - System Prompt:");
+      console.log("🐛 [DEBUG] Compass Conversation Init - Request Payload:");
       console.log("=".repeat(80));
-      console.log(systemPrompt);
+      console.log(JSON.stringify({
+        gameId,
+        gameContext: {
+          setting: gameContext?.setting || 'unknown',
+          role: gameContext?.role || 'unknown',
+          systemName: gameContext?.systemName || 'unknown'
+        },
+        promptMetadata: {
+          systemPromptLength: systemPrompt.length,
+          systemPromptTokens: Math.ceil(systemPrompt.length / 4),
+          includesCompassDefinitions: true
+        }
+      }, null, 2));
       console.log("=".repeat(80) + "\n");
     }
 
@@ -4573,20 +4645,29 @@ Return JSON in this shape:
   ]
 }`;
 
-    // Debug logging
+    // Debug logging (compass analyze request payload)
     if (debugMode) {
       console.log("\n" + "=".repeat(80));
-      console.log("🐛 [DEBUG] Compass Conversation Analyze - Context:");
+      console.log("🐛 [DEBUG] Compass Conversation Analyze - Request Payload:");
       console.log("=".repeat(80));
-      console.log(`SCENARIO CONTEXT: ${scenarioContext}`);
-      console.log(`PLAYER ROLE: ${playerRole}`);
-      console.log(`POLITICAL SYSTEM: ${politicalSystem}`);
-      console.log(`ACTION TITLE: ${actionTitle}`);
-      console.log(`ACTION SUMMARY: ${actionSummary || '(none)'}`);
-      console.log("\n" + "=".repeat(80));
-      console.log("🐛 [DEBUG] Compass Conversation Analyze - User Prompt:");
-      console.log("=".repeat(80));
-      console.log(userPrompt);
+      console.log(JSON.stringify({
+        gameId,
+        action: {
+          title: actionTitle,
+          summary: actionSummary || '(none)'
+        },
+        gameContext: {
+          setting: scenarioContext,
+          role: playerRole,
+          systemName: politicalSystem
+        },
+        conversationMetadata: {
+          messageCount: conversation.meta.messages.length,
+          userPromptLength: userPrompt.length,
+          userPromptTokens: Math.ceil(userPrompt.length / 4),
+          totalConversationTokens: Math.ceil(conversation.meta.messages.reduce((sum, msg) => sum + msg.content.length, 0) / 4)
+        }
+      }, null, 2));
       console.log("=".repeat(80) + "\n");
     }
 
@@ -4606,12 +4687,16 @@ Return JSON in this shape:
 
     console.log(`[CompassConversation] 🤖 AI responded (${content.length} chars)`);
 
-    // Debug logging for AI response
+    // Debug logging for AI response metadata
     if (debugMode) {
       console.log("\n" + "=".repeat(80));
-      console.log("🐛 [DEBUG] Compass Conversation Analyze - Raw AI Response:");
+      console.log("🐛 [DEBUG] Compass Conversation Analyze - Response Metadata:");
       console.log("=".repeat(80));
-      console.log(content);
+      console.log(JSON.stringify({
+        responseLength: content.length,
+        responseTokens: Math.ceil(content.length / 4),
+        responsePreview: content.substring(0, 200) + (content.length > 200 ? '...' : '')
+      }, null, 2));
       console.log("=".repeat(80) + "\n");
     }
 
