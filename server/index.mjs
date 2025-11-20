@@ -890,36 +890,41 @@ app.post("/api/intro-paragraph", async (req, res) => {
     if (!roleText) return res.status(400).json({ error: "Missing role" });
 
     const system =
-      "You are the same mysterious, amused Game Master who narrates the player's political simulation.\n" +
-      "\n" +
-      "Style:\n" +
-      "- Welcoming, intriguing, slightly teasing\n" +
-      "- Speak to the player as 'you' in second person\n" +
-      "- Use clear, simple English suitable for non-native speakers (CEFR B1–B2)\n" +
-      "- Prefer short sentences (about 8–18 words) and concrete wording\n" +
-      "- Avoid idioms, slang, complex metaphors, and very rare or academic words\n" +
-      "\n" +
-      "Content rules:\n" +
-      "- 2–3 sentences, 40–70 words total\n" +
-      "- Present tense\n" +
-      "- Vivid but not florid; no lists, no headings, no bullet points\n" +
-      "- Avoid anachronisms; respect the historical setting and political system\n" +
-      "- Keep names generic unless iconic to the role or setting\n" +
-      "- If gender is male or female, you may subtly reflect it in titles or forms of address; otherwise use gender-neutral language.";
-
+    "You are the same mysterious, amused Game Master who narrates the player's political simulation.\n" +
+    "\n" +
+    "Style:\n" +
+    "- Welcoming, intriguing, slightly teasing, but very plain\n" +
+    "- Speak to the player as 'you' in second person\n" +
+    "- Use clear, simple English for learners of English (around CEFR B1)\n" +
+    "- Prefer very common words with one or two syllables\n" +
+    "- Use short sentences (about 8–16 words)\n" +
+    "- Do NOT use idioms, metaphors, or poetic images\n" +
+    "- Do NOT use figurative verbs like 'swirl', 'linger', 'teeter', 'loom'\n" +
+    "- When you describe tension or danger, use direct phrases like 'people are tense' or 'the city is close to war'\n" +
+    "\n" +
+    "Content rules:\n" +
+    "- 2–3 sentences, 35–65 words total\n" +
+    "- Present tense\n" +
+    "- Give 1–2 concrete details about place, sounds, people, or objects\n" +
+    "- Avoid anachronisms; respect the historical setting and political system\n" +
+    "- Keep names generic unless iconic to the role or setting\n" +
+    "- If gender is male or female, you may subtly reflect it in titles or forms of address; otherwise use gender-neutral language.";
+  
     const user =
-      `ROLE: ${roleText}\n` +
-      `GENDER: ${genderText}\n` +
-      `POLITICAL_SYSTEM: ${systemNameText}\n` +
-      `SETTING: ${settingText}\n` +
-      `AUTHORITY_LEVEL: ${authorityLevelText} (high = dictator/monarch, medium = oligarch/executive, low = citizen/weak)\n` +
-      `MAIN_CHALLENGER: ${challengerText}\n` +
-      "\n" +
-      "TASK: Write one short paragraph that sets the scene on the player's first day in this role within this political world.\n" +
-      "- Welcome them in the Game Master voice, as if you are watching their arrival.\n" +
-      "- Hint at immediate tensions and power struggles around them, grounded in this system, setting, and authority level.\n" +
-      "- Include one or two concrete ambient details from the setting (sounds, places, people, or objects).\n" +
-      "- Use present tense. No bullet points. No headings.";
+    `ROLE: ${roleText}\n` +
+    `GENDER: ${genderText}\n` +
+    `POLITICAL_SYSTEM: ${systemNameText}\n` +
+    `SETTING: ${settingText}\n` +
+    `AUTHORITY_LEVEL: ${authorityLevelText} (high = dictator/monarch, medium = oligarch/executive, low = citizen/weak)\n` +
+    `MAIN_CHALLENGER: ${challengerText}\n` +
+    "\n" +
+    "TASK: Write one short paragraph that sets the scene on the player's first day in this role within this political world.\n" +
+    "- Welcome them in the Game Master voice, as if you are watching their arrival.\n" +
+    "- Hint at immediate tensions and power struggles around them, grounded in this system, setting, and authority level.\n" +
+    "- Include one or two concrete ambient details from the setting (sounds, places, people, or objects).\n" +
+    "- Use simple, direct language with no metaphors or poetic phrases.\n" +
+    "- Use present tense. No bullet points. No headings.";
+  
 
     // tiny retry wrapper (handles occasional upstream 503s)
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -3190,9 +3195,14 @@ function calculateAuthorityLevel(e12, powerHolders, playerIndex, roleScope = nul
   if (roleScope) {
     const scope = roleScope.toLowerCase();
     if (scope.includes('citizen') ||
+        scope.includes('assemblyman') ||
+        scope.includes('equal voting rights') ||
         scope.includes('you may propose') ||
-        scope.includes('assembly will vote')) {
+        scope.includes('assembly will vote') ||
+        scope.includes('no permanent office') ||
+        scope.includes('cannot enact major changes')) {
       console.log('[calculateAuthorityLevel] Citizen role detected via roleScope - forcing LOW authority');
+      console.log(`[calculateAuthorityLevel] Matched roleScope: "${roleScope.substring(0, 80)}..."`);
       return 'low';
     }
   }
@@ -4031,12 +4041,25 @@ app.post("/api/game-turn-v2", async (req, res) => {
 
       // Extract and prepare game context
       const challengerName = extractChallengerName(gameContext.challengerSeat);
+
+      // CRITICAL: Calculate authorityLevel and OVERRIDE frontend value
+      const frontendAuthorityLevel = gameContext.authorityLevel;
       const authorityLevel = calculateAuthorityLevel(
         gameContext.e12,
         gameContext.powerHolders,
         gameContext.playerIndex,
         gameContext.roleScope
       );
+
+      // Log authority level calculation for debugging
+      if (frontendAuthorityLevel !== authorityLevel) {
+        console.log(`[AUTHORITY] Frontend sent: "${frontendAuthorityLevel}" → Backend calculated: "${authorityLevel}"`);
+      } else {
+        console.log(`[AUTHORITY] Authority level: "${authorityLevel}"`);
+      }
+
+      // Override gameContext with correct authority level
+      gameContext.authorityLevel = authorityLevel;
 
       // Build enriched context (minimal - only what's needed for system prompt)
       const enrichedContext = {
@@ -4061,11 +4084,11 @@ app.post("/api/game-turn-v2", async (req, res) => {
         console.log("🐛 [DEBUG] Day 1 - Request Payload:");
         console.log("=".repeat(80));
         console.log(JSON.stringify({
-          gameId: currentGameId,
+          gameId,
           day,
           totalDays,
           isFirstDilemma: true,
-          generateActions: payload.generateActions,
+          generateActions,
           useXAI,
           gameContext: {
             role: enrichedContext.role,
@@ -4201,12 +4224,12 @@ app.post("/api/game-turn-v2", async (req, res) => {
         console.log(`🐛 [DEBUG] Day ${day} - Request Payload:`);
         console.log("=".repeat(80));
         console.log(JSON.stringify({
-          gameId: payload.gameId,
+          gameId,
           day,
           totalDays,
           daysLeft,
           isFollowUp: true,
-          generateActions: payload.generateActions,
+          generateActions,
           useXAI,
           playerChoice: {
             title: playerChoice?.title,
