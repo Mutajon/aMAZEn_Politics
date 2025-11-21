@@ -236,14 +236,14 @@ function FragmentSlot({
           animate={
             showPulse && !isEmpty
               ? {
-                  scale: [1.0, 1.08, 1.0],
+                  scale: [1.0, 1.5, 1.0],
                 }
               : {}
           }
           transition={
             showPulse && !isEmpty
               ? {
-                  duration: 2.5,
+                  duration: 1,
                   repeat: Infinity,
                   ease: "easeInOut",
                 }

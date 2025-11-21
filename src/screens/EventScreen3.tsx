@@ -12,6 +12,7 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useSettingsStore } from "../store/settingsStore";
+import { useCompassStore } from "../store/compassStore";
 import { useEventDataCollector } from "../hooks/useEventDataCollector";
 import { useEventNarration } from "../hooks/useEventNarration";
 import { useNarrator } from "../hooks/useNarrator";
@@ -477,44 +478,137 @@ export default function EventScreen3({ push }: Props) {
   };
 
   /**
-   * Handle reasoning submission
+   * Handle reasoning submission - analyzes reasoning text with compass API
    */
-  const handleReasoningSubmit = async (reasoningText: string) => {
-    if (!reasoningModalAction) return;
+  const handleReasoningSubmit = async (reasoningText: string): Promise<{ pills: any[]; message: string } | null> => {
+    if (!reasoningModalAction) return null;
 
     setIsSubmittingReasoning(true);
 
-    // Store reasoning in dilemmaStore
-    addReasoningEntry({
-      day,
-      actionId: reasoningModalAction.id,
-      actionTitle: reasoningModalAction.title,
-      actionDescription: reasoningModalAction.summary,
-      reasoningText,
-    });
+    try {
+      // Get current game and dilemma context
+      const gameId = useDilemmaStore.getState().gameId;
+      const dilemma = collectedData?.dilemma;
 
-    // Log reasoning stored
-    logger.logSystem(
-      "reasoning_stored",
-      {
+      if (!gameId || !dilemma) {
+        console.error('[EventScreen3] Missing gameId or dilemma for reasoning analysis');
+        return null;
+      }
+
+      // Log analysis start
+      logger.log('reasoning_compass_analysis_started', {
         day,
         actionId: reasoningModalAction.id,
-        entryCount: useDilemmaStore.getState().reasoningHistory.length,
-        willSendToAI: true,
-      },
-      `Reasoning entry added to history (total: ${useDilemmaStore.getState().reasoningHistory.length})`
-    );
+        reasoningLength: reasoningText.length,
+        wordCount: reasoningText.split(/\s+/).length
+      }, 'Starting reasoning compass analysis');
 
-    setIsSubmittingReasoning(false);
+      // Call compass conversation API for reasoning analysis
+      const response = await fetch('/api/compass-conversation/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gameId,
+          action: {
+            title: dilemma.title,
+            summary: dilemma.description
+          },
+          reasoning: {
+            text: reasoningText,
+            selectedAction: reasoningModalAction.title
+          },
+          gameContext: {
+            setting: useRoleStore.getState().roleIntro?.split('.')[0] || 'Unknown setting',
+            role: useRoleStore.getState().roleScope,
+            systemName: useRoleStore.getState().analysis?.systemName || 'Unknown system'
+          },
+          debugMode
+        })
+      });
 
-    // Close modal and clear action (prevents ghost appearances on subsequent days)
-    setShowReasoningModal(false);
-    setReasoningModalAction(null);
+      if (!response.ok) {
+        throw new Error(`Compass analysis failed (${response.status})`);
+      }
 
-    // Resolve the promise to continue game flow
-    if (reasoningResolveRef.current) {
-      reasoningResolveRef.current();
-      reasoningResolveRef.current = null;
+      const data = await response.json();
+      const hints = data.compassHints || [];
+
+      // Convert hints to CompassPill format
+      const pills = hints.map((hint: any) => ({
+        prop: hint.prop,
+        idx: hint.idx,
+        delta: hint.polarity
+      }));
+
+      // Update compass store with new values
+      const compassStore = useCompassStore.getState();
+      pills.forEach((pill: any) => {
+        const currentValue = compassStore.values[pill.prop][pill.idx];
+        const newValue = Math.max(0, Math.min(10, currentValue + pill.delta));
+        compassStore.setValue(pill.prop, pill.idx, newValue);
+      });
+
+      // Store reasoning entry in dilemmaStore
+      addReasoningEntry({
+        day,
+        actionId: reasoningModalAction.id,
+        actionTitle: reasoningModalAction.title,
+        actionDescription: reasoningModalAction.summary,
+        reasoningText,
+      });
+
+      // Log successful analysis
+      logger.log('reasoning_compass_analysis_completed', {
+        day,
+        actionId: reasoningModalAction.id,
+        pillsCount: pills.length,
+        dimensions: pills.map((p: any) => `${p.prop}:${p.idx}`),
+        entryCount: useDilemmaStore.getState().reasoningHistory.length
+      }, `Reasoning compass analysis completed with ${pills.length} pills`);
+
+      // Pick a random thank-you message
+      const thankYouMessages = [
+        "Ah, thank you—your thought now curls up nicely in my collection.",
+        "Gratitude, traveler. I've tucked your thought among the others.",
+        "Thank you. Your thought has found its shelf in my curious archive.",
+        "Much obliged—your thought now wanders my halls with the rest.",
+        "I appreciate the offering; your thought has joined my growing hoard.",
+        "Thank you. Another thought slips into my vault of oddities.",
+        "My thanks—your thought is now bottled and labeled accordingly.",
+        "Cheers, wanderer. Your thought now chatters with its new neighbors.",
+        "Thank you. I've added your thought to the maze—may it not get lost.",
+        "Grateful, I am. Your thought now hums quietly in my collection."
+      ];
+      const randomMessage = thankYouMessages[Math.floor(Math.random() * thankYouMessages.length)];
+
+      setIsSubmittingReasoning(false);
+
+      // Return pills and message for modal to display
+      return { pills, message: randomMessage };
+
+    } catch (error) {
+      console.error('[EventScreen3] Reasoning compass analysis failed:', error);
+
+      // Log error
+      logger.log('reasoning_compass_analysis_failed', {
+        day,
+        actionId: reasoningModalAction.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, 'Reasoning compass analysis failed');
+
+      // Still store reasoning entry even if analysis fails
+      addReasoningEntry({
+        day,
+        actionId: reasoningModalAction.id,
+        actionTitle: reasoningModalAction.title,
+        actionDescription: reasoningModalAction.summary,
+        reasoningText,
+      });
+
+      setIsSubmittingReasoning(false);
+
+      // Return null to indicate failure (modal will show fallback message)
+      return null;
     }
   };
 
@@ -533,11 +627,17 @@ export default function EventScreen3({ push }: Props) {
   };
 
   /**
-   * Handle reasoning modal close
+   * Handle reasoning modal close - called after pills are shown and user clicks Close
    */
   const handleReasoningClose = () => {
     setShowReasoningModal(false);
     setReasoningModalAction(null);
+
+    // Resolve the promise to continue game flow
+    if (reasoningResolveRef.current) {
+      reasoningResolveRef.current();
+      reasoningResolveRef.current = null;
+    }
   };
 
   /**
