@@ -40,9 +40,6 @@ const LOADING_QUOTES = createTranslatedConst((lang) => [
   lang("COMPASS_INTRO_QUOTE_6"),
 ]);
 
-// Gatekeeper mirror intro text
-const MIRROR_INTRO_TEXT = "Before we begin, take this— the Reflection Mirror. It doesn't show your face, only your values. Your choices will carve themselves onto its surface, and together we'll use what it reveals to shape your next fragment. The mirror will whisper its guidance as you go… so keep it close.";
-
 export default function CompassIntroStart({ push }: { push: PushFn }) {
   console.log("[CompassIntroStart] 🟢 Component rendered");
 
@@ -170,7 +167,7 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
 
       {/* Gatekeeper with mirror intro text */}
       <Gatekeeper
-        text={MIRROR_INTRO_TEXT}
+        text={lang(getGenderKey("COMPASS_MIRROR_INTRO"))}
         isVisible={showGatekeeper}
         onDismiss={() => {}} // No dismiss behavior - stays visible
         showHint={false}

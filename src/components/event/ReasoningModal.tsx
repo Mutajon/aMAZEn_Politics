@@ -24,6 +24,9 @@ import { useLogger } from "../../hooks/useLogger";
 import { validateReasoningText } from "../../hooks/useReasoning";
 import { useDilemmaStore } from "../../store/dilemmaStore";
 import { SpeakerAvatar } from "./SpeakerAvatar";
+import CompassPillsOverlay from "./CompassPillsOverlay";
+import type { CompassPill } from "../../hooks/useEventDataCollector";
+import type { CompassEffectPing } from "../MiniCompass";
 
 // Speaker avatar constants
 const AVATAR_SIZE_PX = 120; // Sized to show full face and upper body
@@ -31,7 +34,7 @@ const AVATAR_SIZE_PX = 120; // Sized to show full face and upper body
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (reasoningText: string) => Promise<void>;
+  onSubmit: (reasoningText: string) => Promise<{ pills: CompassPill[]; message: string } | null>;
   onSkip?: () => void;
   actionTitle: string;
   actionSummary: string;
@@ -58,6 +61,8 @@ export default function ReasoningModal({
   const [reasoningText, setReasoningText] = useState("");
   const [showAcknowledgment, setShowAcknowledgment] = useState(false);
   const [validationError, setValidationError] = useState<string>("");
+  const [compassPills, setCompassPills] = useState<CompassPill[]>([]);
+  const [thankYouMessage, setThankYouMessage] = useState<string>("");
 
   // Logging hooks
   const timingLogger = useTimingLogger();
@@ -100,6 +105,8 @@ export default function ReasoningModal({
       setReasoningText("");
       setShowAcknowledgment(false);
       setValidationError("");
+      setCompassPills([]);
+      setThankYouMessage("");
       if (typingTimingIdRef.current) {
         timingLogger.cancel(typingTimingIdRef.current);
         typingTimingIdRef.current = null;
@@ -161,12 +168,36 @@ export default function ReasoningModal({
       `Reasoning submitted (${reasoningText.length} chars, ${typingDuration}ms)`
     );
 
-    // Submit reasoning
-    await onSubmit(reasoningText);
+    // Submit reasoning and get pills + message
+    const result = await onSubmit(reasoningText);
 
     // Increment reasoning submission counter for session summary
     const { incrementReasoningCount } = useDilemmaStore.getState();
     incrementReasoningCount();
+
+    // Set pills and message from result
+    if (result) {
+      setCompassPills(result.pills);
+      setThankYouMessage(result.message);
+
+      // Log pills display
+      if (result.pills.length > 0) {
+        logger.log(
+          "reasoning_compass_pills_displayed",
+          {
+            day,
+            actionTitle,
+            pillsCount: result.pills.length,
+            dimensions: result.pills.map(p => `${p.prop}:${p.idx}`)
+          },
+          `Compass pills displayed (${result.pills.length} pills)`
+        );
+      }
+    } else {
+      // Fallback message if analysis failed
+      setThankYouMessage("Thank you for sharing your thoughts with me.");
+      setCompassPills([]);
+    }
 
     // Show acknowledgment
     setShowAcknowledgment(true);
@@ -177,9 +208,10 @@ export default function ReasoningModal({
       {
         day,
         actionTitle,
-        acknowledgmentText: "Thank you for sharing your thoughts with me.",
+        acknowledgmentText: thankYouMessage || "Thank you for sharing your thoughts with me.",
+        hasPills: result ? result.pills.length > 0 : false
       },
-      "Static acknowledgment displayed to player"
+      "Acknowledgment displayed to player with compass pills"
     );
   };
 
@@ -399,21 +431,42 @@ export default function ReasoningModal({
                     </div>
                     <div className="flex-1">
                       <p
-                        className="text-white leading-relaxed"
+                        className="text-white leading-relaxed italic"
                         style={{ fontFamily: "Georgia, serif", fontSize: "15px" }}
                       >
-                        Thank you for sharing your thoughts with me.
+                        {thankYouMessage || "Thank you for sharing your thoughts with me."}
                       </p>
                     </div>
                   </div>
                 </motion.div>
 
+                {/* Compass Pills Display */}
+                {compassPills.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 20 }}
+                    className="mt-4"
+                  >
+                    <CompassPillsOverlay
+                      effectPills={compassPills.map((pill, i) => ({
+                        id: `reasoning-${Date.now()}-${i}`,
+                        prop: pill.prop,
+                        idx: pill.idx,
+                        delta: pill.delta
+                      }) as CompassEffectPing)}
+                      loading={false}
+                      color="purple"
+                    />
+                  </motion.div>
+                )}
+
                 {/* Close Button */}
                 <button
                   onClick={handleCloseAfterAcknowledgment}
-                  className="w-full px-6 py-3 rounded-lg font-semibold bg-purple-500 hover:bg-purple-400 text-white transition-all duration-200"
+                  className="w-full px-6 py-3 rounded-lg font-semibold bg-purple-500 hover:bg-purple-400 text-white transition-all duration-200 mt-4"
                 >
-                  Continue
+                  Close
                 </button>
               </>
             )}

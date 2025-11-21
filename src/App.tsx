@@ -40,6 +40,7 @@ import DownfallScreen from "./screens/DownfallScreen";
 import AudioControls from "./components/AudioControls";
 import { useAudioManager } from "./hooks/useAudioManager";
 import { useSettingsStore } from "./store/settingsStore";
+import { useDilemmaStore } from "./store/dilemmaStore";
 import { useLoggingStore } from "./store/loggingStore";
 import { loggingService } from "./lib/loggingService";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -111,6 +112,7 @@ export default function App() {
   const enableModifiers = useSettingsStore((s) => s.enableModifiers);
   const debugMode = useSettingsStore((s) => s.debugMode);
   const consented = useLoggingStore((s) => s.consented);
+  const gameId = useDilemmaStore((s) => s.gameId);
   // const [gameStatus, setGameStatus] = useState<GameStatus>('loading');
 
   console.debug("[App] 📍 Current route:", route);
@@ -168,6 +170,7 @@ export default function App() {
 // Separate component to access language context
 function AppContent({ route, push, enableModifiers }: { route: string; push: (route: string) => void; enableModifiers: boolean }) {
   const { isLoading } = useLanguage();
+  const gameId = useDilemmaStore((s) => s.gameId);
 
   // Global logging hooks (run once at app level for comprehensive coverage)
   useStateChangeLogger(); // Automatically logs all Zustand store changes
@@ -235,7 +238,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
           {route.startsWith("/highscores") && <HighscoreScreen />}
           {route === "/achievements" && <AchievementsScreen />}
           {route === "/aftermath" && <AftermathScreen push={push} />}
-          {route === "/final-score" && <FinalScoreScreen push={push} />}
+          {route === "/final-score" && <FinalScoreScreen key={gameId} push={push} />}
           {route === "/capped" && <GameCappedScreen push={push} />}
 
           {/* Backstage route - Development mode (bypasses experiments) */}

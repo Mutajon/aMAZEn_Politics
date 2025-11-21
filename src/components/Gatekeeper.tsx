@@ -25,6 +25,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
 import { gatekeeperTheme } from '../theme/gatekeeperTheme';
 import { useLogger } from '../hooks/useLogger';
+import { useLang } from '../i18n/lang';
 
 interface GatekeeperProps {
   /** The text to display in the speech bubble */
@@ -50,6 +51,7 @@ export default function Gatekeeper({
   showHint = true,
 }: GatekeeperProps) {
   const logger = useLogger();
+  const lang = useLang();
   const [shownText, setShownText] = useState('');
   const [typingComplete, setTypingComplete] = useState(false);
   const doneRef = useRef(false);
@@ -218,7 +220,7 @@ export default function Gatekeeper({
               {/* Hint text */}
               {showHint && (
                 <div className="mt-2 text-xs opacity-60">
-                  {typingComplete ? 'Click to dismiss' : 'Click to skip'}
+                  {typingComplete ? lang("GATEKEEPER_CLICK_TO_DISMISS") : lang("GATEKEEPER_CLICK_TO_SKIP")}
                 </div>
               )}
             </div>

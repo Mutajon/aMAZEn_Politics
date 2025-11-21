@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useLang } from '../i18n/lang';
 
 /**
  * Hook for rotating loading tips with fade transitions
@@ -12,12 +13,12 @@ import { useState, useEffect, useRef } from 'react';
  * Tips are shuffled on mount so each overlay display shows a random tip first
  */
 
-const LOADING_TIPS = [
-  "Click your avatar picture to learn about your current values",
-  "Click the gatekeeper to learn about his background",
-  "Remember you can suggest your own actions - experiment!",
-  "Try to balance the between desires of different supporters",
-  "You can click inquire to learn more about a problem before making a decision",
+const LOADING_TIP_KEYS = [
+  "LOADING_TIP_AVATAR",
+  "LOADING_TIP_GATEKEEPER",
+  "LOADING_TIP_SUGGEST_ACTIONS",
+  "LOADING_TIP_BALANCE",
+  "LOADING_TIP_INQUIRE",
 ];
 
 /**
@@ -35,8 +36,14 @@ function shuffleArray<T>(array: T[]): T[] {
 type FadeState = 'in' | 'visible' | 'out';
 
 export function useRotatingTips() {
-  // Shuffle tips once when hook mounts - ensures different tip on first display
-  const [shuffledTips] = useState(() => shuffleArray(LOADING_TIPS));
+  const lang = useLang();
+  
+  // Get translated tips and shuffle them - recompute when language changes
+  const shuffledTips = useMemo(() => {
+    const tips = LOADING_TIP_KEYS.map(key => lang(key));
+    return shuffleArray(tips);
+  }, [lang]);
+  
   const [currentIndex, setCurrentIndex] = useState(0);
   const [fadeState, setFadeState] = useState<FadeState>('in');
   const timerRef = useRef<NodeJS.Timeout | null>(null);

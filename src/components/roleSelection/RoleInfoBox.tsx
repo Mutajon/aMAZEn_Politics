@@ -11,6 +11,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import type { CarouselItem } from "../../hooks/useRoleCarousel";
+import { useLang } from "../../i18n/lang";
 
 interface RoleInfoBoxProps {
   item: CarouselItem;
@@ -25,6 +26,8 @@ export default function RoleInfoBox({
   onOpenCustomRole,
   onOpenScenario,
 }: RoleInfoBoxProps) {
+  const lang = useLang();
+  
   // Determine goal color based on score goal
   const goalColorClass = (() => {
     if (!item.scoreGoal) return "text-white";
@@ -102,13 +105,13 @@ export default function RoleInfoBox({
           <div className="flex flex-col items-end gap-2">
             {item.year && (
               <div className="flex items-center gap-1.5 bg-slate-900/60 px-3 py-1.5 rounded-lg border border-amber-400/30">
-                <span className="text-[10px] uppercase tracking-wider text-amber-300/80">Year</span>
+                <span className="text-[10px] uppercase tracking-wider text-amber-300/80">{lang("YEAR")}</span>
                 <span className="text-sm text-amber-300 font-light tracking-wider drop-shadow-md">{item.year}</span>
               </div>
             )}
             {item.goalStatus && (
               <span className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full font-medium ${statusClasses}`}>
-                {statusCompleted ? "Completed" : "Uncompleted"}
+                {statusCompleted ? lang("ROLE_GOAL_COMPLETED") : lang("ROLE_GOAL_UNCOMPLETED")}
               </span>
             )}
           </div>
@@ -125,13 +128,13 @@ export default function RoleInfoBox({
         {item.scoreGoal && (
           <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-700/40">
             <div className="flex items-center gap-2">
-              <span className="text-white/70">Score goal:</span>
+              <span className="text-white/70">{lang("ROLE_GOAL_TARGET_LABEL")}:</span>
               <span className={`font-bold ${goalColorClass}`}>
                 {item.scoreGoal.toLocaleString()}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-white/70">High score:</span>
+              <span className="text-white/70">{lang("FINAL_SCORE_HIGH_SCORE")}:</span>
               <span className="font-semibold text-amber-300">{highScoreDisplay}</span>
             </div>
           </div>
@@ -150,7 +153,7 @@ export default function RoleInfoBox({
             onClick={onConfirm}
             className="w-full rounded-xl px-4 sm:px-6 py-3 sm:py-4 font-semibold text-base shadow-lg bg-gradient-to-r from-amber-400 to-amber-600 text-gray-900 hover:from-amber-300 hover:to-amber-500 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
           >
-            Confirm Role
+            {lang("CONFIRM_ROLE")}
           </button>
         )}
       </div>

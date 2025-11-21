@@ -3,9 +3,11 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import "./App.css";
 import { useSettingsStore } from "./store/settingsStore";
 import { usePastGamesStore } from "./store/pastGamesStore";
 import { useFragmentsStore } from "./store/fragmentsStore";
+import { useMirrorDialogueStore } from "./store/mirrorDialogueStore";
 import { useLoggingStore, resetLoggingStore } from "./store/loggingStore";
 import { useDilemmaStore } from "./store/dilemmaStore";
 import { useCompassStore } from "./store/compassStore";
@@ -301,6 +303,27 @@ const useStrict = import.meta.env.MODE !== "development";
   }
 };
 
+(window as any).resetMirrorDialogue = () => {
+  const currentState = useMirrorDialogueStore.getState().firstMirrorDialogue;
+
+  if (currentState) {
+    console.log('ℹ️  Mirror dialogue flag is already true (will show full dialogue).');
+    return;
+  }
+
+  const confirmed = confirm(
+    'Reset mirror dialogue flag? This will make the next mirror dialogue visit show the full conversation again.'
+  );
+
+  if (confirmed) {
+    useMirrorDialogueStore.getState().resetMirrorDialogue();
+    console.log('✅ Mirror dialogue flag reset to true. Next visit will show full dialogue.');
+    console.log('💡 Navigate to the mirror dialogue screen to see the change.');
+  } else {
+    console.log('❌ Reset cancelled.');
+  }
+};
+
 // ========================================================================
 // Experiment Mode Management
 // ========================================================================
@@ -329,6 +352,24 @@ const useStrict = import.meta.env.MODE !== "development";
 
 (window as any).clearExperimentProgress = (window as any).resetExperimentProgress;
 
+// Skip to specific scenarios for testing
+(window as any).skipToNorthAmerica = () => {
+  useLoggingStore.getState().markExperimentRoleCompleted('Athens — Shadows of War (-431)');
+  useDilemmaStore.getState().reset();
+  useRoleStore.getState().reset();
+  console.log('✅ Athens marked complete. North America unlocked.');
+  console.log('💡 Navigate to /role to start North America scenario.');
+};
+
+(window as any).skipToMars = () => {
+  useLoggingStore.getState().markExperimentRoleCompleted('Athens — Shadows of War (-431)');
+  useLoggingStore.getState().markExperimentRoleCompleted('North America — The First Frontier (1607)');
+  useDilemmaStore.getState().reset();
+  useRoleStore.getState().reset();
+  console.log('✅ Athens + North America marked complete. Mars unlocked.');
+  console.log('💡 Navigate to /role to start Mars scenario.');
+};
+
 // ========================================================================
 // Complete Reset (First-Time Player Experience)
 // ========================================================================
@@ -344,6 +385,7 @@ const useStrict = import.meta.env.MODE !== "development";
     usePastGamesStore.getState().clearAll();
     useFragmentsStore.getState().clearFragments();
     useFragmentsStore.getState().resetIntro();
+    useMirrorDialogueStore.getState().resetMirrorDialogue();
     useHighscoreStore.getState().reset();
 
     // User identity & treatment
@@ -359,6 +401,7 @@ const useStrict = import.meta.env.MODE !== "development";
     console.log('   → Experiment progress reset');
     console.log('   → Past games cleared');
     console.log('   → Fragments cleared, intro reset');
+    console.log('   → Mirror dialogue reset');
     console.log('   → Highscores reset to defaults');
     console.log('   → New anonymous user ID generated');
     console.log('   → Treatment reset to semiAutonomy');

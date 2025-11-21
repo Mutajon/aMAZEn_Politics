@@ -55,6 +55,9 @@ const AUDIO_FILES = {
     'behold-fragment': '/assets/sounds/VO/gatekeeperIntro/beholdFragment.wav',
     // Mirror intro (compass intro screen)
     'mirror-intro': '/assets/sounds/VO/gatekeeperIntro/mirrorIntro.wav',
+    // Final fragment selection
+    'gatekeeper-which-version': '/assets/sounds/VO/gatekeeperIntro/whichVersionOfSelf.wav',
+    'gatekeeper-rest': '/assets/sounds/VO/gatekeeperIntro/youCanNowGoToRest.wav',
   },
 } as const;
 
