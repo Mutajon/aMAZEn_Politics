@@ -140,11 +140,6 @@ export default function IntroScreen({ push }: { push: PushFn }) {
         const voKey = getVoiceoverKey(0);
         if (voKey) {
           audioManager.playVoiceover(voKey);
-          logger.logSystem(
-            "gatekeeper_voiceover_started",
-            { lineIndex: 0, voiceoverKey: voKey },
-            "Started voiceover for line 0"
-          );
         }
       } else {
         // Returning visit - play appropriate message
@@ -152,18 +147,7 @@ export default function IntroScreen({ push }: { push: PushFn }) {
           ? 'gatekeeper-return-complete'
           : 'gatekeeper-return-incomplete';
         audioManager.playVoiceover(voKey);
-        logger.logSystem(
-          "gatekeeper_voiceover_started",
-          { visitType: 'returning', fragmentCount, voiceoverKey: voKey },
-          `Started voiceover for returning visit (${fragmentCount} fragments)`
-        );
       }
-
-      logger.logSystem(
-        "intro_gatekeeper_shown",
-        { delay: 1000 },
-        "Gatekeeper appeared on intro screen after 1 second delay"
-      );
     }, 1000);
     return () => clearTimeout(timer);
   }, [logger, firstIntro, fragmentCount, hasAllFragments]);
@@ -235,11 +219,6 @@ export default function IntroScreen({ push }: { push: PushFn }) {
       const voKey = getVoiceoverKey(nextIndex);
       if (voKey) {
         audioManager.playVoiceover(voKey);
-        logger.logSystem(
-          "gatekeeper_voiceover_started",
-          { lineIndex: nextIndex, voiceoverKey: voKey },
-          `Started voiceover for line ${nextIndex}`
-        );
       }
 
       logger.log(
@@ -266,22 +245,12 @@ export default function IntroScreen({ push }: { push: PushFn }) {
 
     // Stop current voiceover
     audioManager.stopVoiceover();
-    logger.logSystem(
-      "gatekeeper_voiceover_stopped",
-      { lineIndex: currentLineIndex, reason: "skip" },
-      "Stopped voiceover (user skipped)"
-    );
 
     // Play last line voiceover (line 18)
     const lastLineIndex = dialogLines.length - 1; // Line 18
     const voKey = getVoiceoverKey(lastLineIndex);
     if (voKey) {
       audioManager.playVoiceover(voKey);
-      logger.logSystem(
-        "gatekeeper_voiceover_started",
-        { lineIndex: lastLineIndex, voiceoverKey: voKey },
-        `Started voiceover for last line ${lastLineIndex}`
-      );
     }
 
     setFragmentsRevealed(true); // Mark as revealed
@@ -336,6 +305,7 @@ export default function IntroScreen({ push }: { push: PushFn }) {
 
   // Handle preferred fragment selection
   const handleSelectPreferred = (gameId: string) => {
+    const roleTitle = selectedFragment?.roleTitle || "Unknown";
     setPreferredFragment(gameId);
     setIsPopupOpen(false);
     setSelectedFragment(null);
@@ -343,8 +313,8 @@ export default function IntroScreen({ push }: { push: PushFn }) {
     audioManager.playVoiceover('gatekeeper-rest');
     logger.log(
       "preferred_fragment_selected",
-      { gameId, fragmentCount },
-      `User selected preferred fragment: ${gameId}`
+      { roleTitle, gameId, fragmentCount },
+      `User selected preferred fragment: ${roleTitle}`
     );
   };
 
@@ -379,11 +349,6 @@ export default function IntroScreen({ push }: { push: PushFn }) {
       const voKey = getVoiceoverKey(nextIndex);
       if (voKey) {
         audioManager.playVoiceover(voKey);
-        logger.logSystem(
-          "gatekeeper_voiceover_started",
-          { lineIndex: nextIndex, voiceoverKey: voKey },
-          `Started voiceover for line ${nextIndex}`
-        );
       }
 
       logger.log(
