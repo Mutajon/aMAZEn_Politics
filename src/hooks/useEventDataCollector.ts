@@ -213,6 +213,7 @@ async function fetchGameTurn(): Promise<{
 
     payload.gameContext = {
       role: roleState.roleScope,
+      roleScope: roleState.roleScope, // Added for backend authority calculation
       systemName: roleState.analysis?.systemName || "Divine Right Monarchy",
       setting,
       challengerSeat: roleState.analysis?.challengerSeat?.name || "Unknown Opposition (Institutional Power)",

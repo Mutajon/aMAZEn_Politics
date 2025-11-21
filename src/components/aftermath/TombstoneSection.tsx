@@ -9,6 +9,7 @@
 // - src/components/aftermath/AftermathContent.tsx: main content orchestration
 
 import { motion } from "framer-motion";
+import { useRoleStore } from "../../store/roleStore";
 
 type Props = {
   haiku: string;
@@ -17,6 +18,8 @@ type Props = {
 const FADE_DURATION_S = 0.5;
 
 export default function TombstoneSection({ haiku }: Props) {
+  const characterName = useRoleStore((state) => state.character?.name);
+
   return (
     <motion.div
       className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6"
@@ -30,9 +33,14 @@ export default function TombstoneSection({ haiku }: Props) {
           alt="Tombstone"
           className="w-full opacity-80"
         />
-        {/* Haiku Overlay */}
-        <div className="absolute inset-0 flex items-center justify-center px-12">
-          <p className="text-gray-900 text-center font-serif italic text-sm whitespace-pre-line max-w-[200px]">
+        {/* Name and Haiku Overlay */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center px-8">
+          {characterName && (
+            <p className="text-gray-900 text-center font-serif font-semibold text-sm mb-2">
+              {characterName}
+            </p>
+          )}
+          <p className="text-gray-900 text-center font-serif italic text-xs whitespace-pre-line max-w-[140px]">
             {haiku}
           </p>
         </div>

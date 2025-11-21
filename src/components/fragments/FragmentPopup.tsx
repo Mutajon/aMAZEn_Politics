@@ -131,6 +131,21 @@ export default function FragmentPopup({
                 </div>
               )}
 
+              {/* Top Compass Value */}
+              {fragment.topCompassValues && fragment.topCompassValues.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                    Dominant Value
+                  </h3>
+                  <div className="bg-amber-900/20 border border-amber-700/40 rounded-lg px-4 py-3">
+                    <p className="text-sm text-amber-200">
+                      <span className="font-semibold">{fragment.topCompassValues[0].componentName}</span>
+                      <span className="text-amber-400/70 ml-2">({fragment.topCompassValues[0].value}/10)</span>
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Self-Judgment */}
               {fragment.selfJudgment && (
                 <div className="mb-4">
