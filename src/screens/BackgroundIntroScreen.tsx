@@ -10,7 +10,7 @@ import { useRoleStore } from "../store/roleStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useLogger } from "../hooks/useLogger";
 import { useNavigationGuard } from "../hooks/useNavigationGuard";
-import { useLang } from "../i18n/lang";
+import { useLang, getCurrentLanguage } from "../i18n/lang";
 import { useReserveGameSlot } from "../hooks/useReserveGameSlot";
 
 /**
@@ -145,7 +145,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
       // Wrap everything in try-finally to guarantee flag reset
       try {
         try {
-          const payload = { role: roleText || "Unknown role", gender };
+          const payload = { role: roleText || "Unknown role", gender, language: getCurrentLanguage() };
           const r = await fetch("/api/intro-paragraph", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -275,7 +275,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
       // Wrap in try-finally to guarantee flag reset
       try {
         try {
-          const payload = { role: roleText || "Unknown role", gender };
+          const payload = { role: roleText || "Unknown role", gender, language: getCurrentLanguage() };
           const r = await fetch("/api/intro-paragraph", {
             method: "POST",
             headers: { "Content-Type": "application/json" },

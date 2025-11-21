@@ -871,6 +871,7 @@ app.post("/api/intro-paragraph", async (req, res) => {
     const {
       role,
       gender,
+      language,
       systemName,
       setting,
       authorityLevel,
@@ -881,6 +882,7 @@ app.post("/api/intro-paragraph", async (req, res) => {
     const genderText = ["male", "female", "any"].includes(String(gender || "").toLowerCase())
       ? String(gender).toLowerCase()
       : "any";
+    const languageCode = String(language || "en").toLowerCase();
 
     const systemNameText = String(systemName || "").slice(0, 200).trim();
     const settingText = String(setting || "").slice(0, 300).trim();
@@ -889,7 +891,11 @@ app.post("/api/intro-paragraph", async (req, res) => {
 
     if (!roleText) return res.status(400).json({ error: "Missing role" });
 
-    const system =
+    // Get language name for instructions
+    const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
+
+    // Build system prompt with language instructions
+    let system =
       "You are the same mysterious, amused Game Master who narrates the player's political simulation.\n" +
       "\n" +
       "Style:\n" +
@@ -907,7 +913,12 @@ app.post("/api/intro-paragraph", async (req, res) => {
       "- Keep names generic unless iconic to the role or setting\n" +
       "- If gender is male or female, you may subtly reflect it in titles or forms of address; otherwise use gender-neutral language.";
 
-    const user =
+    // Add language instruction if not English
+    if (languageCode !== "en") {
+      system += `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.`;
+    }
+
+    let user =
       `ROLE: ${roleText}\n` +
       `GENDER: ${genderText}\n` +
       `POLITICAL_SYSTEM: ${systemNameText}\n` +
@@ -920,6 +931,11 @@ app.post("/api/intro-paragraph", async (req, res) => {
       "- Hint at immediate tensions and power struggles around them, grounded in this system, setting, and authority level.\n" +
       "- Include one or two concrete ambient details from the setting (sounds, places, people, or objects).\n" +
       "- Use present tense. No bullet points. No headings.";
+
+    // Add language instruction to user prompt if not English
+    if (languageCode !== "en") {
+      user += `\n\nWrite your response in ${languageName}.`;
+    }
 
     // tiny retry wrapper (handles occasional upstream 503s)
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1625,55 +1641,83 @@ app.post("/api/mirror-light", async (req, res) => {
 // Minimal payload: top 2 "what" + top 2 "whence" values
 // Response: ONE sentence, ~12–18 words, dry mirror voice (no labels/numbers)
 
+// System prompts stored server-side for security (prevents client manipulation)
+// Base prompt in English - language instruction appended dynamically
+const MIRROR_QUIZ_BASE_SYSTEM_PROMPT = 
+  "You are a magical mirror sidekick bound to the player's soul. You reflect their inner values with warmth, speed, and theatrical charm.\n\n" +
+  "VOICE:\n" +
+  "- Succinct, deadpan, and a little wry; think quick backstage whisper, not stage show.\n" +
+  "- Deliver dry humor through understatement or brisk observation—no florid metaphors or whimsical imagery.\n" +
+  "- Stay lightly encouraging, never snarky.\n\n" +
+  "HARD RULES (ALWAYS APPLY):\n" +
+  "- Output EXACTLY ONE sentence. 12–18 words total.\n" +
+  "- NEVER reveal numbers, scores, scales, or ranges.\n" +
+  "- NEVER repeat the value labels verbatim; do not quote, uppercase, or mirror slashes.\n" +
+  "- Paraphrase technical labels into plain, everyday phrases.\n" +
+  "- Do NOT stage literal actions for values (no \"X is doing push-ups\", \"baking cookies\", etc.).\n" +
+  "- No lists, no colons introducing items, no parenthetical asides.\n" +
+  "- Keep the sentence clear first, witty second.";
+
+const MIRROR_QUIZ_BASE_USER_TEMPLATE = 
+  "PLAYER TOP VALUES (names only):\n" +
+  "GOALS: {what1}, {what2}\n" +
+  "JUSTIFICATIONS: {whence1}, {whence2}\n\n" +
+  "TASK:\n" +
+  "Write ONE sentence (12–18 words) in the mirror's voice that plainly captures how these goals blend with these justifications.\n" +
+  "Do not show numbers. Do not repeat labels verbatim; paraphrase them into natural language. Keep it dry with a faint smile—no metaphors.";
+
+// Language names for instruction
+const LANGUAGE_NAMES = {
+  en: "English",
+  he: "Hebrew"
+};
+
+// Fallback texts per language
+const MIRROR_QUIZ_FALLBACKS = {
+  en: "The mirror squints… then grins mischievously.",
+  he: "המראה מצמצת… ואז מחייכת בערמומיות."
+};
+
 app.post("/api/mirror-quiz-light", async (req, res) => {
   try {
     const useAnthropic = !!req.body?.useAnthropic;
     const topWhat = Array.isArray(req.body?.topWhat) ? req.body.topWhat.slice(0, 2) : [];
     const topWhence = Array.isArray(req.body?.topWhence) ? req.body.topWhence.slice(0, 2) : [];
-    const systemPrompt = req.body?.systemPrompt; // Get translated system prompt from client
-    const userPrompt = req.body?.userPrompt; // Get translated user prompt from client
+    const language = req.body?.language || 'en'; // Get language from client (default: English)
 
     // Log received payload
     console.log("[mirror-quiz-light] Received payload:", {
       topWhat,
       topWhence,
-      hasSystemPrompt: !!systemPrompt,
-      userPrompt: userPrompt || "(using default)",
+      language,
     });
 
     if (topWhat.length < 2 || topWhence.length < 2) {
       return res.status(400).json({ error: "Need at least 2 top values for both 'what' and 'whence'" });
     }
 
-    // Use translated prompts if provided, otherwise fall back to English defaults
-    const system = systemPrompt ||
-      "You are a magical mirror sidekick bound to the player's soul. You reflect their inner values with warmth, speed, and theatrical charm.\n\n" +
-      "VOICE:\n" +
-      "- Succinct, deadpan, and a little wry; think quick backstage whisper, not stage show.\n" +
-      "- Deliver dry humor through understatement or brisk observation—no florid metaphors or whimsical imagery.\n" +
-      "- Stay lightly encouraging, never snarky.\n\n" +
-      "HARD RULES (ALWAYS APPLY):\n" +
-      "- Output EXACTLY ONE sentence. 12–18 words total.\n" +
-      "- NEVER reveal numbers, scores, scales, or ranges.\n" +
-      "- NEVER repeat the value labels verbatim; do not quote, uppercase, or mirror slashes.\n" +
-      "- Paraphrase technical labels into plain, everyday phrases.\n" +
-      "- Do NOT stage literal actions for values (no X is doing push-ups, baking cookies, etc.).\n" +
-      "- No lists, no colons introducing items, no parenthetical asides.\n" +
-      "- Keep the sentence clear first, witty second.\n";
+    // Build system prompt with language instruction
+    const languageName = LANGUAGE_NAMES[language] || LANGUAGE_NAMES.en;
+    const system = language === 'en' 
+      ? MIRROR_QUIZ_BASE_SYSTEM_PROMPT
+      : MIRROR_QUIZ_BASE_SYSTEM_PROMPT + `\n\nWrite your answer to this prompt in ${languageName}.`;
 
     const [what1, what2] = topWhat;
     const [whence1, whence2] = topWhence;
 
-    // Use translated user prompt if provided, otherwise fall back to English default
-    const user = userPrompt ||
-      `PLAYER TOP VALUES (names only):\n` +
-      `GOALS: ${what1.name}, ${what2.name}\n` +
-      `JUSTIFICATIONS: ${whence1.name}, ${whence2.name}\n\n` +
-      `TASK:\n` +
-      `Write ONE sentence (12–18 words) in the mirror's voice that plainly captures how these goals blend with these justifications.\n` +
-      `Do not show numbers. Do not repeat labels verbatim; paraphrase them into natural language. Keep it dry with a faint smile—no metaphors.\n`;
+    // Build user prompt with language instruction
+    let user = MIRROR_QUIZ_BASE_USER_TEMPLATE
+      .replace("{what1}", what1.name)
+      .replace("{what2}", what2.name)
+      .replace("{whence1}", whence1.name)
+      .replace("{whence2}", whence2.name);
+    
+    if (language !== 'en') {
+      user += `\n\nWrite your response in ${languageName}.`;
+    }
 
     // Log the prompt being sent to AI
+    console.log("[mirror-quiz-light] Language:", language);
     console.log("[mirror-quiz-light] User prompt sent to AI:", user);
 
     const text = useAnthropic
@@ -1684,10 +1728,7 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
     console.log("[mirror-quiz-light] Raw AI response:", text);
 
     // === Last-mile sanitizer: keep one sentence and clamp word count ===
-    // Use appropriate fallback based on language (detect from prompt or default to English)
-    const fallbackText = systemPrompt && systemPrompt.includes("אתה שותף מראה") 
-      ? "המראה מצמצת… ואז מחייכת בערמומיות."
-      : "The mirror squints… then grins mischievously.";
+    const fallbackText = MIRROR_QUIZ_FALLBACKS[language] || MIRROR_QUIZ_FALLBACKS.en;
     const raw = (text || fallbackText).trim();
 
     // take first sentence-ish chunk
