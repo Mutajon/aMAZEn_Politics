@@ -123,20 +123,15 @@ export async function generateMirrorQuizSummary(
 
   if (useAI) {
     try {
-      // Get translated prompts
-      const systemPrompt = lang("MIRROR_QUIZ_SYSTEM_PROMPT");
-      const userPromptTemplate = lang("MIRROR_QUIZ_USER_PROMPT");
-      const userPrompt = userPromptTemplate
-        .replace("{what1}", whatTop[0].label)
-        .replace("{what2}", whatTop[1].label)
-        .replace("{whence1}", whenceTop[0].label)
-        .replace("{whence2}", whenceTop[1].label);
+      // Import getCurrentLanguage to send language preference to backend
+      const { getCurrentLanguage } = await import("../i18n/lang");
+      const language = getCurrentLanguage();
 
       // Log payload for debugging
       console.log("[Mirror Quiz Light] Sending payload:", {
         topWhat: whatTop.map(minify),
         topWhence: whenceTop.map(minify),
-        userPrompt: userPrompt,
+        language,
       });
 
       const resp = await fetch("/api/mirror-quiz-light", {
@@ -146,8 +141,7 @@ export async function generateMirrorQuizSummary(
           topWhat: whatTop.map(minify),
           topWhence: whenceTop.map(minify),
           useAnthropic: useLightDilemmaAnthropic,
-          systemPrompt: systemPrompt,
-          userPrompt: userPrompt,
+          language: language, // Send only language code, not the full prompt (security)
         }),
       });
 

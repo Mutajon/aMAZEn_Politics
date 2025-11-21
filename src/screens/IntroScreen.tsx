@@ -10,33 +10,33 @@ import EmptyFragmentPopup from "../components/fragments/EmptyFragmentPopup";
 import { useFragmentsStore } from "../store/fragmentsStore";
 import type { PastGameEntry } from "../lib/types/pastGames";
 import { audioManager, type VoKey } from "../lib/audioManager";
+import { useLang } from "../i18n/lang";
 
-const dialogLines = [
-  "Oh! Another one. Lost.",
-  "I can see it in your eyes. The blank confusion of a soul Name-Washed.",
-  "You don't remember where you are, or who you were. That's a problem.",
-  "Let me save us both some time: I am the Gatekeeper, and this is the Crossroad of Consciousness.",
-  "A place Where people transition from the world of the living to their eternal rest.",
-  "Yes, you are dead. My condolences.",
-  "But your bigger issue is the Amnesia of the Self. You cannot proceed to rest until you recall your true nature.",
-  "That's where I come in.",
-  "I offer you a short trip back to the world of the living. Seven days. Be whoever you want.",
-  "A chance to test your values, remember who you are.",
-  "Each venture will give you a fragment of yourself.",
-  "Gather three such Fragments, and your true Name will be woven.",
-  "Your self will be complete, and you'll be ready to move on.",
-  "What's the catch?",
-  "I come with you. Every decision you make, every motive you hide, I will observe and collect.",
-  "I need it to pay an old debt, so that I too can finally leave this place.",
-  "So, Interested?",
-  "Good. Because you don't really have a choice.",
-  "Let me know when you are ready.",
+// Get dialog lines from translations (function to be called inside component)
+const getDialogLines = (lang: (key: string) => string) => [
+  lang("INTRO_LINE_0"),
+  lang("INTRO_LINE_1"),
+  lang("INTRO_LINE_2"),
+  lang("INTRO_LINE_3"),
+  lang("INTRO_LINE_4"),
+  lang("INTRO_LINE_5"),
+  lang("INTRO_LINE_6"),
+  lang("INTRO_LINE_7"),
+  lang("INTRO_LINE_8"),
+  lang("INTRO_LINE_9"),
+  lang("INTRO_LINE_10"),
+  lang("INTRO_LINE_11"),
+  lang("INTRO_LINE_12"),
+  lang("INTRO_LINE_13"),
+  lang("INTRO_LINE_14"),
+  lang("INTRO_LINE_15"),
+  lang("INTRO_LINE_16"),
+  lang("INTRO_LINE_17"),
+  lang("INTRO_LINE_18"),
 ];
 
-// Find fragment reveal line by text content (resilient to dialog changes)
-const FRAGMENT_LINE_INDEX = dialogLines.findIndex(
-  (line) => line.includes("Gather") && line.includes("Fragments")
-);
+// Fragment reveal line index (line 11: "Gather three such Fragments...")
+const FRAGMENT_LINE_INDEX = 11;
 
 // Voiceover mapping: line index → audio key
 // Returns voiceover key if audio exists for this line, null otherwise
@@ -75,6 +75,9 @@ const etherPlaceBackground = {
 
 export default function IntroScreen({ push }: { push: PushFn }) {
   const logger = useLogger();
+  const lang = useLang();
+  const dialogLines = getDialogLines(lang);
+  
   const [showGatekeeper, setShowGatekeeper] = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [isLastLine, setIsLastLine] = useState(false);
@@ -119,7 +122,7 @@ export default function IntroScreen({ push }: { push: PushFn }) {
       return "You have collected all the required fragments. You are ready to move on to your eternal rest.";
     }
 
-    return "Ready for another trip to the world of the living?";
+    return lang("INTRO_RETURN_MESSAGE");
   };
 
   const shouldShowFragments = firstIntro
@@ -440,7 +443,7 @@ export default function IntroScreen({ push }: { push: PushFn }) {
           className="fixed bottom-8 left-8 px-4 py-2 text-sm font-medium text-white/70 hover:text-white/90 underline underline-offset-2 transition-colors"
           style={{ zIndex: 40 }}
         >
-          Skip
+          {lang("INTRO_SKIP_BUTTON")}
         </motion.button>
       )}
 
@@ -463,7 +466,7 @@ export default function IntroScreen({ push }: { push: PushFn }) {
           className="fixed bottom-8 left-8 rounded-full px-8 py-3 font-bold text-lg bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg"
           style={{ zIndex: 150 }}
         >
-          I'm ready
+          {lang("INTRO_READY_BUTTON")}
         </motion.button>
       )}
     </div>
