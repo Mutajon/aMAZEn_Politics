@@ -352,6 +352,24 @@ const useStrict = import.meta.env.MODE !== "development";
 
 (window as any).clearExperimentProgress = (window as any).resetExperimentProgress;
 
+// Skip to specific scenarios for testing
+(window as any).skipToNorthAmerica = () => {
+  useLoggingStore.getState().markExperimentRoleCompleted('Athens — Shadows of War (-431)');
+  useDilemmaStore.getState().reset();
+  useRoleStore.getState().reset();
+  console.log('✅ Athens marked complete. North America unlocked.');
+  console.log('💡 Navigate to /role to start North America scenario.');
+};
+
+(window as any).skipToMars = () => {
+  useLoggingStore.getState().markExperimentRoleCompleted('Athens — Shadows of War (-431)');
+  useLoggingStore.getState().markExperimentRoleCompleted('North America — The First Frontier (1607)');
+  useDilemmaStore.getState().reset();
+  useRoleStore.getState().reset();
+  console.log('✅ Athens + North America marked complete. Mars unlocked.');
+  console.log('💡 Navigate to /role to start Mars scenario.');
+};
+
 // ========================================================================
 // Complete Reset (First-Time Player Experience)
 // ========================================================================

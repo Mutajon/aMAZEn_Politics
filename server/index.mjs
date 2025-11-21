@@ -52,24 +52,26 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
-// -------------------- Topic/Scope Debug Tracker ---------------------------
+// -------------------- Topic/Scope/TensionCluster Debug Tracker ---------------------------
 /**
- * Debug tracker for topic/scope variety
- * Logs topic/scope for each dilemma and warns if AI violates diversity rules
+ * Debug tracker for topic/scope/tensionCluster variety
+ * Logs topic/scope/tensionCluster for each dilemma and warns if AI violates diversity rules
  *
  * Rules being validated:
  * 1. Must NOT repeat same topic+scope as previous day
  * 2. Over any 3 consecutive days: use at least 2 different topics
  * 3. Over any 3 consecutive days: use at least 2 different scopes
+ * 4. Must NOT repeat same tensionCluster as previous day
  *
  * @param {string} gameId - Game session ID
  * @param {number} day - Current day number
  * @param {string} topic - Dilemma topic (Military, Economy, etc.)
  * @param {string} scope - Dilemma scope (Local, National, etc.)
+ * @param {string} tensionCluster - Tension cluster category
  * @param {string} title - Dilemma title
- * @param {Array} topicHistory - Array of {day, topic, scope} from previous days
+ * @param {Array} topicHistory - Array of {day, topic, scope, tensionCluster} from previous days
  */
-function logTopicScopeDebug(gameId, day, topic, scope, title, topicHistory) {
+function logTopicScopeDebug(gameId, day, topic, scope, tensionCluster, title, topicHistory) {
   const warnings = [];
 
   // Rule 1: Check if same topic+scope as previous day
@@ -98,9 +100,18 @@ function logTopicScopeDebug(gameId, day, topic, scope, title, topicHistory) {
     }
   }
 
+  // Rule 4: Check tensionCluster repetition
+  const prevCluster = topicHistory.length > 0 ? topicHistory[topicHistory.length - 1].tensionCluster : null;
+  if (prevCluster && prevCluster === tensionCluster) {
+    warnings.push(`REPEATED tensionCluster (${tensionCluster})`);
+  }
+
   // Log with warnings if any
   const warnStr = warnings.length > 0 ? ` [⚠️  WARN: ${warnings.join(', ')}]` : ' [✅ OK]';
-  console.log(`[TOPIC] gameId=${gameId} Day=${day} topic=${topic} scope=${scope} title="${title}"${warnStr}`);
+  console.log(`[TOPIC] gameId=${gameId} Day=${day} topic=${topic} scope=${scope} cluster=${tensionCluster} title="${title}"${warnStr}`);
+
+  // Extra tension cluster log for easy filtering
+  console.log(`[TENSION] Day ${day}: ${tensionCluster} (prev: ${prevCluster || 'none'})`);
 }
 
 const app = express();
@@ -3412,10 +3423,12 @@ Player Values (for optional tension-building, do NOT mention explicitly):
 ${compassText}
 
 You must respect all of them strictly.
+When you judge actions or reactions, you must think from inside this setting’s values, not from 21st-century Western morality.
 
 2. GOLDEN RULE A — ROLE-TRUE DILEMMAS
 
 Every dilemma and every action option must match the actual life of the player's role.
+dilemmas must be engaging, meaningful and thought provoking
 
 If the player is LOW authority (citizen, commoner):
 MUST give dilemmas about:
@@ -3447,33 +3460,49 @@ May give dilemmas about:
 - commanding troops, diplomacy, executions
 But MUST still include personal risks, family tensions, court intrigue.
 
-3. GOLDEN RULE B — FAST PLOT PROGRESSION
+3. GOLDEN RULE B — FAST PLOT PROGRESSION (STRICT)
 
-From Day 2 onward, the new day MUST:
-- Show consequences of previous action as if several days passed
-- Always introduce a new twist or new tension, after a short bridging sentence.
-- Change the angle or level: personal ↔ local ↔ regional ↔ state
-- Shift topics: domestic ↔ economic ↔ religious ↔ military ↔ social
+    From Day 2 onward:
 
-The new day MUST NOT:
-- Ask the player to repeat yesterday's decision
-- Ask "Do you still stand by this?"
-- Re-open the same vote, debate, or tension
-- Keep circling same issue more than one additional day
-- Stall on national issues when player is a citizen
+    a. HARD RULE — No repetition of the same tension:
+      Do NOT give two consecutive days about the same underlying issue.
+      Example: if yesterday was about war or war-preparation in ANY form, today MUST NOT be about war, battles, troops, ambushes, scouting enemies, or reacting to the same threat.
 
-If yesterday was about war preparation, today must be about:
-food shortages, panic, a sick child, rumours, religious omens, a neighbour accusing you, a magistrate questioning your loyalty, etc.
+    b. Mandatory angle shift:
+      Each new day must come from a different human angle:
+      personal, family, economic, religious, social, political, health, environmental, or internal power struggles.
 
-Always shift the lived human angle.
+    c. War, diplomacy, famine, plague, succession, rebellion, unrest, and resource crises are ALL separate tension types.
+      Never stay on the same type two days in a row.
 
-4. HISTORICAL REALISM
+    d. You may mention yesterday’s situation in ONE short bridging sentence, but today’s problem must be NEW and DIFFERENT.
+
+
+4. HISTORICAL REALISM (OVERRIDES MODERN MORALITY)
+
+This rule is HIGH PRIORITY. It applies to EVERYTHING:
+- dilemmas and action options
+- supportShift reactions (people, holders, mom)
+- mirrorAdvice tone
 
 All reactions must match the actual culture and moral norms of the historical setting, NOT modern Western values.
 
-Ask: "Would people here see this as normal, dangerous, sacred, shameful?"
+Always anchor your judgment in:
+- Setting: ${setting}
+- System: ${systemName}
+- Role + Authority: ${role}, ${authorityLevel}
 
-Examples of period-appropriate norms:
+Ask: "Would people here see this as normal, risky, sacred, shameful, clever, or cowardly?"
+
+Default pattern:
+- If an action is COMMON OR EXPECTED for this era (e.g. taking captives in war, public beatings, harsh punishments):
+  - Treat it as normal, maybe risky or controversial
+  - People may debate strategy or spiritual consequences
+  - Do NOT have everyone act shocked just because of violence.
+- Only show strong moral outrage ("this is cruel/evil") when the action breaks THEIR core taboos
+  (e.g. betraying guests, harming kin, violating sacred places or oaths).
+
+Examples of period-appropriate norms (non-exhaustive):
 - Public beatings may be normal
 - Blood feuds may be respected
 - Oaths may be sacred
@@ -3481,7 +3510,9 @@ Examples of period-appropriate norms:
 - Torture may be common
 - Mercy may be rare
 
-Only show moral outrage if it fits THEIR values.
+"Mom", "people", and "holders" must sound like members of this culture.
+They may worry about retaliation, honor, spirits, or lost trade — not abstract modern human-rights language.
+
 
 5. DAY STRUCTURE
 
@@ -3494,7 +3525,9 @@ Day 2-6:
 - New situation — obey GOLDEN RULE A + B
 - 3 actions — each must be something the player, under current role, authority and setting, can realistically do
 - supportShift — reactions of people, holders, mom (10-15 words each)
-- dynamicParams — 1-3 concrete consequences of most recent player action
+    * All three reactions MUST follow the HISTORICAL REALISM rules (section 4).
+    No generic modern pacifist language unless the culture is actually pacifist.
+- dynamicParams — 2-3 concrete consequences of most recent player action
   * Emoji icon + brief text (2-4 words)
   * Include numbers when dramatically impactful
   * NEVER about support levels (handled separately)
@@ -3533,7 +3566,7 @@ Use direct concrete language:
 - "Your neighbour accuses you"
 - "The Assembly passed a vote"
 
-7. TOPIC / SCOPE RULES
+7. TOPIC / SCOPE / TENSION CLUSTER RULES
 
 You MUST NOT repeat yesterday's exact topic + scope.
 
@@ -3543,6 +3576,20 @@ In every 3-day window:
 
 Valid topics: Military, Economy, Religion, Diplomacy, Justice, Infrastructure, Politics, Social, Health, Education
 Valid scopes: Personal, Local, Regional, National, International
+
+TENSION CLUSTER (MANDATORY):
+For "tensionCluster", analyze the dilemma you created and classify it as exactly ONE of:
+- ExternalConflict (wars, invasions, foreign threats)
+- InternalPower (coups, succession, factions competing for control)
+- EconomyResources (trade, famine, treasury, resource scarcity)
+- HealthDisaster (plague, natural disasters, epidemics)
+- ReligionCulture (faith conflicts, traditions, cultural clashes)
+- LawJustice (trials, crimes, rights, legal disputes)
+- SocialOrder (riots, class tension, reforms, public unrest)
+- FamilyPersonal (marriage, heirs, personal crises, loyalty)
+- DiplomacyTreaty (alliances, negotiations, ambassadors)
+
+You MUST NOT use the same tensionCluster as yesterday.
 
 MIRROR BRIEFING
 
@@ -3581,7 +3628,8 @@ CRITICAL JSON RULES:
       {"title": "Action title (2-4 words)", "summary": "One complete sentence explaining what this action does (8-15 words)", "icon": "coin"}
     ],
     "topic": "Military|Economy|Religion|Diplomacy|Justice|Infrastructure|Politics|Social|Health|Education",
-    "scope": "Local|Regional|National|International"
+    "scope": "Local|Regional|National|International",
+    "tensionCluster": "ExternalConflict|InternalPower|EconomyResources|HealthDisaster|ReligionCulture|LawJustice|SocialOrder|FamilyPersonal|DiplomacyTreaty"
   },
   "mirrorAdvice": "One sentence in FIRST PERSON (20-25 words)",
 
@@ -3604,7 +3652,8 @@ CRITICAL JSON RULES:
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."}
     ],
     "topic": "Military|Economy|Religion|Diplomacy|Justice|Infrastructure|Politics|Social|Health|Education",
-    "scope": "Local|Regional|National|International"
+    "scope": "Local|Regional|National|International",
+    "tensionCluster": "ExternalConflict|InternalPower|EconomyResources|HealthDisaster|ReligionCulture|LawJustice|SocialOrder|FamilyPersonal|DiplomacyTreaty"
   },
   "dynamicParams": [
     {"icon": "🔥", "text": "Dramatic consequence (2-4 words)"}
@@ -3861,8 +3910,12 @@ app.post("/api/game-turn-v2", async (req, res) => {
         topicHistory: [{
           day: 1,
           topic: parsed.dilemma?.topic || 'Unknown',
-          scope: parsed.dilemma?.scope || 'Unknown'
-        }]
+          scope: parsed.dilemma?.scope || 'Unknown',
+          tensionCluster: parsed.dilemma?.tensionCluster || 'Unknown'
+        }],
+        clusterCounts: {
+          [parsed.dilemma?.tensionCluster || 'Unknown']: 1
+        }
       };
 
       // FIXED: Store messages array properly in conversation.messages field
@@ -3870,16 +3923,22 @@ app.post("/api/game-turn-v2", async (req, res) => {
 
       console.log('[GAME-TURN-V2] Day 1 complete, conversation stored with unified system prompt');
 
+      // Log Day 1 tension cluster
+      const day1Cluster = parsed.dilemma?.tensionCluster || 'Unknown';
+      console.log(`[TENSION] ✅ Day 1: "${day1Cluster}" (count: 1/2, prev: "none")`);
+      console.log(`[TENSION] Cluster usage: ${day1Cluster}:1`);
+
       // Log mirror advice for debugging
       console.log("[game-turn-v2] Mirror advice generated (Day 1):", parsed.mirrorAdvice);
 
-      // Debug: Track topic/scope variety
+      // Debug: Track topic/scope/tensionCluster variety
       if (debugMode) {
         logTopicScopeDebug(
           gameId,
           day,
           parsed.dilemma?.topic || 'Unknown',
           parsed.dilemma?.scope || 'Unknown',
+          parsed.dilemma?.tensionCluster || 'Unknown',
           parsed.dilemma?.title || 'Untitled',
           [] // Day 1 has no history
         );
@@ -3998,6 +4057,74 @@ app.post("/api/game-turn-v2", async (req, res) => {
         }
       }
 
+      // TENSION CLUSTER VALIDATION + RE-PROMPT
+      const ALL_CLUSTERS = ['ExternalConflict', 'InternalPower', 'EconomyResources', 'HealthDisaster', 'ReligionCulture', 'LawJustice', 'SocialOrder', 'FamilyPersonal', 'DiplomacyTreaty'];
+      const existingTopicHistory = conversation.meta.topicHistory || [];
+      const clusterCounts = { ...(conversation.meta.clusterCounts || {}) };
+
+      const prevCluster = existingTopicHistory.length > 0
+        ? existingTopicHistory[existingTopicHistory.length - 1].tensionCluster
+        : null;
+      let currentCluster = parsed.dilemma?.tensionCluster || 'Unknown';
+
+      // Check violations: consecutive repeat OR max 2 per game
+      const isConsecutiveRepeat = prevCluster && prevCluster === currentCluster && prevCluster !== 'Unknown';
+      const isOverMax = currentCluster !== 'Unknown' && (clusterCounts[currentCluster] || 0) >= 2;
+
+      if (isConsecutiveRepeat || isOverMax) {
+        const reason = isConsecutiveRepeat
+          ? `same as yesterday (${prevCluster})`
+          : `already used 2 times (${currentCluster})`;
+        console.log(`[TENSION] ⚠️ CLUSTER VIOLATION: Day ${day} "${currentCluster}" - ${reason}`);
+        console.log(`[TENSION] 🔄 Attempting re-prompt...`);
+
+        // Find available clusters (not at max AND not yesterday's)
+        const availableClusters = ALL_CLUSTERS.filter(c =>
+          (clusterCounts[c] || 0) < 2 && c !== prevCluster
+        );
+        console.log(`[TENSION] Available clusters: ${availableClusters.join(', ')}`);
+
+        // Re-prompt with improved message
+        const correctionPrompt = `You used tensionCluster "${currentCluster}" which is ${reason}.
+
+INSTRUCTIONS:
+1. Start your dilemma description with ONE short sentence (max 15 words) that closes yesterday's "${prevCluster}" storyline (e.g., "The border crisis settles into uneasy calm." or "The treasury dispute is tabled for now.")
+2. Then introduce a COMPLETELY NEW dilemma from a DIFFERENT tensionCluster
+3. You MUST choose from these available clusters: ${availableClusters.join(', ')}
+
+Regenerate the ENTIRE JSON output with these changes.`;
+
+        const correctedMessages = [...messages, { role: "user", content: correctionPrompt }];
+
+        let retryResponse;
+        if (useXAI) {
+          retryResponse = await callXAIChat(correctedMessages, MODEL_DILEMMA_XAI);
+        } else {
+          retryResponse = await callOpenAIChat(correctedMessages, MODEL_DILEMMA);
+        }
+
+        const retryContent = retryResponse?.content;
+        if (retryContent) {
+          const retryParsed = safeParseJSON(retryContent, { debugTag: "GAME-TURN-V2-RETRY" });
+          const retryCluster = retryParsed?.dilemma?.tensionCluster;
+          if (retryParsed && availableClusters.includes(retryCluster)) {
+            console.log(`[TENSION] ✅ Re-prompt successful: new cluster "${retryCluster}"`);
+            parsed = retryParsed;
+            currentCluster = retryCluster;
+          } else {
+            console.log(`[TENSION] ⚠️ Re-prompt failed (got "${retryCluster}"). Using original response.`);
+          }
+        }
+      }
+
+      // Update cluster counts
+      clusterCounts[currentCluster] = (clusterCounts[currentCluster] || 0) + 1;
+
+      // Enhanced logging
+      const countStr = Object.entries(clusterCounts).map(([k, v]) => `${k}:${v}`).join(', ');
+      console.log(`[TENSION] ✅ Day ${day}: "${currentCluster}" (count: ${clusterCounts[currentCluster]}/2, prev: "${prevCluster || 'none'}")`);
+      console.log(`[TENSION] Cluster usage: ${countStr}`);
+
       // Hybrid support shift validation
       let supportShift = null;
       if (parsed.supportShift) {
@@ -4022,19 +4149,21 @@ app.post("/api/game-turn-v2", async (req, res) => {
         { role: "assistant", content: content }
       ];
 
-      // Get existing topic history and add current day
+      // Get existing topic history and add current day (use currentCluster which may have been updated by re-prompt)
       const topicHistory = conversation.meta.topicHistory || [];
       topicHistory.push({
         day,
         topic: parsed.dilemma?.topic || 'Unknown',
-        scope: parsed.dilemma?.scope || 'Unknown'
+        scope: parsed.dilemma?.scope || 'Unknown',
+        tensionCluster: currentCluster
       });
 
-      // Update meta with new messages array and topic history
+      // Update meta with new messages array, topic history, and cluster counts
       const updatedMeta = {
         ...conversation.meta,
         messages: updatedMessages,
-        topicHistory
+        topicHistory,
+        clusterCounts
       };
 
       // FIXED: Store updated messages properly
@@ -4045,13 +4174,14 @@ app.post("/api/game-turn-v2", async (req, res) => {
       // Log mirror advice for debugging
       console.log(`[game-turn-v2] Mirror advice generated (Day ${day}):`, parsed.mirrorAdvice);
 
-      // Debug: Track topic/scope variety
+      // Debug: Track topic/scope/tensionCluster variety
       if (debugMode) {
         logTopicScopeDebug(
           gameId,
           day,
           parsed.dilemma?.topic || 'Unknown',
           parsed.dilemma?.scope || 'Unknown',
+          currentCluster,
           parsed.dilemma?.title || 'Untitled',
           topicHistory.slice(0, -1) // Pass history without current day for comparison
         );

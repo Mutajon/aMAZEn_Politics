@@ -134,6 +134,8 @@ View and reset experiment progress.
 getExperimentProgress()    // View completed roles and progress
 resetExperimentProgress()  // Reset experiment progress + clear past games/fragments
 clearExperimentProgress()  // Alias for resetExperimentProgress()
+skipToNorthAmerica()       // Mark Athens complete, unlock North America
+skipToMars()               // Mark Athens + North America complete, unlock Mars
 ```
 
 **Warning**: Resets all progression data, useful for testing.
