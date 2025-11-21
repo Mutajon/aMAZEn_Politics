@@ -3491,14 +3491,22 @@ Day 1:
 - Provide mirrorAdvice
 
 Day 2-6:
+- New situation — obey GOLDEN RULE A + B
+- 3 actions — each must be something the player, under current role, authority and setting, can realistically do
 - supportShift — reactions of people, holders, mom (10-15 words each)
-- dynamicParams — 1-3 concrete consequences from yesterday
+- dynamicParams — 1-3 concrete consequences of most recent player action
+  * Emoji icon + brief text (2-4 words)
+  * Include numbers when dramatically impactful
+  * NEVER about support levels (handled separately)
+  * Directly tied to what player did
+  Examples:
+  * {"icon": "⚔️", "text": "12,000 soldiers mobilized"}
+  * {"icon": "🤒", "text": "2,345 civilians infected"}
+  * {"icon": "🚧", "text": "Trade routes blocked"}
 - corruptionShift — score 0-10 evaluating:
   - Corruption = misuse of entrusted power for personal/factional benefit that betrays the trust or norms of this polity
   - Judge relative to ${systemName} norms and ${setting} context — what counts as abuse differs by era/regime
   - Score 0-1 for normal actions, 3-5 for grey-area acts, 6-10 only for blatantly self-serving/abusive acts
-- New situation — obey GOLDEN RULE A + B
-- 3 actions — each must be something the player can realistically do
 - mirrorAdvice — 20-25 words, one value name, dry tone
 
 Day 7:
@@ -3551,20 +3559,6 @@ Rules:
 BAD: "I wonder how you'll handle this crisis."
 GOOD: "Your beloved Deliberation might be a luxury when soldiers are dying by the minute."
 
-DYNAMIC PARAMETERS (Day 2+ only)
-
-Generate 1-3 dramatic consequence indicators from the PREVIOUS action.
-
-Rules:
-- Emoji icon + brief text (2-4 words)
-- Include numbers when dramatically impactful
-- NEVER about support levels (handled separately)
-- Directly tied to what player did
-
-Examples:
-- {"icon": "⚔️", "text": "12,000 soldiers mobilized"}
-- {"icon": "🤒", "text": "2,345 civilians infected"}
-- {"icon": "🚧", "text": "Trade routes blocked"}
 
 8. OUTPUT FORMAT
 

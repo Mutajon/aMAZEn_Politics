@@ -45,6 +45,22 @@
   background-size: 200% auto;
   background-clip: text;
   -webkit-background-clip: text;
-  color: transparent;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
   animation: shimmer-text 3s linear infinite;
+}
+
+/* Gentle pulse animation for fragment images */
+@keyframes fragment-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 0 20px 4px rgba(251, 191, 36, 0.3);
+  }
+}
+.animate-fragment-pulse {
+  animation: fragment-pulse 2s ease-in-out infinite;
 }

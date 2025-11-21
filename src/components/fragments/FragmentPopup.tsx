@@ -9,18 +9,24 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Puzzle } from "lucide-react";
 import type { PastGameEntry } from "../../lib/types/pastGames";
+import type { PropKey } from "../../data/compass-data";
+import { PALETTE } from "../../data/compass-data";
 import { useEffect } from "react";
 
 interface FragmentPopupProps {
   isOpen: boolean;
   fragment: PastGameEntry | null;
   onClose: () => void;
+  showSelectionButton?: boolean; // Show "This is my preferred version" button
+  onSelectPreferred?: (gameId: string) => void; // Callback when selected
 }
 
 export default function FragmentPopup({
   isOpen,
   fragment,
   onClose,
+  showSelectionButton = false,
+  onSelectPreferred,
 }: FragmentPopupProps) {
   // Handle ESC key to close
   useEffect(() => {
@@ -131,17 +137,33 @@ export default function FragmentPopup({
                 </div>
               )}
 
-              {/* Top Compass Value */}
+              {/* Dominant Values - Top value from each dimension */}
               {fragment.topCompassValues && fragment.topCompassValues.length > 0 && (
                 <div className="mb-4">
                   <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                    Dominant Value
+                    Dominant Values
                   </h3>
-                  <div className="bg-amber-900/20 border border-amber-700/40 rounded-lg px-4 py-3">
-                    <p className="text-sm text-amber-200">
-                      <span className="font-semibold">{fragment.topCompassValues[0].componentName}</span>
-                      <span className="text-amber-400/70 ml-2">({fragment.topCompassValues[0].value}/10)</span>
-                    </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["what", "whence", "how", "whither"] as PropKey[]).map((dim) => {
+                      const topValue = fragment.topCompassValues.find((v) => v.dimension === dim);
+                      if (!topValue) return null;
+                      const color = PALETTE[dim].base;
+                      return (
+                        <div
+                          key={dim}
+                          className="rounded-lg px-3 py-2"
+                          style={{ backgroundColor: `${color}20`, borderColor: `${color}60`, borderWidth: 1 }}
+                        >
+                          <p className="text-xs uppercase tracking-wide mb-0.5" style={{ color: `${color}99` }}>
+                            {dim}
+                          </p>
+                          <p className="text-sm" style={{ color }}>
+                            <span className="font-semibold">{topValue.componentName}</span>
+                            <span className="opacity-70 ml-1">({topValue.value}/10)</span>
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -166,6 +188,19 @@ export default function FragmentPopup({
                   </span>
                 </div>
               </div>
+
+              {/* Selection Button - only shown when in selection mode */}
+              {showSelectionButton && onSelectPreferred && (
+                <motion.button
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  onClick={() => onSelectPreferred(fragment.gameId)}
+                  className="mt-4 w-full py-3 rounded-lg font-bold text-[#0b1335] bg-gradient-to-r from-amber-300 to-amber-500 hover:from-amber-400 hover:to-amber-600 transition-all shadow-lg"
+                >
+                  This is my preferred version of myself
+                </motion.button>
+              )}
             </div>
           </motion.div>
         </div>

@@ -13,6 +13,8 @@ const MAX_FRAGMENTS = 3;
 export interface FragmentsState {
   firstIntro: boolean; // true on first visit, false after completing intro
   fragmentGameIds: string[]; // Array of gameIds from pastGamesStore (max 3)
+  hasClickedFragment: boolean; // true after user clicks a fragment for the first time
+  preferredFragmentId: string | null; // gameId of preferred fragment (final selection)
 
   // Actions
   markIntroCompleted: () => void;
@@ -22,6 +24,9 @@ export interface FragmentsState {
   hasCompletedThreeFragments: () => boolean;
   clearFragments: () => void; // For testing/reset
   resetIntro: () => void; // Reset firstIntro flag for testing
+  markFragmentClicked: () => void; // Mark that user has clicked a fragment
+  setPreferredFragment: (gameId: string) => void; // Set preferred fragment
+  hasSelectedPreferred: () => boolean; // Check if preferred fragment selected
 }
 
 export const useFragmentsStore = create<FragmentsState>()(
@@ -29,6 +34,8 @@ export const useFragmentsStore = create<FragmentsState>()(
     (set, get) => ({
       firstIntro: true,
       fragmentGameIds: [],
+      hasClickedFragment: false,
+      preferredFragmentId: null,
 
       markIntroCompleted: () => {
         console.log("[Fragments] Marking intro as completed");
@@ -89,12 +96,30 @@ export const useFragmentsStore = create<FragmentsState>()(
         set({ firstIntro: true });
         console.log("[Fragments] Reset firstIntro flag to true");
       },
+
+      markFragmentClicked: () => {
+        if (!get().hasClickedFragment) {
+          set({ hasClickedFragment: true });
+          console.log("[Fragments] Marked fragment as clicked (first time)");
+        }
+      },
+
+      setPreferredFragment: (gameId: string) => {
+        set({ preferredFragmentId: gameId });
+        console.log(`[Fragments] Set preferred fragment: ${gameId}`);
+      },
+
+      hasSelectedPreferred: () => {
+        return get().preferredFragmentId !== null;
+      },
     }),
     {
       name: "amaze-politics-fragments-v1", // localStorage key
       partialize: (state) => ({
         firstIntro: state.firstIntro,
         fragmentGameIds: state.fragmentGameIds.slice(0, MAX_FRAGMENTS),
+        hasClickedFragment: state.hasClickedFragment,
+        preferredFragmentId: state.preferredFragmentId,
       }),
     }
   )

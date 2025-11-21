@@ -3,6 +3,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import "./App.css";
 import { useSettingsStore } from "./store/settingsStore";
 import { usePastGamesStore } from "./store/pastGamesStore";
 import { useFragmentsStore } from "./store/fragmentsStore";

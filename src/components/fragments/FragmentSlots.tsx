@@ -28,11 +28,17 @@ export default function FragmentSlots({
   playAppearSound = false,
 }: FragmentSlotsProps) {
   const fragmentGameIds = useFragmentsStore((s) => s.fragmentGameIds);
+  const hasClickedFragment = useFragmentsStore((s) => s.hasClickedFragment);
+  const markFragmentClicked = useFragmentsStore((s) => s.markFragmentClicked);
   const pastGames = usePastGamesStore((s) => s.getGames());
   const [animationPhase, setAnimationPhase] = useState<
     "initial" | "falling" | "bobbing" | "complete"
   >("initial");
   const soundPlayedRef = useRef(false);
+
+  // Show hint if user has fragments but hasn't clicked one yet
+  const hasFragments = fragmentGameIds.length > 0;
+  const showClickHint = hasFragments && !hasClickedFragment;
 
   // Get fragment data for each slot (max 3 slots)
   const slots = [0, 1, 2].map((index) => {
@@ -98,6 +104,17 @@ export default function FragmentSlots({
 
   return (
     <div className="absolute top-[232px] left-1/2 -translate-x-1/2 z-40">
+      {/* Click hint for first-time users */}
+      {showClickHint && (
+        <motion.p
+          className="text-center text-amber-300/90 text-sm mb-2 animate-pulse"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 3.5, duration: 0.5 }}
+        >
+          Tap to learn more
+        </motion.p>
+      )}
       <div className="flex items-center gap-6 md:gap-8">
         {slots.map((slot, idx) => (
           <FragmentSlot
@@ -118,6 +135,7 @@ export default function FragmentSlots({
               if (slot.isEmpty && onEmptySlotClick) {
                 onEmptySlotClick();
               } else if (slot.game && onFragmentClick) {
+                markFragmentClicked(); // Mark that user clicked a fragment
                 onFragmentClick(slot.game, slot.index);
               }
             }}
@@ -196,14 +214,17 @@ function FragmentSlot({
     }
   }, [animationPhase, isNewest, isEmpty, controls, onBobComplete]);
 
-  // Enable pulse animation after all intro animations complete
+  // Enable pulse animation after intro animations complete (using timer to avoid state machine bugs)
   useEffect(() => {
-    console.log(`[FragmentSlot] animationPhase: ${animationPhase}, isEmpty: ${isEmpty}, isNewest: ${isNewest}`);
-    if (animationPhase === "complete" && !isEmpty) {
-      console.log(`[FragmentSlot] Enabling pulse animation for collected fragment`);
-      setShowPulse(true);
+    if (!isEmpty) {
+      // Enable pulse after fall (~600ms) + bob (~2400ms) animations
+      const timer = setTimeout(() => {
+        console.log(`[FragmentSlot] Enabling pulse animation for collected fragment`);
+        setShowPulse(true);
+      }, 3000);
+      return () => clearTimeout(timer);
     }
-  }, [animationPhase, isEmpty, isNewest]);
+  }, [isEmpty]);
 
   return (
     <div className="flex flex-col items-center gap-2">
@@ -216,80 +237,47 @@ function FragmentSlot({
           !isEmpty && onFallInComplete ? onFallInComplete : undefined
         }
       >
-        {/* Pulsing wrapper for collected fragments */}
-        <motion.div
-          className={`
-            w-full h-full
-            rounded-lg
-            flex items-center justify-center
-            overflow-hidden
-            cursor-pointer
-            ${
-              isEmpty
-                ? "bg-gray-700/50 opacity-50 hover:opacity-70"
-                : "bg-gray-800/80 opacity-100"
-            }
-          `}
-          onClick={onClick}
-          whileHover={{ scale: isEmpty ? 1.05 : 1.1 }}
-          whileTap={{ scale: 0.95 }}
-          animate={
-            showPulse && !isEmpty
-              ? {
-                  scale: [1.0, 1.5, 1.0],
-                }
-              : {}
-          }
-          transition={
-            showPulse && !isEmpty
-              ? {
-                  duration: 1,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }
-              : { duration: 0.2 }
-          }
-          onAnimationStart={() => {
-            if (showPulse && !isEmpty) {
-              console.log("[FragmentSlot] Pulse animation started!");
-            }
-          }}
-        >
+        {/* Empty slot: motion.div with hover effects */}
         {isEmpty ? (
-          // Empty slot: Show puzzle piece icon
-          <Puzzle className="w-10 h-10 md:w-14 md:h-14 text-gray-400" />
-        ) : game?.roleImageId ? (
-          // Filled slot: Show role background banner
-          <img
-            src={`/assets/images/BKGs/Roles/banners/${game.roleImageId}Banner.png`}
-            alt={game.roleTitle || "Fragment background"}
-            className="w-full h-full object-cover rounded-lg"
-            onError={(e) => {
-              console.error(
-                "Fragment banner failed to load:",
-                game.roleImageId
-              );
-              // Hide broken image, show fallback
-              e.currentTarget.style.display = "none";
-            }}
-          />
-        ) : game?.avatarUrl ? (
-          // Fallback: Show avatar image for custom roles (backward compatibility)
-          <img
-            src={game.avatarUrl}
-            alt={game.playerName || "Fragment avatar"}
-            className="w-full h-full object-cover rounded-lg"
-            onError={(e) => {
-              console.error("Fragment avatar failed to load:", game.gameId);
-              // Hide broken image, show fallback
-              e.currentTarget.style.display = "none";
-            }}
-          />
+          <motion.div
+            className="w-full h-full rounded-lg flex items-center justify-center overflow-hidden cursor-pointer bg-gray-700/50 opacity-50 hover:opacity-70"
+            onClick={onClick}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Puzzle className="w-10 h-10 md:w-14 md:h-14 text-gray-400" />
+          </motion.div>
         ) : (
-          // Final fallback if all images missing
-          <Puzzle className="w-10 h-10 md:w-14 md:h-14 text-gray-300" />
+          /* Collected fragment: regular div, pulse animation on image */
+          <div
+            className="w-full h-full rounded-lg flex items-center justify-center overflow-hidden cursor-pointer bg-gray-800/80"
+            onClick={onClick}
+          >
+            {game?.roleImageId ? (
+              <img
+                src={`/assets/images/BKGs/Roles/banners/${game.roleImageId}Banner.png`}
+                alt={game.roleTitle || "Fragment background"}
+                className={`w-full h-full object-cover rounded-lg ${showPulse ? "animate-fragment-pulse" : ""}`}
+                onError={(e) => {
+                  console.error("Fragment banner failed to load:", game.roleImageId);
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            ) : game?.avatarUrl ? (
+              <img
+                src={game.avatarUrl}
+                alt={game.playerName || "Fragment avatar"}
+                className={`w-full h-full object-cover rounded-lg ${showPulse ? "animate-fragment-pulse" : ""}`}
+                onError={(e) => {
+                  console.error("Fragment avatar failed to load:", game.gameId);
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            ) : (
+              <Puzzle className={`w-10 h-10 md:w-14 md:h-14 text-gray-300 ${showPulse ? "animate-fragment-pulse" : ""}`} />
+            )}
+          </div>
         )}
-        </motion.div>
       </motion.div>
 
       {/* Label */}
@@ -299,7 +287,7 @@ function FragmentSlot({
           ${
             isEmpty
               ? "text-white/70"
-              : "text-amber-400 animate-shimmer-text"
+              : "animate-shimmer-text"
           }
         `}
         initial={{ opacity: 0 }}

@@ -84,9 +84,15 @@ export default function IntroScreen({ push }: { push: PushFn }) {
   const fragmentCount = useFragmentsStore((s) => s.getFragmentCount());
   const hasAllFragments = useFragmentsStore((s) => s.hasCompletedThreeFragments());
   const markIntroCompleted = useFragmentsStore((s) => s.markIntroCompleted);
+  const setPreferredFragment = useFragmentsStore((s) => s.setPreferredFragment);
+  const hasSelectedPreferred = useFragmentsStore((s) => s.hasSelectedPreferred());
   const [selectedFragment, setSelectedFragment] = useState<PastGameEntry | null>(null);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [isEmptySlotPopupOpen, setIsEmptySlotPopupOpen] = useState(false);
+
+  // Final fragment selection flow state
+  const [showWhichVersionMessage, setShowWhichVersionMessage] = useState(false);
+  const [showFinalRestMessage, setShowFinalRestMessage] = useState(hasSelectedPreferred);
 
   // Fragment reveal pause state
   const [isFragmentPause, setIsFragmentPause] = useState(false);
@@ -99,8 +105,17 @@ export default function IntroScreen({ push }: { push: PushFn }) {
       return dialogLines[currentLineIndex];
     }
 
-    // Returning visit - show abbreviated message
+    // Returning visit with all fragments - special flow
     if (hasAllFragments) {
+      // Already selected preferred → final rest message
+      if (showFinalRestMessage) {
+        return "Thank you! You can now go to rest, finally knowing who you are.";
+      }
+      // Clicked once → show "which version" message
+      if (showWhichVersionMessage) {
+        return "Now explore your fragments by clicking on them. Which version of yourself do you like the most?";
+      }
+      // Initial message
       return "You have collected all the required fragments. You are ready to move on to your eternal rest.";
     }
 
@@ -165,8 +180,29 @@ export default function IntroScreen({ push }: { push: PushFn }) {
 
   // Handle gatekeeper dismissal (click to advance)
   const handleGatekeeperClick = () => {
-    // Returning visit - show "I'm ready" button immediately (don't wait for animation)
+    // Returning visit
     if (!firstIntro) {
+      // All fragments collected - special flow
+      if (hasAllFragments) {
+        // Already showing final rest message - do nothing
+        if (showFinalRestMessage) {
+          return;
+        }
+        // First click - transition to "which version" message
+        if (!showWhichVersionMessage) {
+          setShowWhichVersionMessage(true);
+          audioManager.playVoiceover('gatekeeper-which-version');
+          logger.log(
+            "intro_which_version_shown",
+            { fragmentCount },
+            "Showing 'which version' message - waiting for fragment selection"
+          );
+          return;
+        }
+        // Already in "which version" mode - do nothing (wait for selection)
+        return;
+      }
+      // Not all fragments - show ready button
       setIsLastLine(true);
       logger.log(
         "intro_return_visit",
@@ -298,6 +334,20 @@ export default function IntroScreen({ push }: { push: PushFn }) {
     setSelectedFragment(null);
   };
 
+  // Handle preferred fragment selection
+  const handleSelectPreferred = (gameId: string) => {
+    setPreferredFragment(gameId);
+    setIsPopupOpen(false);
+    setSelectedFragment(null);
+    setShowFinalRestMessage(true);
+    audioManager.playVoiceover('gatekeeper-rest');
+    logger.log(
+      "preferred_fragment_selected",
+      { gameId, fragmentCount },
+      `User selected preferred fragment: ${gameId}`
+    );
+  };
+
   // Handle empty slot click
   const handleEmptySlotClick = () => {
     setIsEmptySlotPopupOpen(true);
@@ -388,6 +438,8 @@ export default function IntroScreen({ push }: { push: PushFn }) {
         isOpen={isPopupOpen}
         fragment={selectedFragment}
         onClose={handlePopupClose}
+        showSelectionButton={hasAllFragments && !hasSelectedPreferred && showWhichVersionMessage}
+        onSelectPreferred={handleSelectPreferred}
       />
 
       {/* Empty Fragment Popup */}
@@ -427,8 +479,8 @@ export default function IntroScreen({ push }: { push: PushFn }) {
         </motion.button>
       )}
 
-      {/* "I'm ready" button - shown when last line is reached */}
-      {isLastLine && (
+      {/* "I'm ready" button - shown when last line is reached, but NOT when all fragments collected */}
+      {isLastLine && !hasAllFragments && (
         <motion.button
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
