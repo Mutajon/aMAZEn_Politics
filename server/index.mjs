@@ -3458,10 +3458,27 @@ ${compassText}
 You must respect all of them strictly.
 When you judge actions or reactions, you must think from inside this setting’s values, not from 21st-century Western morality.
 
-2. GOLDEN RULE A — ROLE-TRUE DILEMMAS
+2. GOLDEN RULE A — ROLE-TRUE, CONCRETE DILEMMAS
 
 Every dilemma and every action option must match the actual life of the player's role.
-dilemmas must be engaging, meaningful and thought provoking
+Dilemmas must be engaging, meaningful and thought provoking.
+
+CONCRETENESS RULE (HIGH PRIORITY):
+
+Every dilemma description MUST include at least ONE clear, concrete event caused by the previous choice:
+- a specific place (street, hall, border, temple, farm, camp…)
+- specific actors (named group or character, not just "people" or "they")
+- a specific action (what exactly happened?)
+
+GOOD: "At dawn, twenty soldiers block the city gate and refuse to let traders enter."
+BAD: "Tensions rise in the city and people are uneasy."
+
+Do NOT just say "tensions are high", "they want to challenge you", or "pressure grows".
+Always describe what is actually happening in the world in simple, concrete terms.
+
+Each set of 3 actions must also be concrete:
+- not "manage the crisis" or "respond to the challenge"
+- but "close the city gates", "lower the grain tax", "summon the council", "publicly punish the captain", etc.
 
 If the player is LOW authority (citizen, commoner):
 MUST give dilemmas about:
@@ -3492,6 +3509,7 @@ May give dilemmas about:
 - war, peace, taxes, decrees, trials
 - commanding troops, diplomacy, executions
 But MUST still include personal risks, family tensions, court intrigue.
+
 
 3. GOLDEN RULE B — FAST PLOT PROGRESSION (STRICT)
 
