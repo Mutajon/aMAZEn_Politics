@@ -170,6 +170,7 @@ export default function App() {
 // Separate component to access language context
 function AppContent({ route, push, enableModifiers }: { route: string; push: (route: string) => void; enableModifiers: boolean }) {
   const { isLoading } = useLanguage();
+  const gameId = useDilemmaStore((s) => s.gameId);
 
   // Global logging hooks (run once at app level for comprehensive coverage)
   useStateChangeLogger(); // Automatically logs all Zustand store changes

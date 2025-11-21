@@ -61,7 +61,7 @@ process.on('SIGTERM', () => {
  * 1. Must NOT repeat same topic+scope as previous day
  * 2. Over any 3 consecutive days: use at least 2 different topics
  * 3. Over any 3 consecutive days: use at least 2 different scopes
- * 4. Must NOT repeat same tensionCluster as previous day
+ * Note: tensionCluster consecutive repeats allowed, max 2 per game enforced elsewhere
  *
  * @param {string} gameId - Game session ID
  * @param {number} day - Current day number
@@ -100,11 +100,8 @@ function logTopicScopeDebug(gameId, day, topic, scope, tensionCluster, title, to
     }
   }
 
-  // Rule 4: Check tensionCluster repetition
+  // Note: Consecutive tensionCluster repeats are allowed, only max-2 per game is enforced
   const prevCluster = topicHistory.length > 0 ? topicHistory[topicHistory.length - 1].tensionCluster : null;
-  if (prevCluster && prevCluster === tensionCluster) {
-    warnings.push(`REPEATED tensionCluster (${tensionCluster})`);
-  }
 
   // Log with warnings if any
   const warnStr = warnings.length > 0 ? ` [⚠️  WARN: ${warnings.join(', ')}]` : ' [✅ OK]';
@@ -3589,7 +3586,7 @@ For "tensionCluster", analyze the dilemma you created and classify it as exactly
 - FamilyPersonal (marriage, heirs, personal crises, loyalty)
 - DiplomacyTreaty (alliances, negotiations, ambassadors)
 
-You MUST NOT use the same tensionCluster as yesterday.
+Each tensionCluster can be used at most 2 times per 7-day game.
 
 MIRROR BRIEFING
 
@@ -4067,29 +4064,23 @@ app.post("/api/game-turn-v2", async (req, res) => {
         : null;
       let currentCluster = parsed.dilemma?.tensionCluster || 'Unknown';
 
-      // Check violations: consecutive repeat OR max 2 per game
-      const isConsecutiveRepeat = prevCluster && prevCluster === currentCluster && prevCluster !== 'Unknown';
+      // Check violation: max 2 per game (consecutive repeats are allowed)
       const isOverMax = currentCluster !== 'Unknown' && (clusterCounts[currentCluster] || 0) >= 2;
 
-      if (isConsecutiveRepeat || isOverMax) {
-        const reason = isConsecutiveRepeat
-          ? `same as yesterday (${prevCluster})`
-          : `already used 2 times (${currentCluster})`;
-        console.log(`[TENSION] ⚠️ CLUSTER VIOLATION: Day ${day} "${currentCluster}" - ${reason}`);
+      if (isOverMax) {
+        console.log(`[TENSION] ⚠️ CLUSTER VIOLATION: Day ${day} "${currentCluster}" - already used 2 times`);
         console.log(`[TENSION] 🔄 Attempting re-prompt...`);
 
-        // Find available clusters (not at max AND not yesterday's)
-        const availableClusters = ALL_CLUSTERS.filter(c =>
-          (clusterCounts[c] || 0) < 2 && c !== prevCluster
-        );
+        // Find available clusters (not at max)
+        const availableClusters = ALL_CLUSTERS.filter(c => (clusterCounts[c] || 0) < 2);
         console.log(`[TENSION] Available clusters: ${availableClusters.join(', ')}`);
 
         // Re-prompt with improved message
-        const correctionPrompt = `You used tensionCluster "${currentCluster}" which is ${reason}.
+        const correctionPrompt = `You used tensionCluster "${currentCluster}" which has already been used 2 times in this game.
 
 INSTRUCTIONS:
-1. Start your dilemma description with ONE short sentence (max 15 words) that closes yesterday's "${prevCluster}" storyline (e.g., "The border crisis settles into uneasy calm." or "The treasury dispute is tabled for now.")
-2. Then introduce a COMPLETELY NEW dilemma from a DIFFERENT tensionCluster
+1. Start your dilemma description with ONE short sentence (max 15 words) that transitions from the previous situation
+2. Then introduce a dilemma from a DIFFERENT tensionCluster
 3. You MUST choose from these available clusters: ${availableClusters.join(', ')}
 
 Regenerate the ENTIRE JSON output with these changes.`;
@@ -4706,42 +4697,45 @@ function buildSuggestionValidatorSystemPrompt({
     `- ROLE SCOPE: ${scopeLine}`,
     "",
     "GENERAL PRINCIPLES:",
-    "- Be generous and player-friendly.",
-    "- Default to ACCEPT unless there is a clear, strong reason to reject.",
+    "- Be EXTREMELY generous and player-friendly. Almost everything should be ACCEPTED.",
+    "- Default to ACCEPT. Only reject in the rarest cases.",
     "- The player is suggesting a course of action for THEIR ROLE within this historical-political context.",
-    "- Interpret the role's authority in combination with the political system.",
+    "- The GAME will handle consequences - your job is NOT to judge feasibility or likelihood of success.",
+    "- If an action might face resistance or fail, that's for the game to show through consequences, NOT for you to block.",
     "",
-    "ACCEPT WHEN POSSIBLE:",
-    "- Accept all suggestions the role could plausibly TRY to do in this setting.",
-    "- The action may be risky, immoral, violent, manipulative, or corrupt – still ACCEPT.",
-    "- The action may have little chance of success – still ACCEPT.",
-    "- You ONLY judge whether the action is possible in principle, not whether it is wise or moral.",
+    "ACCEPT WHEN POSSIBLE (ALMOST ALWAYS):",
+    "- Accept all suggestions the role could plausibly ATTEMPT or PROPOSE.",
+    "- The action may be risky, immoral, violent, manipulative, or corrupt – ACCEPT.",
+    "- The action may have little chance of success – ACCEPT.",
+    "- The action may face strong opposition or resistance – ACCEPT (the game handles this).",
+    "- The action may be unprecedented or revolutionary for the setting – ACCEPT (leaders can propose changes).",
+    "- Leaders (chiefs, kings, presidents, etc.) CAN propose systemic changes like new governance models – ACCEPT.",
+    "- You ONLY judge whether the action can be ATTEMPTED, not whether it will succeed or is politically feasible.",
     "",
-    "REJECT ONLY IF ONE OF THESE APPLIES:",
-    "1) OUTSIDE ROLE AUTHORITY:",
-    "   - The role categorically cannot issue that order, command that institution, or access that resource.",
-    "   - Example: a citizen directly commanding the army or issuing binding decrees.",
+    "REJECT ONLY IF ONE OF THESE TWO CONDITIONS (VERY RARE):",
     "",
-    "2) IMPOSSIBLE FOR THE ERA / SETTING:",
-    "   - The suggestion requires tools, technologies, systems, or institutions that clearly do not exist in this time and place.",
-    "   - Example: using surveillance drones or smartphone apps in a pre-industrial society.",
+    "1) ANACHRONISTIC TECHNOLOGY:",
+    "   - The suggestion requires technology that literally does not exist in this time period.",
+    "   - Example: using smartphones, drones, internet, or firearms before they were invented.",
+    "   - NOTE: Social/political innovations are NOT technology - they CAN be proposed in any era.",
     "",
-    "3) GIBBERISH OR NON-ACTION:",
+    "2) GIBBERISH OR NON-ACTION:",
     "   - Incoherent or meaningless text (e.g., \"I space dog\").",
-    "   - Or a statement that does not describe any actionable behavior in the political world.",
+    "   - Or a statement that does not describe any actionable behavior.",
     "",
-    "AUTHORITY GUIDELINES (EXAMPLES):",
-    "- Citizen in a democracy:",
-    "  * ACCEPT: proposing war or policy to an assembly, organizing protests, bribing officials, attempting an assassination.",
-    "  * REJECT: directly commanding troops or issuing laws.",
+    "IMPORTANT - THESE ARE NOT GROUNDS FOR REJECTION:",
+    "- 'This would face opposition' → ACCEPT (game handles consequences)",
+    "- 'This is unprecedented' → ACCEPT (players can try new things)",
+    "- 'This might not work' → ACCEPT (game determines outcomes)",
+    "- 'Others might resist this' → ACCEPT (that's what makes it interesting)",
+    "- 'This changes the political system' → ACCEPT if the role is a leader who could propose it",
     "",
-    "- Minister / high official:",
-    "  * ACCEPT: manipulating media, allocating funds, directing police within their portfolio.",
-    "  * REJECT: abolishing the constitution single-handedly if this exceeds their office.",
-    "",
-    "- King / autocrat:",
-    "  * ACCEPT: decrees, mobilizing armies, purges, arrests, taxation changes.",
-    "  * REJECT: only things impossible for the era/setting (e.g., digital surveillance tools in 1600).",
+    "EXAMPLES OF WHAT TO ACCEPT:",
+    "- Tribal chief proposing democratic reforms → ACCEPT (chief can propose, tribe decides)",
+    "- King abolishing monarchy → ACCEPT (king can try, consequences follow)",
+    "- Citizen organizing a revolution → ACCEPT (can attempt)",
+    "- Leader changing governance structure → ACCEPT (leaders can propose systemic changes)",
+    "- Any political/social innovation regardless of era → ACCEPT (ideas don't require technology)",
     "",
     "WHEN YOU REJECT (RARE):",
     "- Give one short, friendly sentence naming the exact reason:",
