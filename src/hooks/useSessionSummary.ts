@@ -201,7 +201,6 @@ export function collectSessionSummary(
     supportPeople: dilemmaStore.supportPeople,
     supportMiddle: dilemmaStore.supportMiddle,
     supportMom: dilemmaStore.supportMom,
-    corruptionLevel: dilemmaStore.corruptionLevel,
   });
 
   // Extract ideology ratings from aftermath data

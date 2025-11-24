@@ -83,11 +83,6 @@ type SettingsState = {
   experimentMode: boolean;
   setExperimentMode: (v: boolean) => void;
   toggleExperimentMode: () => void;
-
-  // --- NEW: Corruption tracking (default OFF) ---
-  corruptionTrackingEnabled: boolean;
-  setCorruptionTrackingEnabled: (v: boolean) => void;
-  toggleCorruptionTrackingEnabled: () => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -174,11 +169,6 @@ export const useSettingsStore = create<SettingsState>()(
       experimentMode: true,
       setExperimentMode: (v) => set({ experimentMode: v }),
       toggleExperimentMode: () => set({ experimentMode: !get().experimentMode }),
-
-      // NEW: Corruption tracking (default ON)
-      corruptionTrackingEnabled: true,
-      setCorruptionTrackingEnabled: (v) => set({ corruptionTrackingEnabled: v }),
-      toggleCorruptionTrackingEnabled: () => set({ corruptionTrackingEnabled: !get().corruptionTrackingEnabled }),
     }),
     {
       // Bump key so no stale objects hide the new fields
@@ -202,7 +192,6 @@ export const useSettingsStore = create<SettingsState>()(
         // NOTE: backstageMode is NOT persisted - session-only
         treatment: s.treatment,
         // NOTE: experimentMode is NOT persisted - session-only (always starts true)
-        corruptionTrackingEnabled: s.corruptionTrackingEnabled,
       }),
     }
   )

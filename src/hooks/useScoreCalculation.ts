@@ -25,18 +25,16 @@ export function useScoreCalculation(): ScoreBreakdown {
   const supportPeople = useDilemmaStore((s) => s.supportPeople);
   const supportMiddle = useDilemmaStore((s) => s.supportMiddle);
   const supportMom = useDilemmaStore((s) => s.supportMom);
-  const corruptionLevel = useDilemmaStore((s) => s.corruptionLevel);
 
   return useMemo(() => {
     const breakdown = calculateLiveScoreBreakdown({
       supportPeople,
       supportMiddle,
       supportMom,
-      corruptionLevel,
     });
 
     // ensure final is normalized (guards against numeric drift)
     breakdown.final = calculateFinalScore(breakdown);
     return breakdown;
-  }, [supportPeople, supportMiddle, supportMom, corruptionLevel]);
+  }, [supportPeople, supportMiddle, supportMom]);
 }

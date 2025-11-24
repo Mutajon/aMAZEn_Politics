@@ -1,10 +1,9 @@
 // src/components/event/PlayerCardModal.tsx
-// Modal displaying player character information, compass values, and corruption level
+// Modal displaying player character information and compass values
 //
 // Features:
 // - Shows player avatar, name, role, political system in header
 // - Displays top 2 values for each compass dimension (what/whence/how/whither)
-// - Shows current corruption level with flavor text
 // - Click outside or X button to close
 // - Animated with Framer Motion
 // - Reads live data from stores (compass values update in real-time)
@@ -12,7 +11,6 @@
 // Connected to:
 // - src/components/event/MirrorWithAvatar.tsx: Opened by clicking player avatar
 // - src/lib/compassHelpers.ts: Extracts top compass values
-// - src/lib/corruptionLevels.ts: Maps corruption scores to tiers
 // - src/data/compass-data.ts: Compass component definitions
 
 import { useState } from "react";
@@ -20,11 +18,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, User } from "lucide-react";
 import { PROPERTIES, PALETTE } from "../../data/compass-data";
 import { getAllTopCompassValues, type CompassComponentValue } from "../../lib/compassHelpers";
-import { getCorruptionInfo } from "../../lib/corruptionLevels";
 import { useRoleStore } from "../../store/roleStore";
 import { useCompassStore } from "../../store/compassStore";
-import { useDilemmaStore } from "../../store/dilemmaStore";
-import { normalizeCorruptionLevel } from "../../lib/scoring";
 
 type Props = {
   isOpen: boolean;
@@ -106,16 +101,13 @@ export default function PlayerCardModal({
   const roleYear = useRoleStore((s) => s.roleYear);
   const roleDescription = useRoleStore((s) => s.roleDescription);
   const compassValues = useCompassStore((s) => s.values); // Live compass values
-  const rawCorruptionLevel = useDilemmaStore((s) => s.corruptionLevel);
 
   if (!isOpen) return null;
 
   // Compute derived values
   const playerName = character?.name || "Unknown Leader";
   const systemName = analysis?.systemName || "Unknown System";
-  const normalizedCorruption = normalizeCorruptionLevel(rawCorruptionLevel);
   const topValues = getAllTopCompassValues(compassValues, 2);
-  const corruptionInfo = getCorruptionInfo(normalizedCorruption);
 
   return (
     <AnimatePresence>
@@ -213,41 +205,6 @@ export default function PlayerCardModal({
                     topValues={topValues[prop.key]}
                   />
                 ))}
-              </div>
-            </div>
-
-            {/* Corruption Section */}
-            <div>
-              <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3">
-                Corruption Level
-              </h3>
-              <div
-                className="rounded-xl p-5 border-2"
-                style={{
-                  backgroundColor: `${corruptionInfo.color}10`,
-                  borderColor: `${corruptionInfo.color}40`,
-                }}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: corruptionInfo.color }}
-                    />
-                    <span
-                      className="text-lg font-bold"
-                      style={{ color: corruptionInfo.color }}
-                    >
-                      {corruptionInfo.label}
-                    </span>
-                  </div>
-                  <div className="text-sm text-white/60">
-                    {normalizedCorruption.toFixed(1)} / 10
-                  </div>
-                </div>
-                <p className="text-white/80 italic leading-relaxed">
-                  {corruptionInfo.flavor}
-                </p>
               </div>
             </div>
           </div>

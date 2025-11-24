@@ -46,19 +46,11 @@ export type DynamicParam = {
   text: string; // Narrative text (e.g., "12,000 soldiers mobilized")
 };
 
-export type CorruptionShift = {
-  score: number;       // Raw AI judgment (0-10 scale)
-  reason: string;      // AI's explanation
-  delta: number;       // Change from previous level
-  newLevel: number;    // New corruption level (0-100 scale)
-};
-
 // PHASE 1: Critical data - must load before showing anything
 export type Phase1Data = {
   dilemma: Dilemma;
   supportEffects: SupportEffect[] | null; // Included in dilemma response on Day 2+
   newsItems: TickerItem[]; // Empty array (disabled)
-  corruptionShift: CorruptionShift | null; // Included in dilemma response on Day 2+
 };
 
 // PHASE 2: Secondary data - loads in background while user reads
@@ -156,7 +148,6 @@ async function fetchGameTurn(): Promise<{
   dilemma: Dilemma;
   supportEffects: SupportEffect[] | null;
   newsItems: TickerItem[];
-  corruptionShift: CorruptionShift | null;
   compassPills: CompassPill[] | null;
   dynamicParams: DynamicParam[] | null;
   mirrorText: string;
@@ -449,72 +440,12 @@ async function fetchGameTurn(): Promise<{
     ];
   }
 
-  // Extract corruption shift (Day 2+ only) - Frontend calculates blended level
-  let corruptionShift: CorruptionShift | null = null;
-  if (data.corruptionShift && day > 1) {
-    const {
-      savePreviousCorruption,
-      setCorruptionLevel,
-      corruptionLevel: prevLevel,
-      corruptionHistory
-    } = useDilemmaStore.getState();
-
-    // STEP 0: Save previous value (for animation)
-    savePreviousCorruption();
-
-    // STEP 1: Calculate new corruption level using blending formula
-    const rawScore = Math.max(0, Math.min(10, data.corruptionShift.score));
-    const newScoreScaled = rawScore * 10; // 0-10 → 0-100 scale
-    const prevCorruption = typeof prevLevel === 'number' ? prevLevel : 0;
-
-    // Blending formula: 90% previous + 10% new (gradual accumulation)
-    const newLevel = Number((prevCorruption * 0.9 + newScoreScaled * 0.1).toFixed(2));
-    const delta = Number((newLevel - prevCorruption).toFixed(2));
-
-    // STEP 2: Apply new corruption level
-    setCorruptionLevel(newLevel);
-
-    // STEP 3: Store history entry (raw score + calculated level)
-    useDilemmaStore.setState({
-      corruptionHistory: [
-        ...corruptionHistory,
-        {
-          day,
-          score: rawScore,           // Raw 0-10 AI judgment
-          reason: data.corruptionShift.reason,
-          level: newLevel            // Calculated 0-100 level
-        }
-      ].slice(-3)  // Keep last 3
-    });
-
-    // STEP 4: Prepare for UI and logging
-    corruptionShift = {
-      score: rawScore,
-      reason: String(data.corruptionShift.reason || '').slice(0, 150),
-      delta: delta,
-      newLevel: newLevel
-    };
-
-    // COMPREHENSIVE DEBUG LOGGING
-    console.log('[fetchGameTurn] 🔸 Corruption calculated:');
-    console.log(`   AI judgment: ${rawScore}/10`);
-    console.log(`   Old level: ${prevCorruption.toFixed(2)}`);
-    console.log(`   New level: ${newLevel.toFixed(2)} (${delta >= 0 ? '+' : ''}${delta.toFixed(2)})`);
-    console.log(`   Reason: ${corruptionShift.reason}`);
-
-    if (debugMode) {
-      console.log(`   🐛 [DEBUG] Formula: (${prevCorruption.toFixed(2)} * 0.9) + (${newScoreScaled} * 0.1) = ${newLevel.toFixed(2)}`);
-      console.log(`   🐛 [DEBUG] History: ${JSON.stringify(useDilemmaStore.getState().corruptionHistory)}`);
-    }
-  }
-
   // Update live score once all resource values have been applied.
   {
     const {
       supportPeople: latestPeople,
       supportMiddle: latestMiddle,
       supportMom: latestMom,
-      corruptionLevel: latestCorruption,
       setScore,
     } = useDilemmaStore.getState();
 
@@ -522,7 +453,6 @@ async function fetchGameTurn(): Promise<{
       supportPeople: latestPeople,
       supportMiddle: latestMiddle,
       supportMom: latestMom,
-      corruptionLevel: latestCorruption,
     });
 
     setScore(breakdown.final);
@@ -555,7 +485,6 @@ async function fetchGameTurn(): Promise<{
     dilemma,
     supportEffects,
     newsItems: [], // Empty array (disabled)
-    corruptionShift,
     compassPills,
     dynamicParams,
     mirrorText
@@ -866,7 +795,6 @@ export function useEventDataCollector() {
         supportEffects,
         dynamicParams,
         mirrorText,
-        corruptionShift,
       } = turnData;
 
       console.log(`[Collector] ✅ Unified data received for Day ${day}`);
@@ -892,7 +820,6 @@ export function useEventDataCollector() {
         dilemma,
         supportEffects,
         newsItems: [], // Disabled
-        corruptionShift: corruptionShift ?? null,
       };
 
       // Set Phase 1 data immediately - triggers UI render!
@@ -963,8 +890,7 @@ export function useEventDataCollector() {
     setPhase1Data({
       dilemma: data.dilemma,
       supportEffects: data.supportEffects,
-      newsItems: data.newsItems || [],
-      corruptionShift: data.corruptionShift || null
+      newsItems: data.newsItems || []
     });
 
     setPhase2Data({

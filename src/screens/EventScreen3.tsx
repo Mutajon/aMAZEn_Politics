@@ -27,7 +27,6 @@ import { DynamicParameters, buildDynamicParamsItems } from "../components/event/
 import DilemmaCard from "../components/event/DilemmaCard";
 import MirrorCard from "../components/event/MirrorCard";
 import CompassPillsOverlay from "../components/event/CompassPillsOverlay";
-import CorruptionPill from "../components/event/CorruptionPill";
 import ActionDeck, { type ActionCard } from "../components/event/ActionDeck";
 import CrisisWarningBanner, { type CrisisInfo } from "../components/event/CrisisWarningBanner";
 import { actionsToDeckCards } from "../components/event/actionVisuals";
@@ -35,7 +34,6 @@ import { useCoinFlights, CoinFlightOverlay } from "../components/event/CoinFligh
 import { AnimatePresence } from "framer-motion";
 import { bgStyleWithRoleImage } from "../lib/ui";
 import { calculateLiveScoreBreakdown } from "../lib/scoring";
-import { getCorruptionInfo } from "../lib/corruptionLevels";
 import { Building2, Heart, Users } from "lucide-react";
 import type { CompassEffectPing } from "../components/MiniCompass";
 import { loadEventScreenSnapshot, clearEventScreenSnapshot } from "../lib/eventScreenSnapshot";
@@ -57,7 +55,7 @@ export default function EventScreen3({ push }: Props) {
   const lang = useLang();
 
   // Global state (read only - single source of truth)
-  const { day, totalDays, budget, supportPeople, supportMiddle, supportMom, corruptionLevel, score, crisisMode: storedCrisisMode } = useDilemmaStore();
+  const { day, totalDays, budget, supportPeople, supportMiddle, supportMom, score, crisisMode: storedCrisisMode } = useDilemmaStore();
   const { character, roleBackgroundImage, analysis } = useRoleStore();
   const selectedRoleKey = useRoleStore((s) => s.selectedRole);
   const roleProgress = useRoleProgressStore((s) =>
@@ -123,7 +121,7 @@ export default function EventScreen3({ push }: Props) {
   const { progress, start: startProgress, reset: resetProgress, notifyReady } = useLoadingProgress();
 
   // Phase tracking
-  const [phase, setPhase] = useState<'collecting' | 'presenting' | 'interacting' | 'reasoning' | 'cleaning' | 'confirming'>('collecting');
+  const [phase, setPhase] = useState<'collecting' | 'presenting' | 'interacting' | 'reasoning' | 'confirming'>('collecting');
 
   // Presentation step tracking (controls what's visible)
   const [presentationStep, setPresentationStep] = useState<number>(-1);
@@ -170,9 +168,6 @@ export default function EventScreen3({ push }: Props) {
   // Compass pills state (for visual display during Step 4A)
   const [showCompassPills, setShowCompassPills] = useState(false);
 
-  // Corruption pill state (for visual display during Step 4A, Day 2+)
-  const [showCorruptionPill, setShowCorruptionPill] = useState(false);
-
   // Snapshot restoration flag (prevents collection when restored)
   const [restoredFromSnapshot, setRestoredFromSnapshot] = useState(false);
 
@@ -196,23 +191,11 @@ export default function EventScreen3({ push }: Props) {
     return pills;
   }, [pendingCompassPills]);
 
-  // Extract corruption pill data (Day 2+ only, feature flag gated)
-  const corruptionTrackingEnabled = useSettingsStore((s) => s.corruptionTrackingEnabled);
-  const corruptionPillData = useMemo(() => {
-    if (!corruptionTrackingEnabled) return null;
-    if (!collectedData?.corruptionShift || day === 1) return null;
-    if (Math.abs(collectedData.corruptionShift.delta) < 0.1) return null; // Ignore tiny changes
-
-    console.log(`[EventScreen3] 🔸 Corruption pill data:`, collectedData.corruptionShift);
-    return collectedData.corruptionShift;
-  }, [collectedData?.corruptionShift, day, corruptionTrackingEnabled]);
-
   const scoreDetails: ResourceBarScoreDetails = useMemo(() => {
     const breakdown = calculateLiveScoreBreakdown({
       supportPeople,
       supportMiddle,
       supportMom,
-      corruptionLevel,
     });
 
     const middleLabel =
@@ -243,21 +226,12 @@ export default function EventScreen3({ push }: Props) {
           points: breakdown.support.mom.points,
           maxPoints: breakdown.support.mom.maxPoints,
         },
-        {
-          id: "corruption" as const,
-          label: lang("FINAL_SCORE_CORRUPTION"),
-          tierLabel: getCorruptionInfo(breakdown.corruption.normalizedLevel).label,
-          valueLabel: `${breakdown.corruption.normalizedLevel.toFixed(1)}/10`,
-          points: breakdown.corruption.points,
-          maxPoints: breakdown.corruption.maxPoints,
-        },
       ],
     } as const;
   }, [
     supportPeople,
     supportMiddle,
     supportMom,
-    corruptionLevel,
     analysis?.challengerSeat?.name,
     lang,
   ]);
@@ -435,19 +409,6 @@ export default function EventScreen3({ push }: Props) {
       setShowCompassPills(shouldShow);
     }
   }, [phase, day, compassPings.length, showCompassPills]);
-
-  // ========================================================================
-  // EFFECT 4B: Show/hide corruption pill based on phase and data availability
-  // ========================================================================
-  useEffect(() => {
-    // Show corruption pill when interacting AND data exists AND it's Day 2+ AND feature enabled
-    const shouldShow = phase === 'interacting' && corruptionPillData !== null && day > 1 && corruptionTrackingEnabled;
-
-    if (shouldShow !== showCorruptionPill) {
-      console.log(`[EventScreen3] 🔸 Corruption pill visibility: ${shouldShow} (phase: ${phase}, day: ${day}, enabled: ${corruptionTrackingEnabled})`);
-      setShowCorruptionPill(shouldShow);
-    }
-  }, [phase, day, corruptionPillData, corruptionTrackingEnabled, showCorruptionPill]);
 
   // ========================================================================
   // EFFECT 5: Redirect to downfall screen when terminal crisis occurs
@@ -682,19 +643,22 @@ export default function EventScreen3({ push }: Props) {
     const shouldShowReasoning = reasoning.shouldShowReasoning();
 
     if (shouldShowReasoning) {
-      console.log('[EventScreen3] 💭 Reasoning required - entering reasoning phase');
+      console.log('[EventScreen3] 💭 Reasoning required - temporarily hiding loading for modal');
 
-      // Enter reasoning phase
+      // Temporarily hide loading overlay by switching to reasoning phase
       setPhase('reasoning');
 
       // Show reasoning modal and wait for completion
       await showReasoningModalForAction(actionCard);
 
-      console.log('[EventScreen3] ✅ Reasoning complete - continuing to cleaning');
+      console.log('[EventScreen3] ✅ Reasoning complete - resuming loading overlay');
+
+      // Return to confirming phase to show loading overlay again
+      setPhase('confirming');
     }
 
-    // Advance to cleaning phase
-    setPhase('cleaning');
+    // Keep phase as 'confirming' during cleanup (loading overlay stays visible)
+    console.log('[EventScreen3] 🔄 Starting cleanup with loading overlay visible...');
 
     // Run cleaner (handles: save choice, update budget, coin animation, advance day)
     await cleanAndAdvanceDay(actionCard, clearFlights);
@@ -761,19 +725,22 @@ export default function EventScreen3({ push }: Props) {
     const shouldShowReasoning = reasoning.shouldShowReasoning();
 
     if (shouldShowReasoning) {
-      console.log('[EventScreen3] 💭 Reasoning required - entering reasoning phase');
+      console.log('[EventScreen3] 💭 Reasoning required - temporarily hiding loading for modal');
 
-      // Enter reasoning phase
+      // Temporarily hide loading overlay by switching to reasoning phase
       setPhase('reasoning');
 
       // Show reasoning modal and wait for completion
       await showReasoningModalForAction(suggestionCard);
 
-      console.log('[EventScreen3] ✅ Reasoning complete - continuing to cleaning');
+      console.log('[EventScreen3] ✅ Reasoning complete - resuming loading overlay');
+
+      // Return to confirming phase to show loading overlay again
+      setPhase('confirming');
     }
 
-    // Advance to cleaning phase
-    setPhase('cleaning');
+    // Keep phase as 'confirming' during cleanup (loading overlay stays visible)
+    console.log('[EventScreen3] 🔄 Starting cleanup with loading overlay visible...');
 
     // Run cleaner (handles: save choice, update budget, wait for animation, advance day)
     await cleanAndAdvanceDay(suggestionCard, clearFlights);
@@ -887,9 +854,9 @@ export default function EventScreen3({ push }: Props) {
   }
 
   // ========================================================================
-  // RENDER: Presenting/Interacting/Reasoning/Cleaning Phase
+  // RENDER: Presenting/Interacting/Reasoning Phase
   // ========================================================================
-  if (collectedData && (phase === 'presenting' || phase === 'interacting' || phase === 'reasoning' || phase === 'cleaning')) {
+  if (collectedData && (phase === 'presenting' || phase === 'interacting' || phase === 'reasoning')) {
     // Calculate derived values
     const daysLeft = totalDays - day + 1;
 
@@ -1017,14 +984,6 @@ export default function EventScreen3({ push }: Props) {
                   effectPills={compassPings}
                   loading={false}
                   color="#7de8ff"
-                />
-              )}
-              {/* Corruption Pill - appears at Step 4A (Day 2+, if feature enabled) */}
-              {showCorruptionPill && corruptionPillData && (
-                <CorruptionPill
-                  delta={corruptionPillData.delta}
-                  reason={corruptionPillData.reason}
-                  newLevel={corruptionPillData.newLevel}
                 />
               )}
             </div>

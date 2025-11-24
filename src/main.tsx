@@ -102,30 +102,6 @@ const useStrict = import.meta.env.MODE !== "development";
   }
 };
 
-// Corruption tracking toggle commands
-(window as any).enableCorruption = () => {
-  useSettingsStore.getState().setCorruptionTrackingEnabled(true);
-  console.log('✅ Corruption tracking enabled immediately (no refresh needed).');
-  console.log('🔸 Features: Corruption pills appear on Day 2+, AI judges power misuse');
-  console.log('💡 Corruption level tracked internally (0-100 scale)');
-};
-
-(window as any).disableCorruption = () => {
-  useSettingsStore.getState().setCorruptionTrackingEnabled(false);
-  console.log('❌ Corruption tracking disabled immediately (no refresh needed).');
-};
-
-(window as any).toggleCorruption = () => {
-  const current = useSettingsStore.getState().corruptionTrackingEnabled;
-  useSettingsStore.getState().setCorruptionTrackingEnabled(!current);
-  if (!current) {
-    console.log('✅ Corruption tracking enabled immediately (no refresh needed).');
-    console.log('🔸 Features: Corruption pills appear on Day 2+, AI judges power misuse');
-  } else {
-    console.log('❌ Corruption tracking disabled immediately (no refresh needed).');
-  }
-};
-
 // Democracy rating access (hidden axis for analysis)
 (window as any).showDemocracy = () => {
   const democracyRating = (window as any).__democracyRating;
@@ -170,7 +146,7 @@ const useStrict = import.meta.env.MODE !== "development";
     console.log(`[${index + 1}] ${game.playerName} — ${game.roleTitle}`);
     console.log(`    System: ${game.systemName} | Score: ${game.finalScore}`);
     console.log(`    Support: People=${game.supportPeople} Middle=${game.supportMiddle} MoM=${game.supportMom}`);
-    console.log(`    Corruption: ${game.corruptionLevel} | Date: ${date}`);
+    console.log(`    Date: ${date}`);
     console.log(`    Legacy: "${game.legacy}"`);
     console.log(`    Snapshot Events: ${game.snapshotHighlights.length} highlights`);
     console.log(`    Top Compass: ${game.topCompassValues.length} values`);
@@ -423,9 +399,6 @@ const useStrict = import.meta.env.MODE !== "development";
 // console.log("  skipPreviousContext()     - Skip Day 2+ context (diagnose AI failures)");
 // console.log("  includePreviousContext()  - Include Day 2+ context (normal behavior)");
 // console.log("  togglePreviousContext()   - Toggle previous context on/off");
-// console.log("  enableCorruption()        - Enable corruption tracking (AI judges power misuse)");
-// console.log("  disableCorruption()       - Disable corruption tracking");
-// console.log("  toggleCorruption()        - Toggle corruption tracking on/off");
 // ----------------------------------------------------------------
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

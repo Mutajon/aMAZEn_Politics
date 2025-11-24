@@ -108,8 +108,13 @@ export async function cleanAndAdvanceDay(
   // ========================================================================
   // Note: ActionDeck's confirmation flow already triggers coin flight
   // We just need to wait for it to complete (1200ms standard duration)
-  console.log('[Cleaner] Waiting for coin animation to complete (1200ms)...');
-  await delay(1200);
+  // Only wait if budget system is enabled (otherwise no animation plays)
+  if (showBudget) {
+    console.log('[Cleaner] Waiting for coin animation to complete (1200ms)...');
+    await delay(1200);
+  } else {
+    console.log('[Cleaner] Budget disabled - skipping coin animation wait');
+  }
 
   // ========================================================================
   // STEP 3.5: Fetch and apply compass deltas IMMEDIATELY (Day 1+ with gameId)

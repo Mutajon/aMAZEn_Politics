@@ -143,16 +143,6 @@ type DilemmaState = {
     mom: number;
   } | null;
 
-  // Corruption tracking (mirrors crisis pattern)
-  corruptionLevel: number;                    // Current 0-100
-  previousCorruptionValue: number | null;     // For animation
-  corruptionHistory: Array<{
-    day: number;
-    score: number;      // AI's 0-10 judgment
-    reason: string;
-    level: number;      // Resulting 0-100 level
-  }>;
-
   // Pending compass pills (applied in cleaner phase, displayed in EventScreen)
   pendingCompassPills: CompassPill[] | null;
 
@@ -238,11 +228,6 @@ type DilemmaState = {
   detectAndSetCrisis: () => "downfall" | "people" | "challenger" | "caring" | null;  // Detect crisis after support updates, returns crisis mode
   clearCrisis: () => void;          // Clear crisis state after handling
   savePreviousSupport: () => void;  // Store support values before updates
-
-  // Corruption tracking methods (mirrors support pattern)
-  setCorruptionLevel: (n: number) => void;
-  savePreviousCorruption: () => void;
-  clearCorruptionHistory: () => void;
 };
 
 // Type for goal status changes (used for audio/visual feedback)
@@ -348,14 +333,9 @@ export const useDilemmaStore = create<DilemmaState>()(
   crisisMode: null,
   crisisEntity: null,
   previousSupportValues: null,
-
-  // Corruption tracking (start clean, increases only with corrupt actions)
-  corruptionLevel: 0,
-  previousCorruptionValue: null,
-  corruptionHistory: [],
   pendingCompassPills: null,
 
-  
+
 
   nextDay() {
     const { day } = get();
@@ -445,9 +425,6 @@ export const useDilemmaStore = create<DilemmaState>()(
       crisisMode: null,
       crisisEntity: null,
       previousSupportValues: null,
-      corruptionLevel: 0,
-      previousCorruptionValue: null,
-      corruptionHistory: [],
       pendingCompassPills: null,
       narrativeMemory: null,
       inquiryHistory: new Map(),
@@ -758,11 +735,7 @@ export const useDilemmaStore = create<DilemmaState>()(
 
     set({
       gameId,
-      conversationActive: true,
-      // Explicitly reset corruption to ensure clean slate for new game
-      corruptionLevel: 0,
-      corruptionHistory: [],
-      previousCorruptionValue: null
+      conversationActive: true
     });
   },
 
@@ -991,24 +964,6 @@ export const useDilemmaStore = create<DilemmaState>()(
       previousSupportValues: null
     });
   },
-
-  // Corruption tracking methods (mirror support pattern)
-  setCorruptionLevel(n) {
-    const clamped = Math.max(0, Math.min(100, Number(n) || 50));
-    dlog("setCorruptionLevel:", clamped);
-    set({ corruptionLevel: clamped });
-  },
-
-  savePreviousCorruption() {
-    const { corruptionLevel } = get();
-    dlog("savePreviousCorruption:", corruptionLevel);
-    set({ previousCorruptionValue: corruptionLevel });
-  },
-
-  clearCorruptionHistory() {
-    dlog("clearCorruptionHistory");
-    set({ corruptionHistory: [] });
-  },
     }),
     {
       name: "amaze-politics-game-state-v2", // Updated version to include gameId
@@ -1017,17 +972,7 @@ export const useDilemmaStore = create<DilemmaState>()(
         conversationActive: state.conversationActive,
         difficulty: state.difficulty,
         selectedGoals: state.selectedGoals
-      }),
-      onRehydrateStorage: () => (state) => {
-        // Recalculate corruption level from history on page reload
-        if (state && Array.isArray(state.corruptionHistory) && state.corruptionHistory.length > 0) {
-          const lastEntry = state.corruptionHistory[state.corruptionHistory.length - 1];
-          if (typeof lastEntry.level === 'number') {
-            state.corruptionLevel = lastEntry.level;
-            dlog('Hydrated corruption level from history:', lastEntry.level);
-          }
-        }
-      }
+      })
     }
   )
 );

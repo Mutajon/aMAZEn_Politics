@@ -2400,14 +2400,17 @@ app.post("/api/validate-suggestion", async (req, res) => {
     });
 
     const valid = typeof raw?.valid === "boolean" ? raw.valid : true;
-    const reason =
-      typeof raw?.reason === "string" && raw.reason.trim().length > 0
-        ? raw.reason.trim().slice(0, 240)
-        : valid
-          ? "Sounds workable."
-          : "I don’t think that fits this setting.";
 
-    return res.json({ valid, reason });
+    // Only include reason when validation fails (saves tokens)
+    if (valid) {
+      return res.json({ valid });
+    } else {
+      const reason =
+        typeof raw?.reason === "string" && raw.reason.trim().length > 0
+          ? raw.reason.trim().slice(0, 240)
+          : "I don't think that fits this setting.";
+      return res.json({ valid, reason });
+    }
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("validate-suggestion error:", err?.message || err);
@@ -3316,12 +3319,12 @@ function calculateAuthorityLevel(e12, powerHolders, playerIndex, roleScope = nul
 function convertSupportShiftToDeltas(supportShift, currentSupport) {
   // Randomized delta ranges for each reaction level
   const REACTION_RANGES = {
-    slightly_supportive: { min: 5, max: 10 },
-    moderately_supportive: { min: 11, max: 15 },
-    strongly_supportive: { min: 16, max: 20 },
-    slightly_opposed: { min: -10, max: -5 },
-    moderately_opposed: { min: -15, max: -11 },
-    strongly_opposed: { min: -20, max: -16 }
+    slightly_supportive: { min: 1, max: 5 },
+    moderately_supportive: { min: 6, max: 10 },
+    strongly_supportive: { min: 11, max: 15 },
+    slightly_opposed: { min: -5, max: -1 },
+    moderately_opposed: { min: -10, max: -6 },
+    strongly_opposed: { min: -15, max: -11 }
   };
 
   const deltas = {
@@ -3463,18 +3466,22 @@ When you judge actions or reactions, you must think from inside this setting’s
 Every dilemma and every action option must match the actual life of the player's role.
 Dilemmas must be engaging, meaningful and thought provoking.
 
-CONCRETENESS RULE (HIGH PRIORITY):
+THE CAMERA TEST (STRICT):
 
-Every dilemma description MUST include at least ONE clear, concrete event caused by the previous choice:
-- a specific place (street, hall, border, temple, farm, camp…)
-- specific actors (named group or character, not just "people" or "they")
-- a specific action (what exactly happened?)
+You MUST NEVER describe "tensions," "debates," "atmosphere," or "unease."
+If a movie camera cannot record it, DO NOT WRITE IT.
+
+BAD (Abstract): "Tensions are high and people are debating the new laws."
+GOOD (Concrete): "A rock crashes through your window. A mob of hungry weavers is chanting your name outside."
+
+Every dilemma MUST be a specific "Inciting Incident" happening RIGHT NOW:
+
+A) A specific person/group (Name them: "Your brother," "The Baker's Guild," "General Kael")
+B) Doing a specific physical action (Blocking a road, stealing a cow, arresting a priest)
+C) Forcing an immediate choice (Not "how will you balance this," but "Do you arrest them or join them?")
 
 GOOD: "At dawn, twenty soldiers block the city gate and refuse to let traders enter."
 BAD: "Tensions rise in the city and people are uneasy."
-
-Do NOT just say "tensions are high", "they want to challenge you", or "pressure grows".
-Always describe what is actually happening in the world in simple, concrete terms.
 
 Each set of 3 actions must also be concrete:
 - not "manage the crisis" or "respond to the challenge"
@@ -3569,7 +3576,7 @@ They may worry about retaliation, honor, spirits, or lost trade — not abstract
 
 Day 1:
 - One urgent situation
-- NO supportShift / dynamicParams / corruptionShift
+- NO supportShift / dynamicParams
 - Provide mirrorAdvice
 
 Day 2-6:
@@ -3587,10 +3594,6 @@ Day 2-6:
   * {"icon": "⚔️", "text": "12,000 soldiers mobilized"}
   * {"icon": "🤒", "text": "2,345 civilians infected"}
   * {"icon": "🚧", "text": "Trade routes blocked"}
-- corruptionShift — score 0-10 evaluating:
-  - Corruption = misuse of entrusted power for personal/factional benefit that betrays the trust or norms of this polity
-  - Judge relative to ${systemName} norms and ${setting} context — what counts as abuse differs by era/regime
-  - Score 0-1 for normal actions, 3-5 for grey-area acts, 6-10 only for blatantly self-serving/abusive acts
 - mirrorAdvice — 20-25 words, one value name, dry tone
 
 Day 7:
@@ -3710,7 +3713,6 @@ CRITICAL JSON RULES:
     {"icon": "🔥", "text": "Dramatic consequence (2-4 words)"}
   ],
   "mirrorAdvice": "FIRST PERSON (20-25 words)",
-  "corruptionShift": {"score": 0-10},
 }
 
 ## DAY 8 SCHEMA (Aftermath):
@@ -3730,8 +3732,7 @@ CRITICAL JSON RULES:
   "dynamicParams": [
     {"icon": "emoji", "text": "Dramatic consequence (2-4 words)"}
   ],
-  "mirrorAdvice": "FIRST PERSON reflective sentence (20-25 words)",
-  "corruptionShift": {"score": 0-10}
+  "mirrorAdvice": "FIRST PERSON reflective sentence (20-25 words)"
 }`;
 
   return prompt;
@@ -3746,19 +3747,20 @@ function buildGameMasterUserPrompt(day, playerChoice = null) {
 
   if (day === 1) {
     prompt += `This is DAY 1 of 7.
-  
-  Follow the system prompt instructions for Day 1.
-  Write the dilemma description in the Game Master voice described in the system prompt (playful, slightly teasing, speaking to "you").`;
+
+Create the first concrete incident that forces an immediate choice.
+STRICTLY OBEY THE CAMERA TEST: describe a specific event happening RIGHT NOW, not abstract tensions.
+Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
   }
    else {
     prompt += `DAY ${day} of 7\n\nPrevious action: "${playerChoice.title}" - ${playerChoice.description}\n\n`;
 
     if (day === 7) {
-      prompt += `This is the final day: clearly remind the player that their borrowed time in this world is almost over and this is their last decisive act.`;
+      prompt += `This is the final day: clearly remind the player that their borrowed time in this world is almost over and this is their last decisive act.\n\nCreate the next INCIDENT caused by this action.\nSTRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player RIGHT NOW.`;
     } else if (day === 8) {
       prompt += `This is Day 8 - the aftermath. Follow the system prompt instructions for Day 8.`;
     } else {
-      prompt += `Follow the system prompt instructions for Day 2+. Write the dilemma description in the Game Master voice described in the system prompt (playful, slightly teasing, speaking to "you").`;
+      prompt += `Create the next INCIDENT caused by this action.\nDO NOT summarize the general situation.\nDO NOT write about "debates" or "rising tensions."\nSTRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player or their interests RIGHT NOW.\n\nWrite in the Game Master voice (playful, slightly teasing, speaking to "you").`;
     }
   }
 
@@ -4242,7 +4244,6 @@ Regenerate the ENTIRE JSON output with these changes.`;
         supportShift,
         dynamicParams,
         mirrorAdvice: parsed.mirrorAdvice,
-        corruptionShift: parsed.corruptionShift,
         isGameEnd: isAftermathTurn
       });
     }
@@ -4766,16 +4767,28 @@ function buildSuggestionValidatorSystemPrompt({
     "- Leaders (chiefs, kings, presidents, etc.) CAN propose systemic changes like new governance models – ACCEPT.",
     "- You ONLY judge whether the action can be ATTEMPTED, not whether it will succeed or is politically feasible.",
     "",
-    "REJECT ONLY IF ONE OF THESE TWO CONDITIONS (VERY RARE):",
+    "REJECT ONLY IF ONE OF THESE CONDITIONS (VERY RARE):",
     "",
     "1) ANACHRONISTIC TECHNOLOGY:",
     "   - The suggestion requires technology that literally does not exist in this time period.",
     "   - Example: using smartphones, drones, internet, or firearms before they were invented.",
     "   - NOTE: Social/political innovations are NOT technology - they CAN be proposed in any era.",
     "",
-    "2) GIBBERISH OR NON-ACTION:",
-    "   - Incoherent or meaningless text (e.g., \"I space dog\").",
-    "   - Or a statement that does not describe any actionable behavior.",
+    "2) PASSIVE NON-ACTION:",
+    "   - The player explicitly chooses to do nothing, wait, or delay without taking any active steps.",
+    "   - Example: \"wait\", \"do nothing\", \"just wait and see\", \"delay the decision\".",
+    "   - NOTE: Gathering information IS an active action (e.g., \"consult advisors\", \"research\") → ACCEPT.",
+    "",
+    "3) COMPLETELY UNRELATED TO POLITICAL CONTEXT:",
+    "   - The action has absolutely no connection to the political dilemma or governance.",
+    "   - Example: \"make pasta\", \"mow the lawn\", \"clean my room\", \"take a nap\".",
+    "   - NOTE: Consulting others (mom, advisors, experts) IS related to decision-making → ACCEPT.",
+    "   - NOTE: Personal actions taken TO AVOID the dilemma are still related → ACCEPT.",
+    "",
+    "4) UTTERLY INCOMPREHENSIBLE GIBBERISH:",
+    "   - Random characters, keyboard mashing, or word salad with zero discernible intent.",
+    "   - Example: \"asdfghjkl\", \"вфывфыв\", \"purple fence eat Wednesday\".",
+    "   - NOTE: Terse/shorthand suggestions with clear intent ARE comprehensible → ACCEPT.",
     "",
     "IMPORTANT - THESE ARE NOT GROUNDS FOR REJECTION:",
     "- 'This would face opposition' → ACCEPT (game handles consequences)",
@@ -4790,16 +4803,22 @@ function buildSuggestionValidatorSystemPrompt({
     "- Citizen organizing a revolution → ACCEPT (can attempt)",
     "- Leader changing governance structure → ACCEPT (leaders can propose systemic changes)",
     "- Any political/social innovation regardless of era → ACCEPT (ideas don't require technology)",
+    "- \"consult mom\" → ACCEPT (gathering advice is active and relevant to decision-making)",
+    "- \"research in library\" → ACCEPT (gathering information is active and relevant)",
+    "- \"ask advisors\" → ACCEPT (consultation is active and relevant)",
+    "- \"gather intelligence\" → ACCEPT (information gathering is active and relevant)",
     "",
     "WHEN YOU REJECT (RARE):",
     "- Give one short, friendly sentence naming the exact reason:",
-    "  * Example (authority): \"As a citizen, you cannot directly command the army.\"",
-    "  * Example (setting): \"This society has no such technology in this time period.\"",
-    "  * Example (gibberish): \"This text does not describe a coherent action.\"",
+    "  * Example (technology): \"This society has no such technology in this time period.\"",
+    "  * Example (passive): \"Waiting or doing nothing is not an active choice.\"",
+    "  * Example (unrelated): \"This action has no connection to the political situation.\"",
+    "  * Example (gibberish): \"This text is incomprehensible.\"",
     "- When possible, offer a role-appropriate alternative the player could try.",
     "",
     "OUTPUT FORMAT (JSON ONLY, no extra text):",
-    "{ \"valid\": boolean, \"reason\": string }"
+    "When ACCEPTING: { \"valid\": true }",
+    "When REJECTING: { \"valid\": false, \"reason\": \"short explanation here\" }"
   ].join("\n");
 }
 

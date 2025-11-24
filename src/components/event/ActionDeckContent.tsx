@@ -400,7 +400,11 @@ export default function ActionDeckContent({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              <div className={OVERLAY_BACKDROP} onClick={handleCloseSuggest} />
+              <div className={OVERLAY_BACKDROP} onClick={() => {
+                if (!validatingSuggest) {
+                  handleCloseSuggest();
+                }
+              }} />
               <motion.div
                 className={`${CARD_BASE} bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 w-[96%] max-w-md px-4 py-4 relative`}
                 initial={{ y: 30, scale: 0.98 }}
