@@ -139,8 +139,6 @@ app.use(cors({
 app.use(bodyParser.json());
 
 
-const GAME_LIMIT = 250;
-
 /**
  * Adaptively assign treatment to ensure balanced distribution
  * Selects from treatments with the minimum count, ensuring even distribution
@@ -149,7 +147,7 @@ const GAME_LIMIT = 250;
 async function assignRandomTreatment() {
   const treatments = ['fullAutonomy', 'semiAutonomy', 'noAutonomy'];
   const countersCollection = await getCountersCollection();
-  
+
   // Get current counts for all treatments
   const counts = {};
   for (const treatment of treatments) {
@@ -157,16 +155,16 @@ async function assignRandomTreatment() {
     const counter = await countersCollection.findOne({ name: counterName });
     counts[treatment] = counter?.value || 0;
   }
-  
+
   // Find the minimum count
   const minCount = Math.min(...Object.values(counts));
   const underrepresented = treatments.filter(t => counts[t] === minCount);
   const selected = underrepresented[
     Math.floor(Math.random() * underrepresented.length)
   ];
-  
+
   await incrementCounter(`treatment_${selected}`);
-  
+
   return selected;
 }
 
@@ -174,11 +172,11 @@ async function assignRandomTreatment() {
 /**
  * POST /api/users/register
  * Register a new user or get existing user with treatment assignment
- * 
+ *
  * Body: {
  *   userId: string (email address)
  * }
- * 
+ *
  * Returns: {
  *   success: boolean,
  *   userId: string,
@@ -199,7 +197,7 @@ app.post("/api/users/register", async (req, res) => {
     }
 
     const usersCollection = await getUsersCollection();
-    
+
     // Check if user already exists
     const existingUser = await usersCollection.findOne({ userId });
 
@@ -238,7 +236,7 @@ app.post("/api/users/register", async (req, res) => {
 
   } catch (error) {
     console.error('[User Register] ❌ Error:', error?.message || error);
-    
+
     // Handle duplicate key error (race condition)
     if (error.code === 11000) {
       // User was created between check and insert - fetch existing
@@ -272,8 +270,9 @@ app.post("/api/reserve-game-slot", async (req, res) => {
     const countersCollection = await getCountersCollection();
 
     // Atomically find and increment the counter, but only if its value is less than the limit.
+    const gameLimit = parseInt(process.env.GAME_LIMIT || '250', 10);
     const result = await countersCollection.findOneAndUpdate(
-      { name: 'total_games', value: { $lt: GAME_LIMIT } },
+      { name: 'total_games', value: { $lt: gameLimit } },
       { $inc: { value: 1 } },
       { returnDocument: 'after' }
     );
@@ -283,7 +282,7 @@ app.post("/api/reserve-game-slot", async (req, res) => {
       console.log(`[Reserve Slot] Slot reserved. New count: ${result.value}`);
       res.json({ success: true, gameCount: result.value });
     } else {
-      // The findOneAndUpdate came back empty, which means the condition value < GAME_LIMIT failed.
+      // The findOneAndUpdate came back empty, which means the condition value < gameLimit failed.
       const currentCounter = await countersCollection.findOne({ name: 'total_games' });
       const currentCount = currentCounter ? currentCounter.value : 'unknown';
       console.log(`[Reserve Slot] Game limit reached. Current count: ${currentCount}`);
@@ -1112,7 +1111,7 @@ app.post("/api/bg-suggestion", async (req, res) => {
 /**
  * POST /api/suggest-scenario
  * Save a user-submitted scenario suggestion to the database
- * 
+ *
  * Body: {
  *   title: string (required),
  *   role: string (required),
@@ -1120,7 +1119,7 @@ app.post("/api/bg-suggestion", async (req, res) => {
  *   introParagraph?: string (optional),
  *   topicsToEmphasis?: string (optional)
  * }
- * 
+ *
  * Returns: {
  *   success: boolean,
  *   message: string
@@ -1132,23 +1131,23 @@ app.post("/api/suggest-scenario", async (req, res) => {
 
     // Validate required fields
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Title is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Title is required'
       });
     }
 
     if (!role || typeof role !== 'string' || role.trim().length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Role is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Role is required'
       });
     }
 
     if (!settings || typeof settings !== 'string' || settings.trim().length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Settings (place + time) is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Settings (place + time) is required'
       });
     }
 
@@ -1702,7 +1701,7 @@ app.post("/api/mirror-light", async (req, res) => {
 
 // System prompts stored server-side for security (prevents client manipulation)
 // Base prompt in English - language instruction appended dynamically
-const MIRROR_QUIZ_BASE_SYSTEM_PROMPT = 
+const MIRROR_QUIZ_BASE_SYSTEM_PROMPT =
   "You are a magical mirror sidekick bound to the player's soul. You reflect their inner values with warmth, speed, and theatrical charm.\n\n" +
   "VOICE:\n" +
   "- Succinct, deadpan, and a little wry; think quick backstage whisper, not stage show.\n" +
@@ -1717,7 +1716,7 @@ const MIRROR_QUIZ_BASE_SYSTEM_PROMPT =
   "- No lists, no colons introducing items, no parenthetical asides.\n" +
   "- Keep the sentence clear first, witty second.";
 
-const MIRROR_QUIZ_BASE_USER_TEMPLATE = 
+const MIRROR_QUIZ_BASE_USER_TEMPLATE =
   "PLAYER TOP VALUES (names only):\n" +
   "GOALS: {what1}, {what2}\n" +
   "JUSTIFICATIONS: {whence1}, {whence2}\n\n" +
@@ -1757,7 +1756,7 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
 
     // Build system prompt with language instruction
     const languageName = LANGUAGE_NAMES[language] || LANGUAGE_NAMES.en;
-    const system = language === 'en' 
+    const system = language === 'en'
       ? MIRROR_QUIZ_BASE_SYSTEM_PROMPT
       : MIRROR_QUIZ_BASE_SYSTEM_PROMPT + `\n\nWrite your answer to this prompt in ${languageName}.`;
 
@@ -1770,7 +1769,7 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
       .replace("{what2}", what2.name)
       .replace("{whence1}", whence1.name)
       .replace("{whence2}", whence2.name);
-    
+
     if (language !== 'en') {
       user += `\n\nWrite your response in ${languageName}.`;
     }
