@@ -3597,7 +3597,7 @@ Day 2-6:
 - mirrorAdvice — 20-25 words, one value name, dry tone
 
 Day 7:
-- Peak of the story
+- Generate a climatic dramatic dilemma that ties in the story so far
 - Remind the player their time is ending
 - Same schema as Day 2-6
 
@@ -3756,11 +3756,27 @@ Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
     prompt += `DAY ${day} of 7\n\nPrevious action: "${playerChoice.title}" - ${playerChoice.description}\n\n`;
 
     if (day === 7) {
-      prompt += `This is the final day: clearly remind the player that their borrowed time in this world is almost over and this is their last decisive act.\n\nCreate the next INCIDENT caused by this action.\nSTRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player RIGHT NOW.`;
+      prompt += `This is the final day: clearly remind the player that their borrowed time in this world is almost over and this is their last decisive act.
+
+In ONE SHORT SENTENCE, acknowledge the previous action and its immediate consequence.
+Then introduce a NEW dilemma from a DIFFERENT underlying issue.
+
+CRITICAL: Follow Golden Rule B - Do NOT repeat the same tension. If yesterday was about [topic X], today must be about something completely different.
+
+STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player RIGHT NOW.`;
     } else if (day === 8) {
       prompt += `This is Day 8 - the aftermath. Follow the system prompt instructions for Day 8.`;
     } else {
-      prompt += `Create the next INCIDENT caused by this action.\nDO NOT summarize the general situation.\nDO NOT write about "debates" or "rising tensions."\nSTRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player or their interests RIGHT NOW.\n\nWrite in the Game Master voice (playful, slightly teasing, speaking to "you").`;
+      prompt += `In ONE SHORT SENTENCE, acknowledge the previous action and its immediate consequence.
+Then introduce a NEW dilemma from a DIFFERENT underlying issue.
+
+CRITICAL: Follow Golden Rule B - Do NOT repeat the same tension. If yesterday was about [topic X], today must be about something completely different.
+
+DO NOT summarize the general situation.
+DO NOT write about "debates" or "rising tensions."
+STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player or their interests RIGHT NOW.
+
+Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
     }
   }
 
@@ -4110,9 +4126,93 @@ app.post("/api/game-turn-v2", async (req, res) => {
         }
       }
 
+      // Get existing topic history (used by both topic/scope and tension cluster validation)
+      const existingTopicHistory = conversation.meta.topicHistory || [];
+
+      // SEMANTIC SIMILARITY VALIDATION (prevent narrative repetition)
+      if (existingTopicHistory.length > 0) {
+        const prevDilemma = existingTopicHistory[existingTopicHistory.length - 1];
+        const currentTitle = parsed.dilemma?.title || '';
+        const currentDescription = parsed.dilemma?.description || '';
+
+        // Quick AI check for semantic similarity using cheap model
+        const similarityPrompt = `Analyze if these two political dilemmas are about the same underlying issue:
+
+Dilemma 1 (Day ${prevDilemma.day}): "${prevDilemma.title}" - ${prevDilemma.description}
+Dilemma 2 (Day ${day}): "${currentTitle}" - ${currentDescription}
+
+Answer ONLY with this JSON format:
+{
+  "isSimilar": true,
+  "reason": "Brief explanation (1 sentence)"
+}
+
+Consider them "similar" (isSimilar: true) if they involve:
+- Same people/groups (e.g., bakers, merchants, priests)
+- Same core tension (e.g., food prices, succession, war)
+- Continuation of same conflict (e.g., baker strike after baker demands)
+
+Consider them "different" (isSimilar: false) if they:
+- Involve completely different stakeholders
+- Address unrelated issues (e.g., baker prices vs military coup)
+- Shift to new tension type (e.g., economic → family crisis)`;
+
+        const similarityCheck = await callOpenAIChat([
+          { role: "user", content: similarityPrompt }
+        ], "gpt-4o-mini"); // Use cheap model for validation
+
+        const similarity = safeParseJSON(similarityCheck?.content, { debugTag: "SEMANTIC-CHECK" });
+
+        if (similarity?.isSimilar) {
+          console.log(`[SEMANTIC] ⚠️ VIOLATION: Day ${day} similar to Day ${prevDilemma.day}`);
+          console.log(`[SEMANTIC] Reason: ${similarity.reason}`);
+          console.log(`[SEMANTIC] 🔄 Re-prompting for different scenario...`);
+
+          const correctionPrompt = `Your dilemma is too similar to yesterday's dilemma.
+
+Yesterday (Day ${prevDilemma.day}): "${prevDilemma.title}" - ${prevDilemma.description}
+Today (Day ${day}): "${currentTitle}" - ${currentDescription}
+Similarity reason: ${similarity.reason}
+
+INSTRUCTIONS:
+1. Keep ONE short sentence acknowledging yesterday's action
+2. Then pivot to a COMPLETELY DIFFERENT underlying issue
+3. Follow Golden Rule B: different human angle (personal, family, religious, social, political, health, environmental, power struggle)
+4. Must be about a different topic entirely, not a continuation of the same tension
+5. Different people/groups should be involved
+
+Regenerate the ENTIRE JSON output with these changes.`;
+
+          const correctedMessages = [...messages, { role: "user", content: correctionPrompt }];
+
+          let retryResponse;
+          if (useXAI) {
+            retryResponse = await callXAIChat(correctedMessages, MODEL_DILEMMA_XAI);
+          } else {
+            retryResponse = await callOpenAIChat(correctedMessages, MODEL_DILEMMA);
+          }
+
+          const retryContent = retryResponse?.content;
+          if (retryContent) {
+            const retryParsed = safeParseJSON(retryContent, { debugTag: "GAME-TURN-V2-SEMANTIC-RETRY" });
+            if (retryParsed && retryParsed.dilemma) {
+              console.log(`[SEMANTIC] ✅ Re-prompt successful: "${retryParsed.dilemma.title}"`);
+              parsed = retryParsed;
+            } else {
+              console.log(`[SEMANTIC] ⚠️ Re-prompt failed to parse. Using original response.`);
+            }
+          } else {
+            console.log(`[SEMANTIC] ⚠️ Re-prompt returned no content. Using original response.`);
+          }
+        } else {
+          console.log(`[SEMANTIC] ✅ Day ${day}: Different from Day ${prevDilemma.day} - "${currentTitle}"`);
+        }
+      } else {
+        console.log(`[SEMANTIC] ✅ Day ${day}: First dilemma - "${parsed.dilemma?.title || 'Unknown'}"`);
+      }
+
       // TENSION CLUSTER VALIDATION + RE-PROMPT
       const ALL_CLUSTERS = ['ExternalConflict', 'InternalPower', 'EconomyResources', 'HealthDisaster', 'ReligionCulture', 'LawJustice', 'SocialOrder', 'FamilyPersonal', 'DiplomacyTreaty'];
-      const existingTopicHistory = conversation.meta.topicHistory || [];
       const clusterCounts = { ...(conversation.meta.clusterCounts || {}) };
 
       const prevCluster = existingTopicHistory.length > 0
@@ -4202,7 +4302,9 @@ Regenerate the ENTIRE JSON output with these changes.`;
         day,
         topic: parsed.dilemma?.topic || 'Unknown',
         scope: parsed.dilemma?.scope || 'Unknown',
-        tensionCluster: currentCluster
+        tensionCluster: currentCluster,
+        title: parsed.dilemma?.title || '',        // For semantic similarity validation
+        description: parsed.dilemma?.description || ''  // For semantic similarity validation
       });
 
       // Update meta with new messages array, topic history, and cluster counts

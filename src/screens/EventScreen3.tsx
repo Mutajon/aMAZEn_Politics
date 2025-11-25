@@ -46,6 +46,9 @@ import { useSessionLogger } from "../hooks/useSessionLogger";
 import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import ReasoningModal from "../components/event/ReasoningModal";
 import SelfJudgmentModal from "../components/event/SelfJudgmentModal";
+import { useDay2Tutorial } from "../hooks/useDay2Tutorial";
+import { TutorialOverlay } from "../components/event/TutorialOverlay";
+import { ValueExplanationModal } from "../components/event/ValueExplanationModal";
 
 type Props = {
   push: (path: string) => void;
@@ -112,7 +115,7 @@ export default function EventScreen3({ push }: Props) {
   } = useEventDataCollector();
 
   // Narration integration - prepares TTS when dilemma loads, provides canShowDilemma flag
-  const { canShowDilemma, startNarrationIfReady } = useEventNarration();
+  const { canShowDilemma, startNarrationIfReady, speaking } = useEventNarration();
 
   // Global narration stop (for stopping audio when navigating away or opening modals)
   const { stop: stopNarration } = useNarrator();
@@ -154,6 +157,19 @@ export default function EventScreen3({ push }: Props) {
 
   // Self-judgment modal (Day 8 only)
   const [showSelfJudgmentModal, setShowSelfJudgmentModal] = useState(false);
+
+  // Tutorial system (Day 2 only)
+  const tutorial = useDay2Tutorial();
+  const [tutorialAvatarRef, setTutorialAvatarRef] = useState<HTMLElement | null>(null);
+  const [tutorialValueRef, setTutorialValueRef] = useState<HTMLElement | null>(null);
+  const [narrationWasPlaying, setNarrationWasPlaying] = useState(false);
+
+  // Debug: Log when tutorial value ref is set
+  useEffect(() => {
+    if (tutorialValueRef && day === 2) {
+      console.log('[EventScreen3] Tutorial value ref set:', tutorialValueRef);
+    }
+  }, [tutorialValueRef, day]);
 
   // Navigation guard - prevent back button during gameplay
   useNavigationGuard({
@@ -411,7 +427,35 @@ export default function EventScreen3({ push }: Props) {
   }, [phase, day, compassPings.length, showCompassPills]);
 
   // ========================================================================
-  // EFFECT 5: Redirect to downfall screen when terminal crisis occurs
+  // EFFECT 5A: Track when narration starts playing (for tutorial timing)
+  // ========================================================================
+  useEffect(() => {
+    if (speaking && day === 2) {
+      setNarrationWasPlaying(true);
+    }
+  }, [speaking, day]);
+
+  // ========================================================================
+  // EFFECT 5B: Trigger Day 2 tutorial when narration completes
+  // ========================================================================
+  useEffect(() => {
+    if (day === 2 && phase === 'interacting' && !tutorial.tutorialCompleted) {
+      // Only start if narration was playing and is now done
+      const narrationComplete = narrationWasPlaying && !speaking;
+
+      if (narrationComplete) {
+        const timer = setTimeout(() => {
+          console.log('[EventScreen3] 🎓 Starting Day 2 tutorial (narration complete)');
+          tutorial.startTutorial();
+        }, 500);
+
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [day, phase, narrationWasPlaying, speaking, tutorial.tutorialCompleted, tutorial.startTutorial]);
+
+  // ========================================================================
+  // EFFECT 6: Redirect to downfall screen when terminal crisis occurs
   // ========================================================================
   useEffect(() => {
     // Check if game ended with downfall crisis (all 3 tracks < 20%)
@@ -914,6 +958,13 @@ export default function EventScreen3({ push }: Props) {
               score={score}
               scoreDetails={scoreDetails}
               avatarSrc={character?.avatarUrl || null}
+              tutorialMode={tutorial.tutorialActive}
+              tutorialDisableClose={tutorial.shouldDisableModalClose}
+              onTutorialAvatarClick={tutorial.onAvatarOpened}
+              onTutorialValueClick={tutorial.onValueClicked}
+              onTutorialModalClose={tutorial.onModalClosed}
+              tutorialValueRef={(el) => setTutorialValueRef(el)}
+              avatarButtonRef={(el) => setTutorialAvatarRef(el)}
             />
           )}
 
@@ -1055,6 +1106,26 @@ export default function EventScreen3({ push }: Props) {
             push('/aftermath');
           }}
         />
+
+        {/* Tutorial Overlay - Day 2 only */}
+        {tutorial.shouldShowOverlay && (
+          <TutorialOverlay
+            step={tutorial.tutorialStep}
+            targetElement={
+              tutorial.tutorialStep === 'awaiting-avatar'
+                ? tutorialAvatarRef
+                : tutorialValueRef
+            }
+          />
+        )}
+
+        {/* Value Explanation Modal - Tutorial only */}
+        {tutorial.shouldShowExplanation && tutorial.selectedValue && (
+          <ValueExplanationModal
+            value={tutorial.selectedValue}
+            onClose={tutorial.onExplanationClosed}
+          />
+        )}
       </div>
     );
   }

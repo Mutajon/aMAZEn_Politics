@@ -13,6 +13,7 @@ import { useDilemmaStore } from "./store/dilemmaStore";
 import { useCompassStore } from "./store/compassStore";
 import { useRoleStore } from "./store/roleStore";
 import { useHighscoreStore } from "./store/highscoreStore";
+import { resetDay2Tutorial } from "./hooks/useDay2Tutorial";
 
 // Disable StrictMode in development to avoid double-invoked effects (which fire duplicate API calls).
 const useStrict = import.meta.env.MODE !== "development";
@@ -364,6 +365,9 @@ const useStrict = import.meta.env.MODE !== "development";
     useMirrorDialogueStore.getState().resetMirrorDialogue();
     useHighscoreStore.getState().reset();
 
+    // Tutorial systems
+    resetDay2Tutorial();
+
     // User identity & treatment
     resetLoggingStore(); // Generates new userId
     useSettingsStore.getState().setTreatment('semiAutonomy'); // Reset to default
@@ -378,6 +382,7 @@ const useStrict = import.meta.env.MODE !== "development";
     console.log('   → Past games cleared');
     console.log('   → Fragments cleared, intro reset');
     console.log('   → Mirror dialogue reset');
+    console.log('   → Day 2 tutorial reset');
     console.log('   → Highscores reset to defaults');
     console.log('   → New anonymous user ID generated');
     console.log('   → Treatment reset to semiAutonomy');
@@ -385,6 +390,13 @@ const useStrict = import.meta.env.MODE !== "development";
     console.log('💾 User preferences preserved (audio, language, display)');
     console.log('💡 Refresh the page to start fresh!');
   }
+};
+
+// Tutorial management
+(window as any).resetDay2Tutorial = () => {
+  resetDay2Tutorial();
+  console.log('✅ Day 2 tutorial reset');
+  console.log('💡 Tutorial will show again on next Day 2 playthrough');
 };
 
 // HIDDEN FOR EXPERIMENTAL DISTRIBUTION
