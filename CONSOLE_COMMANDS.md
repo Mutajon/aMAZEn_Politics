@@ -10,6 +10,7 @@ Switch between AI providers without restarting the application.
 switchToClaude()     // Switch to Anthropic Claude (requires MODEL_DILEMMA_ANTHROPIC in .env)
 switchToGPT()        // Switch to OpenAI GPT (DEFAULT)
 switchToXAI()        // Switch to X.AI/Grok (requires MODEL_DILEMMA_XAI in .env)
+switchToGemini()     // Switch to Google Gemini (requires MODEL_DILEMMA_GEMINI in .env)
 ```
 
 **Note**: Provider switching persists in localStorage. Requires corresponding API keys in `.env`.

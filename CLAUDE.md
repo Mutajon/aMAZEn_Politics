@@ -13,6 +13,7 @@ This project uses **modular documentation** for better maintainability:
 - **[API_REFERENCE.md](./API_REFERENCE.md)** - All backend endpoints with examples
 - **[CONSOLE_COMMANDS.md](./CONSOLE_COMMANDS.md)** - Browser console commands for debugging
 - **[LOGGING_SYSTEM.md](./LOGGING_SYSTEM.md)** - Data collection & logging integration
+- **[src/i18n/README.md](./src/i18n/README.md)** - Internationalization system guide
 
 ---
 
@@ -24,6 +25,7 @@ This project uses **modular documentation** for better maintainability:
 
 | Change Type | Documentation File | Section |
 |-------------|-------------------|---------|
+| **New user-facing text** | en.json + he.json | Add i18n keys, integrate with lang() |
 | **New console command** | CONSOLE_COMMANDS.md | Appropriate category, add function signature & use case |
 | **New API endpoint** | API_REFERENCE.md | Relevant category, include request/response schemas |
 | **New game mechanic** | ARCHITECTURE.md | Core Game Systems section |
@@ -38,6 +40,7 @@ This project uses **modular documentation** for better maintainability:
 
 When making ANY code change, verify:
 
+- [ ] Does this add user-facing text? → Update en.json + he.json, integrate with lang()
 - [ ] Does this add a new console command? → Update CONSOLE_COMMANDS.md
 - [ ] Does this add/modify an API endpoint? → Update API_REFERENCE.md
 - [ ] Does this change game mechanics or flow? → Update ARCHITECTURE.md
@@ -133,6 +136,124 @@ KillShell(shell_id: "163811")
 - Clear relevant localStorage keys
 - Reset Zustand stores to initial state
 - **Preserve**: audio settings, language preferences, display settings
+
+---
+
+## ⚠️ CRITICAL: Internationalization (i18n) Integration
+
+**When adding ANY user-facing text, ALWAYS integrate with i18n immediately.**
+
+### When to Add i18n Keys
+
+Add translation keys for ALL user-facing text:
+- **UI Elements**: Buttons, labels, headings, tooltips, placeholders, error messages
+- **Game Content**: Dilemmas, actions, quiz questions/answers, dialogue lines
+- **Narratives**: Story text, epilogues, character descriptions
+- **System Messages**: Loading states, notifications, warnings
+
+### Where to Add Keys
+
+**BOTH files must be updated simultaneously**:
+- `src/i18n/languages/en.json` - English translation
+- `src/i18n/languages/he.json` - Hebrew translation
+
+### Key Naming Conventions
+
+Follow these rules for consistent key names:
+
+1. **Format**: SCREAMING_SNAKE_CASE (e.g., `START_GAME`, `LOADING_QUOTE_1`)
+2. **Gender Variants**: Add suffixes for character gender
+   - Base: `QUIZ_TOWN_STATUE_Q`
+   - Male: `QUIZ_TOWN_STATUE_Q_MALE`
+   - Female: `QUIZ_TOWN_STATUE_Q_FEMALE`
+   - Any: `QUIZ_TOWN_STATUE_Q_ANY`
+3. **Sequences**: Use numbered suffixes for grouped text
+   - `INTRO_LINE_0`, `INTRO_LINE_1`, `INTRO_LINE_2`, etc.
+4. **Categories**: Use prefixes to group related keys
+   - Quiz: `QUIZ_[NAME]_Q`, `QUIZ_[NAME]_A1`, `QUIZ_[NAME]_A2`
+   - Compass: `COMPASS_VALUE_TRUTH`, `COMPASS_VALUE_LIBERTY`
+   - Political: `POLITICAL_SYSTEM_DEMOCRACY`, `POLITICAL_SYSTEM_ANARCHY`
+   - Characters: `ATHENS_CHAR_MALE_NAME`, `ATHENS_CHAR_MALE_PROMPT`
+
+### Integration Patterns
+
+**Pattern 1: Direct Import (Recommended for most cases)**
+```typescript
+import { lang } from '@/i18n/lang';
+
+function MyComponent() {
+  return <button>{lang("START_GAME")}</button>;
+}
+```
+
+**Pattern 2: Reactive Hook (For components that need to re-render on language change)**
+```typescript
+import { useLang } from '@/i18n/lang';
+
+function MyComponent() {
+  const lang = useLang();
+  return <h1>{lang("GAME_TITLE")}</h1>;
+}
+```
+
+**Pattern 3: Translated Constants (For complex objects)**
+```typescript
+import { useTranslatedConst, createTranslatedConst } from '@/i18n/useTranslatedConst';
+
+const LOADING_QUOTES = createTranslatedConst((lang) => [
+  lang("LOADING_QUOTE_1"),
+  lang("LOADING_QUOTE_2"),
+  lang("LOADING_QUOTE_3")
+]);
+
+function MyComponent() {
+  const quotes = useTranslatedConst(LOADING_QUOTES);
+  return <div>{quotes[0]}</div>;
+}
+```
+
+### i18n Integration Checklist
+
+When adding new text:
+
+- [ ] Add key to `src/i18n/languages/en.json`
+- [ ] Add key to `src/i18n/languages/he.json`
+- [ ] Use descriptive, semantic key name (not `BTN_1` or `TEXT_123`)
+- [ ] Add gender variants (`_MALE`, `_FEMALE`, `_ANY`) if text differs by character
+- [ ] Import `lang()` function in component (`import { lang } from '@/i18n/lang'`)
+- [ ] Replace hardcoded text with `lang("KEY_NAME")`
+- [ ] Test in both English and Hebrew languages
+- [ ] Verify RTL layout works correctly for Hebrew
+
+### Translation Helpers
+
+Use built-in helpers for game data (`src/i18n/translateGameData.ts`):
+
+```typescript
+import { translateCompassValue, translatePoliticalSystem } from '@/i18n/translateGameData';
+
+// Translate compass values
+const translated = translateCompassValue("Liberty/Agency", lang);
+
+// Translate political systems
+const system = translatePoliticalSystem("Democracy", lang);
+```
+
+**Available Helpers**:
+- `translateDemocracyLevel(level, lang)` - Democracy level names
+- `translatePoliticalSystem(systemName, lang)` - Political system names
+- `translateCompassValue(value, lang)` - Compass axis values
+- `translateLeaderDescription(name, desc, lang)` - Leader descriptions
+- `translateQuizQuestion(quizId, question, lang, gender?)` - Quiz questions (gender-aware)
+- `translateQuizAnswer(quizId, index, answer, lang)` - Quiz answers
+
+### Reference Documentation
+
+**→ See [src/i18n/README.md](./src/i18n/README.md)** for:
+- Comprehensive i18n system guide
+- Language switching implementation
+- RTL (right-to-left) support details
+- Advanced usage patterns
 
 ---
 
@@ -343,9 +464,10 @@ if (config.showCustomAction) { /* Show button */ }
 2. **Ask Before Extra Changes**: Confirm before making changes beyond the task
 3. **Follow Component Patterns**: Extract state hooks → logic hooks → content components
 4. **Update Documentation**: Update relevant .md files when making changes (see maintenance guide above)
-5. **Integrate Logging**: ALWAYS add logging for new features (see LOGGING_SYSTEM.md)
-6. **Use Optimization Patterns**: Follow EventScreen3, ActionDeck refactoring patterns
-7. **Test Dev Server**: Run `npm run dev` to test, then KILL the server with KillShell
+5. **Integrate i18n**: ALWAYS add user-facing text to en.json + he.json, use lang() function
+6. **Integrate Logging**: ALWAYS add logging for new features (see LOGGING_SYSTEM.md)
+7. **Use Optimization Patterns**: Follow EventScreen3, ActionDeck refactoring patterns
+8. **Test Dev Server**: Run `npm run dev` to test, then KILL the server with KillShell
 
 ---
 
@@ -392,10 +514,11 @@ MONGODB_URI=mongodb://...
 1. **Token Efficiency**: Minimize AI context, use incremental updates
 2. **Treatment-Aware**: Feature availability controlled by experiment config
 3. **Comprehensive Logging**: All user actions and system events logged
-4. **Component Optimization**: Extract hooks, minimize re-renders
-5. **Fail Gracefully**: Prefetching failures don't block gameplay
-6. **Mobile-First**: Responsive design, touch-friendly UI
-7. **Modular Documentation**: Keep docs organized and up-to-date
+4. **Internationalization**: All user-facing text in i18n files, support EN + HE with RTL
+5. **Component Optimization**: Extract hooks, minimize re-renders
+6. **Fail Gracefully**: Prefetching failures don't block gameplay
+7. **Mobile-First**: Responsive design, touch-friendly UI
+8. **Modular Documentation**: Keep docs organized and up-to-date
 
 ---
 
@@ -417,10 +540,12 @@ MONGODB_URI=mongodb://...
 ## Quick Reference Card
 
 **Need to...**
+- **Add user-facing text?** → Update en.json + he.json, use lang() function
 - **Add a console command?** → Update CONSOLE_COMMANDS.md
 - **Add an API endpoint?** → Update API_REFERENCE.md
 - **Understand game mechanics?** → Read ARCHITECTURE.md
 - **Integrate logging?** → Read LOGGING_SYSTEM.md
+- **Understand i18n?** → Read src/i18n/README.md
 - **Find a critical workflow?** → Check CLAUDE.md (this file)
 
 **Testing**:

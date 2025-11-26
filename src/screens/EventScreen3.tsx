@@ -172,6 +172,13 @@ export default function EventScreen3({ push }: Props) {
     }
   }, [tutorialValueRef, day]);
 
+  // Debug: Log when tutorial pills ref is set
+  useEffect(() => {
+    if (tutorialPillsRef && day === 2) {
+      console.log('[EventScreen3] Tutorial pills ref set:', tutorialPillsRef);
+    }
+  }, [tutorialPillsRef, day]);
+
   // Navigation guard - prevent back button during gameplay
   useNavigationGuard({
     enabled: true,
@@ -963,7 +970,12 @@ export default function EventScreen3({ push }: Props) {
               tutorialDisableClose={tutorial.shouldDisableModalClose}
               onTutorialAvatarClick={tutorial.onAvatarOpened}
               onTutorialValueClick={tutorial.onValueClicked}
-              onTutorialModalClose={tutorial.onModalClosed}
+              onTutorialModalClose={() => {
+                // Clear value ref to prevent stale state
+                setTutorialValueRef(null);
+                // Call with ref checker function
+                tutorial.onModalClosed(() => tutorialPillsRef !== null);
+              }}
               tutorialValueRef={(el) => setTutorialValueRef(el)}
               avatarButtonRef={(el) => setTutorialAvatarRef(el)}
             />
@@ -1039,6 +1051,7 @@ export default function EventScreen3({ push }: Props) {
                   tutorialMode={tutorial.tutorialActive && tutorial.tutorialStep === 'awaiting-compass-pills'}
                   tutorialPillsButtonRef={(el) => setTutorialPillsRef(el)}
                   onTutorialPillsClick={tutorial.onCompassPillsClicked}
+                  forceCollapse={tutorial.tutorialStep === 'awaiting-compass-pills'}
                 />
               )}
             </div>

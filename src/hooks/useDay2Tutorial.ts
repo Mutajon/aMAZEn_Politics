@@ -35,10 +35,10 @@ export function useDay2Tutorial() {
   // Handle avatar being clicked
   const onAvatarOpened = useCallback(() => {
     if (tutorialStep === 'awaiting-avatar') {
-      // Wait 2 seconds before showing the value highlight
+      // Wait 1 second before showing the value highlight (reduced from 2s)
       setTimeout(() => {
         setTutorialStep('awaiting-value');
-      }, 2000);
+      }, 1000);
     }
   }, [tutorialStep]);
 
@@ -60,11 +60,32 @@ export function useDay2Tutorial() {
   }, [tutorialStep]);
 
   // Handle main modal being closed (advance to compass pills step)
-  const onModalClosed = useCallback(() => {
+  const onModalClosed = useCallback((checkPillsRefReady?: () => boolean) => {
     if (tutorialStep === 'awaiting-modal-close') {
-      console.log('[Tutorial] PlayerCardModal closed, advancing to compass pills step');
-      setTutorialStep('awaiting-compass-pills');
+      console.log('[Tutorial] PlayerCardModal closed, polling for pills ref');
       setSelectedValue(null);
+
+      // Poll for pills ref to be ready (max 1000ms)
+      let attempts = 0;
+      const maxAttempts = 10; // 10 attempts * 100ms = 1000ms max
+
+      const pollForRef = () => {
+        attempts++;
+        const refReady = checkPillsRefReady?.() ?? false;
+
+        if (refReady) {
+          console.log(`[Tutorial] Pills ref ready after ${attempts * 100}ms, advancing to compass pills step`);
+          setTutorialStep('awaiting-compass-pills');
+        } else if (attempts < maxAttempts) {
+          setTimeout(pollForRef, 100);
+        } else {
+          console.log('[Tutorial] Pills ref timeout, advancing anyway');
+          setTutorialStep('awaiting-compass-pills');
+        }
+      };
+
+      // Start polling after small initial delay
+      setTimeout(pollForRef, 100);
     }
   }, [tutorialStep]);
 

@@ -14,6 +14,7 @@ type Props = {
   tutorialMode?: boolean;
   tutorialPillsButtonRef?: (element: HTMLElement | null) => void;
   onTutorialPillsClick?: () => void;
+  forceCollapse?: boolean; // Force pills to collapse (used by tutorial)
 };
 
 /** Spinner + stacked pills ABOVE the mirror card.
@@ -28,6 +29,7 @@ export default function CompassPillsOverlay({
   tutorialMode = false,
   tutorialPillsButtonRef,
   onTutorialPillsClick,
+  forceCollapse = false,
 }: Props) {
   const { playSfx } = useAudioManager();
 
@@ -69,6 +71,18 @@ export default function CompassPillsOverlay({
     };
   }, [batchKey, loading, effectPills.length]);
 
+  // Force collapse when tutorial requires it
+  useEffect(() => {
+    if (forceCollapse) {
+      setExpanded(false);
+      // Clear auto-collapse timer since we're force-collapsing
+      if (timerRef.current) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  }, [forceCollapse]);
+
   // Nothing to render?
   const hasPills = effectPills.length > 0;
 
@@ -77,7 +91,9 @@ export default function CompassPillsOverlay({
   const buttonPosition = { x: 0, y: 0 }; // Relative to container center
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
+    <div
+      className={`pointer-events-none absolute inset-0 flex items-center justify-center ${tutorialMode ? 'z-[90]' : 'z-30'}`}
+    >
       {loading && (
         <div className="flex items-center justify-center" style={{ color }}>
           <span className="inline-block w-5 h-5 rounded-full border-2 border-current border-t-transparent animate-spin" />

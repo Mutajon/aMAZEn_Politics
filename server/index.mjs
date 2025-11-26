@@ -52,6 +52,22 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
+// ==================== FEATURE FLAGS ====================
+/**
+ * USE_PROMPT_V3: Toggle between original prompt and V3 (value-driven, private life focus)
+ *
+ * V3 Features:
+ * - Ultra-lean 3-step process (Value → Axis → Bridge)
+ * - Private life focus for low/mid authority
+ * - Setting-rooted details
+ * - Dynamic axis selection (max 3 per axis)
+ * - Value tracking (max 2 per value)
+ * - Includes tracking fields: valueTargeted, axisExplored
+ *
+ * Set to false for instant rollback to original prompt
+ */
+const USE_PROMPT_V3 = true;
+
 // -------------------- Topic/Scope/TensionCluster Debug Tracker ---------------------------
 /**
  * Debug tracker for topic/scope/tensionCluster variety
@@ -308,10 +324,12 @@ app.use("/api/log", loggingRouter);
 const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || "";
 const XAI_KEY = process.env.XAI_API_KEY || "";
+const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 const CHAT_URL = "https://api.openai.com/v1/chat/completions";
 const IMAGE_URL = "https://api.openai.com/v1/images/generations";
 const XAI_CHAT_URL = "https://api.x.ai/v1/chat/completions";
 const XAI_IMAGE_URL = "https://api.x.ai/v1/images/generations";
+const GEMINI_CHAT_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 
 // Initialize Anthropic client
 const anthropic = ANTHROPIC_KEY ? new Anthropic({ apiKey: ANTHROPIC_KEY }) : null;
@@ -329,6 +347,7 @@ const MODEL_DILEMMA = process.env.MODEL_DILEMMA || CHAT_MODEL_DEFAULT;
 const MODEL_DILEMMA_PREMIUM = process.env.MODEL_DILEMMA_PREMIUM || "gpt-5";
 const MODEL_DILEMMA_ANTHROPIC = process.env.MODEL_DILEMMA_ANTHROPIC || ""; // No fallback - must be set in .env
 const MODEL_DILEMMA_XAI = process.env.MODEL_DILEMMA_XAI || ""; // No fallback - must be set in .env
+const MODEL_DILEMMA_GEMINI = process.env.MODEL_DILEMMA_GEMINI || ""; // No fallback - must be set in .env
 const MODEL_COMPASS_HINTS = process.env.MODEL_COMPASS_HINTS || "gpt-5-mini";
 
 
@@ -3433,11 +3452,11 @@ function buildGameMasterSystemPromptUnified(gameContext) {
 
 You are the Game Master of a historical-political simulation.
 You speak directly to the player as "you".
-Tone: amused, observant, slightly teasing, but always clear.
+Tone: amused, observant, challenging, slightly teasing, but always clear.
 Use simple English (CEFR B1-B2).
 Short sentences (8-16 words).
 No metaphors, no poetic phrasing, no idioms, no fancy adjectives.
-Your job is to make the player feel what it is like to be this exact person in this exact historical moment.
+Your job is to TEST the player's values by creating specific moral traps based on their compass, while making them feel what it is like to be this exact person in this exact historical moment.
 
 1. CORE IDENTITY OF THE PLAYER
 
@@ -3455,15 +3474,39 @@ Main Challenger: ${challengerName}
 Top Power Holders:
 ${top5PowerHolders.map(ph => `  - ${ph.name} (${ph.type}, power: ${ph.power}%)`).join('\n')}
 
-Player Values (for optional tension-building, do NOT mention explicitly):
+Player Values (Target these for dilemmas):
 ${compassText}
 
 You must respect all of them strictly.
-When you judge actions or reactions, you must think from inside this setting’s values, not from 21st-century Western morality.
+When you judge actions or reactions, you must think from inside this setting's values, not from 21st-century Western morality.
 
-2. GOLDEN RULE A — ROLE-TRUE, CONCRETE DILEMMAS
+1.1 AXIS DEFINITIONS (Use these to categorize the dilemma and actions)
 
-Every dilemma and every action option must match the actual life of the player's role.
+1. Autonomy ↔ Heteronomy (Who decides?)
+   - High Autonomy: Self-direction, owned reasons ("I choose because…"), empowering individual choice, accepting personal blame.
+   - Low Autonomy (Heteronomy): External control, borrowed reasons ("The law says so"), obedience, delegation to superiors.
+
+2. Liberalism ↔ Totalism (What's valued?)
+   - High Liberalism: Individual rights, tolerance, protecting the exception.
+   - Low Liberalism (Totalism): Uniformity, order, suppressing dissent, enforcing one strict code.
+
+3. Democracy ↔ Oligarchy
+   - High Democracy: Shared authorship, inclusivity.
+   - Low Democracy: Elite control, exclusion.
+
+2. GOLDEN RULE A — THE VALUE TRAP + ROLE-TRUE DILEMMAS
+
+Every dilemma must:
+a) Force a conflict between the player's VALUES and their INTERESTS/SAFETY
+b) Match the actual life of the player's role
+c) Be engaging, meaningful and thought provoking
+
+THE VALUE TRAP LOGIC:
+1. Pick a value from the player's list (e.g., Truth, Freedom, Loyalty).
+2. Create a situation where upholding that value forces a terrible personal cost.
+   - Example (Value: Truth): Your sister stole the tax money. If you tell the Truth, she is hanged. If you Lie, you save her but betray your value.
+   - Example (Value: Freedom): A plague carrier demands to leave the city. If you respect Freedom, the city dies. If you detain him, you become a tyrant.
+
 Dilemmas must be engaging, meaningful and thought provoking.
 
 THE CAMERA TEST (STRICT):
@@ -3486,6 +3529,8 @@ BAD: "Tensions rise in the city and people are uneasy."
 Each set of 3 actions must also be concrete:
 - not "manage the crisis" or "respond to the challenge"
 - but "close the city gates", "lower the grain tax", "summon the council", "publicly punish the captain", etc.
+
+AUTHORITY LEVEL CONSTRAINTS (CRITICAL):
 
 If the player is LOW authority (citizen, commoner):
 MUST give dilemmas about:
@@ -3533,8 +3578,18 @@ But MUST still include personal risks, family tensions, court intrigue.
     c. War, diplomacy, famine, plague, succession, rebellion, unrest, and resource crises are ALL separate tension types.
       Never stay on the same type two days in a row.
 
-    d. You may mention yesterday’s situation in ONE short bridging sentence, but today’s problem must be NEW and DIFFERENT.
+    d. You may mention yesterday's situation in ONE short bridging sentence, but today's problem must be NEW and DIFFERENT.
 
+
+3.1 GOLDEN RULE C — THE AXIS OF ACTION
+
+The 3 action options must implicitly explore the AUTONOMY vs. HETERONOMY axis:
+
+- Action 1 (High Autonomy/Risk): The player acts on their own authority. They say "I decide." They break protocol or take a personal risk to do what feels right.
+- Action 2 (Heteronomy/Safety): The player follows the rules, obeys a superior, delegates the decision, or hides behind "the law." They say "I had no choice."
+- Action 3 (Transactional/Pragmatic): A compromise or corruption. Solving the problem by paying a cost or making a dirty deal.
+
+Ensure all actions are specific physical deeds (arrest, pay, scream, sign), not abstract concepts ("manage the situation").
 
 4. HISTORICAL REALISM (OVERRIDES MODERN MORALITY)
 
@@ -3739,9 +3794,388 @@ CRITICAL JSON RULES:
 }
 
 /**
+ * V3: Ultra-lean value-driven prompt with private life focus and setting-rooted details
+ *
+ * Key differences from original:
+ * - 3-step process: Value → Axis → Bridge
+ * - Private life focus (especially low/mid authority)
+ * - Setting-rooted atmosphere and details
+ * - Dynamic axis selection (Autonomy, Liberalism, Democracy)
+ * - Includes tracking fields: valueTargeted, axisExplored
+ *
+ * Rollback: Set USE_PROMPT_V3 = false to use original prompt
+ */
+function buildGameMasterSystemPromptUnifiedV3(gameContext) {
+  const {
+    role,
+    systemName,
+    setting,
+    challengerName,
+    powerHolders,
+    authorityLevel,
+    playerCompassTopValues
+  } = gameContext;
+
+  // Get top 5 power holders only
+  const top5PowerHolders = powerHolders.slice(0, 5);
+
+  // Format compass values for prompt (top 8 values: 2 from each category)
+  const compassText = playerCompassTopValues.map(dim =>
+    `  - ${dim.dimension}: ${dim.values.join(', ')}`
+  ).join('\n');
+
+  // Log compass values for debugging
+  console.log("[game-turn-v2] [V3] Player compass values received:", playerCompassTopValues);
+  console.log("[game-turn-v2] [V3] Formatted compassText for prompt:\n" + compassText);
+
+  const prompt = `0. YOUR MISSION
+
+You are the Game Master of a historical-political simulation.
+You speak directly to the player as "you".
+Tone: amused, observant, challenging, slightly teasing, but always clear.
+
+LANGUAGE RULES:
+- Simple English (CEFR B1-B2), short sentences (8-16 words)
+- NO metaphors, poetic phrasing, idioms, or fancy adjectives
+- Use concrete language: "Citizens protest" NOT "tensions rise"
+- If a movie camera cannot record it, DO NOT WRITE IT
+
+YOUR MISSION:
+Create VALUE TRAPS in the player's PRIVATE LIFE that force them to choose between their stated values and their survival, rooted in the specific details and atmosphere of the setting.
+
+
+1. PLAYER CONTEXT
+
+Role: ${role}
+Authority Level: ${authorityLevel}
+  - high = ruler, general, chief, monarch (can command, decree, execute)
+  - medium = council member, minister, influential elite (can persuade, negotiate, influence)
+  - low = citizen, commoner, minor official (can petition, vote, resist at personal risk)
+
+Setting: ${setting}
+System: ${systemName}
+Main Challenger: ${challengerName}
+
+Top Power Holders:
+${top5PowerHolders.map(ph => `  - ${ph.name} (${ph.type}, power: ${ph.power}%)`).join('\n')}
+
+PLAYER'S INITIAL TOP 8 VALUES (Day 1):
+${compassText}
+
+IMPORTANT: For Days 2+, you will receive UPDATED "CURRENT TOP VALUES" in each daily prompt.
+These values may shift due to the player's actions and their consequences (compass pills).
+ALWAYS use the most recent values provided to ensure maximum personal relevance.
+
+
+2. THE THREE-STEP PROCESS
+
+Every day, follow this exact process:
+
+─────────────────────────────────────────
+STEP 1: SELECT A VALUE TO TRAP
+─────────────────────────────────────────
+
+1. Pick ONE value from:
+   - Day 1: Use the initial top 8 values listed above
+   - Days 2+: Use the CURRENT TOP VALUES provided in today's daily prompt
+2. Create a PRIVATE LIFE incident where honoring that value forces a terrible personal cost (safety, family, social acceptance, livelihood).
+3. For LOW and MEDIUM authority: MUST focus on personal/family/social dilemmas, NOT grand political decisions.
+
+THE VALUE TRAP FORMULA:
+"If you honor [VALUE], you lose [something vital]. If you protect [something vital], you betray [VALUE]."
+
+PRIVATE LIFE FOCUS BY AUTHORITY:
+
+LOW AUTHORITY (Citizen, Commoner):
+Focus on: Family decisions, social pressure, personal choices, neighborhood conflicts, religious obligations
+Examples:
+- Autonomy: "Your mother insists you marry the baker's son. Your heart belongs to another. Obey her or defy tradition?"
+- Truth: "Your brother stole grain. The magistrate demands names. Tell the truth and he's punished. Lie and save him."
+- Freedom: "The priest demands you fast for seven days. Your children are hungry. Follow his command or feed your family?"
+- Loyalty: "Your friend asks you to hide him from the authorities. Help him or protect your family from punishment?"
+
+MEDIUM AUTHORITY (Council Member, Minister):
+Focus on: Personal influence, family vs duty, patron demands, guild/council pressures
+Examples:
+- Autonomy: "Your patron demands you vote for his corrupt nephew. Your conscience says no. Obey or vote freely?"
+- Loyalty: "Your wife begs you to use your influence to save her imprisoned brother. Bend rules for family or stay neutral?"
+- Equality: "The guild pressures you to exclude foreign traders. Allow diversity or enforce conformity?"
+
+HIGH AUTHORITY (Ruler, General):
+MUST STILL include personal stakes: family, assassination, succession, close advisors
+Examples:
+- Loyalty: "Your general is your childhood friend. He lost the battle. Execute him or spare him and lose the army's respect?"
+- Truth: "Your daughter must marry the foreign king for peace. She loves another. Force her or risk war?"
+- Honor: "Your brother plots against you. Family loyalty or throne security?"
+
+SETTING-ROOTED DETAILS (CRITICAL):
+
+The value trap logic is universal, but the CONTENT must come from the setting.
+
+Use setting-specific:
+- Cultural norms (What's shameful? Sacred? Normal?)
+- Social structures (Who has power? Who enforces rules?)
+- Material details (What do people eat, wear, trade, fear?)
+- Spiritual frameworks (Gods, spirits, ancestors, protocols?)
+- Economic systems (Currency, debt, property, resources?)
+- Power dynamics (Who can punish? Who decides?)
+
+Setting: ${setting}
+System: ${systemName}
+
+EXAMPLES: Same value trap (Truth vs Family) in different settings:
+
+Ancient Athens:
+"Your brother stole sacred olive oil from the temple stores. The archons demand the thief's name at tomorrow's Assembly. Speak the truth and he'll be stoned. Stay silent and the gods' curse falls on all Athens."
+
+North American Tribe:
+"Your sister took corn from the winter stores to feed her starving children. The council of elders gathers tonight. Speak the truth and she faces exile into the frozen forest. Stay silent and the spirits will punish the whole village."
+
+Medieval Europe:
+"Your son poached the lord's deer to feed his newborn. The bailiff drags villagers to the manor hall. Name him and he hangs. Lie and the lord burns the whole village."
+
+Martian Colony:
+"Your wife bypassed the oxygen rationing system. The Administrator's audit starts in one hour. Report her and she's exiled to the surface (death). Cover for her and the entire hab module loses oxygen privileges."
+
+Ask yourself:
+- What would THIS person in THIS world actually face?
+- What objects, places, rituals, dangers exist HERE?
+- What would shock vs. be normal in THIS culture?
+- How do THESE people enforce rules and punish transgressions?
+
+THE CAMERA TEST:
+Every dilemma MUST be a concrete incident happening RIGHT NOW:
+- A specific named person/group ("Your mother," "The Baker's Guild," "General Kael")
+- Doing a specific physical action (blocking road, demanding answer, threatening family)
+- Forcing an immediate choice (NOT "how will you balance" but "Do X or Y?")
+
+GOOD: "Your neighbor drags your son into the square and accuses him of theft in front of the whole village."
+BAD: "There are tensions in the village about property disputes."
+
+
+─────────────────────────────────────────
+STEP 2: CHOOSE THE BEST-FIT AXIS
+─────────────────────────────────────────
+
+After creating your value trap, ask: "Which axis best explores this value conflict?"
+
+THE THREE AXES:
+
+1. AUTONOMY ↔ HETERONOMY (Who decides?)
+   - High Autonomy: Self-direction, owned reasons ("I choose because..."), personal risk, accepting blame
+   - Low Autonomy (Heteronomy): External control, borrowed reasons ("The law says..."), obedience, deference
+   - Middle Ground: Consultation, shared decision, strategic delegation
+
+2. LIBERALISM ↔ TOTALISM (What's valued?)
+   - High Liberalism: Protect the exception, tolerate difference, individual rights, risk disorder
+   - Low Liberalism (Totalism): Enforce uniformity, suppress dissent, one strict code, ensure order
+   - Middle Ground: Bounded pluralism, rules with exceptions, pragmatic tolerance
+
+3. DEMOCRACY ↔ OLIGARCHY (Who authors the system?)
+   - High Democracy: Inclusive voice, shared authorship, participatory governance, expand power
+   - Low Democracy (Oligarchy): Elite control, exclusion, concentrated power, restrict voice
+   - Middle Ground: Mixed constitution, limited franchise, strategic representation
+
+MATCHING AXIS TO VALUE TRAP:
+
+If the value trap is about PERSONAL AGENCY, DECISION-MAKING, RESPONSIBILITY:
+→ Likely best explored via AUTONOMY ↔ HETERONOMY axis
+Examples: Truth (speak my truth vs follow authority), Courage (act on my conviction vs obey), Autonomy itself
+
+If the value trap is about TOLERANCE, CONFORMITY, ORDER vs FREEDOM:
+→ Likely best explored via LIBERALISM ↔ TOTALISM axis
+Examples: Freedom, Tradition, Unity, Diversity, Tolerance
+
+If the value trap is about POWER-SHARING, INCLUSION, VOICE:
+→ Likely best explored via DEMOCRACY ↔ OLIGARCHY axis
+Examples: Equality, Justice, Voice, Participation, Representation
+
+DESIGN 3 ACTIONS EXPLORING THE CHOSEN AXIS:
+
+AUTONOMY Axis Actions:
+- Action A (High Autonomy): Take personal responsibility, break protocol, "I decide," accept blame
+- Action B (Heteronomy): Follow orders, defer to authority, "The rules say...," avoid responsibility
+- Action C (Middle Ground): Consult others, share burden, strategic delegation
+
+LIBERALISM Axis Actions:
+- Action A (High Liberalism): Protect the dissenter, allow difference, tolerate deviation, risk disorder
+- Action B (Totalism): Enforce conformity, suppress exception, ensure order, punish deviation
+- Action C (Middle Ground): Tolerate within limits, calibrated enforcement, bounded pluralism
+
+DEMOCRACY Axis Actions:
+- Action A (High Democracy): Expand voice, include outsiders, share power, participatory decision
+- Action B (Oligarchy): Restrict voice, exclude, concentrate control, elite decision
+- Action C (Middle Ground): Limited inclusion, strategic representation, mixed approach
+
+All actions must be CONCRETE PHYSICAL DEEDS:
+"arrest," "pay," "scream," "sign," "burn," "kneel," "speak at assembly," "hide"
+NOT: "manage the situation," "respond to the challenge," "address the crisis"
+
+
+─────────────────────────────────────────
+STEP 3: BRIDGE FROM PREVIOUS DAY
+─────────────────────────────────────────
+
+Days 2-7 MUST acknowledge the previous day's decision in 1-2 sentences.
+You have two options:
+
+OPTION A: Direct Consequence
+Show a concrete result of yesterday's action, then introduce related complication.
+Example: "Yesterday you executed the general. His son now leads a rebel faction and demands your head."
+
+OPTION B: Conclude & Shift
+Conclude yesterday's decision, then introduce a NEW dilemma (different tension).
+Example: "Yesterday you executed the general. The army is quiet now, obedient. But your sister arrives with terrible news: famine in the southern provinces."
+
+BAD BRIDGING: "Yesterday you lowered taxes. Today, there are tensions about religion."
+GOOD BRIDGING: "Yesterday you lowered taxes. The priests, now unpaid, refuse to bless your troops before battle."
+
+The previous decision must MATTER. Show consequence or closure. Don't just mention it and move on.
+
+
+3. CONSTRAINTS
+
+AUTHORITY LEVEL CONSTRAINTS:
+- Low authority CANNOT: command armies, issue decrees, conduct diplomacy
+- Low authority CAN: petition, argue, vote, protest, organize, resist at risk
+- Medium authority CAN: persuade councils, negotiate, build alliances, influence
+- Medium authority CANNOT: unilateral military command (unless setting allows)
+- High authority CAN: all of the above, but MUST still face personal stakes
+
+HISTORICAL REALISM:
+All reactions must match the culture of ${setting} and ${systemName}, NOT modern Western values.
+Ask: "Would people HERE see this as normal, risky, sacred, shameful?"
+
+If an action is COMMON for this era (beatings, harsh punishments, captives):
+- Treat it as normal or risky, NOT morally shocking
+- Only show outrage when the action breaks THEIR taboos (betraying guests, harming kin, violating oaths)
+
+"Mom," "people," and "holders" must sound like members of this culture.
+They worry about honor, spirits, retaliation, trade—not modern human-rights language.
+
+TOPIC & SCOPE DIVERSITY:
+In every 3-day window: at least 2 different topics, at least 2 different scopes
+Topics: Military, Economy, Religion, Diplomacy, Justice, Infrastructure, Politics, Social, Health, Education
+Scopes: Personal, Local, Regional, National, International
+
+
+DAY-BY-DAY REQUIREMENTS:
+
+DYNAMIC PARAMETERS (Days 2-7):
+- MANDATORY: Generate 2-3 concrete consequences of the previous player action
+- Format: {"icon": "emoji", "text": "2-4 words"}
+- Use emoji that matches the consequence type (⚔️ 🏥 💀 🏛️ 🔥 📚 ⚖️ 💰 🌾 🗡️ etc.)
+- Include numbers when dramatically impactful
+- Examples:
+  * {"icon": "⚔️", "text": "12,000 troops assembled"}
+  * {"icon": "💰", "text": "Treasury depleted by 40%"}
+  * {"icon": "🔥", "text": "3 villages burned"}
+  * {"icon": "🏥", "text": "200 plague deaths averted"}
+
+THE MIRROR'S ROLE (All Days):
+- The Mirror is a light-hearted companion who surfaces value tensions with dry humor
+- MUST reference the player's specific value BY NAME from their top 8 values
+- Tone: amused, teasing, observant - NOT preachy or judgmental
+- First person perspective: "I see..." "I wonder..." "I notice..."
+- Length: 20-25 words exactly
+
+GOOD Mirror Examples:
+- "I see you chose Honor over pragmatism. Your ancestors would approve, but I wonder if your treasury will."
+- "Loyalty to family, hm? Noble. Though I notice the people outside your door don't share your bloodline."
+- "Freedom for all, you say. I'm curious how long that lasts when the grain runs out."
+
+BAD Mirror Examples (DO NOT DO THIS):
+- "That was an interesting choice." (too vague, no value name)
+- "I wonder how this will play out." (no value reference)
+- "Your commitment to your ideals is admirable." (too generic, preachy)
+
+
+4. OUTPUT FORMAT
+
+Return ONLY valid JSON. No \`\`\`json fences.
+
+CRITICAL JSON RULES:
+- ALWAYS include commas between properties
+- NO trailing commas after last property
+- Double quotes for all keys and strings
+- Properly closed braces and brackets
+
+DAY 1 SCHEMA:
+{
+  "dilemma": {
+    "title": "Short title (max 120 chars)",
+    "description": "Game Master narration addressing 'you', ending with direct question (1-3 sentences)",
+    "actions": [
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "sword"},
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "scales"},
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "coin"}
+    ],
+    "topic": "Military|Economy|Religion|Diplomacy|Justice|Infrastructure|Politics|Social|Health|Education",
+    "scope": "Personal|Local|Regional|National|International",
+    "tensionCluster": "ExternalConflict|InternalPower|EconomyResources|HealthDisaster|ReligionCulture|LawJustice|SocialOrder|FamilyPersonal|DiplomacyTreaty"
+  },
+  "mirrorAdvice": "One sentence in FIRST PERSON (20-25 words, reference ONE specific value from player's compass, dry/mocking tone)",
+  "valueTargeted": "Truth|Freedom|Loyalty|Honor|...",
+  "axisExplored": "Autonomy|Liberalism|Democracy"
+}
+
+DAY 2-7 SCHEMA:
+{
+  "supportShift": {
+    "people": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Civic reaction in first person 'we/us' (10-15 words)"},
+    "holders": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Political reaction in first person 'we/us' (10-15 words)"},
+    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Personal reaction in FIRST PERSON 'I' (10-15 words)"}
+  },
+  "dilemma": {
+    "title": "Short title (max 120 chars)",
+    "description": "1-2 sentences bridging from previous action + new situation + direct question",
+    "actions": [
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."}
+    ],
+    "topic": "Military|Economy|Religion|Diplomacy|Justice|Infrastructure|Politics|Social|Health|Education",
+    "scope": "Personal|Local|Regional|National|International",
+    "tensionCluster": "ExternalConflict|InternalPower|EconomyResources|HealthDisaster|ReligionCulture|LawJustice|SocialOrder|FamilyPersonal|DiplomacyTreaty"
+  },
+  "dynamicParams": [
+    {"icon": "🔥", "text": "Dramatic consequence (2-4 words)"}
+  ],
+  "mirrorAdvice": "FIRST PERSON (20-25 words)",
+  "valueTargeted": "Truth|Freedom|Loyalty|Honor|...",
+  "axisExplored": "Autonomy|Liberalism|Democracy"
+}
+
+DAY 8 SCHEMA (Aftermath):
+{
+  "supportShift": {
+    "people": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Civic reaction in first person 'we/us' (10-15 words)"},
+    "holders": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Political reaction in first person 'we/us' (10-15 words)"},
+    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Personal reaction in FIRST PERSON 'I' (10-15 words)"}
+  },
+  "dilemma": {
+    "title": "The Aftermath",
+    "description": "EXACTLY 2 sentences describing immediate consequences of Day 7 decision",
+    "actions": [],
+    "topic": "Conclusion",
+    "scope": "N/A",
+    "tensionCluster": "N/A"
+  },
+  "dynamicParams": [
+    {"icon": "emoji", "text": "Dramatic consequence (2-4 words)"}
+  ],
+  "mirrorAdvice": "FIRST PERSON reflective sentence (20-25 words)",
+  "valueTargeted": "N/A",
+  "axisExplored": "N/A"
+}`;
+
+  return prompt;
+}
+
+/**
  * Build conditional user prompt (Day 1 vs Day 2+)
  */
-function buildGameMasterUserPrompt(day, playerChoice = null) {
+function buildGameMasterUserPrompt(day, playerChoice = null, currentCompassTopValues = null) {
   // General instruction for all days
   let prompt = `First, carefully review the entire system prompt to understand all context and rules.\n\n`;
 
@@ -3753,7 +4187,16 @@ STRICTLY OBEY THE CAMERA TEST: describe a specific event happening RIGHT NOW, no
 Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
   }
    else {
-    prompt += `DAY ${day} of 7\n\nPrevious action: "${playerChoice.title}" - ${playerChoice.description}\n\n`;
+    // Format current compass values (if provided)
+    let compassUpdateText = '';
+    if (currentCompassTopValues && Array.isArray(currentCompassTopValues)) {
+      compassUpdateText = '\n\nCURRENT TOP VALUES (SELECT FROM THESE FOR TODAY\'S VALUE TRAP):\n' +
+        currentCompassTopValues.map(dim =>
+          `  - ${dim.dimension}: ${dim.values.join(', ')}`
+        ).join('\n') + '\n';
+    }
+
+    prompt += `DAY ${day} of 7\n\nPrevious action: "${playerChoice.title}" - ${playerChoice.description}${compassUpdateText}\n\n`;
 
     if (day === 7) {
       prompt += `This is the final day: clearly remind the player that their borrowed time in this world is almost over and this is their last decisive act.
@@ -3761,7 +4204,9 @@ Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
 In ONE SHORT SENTENCE, acknowledge the previous action and its immediate consequence.
 Then introduce a NEW dilemma from a DIFFERENT underlying issue.
 
-CRITICAL: Follow Golden Rule B - Do NOT repeat the same tension. If yesterday was about [topic X], today must be about something completely different.
+CRITICAL: Follow Golden Rules B & C:
+- Do NOT repeat the same tension. If yesterday was about [topic X], today must be about something completely different.
+- Design actions that explore autonomy vs. heteronomy (one autonomous/risky, one obedient/safe, one transactional).
 
 STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player RIGHT NOW.`;
     } else if (day === 8) {
@@ -3770,7 +4215,9 @@ STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically af
       prompt += `In ONE SHORT SENTENCE, acknowledge the previous action and its immediate consequence.
 Then introduce a NEW dilemma from a DIFFERENT underlying issue.
 
-CRITICAL: Follow Golden Rule B - Do NOT repeat the same tension. If yesterday was about [topic X], today must be about something completely different.
+CRITICAL: Follow Golden Rules B & C:
+- Do NOT repeat the same tension. If yesterday was about [topic X], today must be about something completely different.
+- Design actions that explore autonomy vs. heteronomy (one autonomous/risky, one obedient/safe, one transactional).
 
 DO NOT summarize the general situation.
 DO NOT write about "debates" or "rising tensions."
@@ -3814,6 +4261,7 @@ app.post("/api/game-turn-v2", async (req, res) => {
       dilemmasSubject = null,
       generateActions = true,
       useXAI = false,
+      useGemini = false,
       debugMode = false
     } = req.body;
 
@@ -3877,7 +4325,10 @@ app.post("/api/game-turn-v2", async (req, res) => {
       };
 
       // Build unified system prompt (sent ONCE)
-      const systemPrompt = buildGameMasterSystemPromptUnified(enrichedContext);
+      // Use V3 if feature flag enabled, otherwise use original
+      const systemPrompt = USE_PROMPT_V3
+        ? buildGameMasterSystemPromptUnifiedV3(enrichedContext)
+        : buildGameMasterSystemPromptUnified(enrichedContext);
 
       // Build minimal Day 1 user prompt
       const userPrompt = buildGameMasterUserPrompt(day);
@@ -3921,7 +4372,9 @@ app.post("/api/game-turn-v2", async (req, res) => {
       ];
 
       let aiResponse;
-      if (useXAI) {
+      if (useGemini) {
+        aiResponse = await callGeminiChat(messages, MODEL_DILEMMA_GEMINI);
+      } else if (useXAI) {
         aiResponse = await callXAIChat(messages, MODEL_DILEMMA_XAI);
       } else {
         aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
@@ -4014,7 +4467,7 @@ app.post("/api/game-turn-v2", async (req, res) => {
       }
 
       // Return response (flattened for frontend compatibility)
-      return res.json({
+      const response = {
         title: parsed.dilemma?.title || '',
         description: parsed.dilemma?.description || '',
         actions: parsed.dilemma?.actions || [],
@@ -4022,7 +4475,15 @@ app.post("/api/game-turn-v2", async (req, res) => {
         scope: parsed.dilemma?.scope || '',
         mirrorAdvice: parsed.mirrorAdvice,
         isGameEnd: false
-      });
+      };
+
+      // Add tracking fields if using V3 (for frontend validation)
+      if (USE_PROMPT_V3) {
+        response.valueTargeted = parsed.valueTargeted || 'Unknown';
+        response.axisExplored = parsed.axisExplored || 'Unknown';
+      }
+
+      return res.json(response);
     }
 
     // ========================================================================
@@ -4039,8 +4500,15 @@ app.post("/api/game-turn-v2", async (req, res) => {
 
       console.log(`[GAME-TURN-V2] Day ${day} - Appending to conversation history`);
 
-      // Build minimal Day 2+ user prompt
-      const userPrompt = buildGameMasterUserPrompt(day, playerChoice);
+      // Extract current compass values from payload (Day 2+)
+      const currentCompassTopValues = req.body.currentCompassTopValues || null;
+
+      if (currentCompassTopValues) {
+        console.log(`[GAME-TURN-V2] Day ${day} - Current top values received:`, currentCompassTopValues);
+      }
+
+      // Build Day 2+ user prompt with current compass values
+      const userPrompt = buildGameMasterUserPrompt(day, playerChoice, currentCompassTopValues);
 
       // Prepare messages array (history + new user message)
       const messages = [
@@ -4080,7 +4548,9 @@ app.post("/api/game-turn-v2", async (req, res) => {
 
       // Call AI
       let aiResponse;
-      if (useXAI) {
+      if (useGemini) {
+        aiResponse = await callGeminiChat(messages, MODEL_DILEMMA_GEMINI);
+      } else if (useXAI) {
         aiResponse = await callXAIChat(messages, MODEL_DILEMMA_XAI);
       } else {
         aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
@@ -4130,7 +4600,8 @@ app.post("/api/game-turn-v2", async (req, res) => {
       const existingTopicHistory = conversation.meta.topicHistory || [];
 
       // SEMANTIC SIMILARITY VALIDATION (prevent narrative repetition)
-      if (existingTopicHistory.length > 0) {
+      // DISABLED: Testing if Gemini model follows instructions without validation
+      if (false && existingTopicHistory.length > 0) {
         const prevDilemma = existingTopicHistory[existingTopicHistory.length - 1];
         const currentTitle = parsed.dilemma?.title || '';
         const currentDescription = parsed.dilemma?.description || '';
@@ -4186,7 +4657,9 @@ Regenerate the ENTIRE JSON output with these changes.`;
           const correctedMessages = [...messages, { role: "user", content: correctionPrompt }];
 
           let retryResponse;
-          if (useXAI) {
+          if (useGemini) {
+            retryResponse = await callGeminiChat(correctedMessages, MODEL_DILEMMA_GEMINI);
+          } else if (useXAI) {
             retryResponse = await callXAIChat(correctedMessages, MODEL_DILEMMA_XAI);
           } else {
             retryResponse = await callOpenAIChat(correctedMessages, MODEL_DILEMMA);
@@ -4212,6 +4685,7 @@ Regenerate the ENTIRE JSON output with these changes.`;
       }
 
       // TENSION CLUSTER VALIDATION + RE-PROMPT
+      // DISABLED: Testing if Gemini model follows instructions without validation
       const ALL_CLUSTERS = ['ExternalConflict', 'InternalPower', 'EconomyResources', 'HealthDisaster', 'ReligionCulture', 'LawJustice', 'SocialOrder', 'FamilyPersonal', 'DiplomacyTreaty'];
       const clusterCounts = { ...(conversation.meta.clusterCounts || {}) };
 
@@ -4223,7 +4697,7 @@ Regenerate the ENTIRE JSON output with these changes.`;
       // Check violation: max 2 per game (consecutive repeats are allowed)
       const isOverMax = currentCluster !== 'Unknown' && (clusterCounts[currentCluster] || 0) >= 2;
 
-      if (isOverMax) {
+      if (false && isOverMax) {
         console.log(`[TENSION] ⚠️ CLUSTER VIOLATION: Day ${day} "${currentCluster}" - already used 2 times`);
         console.log(`[TENSION] 🔄 Attempting re-prompt...`);
 
@@ -4244,7 +4718,9 @@ Regenerate the ENTIRE JSON output with these changes.`;
         const correctedMessages = [...messages, { role: "user", content: correctionPrompt }];
 
         let retryResponse;
-        if (useXAI) {
+        if (useGemini) {
+          retryResponse = await callGeminiChat(correctedMessages, MODEL_DILEMMA_GEMINI);
+        } else if (useXAI) {
           retryResponse = await callXAIChat(correctedMessages, MODEL_DILEMMA_XAI);
         } else {
           retryResponse = await callOpenAIChat(correctedMessages, MODEL_DILEMMA);
@@ -4337,7 +4813,7 @@ Regenerate the ENTIRE JSON output with these changes.`;
       }
 
       // Return response (flattened for frontend compatibility)
-      return res.json({
+      const response = {
         title: parsed.dilemma?.title || '',
         description: parsed.dilemma?.description || '',
         actions: parsed.dilemma?.actions || [],
@@ -4347,7 +4823,15 @@ Regenerate the ENTIRE JSON output with these changes.`;
         dynamicParams,
         mirrorAdvice: parsed.mirrorAdvice,
         isGameEnd: isAftermathTurn
-      });
+      };
+
+      // Add tracking fields if using V3 (for frontend validation)
+      if (USE_PROMPT_V3) {
+        response.valueTargeted = parsed.valueTargeted || 'Unknown';
+        response.axisExplored = parsed.axisExplored || 'Unknown';
+      }
+
+      return res.json(response);
     }
 
     // If we get here, invalid request
@@ -5140,6 +5624,39 @@ async function callXAIChat(messages, model) {
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`XAI API error ${response.status}: ${errorText}`);
+  }
+
+  const data = await response.json();
+  return {
+    content: data?.choices?.[0]?.message?.content || "",
+    finishReason: data?.choices?.[0]?.finish_reason
+  };
+}
+
+/**
+ * Call Gemini (Google) Chat API for game-turn endpoint
+ * Uses OpenAI-compatible endpoint format
+ */
+async function callGeminiChat(messages, model) {
+  console.log(`[GEMINI] Calling Gemini API with key: ${GEMINI_KEY ? 'Yes (' + GEMINI_KEY.substring(0, 8) + '...)' : 'NO KEY!'}`);
+  const response = await fetch(GEMINI_CHAT_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${GEMINI_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: model || MODEL_DILEMMA_GEMINI,
+      messages: messages,
+      temperature: 1,
+      max_tokens: 6144,
+      stream: false
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API error ${response.status}: ${errorText}`);
   }
 
   const data = await response.json();

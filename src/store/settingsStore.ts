@@ -47,6 +47,10 @@ type SettingsState = {
   setUseXAI: (v: boolean) => void;
   toggleUseXAI: () => void;
 
+  // --- NEW: Use Gemini (Google) for game-turn API ---
+  useGemini: boolean;
+  setUseGemini: (v: boolean) => void;
+
   // --- NEW: In-game narration mute (separate from global toggle) ---
   narrationMutedInGame: boolean;
   setNarrationMutedInGame: (v: boolean) => void;
@@ -133,6 +137,10 @@ export const useSettingsStore = create<SettingsState>()(
       setUseXAI: (v) => set({ useXAI: v }),
       toggleUseXAI: () => set({ useXAI: !get().useXAI }),
 
+      // NEW: Use Gemini (Google) for game-turn API (default ON)
+      useGemini: true,
+      setUseGemini: (v) => set({ useGemini: v }),
+
       // NEW: In-game narration mute (default OFF - respects global setting)
       narrationMutedInGame: false,
       setNarrationMutedInGame: (v) => set({ narrationMutedInGame: v }),
@@ -183,6 +191,7 @@ export const useSettingsStore = create<SettingsState>()(
         dilemmasSubject: s.dilemmasSubject,
         enableModifiers: s.enableModifiers,
         useLightDilemmaAnthropic: s.useLightDilemmaAnthropic,
+        useGemini: s.useGemini,
         narrationMutedInGame: s.narrationMutedInGame,
         musicEnabled: s.musicEnabled,
         musicVolume: s.musicVolume,

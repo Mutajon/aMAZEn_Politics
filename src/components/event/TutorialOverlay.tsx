@@ -82,7 +82,10 @@ export function TutorialOverlay({ step, targetElement }: TutorialOverlayProps) {
           },
         });
       } else if (step === 'awaiting-compass-pills') {
-        if (!targetElement) return;
+        if (!targetElement) {
+          console.log('[TutorialOverlay] WARNING: Compass pills ref not ready (polling should have prevented this)');
+          return; // Early return - polling should ensure ref is ready
+        }
         const rect = targetElement.getBoundingClientRect();
         // Compass pills button is at right edge, point arrow from left side
         setArrowConfig({

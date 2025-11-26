@@ -240,7 +240,7 @@ async function fetchGameTurn(): Promise<{
     payload.dilemmasSubject = dilemmasSubject || null;
   }
 
-  // Day 2+: Send player choice
+  // Day 2+: Send player choice + current compass values
   if (day > 1 && lastChoice) {
     const { dilemmasSubjectEnabled, dilemmasSubject } = useSettingsStore.getState();
 
@@ -250,6 +250,14 @@ async function fetchGameTurn(): Promise<{
       cost: lastChoice.cost,
       iconHint: lastChoice.iconHint || "speech"
     };
+
+    // Include CURRENT top values (may have shifted due to compass pills)
+    payload.currentCompassTopValues = [
+      { dimension: "what", values: topKWithNames(compassValues?.what, 'what', 2).map(v => v.name) },
+      { dimension: "whence", values: topKWithNames(compassValues?.whence, 'whence', 2).map(v => v.name) },
+      { dimension: "how", values: topKWithNames(compassValues?.how, 'how', 2).map(v => v.name) },
+      { dimension: "whither", values: topKWithNames(compassValues?.whither, 'whither', 2).map(v => v.name) }
+    ];
 
     // Subject focus for Day 2+
     payload.dilemmasSubjectEnabled = dilemmasSubjectEnabled || false;
@@ -267,6 +275,10 @@ async function fetchGameTurn(): Promise<{
   // Pass XAI provider flag
   const useXAI = useSettingsStore.getState().useXAI;
   payload.useXAI = useXAI;
+
+  // Pass Gemini provider flag
+  const useGemini = useSettingsStore.getState().useGemini;
+  payload.useGemini = useGemini;
 
   // Day 1: Initialize compass conversation with game context
   if (day === 1 && payload.gameContext) {
@@ -297,7 +309,7 @@ async function fetchGameTurn(): Promise<{
     }
   }
 
-  console.log(`[fetchGameTurn] Calling /api/game-turn-v2 for Day ${day}, gameId=${currentGameId}, treatment=${treatment}, generateActions=${payload.generateActions}, useXAI=${useXAI}`);
+  console.log(`[fetchGameTurn] Calling /api/game-turn-v2 for Day ${day}, gameId=${currentGameId}, treatment=${treatment}, generateActions=${payload.generateActions}, useXAI=${useXAI}, useGemini=${useGemini}`);
 
   // Log compass values being sent for mirror advice debugging
   if (payload.gameContext?.playerCompassTopValues) {

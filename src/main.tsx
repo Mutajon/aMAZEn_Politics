@@ -22,6 +22,8 @@ const useStrict = import.meta.env.MODE !== "development";
 // Add global functions for switching between AI models
 (window as any).switchToClaude = () => {
   useSettingsStore.getState().setUseLightDilemmaAnthropic(true);
+  useSettingsStore.getState().setUseXAI(false);
+  useSettingsStore.getState().setUseGemini(false);
   console.log("✅ Switched to Claude (Anthropic)");
   console.log("📋 Affected: Dilemma generation + Mirror dialogue");
   console.log("🔧 Models configured in .env:");
@@ -33,6 +35,7 @@ const useStrict = import.meta.env.MODE !== "development";
 (window as any).switchToGPT = () => {
   useSettingsStore.getState().setUseLightDilemmaAnthropic(false);
   useSettingsStore.getState().setUseXAI(false);
+  useSettingsStore.getState().setUseGemini(false);
   console.log("✅ Switched to GPT (OpenAI)");
   console.log("📋 Affected: Dilemma generation + Mirror dialogue + Image generation");
   console.log("🔧 Models configured in .env:");
@@ -45,6 +48,7 @@ const useStrict = import.meta.env.MODE !== "development";
 (window as any).switchToXAI = () => {
   useSettingsStore.getState().setUseLightDilemmaAnthropic(false);
   useSettingsStore.getState().setUseXAI(true);
+  useSettingsStore.getState().setUseGemini(false);
   console.log("✅ Switched to XAI (X.AI/Grok)");
   console.log("📋 Affected: Dilemma generation + Compass pills + Image generation");
   console.log("🔧 Models configured in .env:");
@@ -52,6 +56,17 @@ const useStrict = import.meta.env.MODE !== "development";
   console.log("   - IMAGE_MODEL_XAI (optional - falls back to OpenAI)");
   console.log("💡 Next dilemma/compass will use XAI API");
   console.log("⚠️  Note: XAI doesn't support image generation yet - will fall back to OpenAI");
+};
+
+(window as any).switchToGemini = () => {
+  useSettingsStore.getState().setUseLightDilemmaAnthropic(false);
+  useSettingsStore.getState().setUseXAI(false);
+  useSettingsStore.getState().setUseGemini(true);
+  console.log("✅ Switched to Gemini (Google)");
+  console.log("📋 Affected: Dilemma generation");
+  console.log("🔧 Models configured in .env:");
+  console.log("   - MODEL_DILEMMA_GEMINI");
+  console.log("💡 Next dilemma will use Gemini API");
 };
 
 // Debug mode toggle commands
