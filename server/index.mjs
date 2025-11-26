@@ -969,7 +969,7 @@ app.post("/api/intro-paragraph", async (req, res) => {
       "- Vivid but not florid; no lists, no headings, no bullet points\n" +
       "- Avoid anachronisms; respect the historical setting and political system\n" +
       "- Keep names generic unless iconic to the role or setting\n" +
-      "- If gender is male or female, you may subtly reflect it in titles or forms of address; otherwise use gender-neutral language.";
+      "- If gender is male or female, you must use gender-appropriate grammar and verb forms. For Hebrew: use 'אתה' (you, male) with masculine verbs for male characters, and 'את' (you, female) with feminine verbs for female characters. All verbs must match the character's gender grammatically.";
 
     // Add language instruction if not English
     if (languageCode !== "en") {
@@ -993,6 +993,14 @@ app.post("/api/intro-paragraph", async (req, res) => {
     // Add language instruction to user prompt if not English
     if (languageCode !== "en") {
       user += `\n\nWrite your response in ${languageName}.`;
+      // Add specific Hebrew gender grammar instructions
+      if (languageCode === "he" && (genderText === "male" || genderText === "female")) {
+        if (genderText === "male") {
+          user += `\n\nIMPORTANT: Use masculine forms throughout: "אתה" (you), masculine verbs (נכנס, מרגיש, עומד, etc.). All verbs must be in masculine form.`;
+        } else if (genderText === "female") {
+          user += `\n\nIMPORTANT: Use feminine forms throughout: "את" (you), feminine verbs (נכנסת, מרגישה, עומדת, etc.). All verbs must be in feminine form.`;
+        }
+      }
     }
 
     // tiny retry wrapper (handles occasional upstream 503s)

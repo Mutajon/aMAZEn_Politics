@@ -8,6 +8,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Puzzle } from "lucide-react";
 import { useEffect } from "react";
+import { lang } from "../../i18n/lang";
 
 interface EmptyFragmentPopupProps {
   isOpen: boolean;
@@ -73,7 +74,7 @@ export default function EmptyFragmentPopup({
               {/* Message */}
               <div className="text-center">
                 <h2 className="text-lg font-bold text-white mb-3">
-                  Missing Fragment
+                  {lang("MISSING_FRAGMENT")}
                 </h2>
                 <p className="text-sm text-gray-300 leading-relaxed">
                   Play a game to collect a fragment and learn about yourself!
