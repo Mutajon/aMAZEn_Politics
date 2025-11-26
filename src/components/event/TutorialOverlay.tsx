@@ -81,6 +81,22 @@ export function TutorialOverlay({ step, targetElement }: TutorialOverlayProps) {
             y: 120,
           },
         });
+      } else if (step === 'awaiting-compass-pills') {
+        if (!targetElement) return;
+        const rect = targetElement.getBoundingClientRect();
+        // Compass pills button is at right edge, point arrow from left side
+        setArrowConfig({
+          message: 'Click here to see the latest changes to your values',
+          arrowDirection: 'right',
+          arrowPosition: {
+            x: rect.left - 60,
+            y: rect.top + rect.height / 2,
+          },
+          textPosition: {
+            x: Math.max(20, rect.left - 380),
+            y: rect.top + rect.height / 2 - 40,
+          },
+        });
       }
     };
 

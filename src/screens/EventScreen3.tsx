@@ -162,6 +162,7 @@ export default function EventScreen3({ push }: Props) {
   const tutorial = useDay2Tutorial();
   const [tutorialAvatarRef, setTutorialAvatarRef] = useState<HTMLElement | null>(null);
   const [tutorialValueRef, setTutorialValueRef] = useState<HTMLElement | null>(null);
+  const [tutorialPillsRef, setTutorialPillsRef] = useState<HTMLElement | null>(null);
   const [narrationWasPlaying, setNarrationWasPlaying] = useState(false);
 
   // Debug: Log when tutorial value ref is set
@@ -1035,6 +1036,9 @@ export default function EventScreen3({ push }: Props) {
                   effectPills={compassPings}
                   loading={false}
                   color="#7de8ff"
+                  tutorialMode={tutorial.tutorialActive && tutorial.tutorialStep === 'awaiting-compass-pills'}
+                  tutorialPillsButtonRef={(el) => setTutorialPillsRef(el)}
+                  onTutorialPillsClick={tutorial.onCompassPillsClicked}
                 />
               )}
             </div>
@@ -1114,6 +1118,8 @@ export default function EventScreen3({ push }: Props) {
             targetElement={
               tutorial.tutorialStep === 'awaiting-avatar'
                 ? tutorialAvatarRef
+                : tutorial.tutorialStep === 'awaiting-compass-pills'
+                ? tutorialPillsRef
                 : tutorialValueRef
             }
           />

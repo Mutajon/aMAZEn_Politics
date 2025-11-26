@@ -8,6 +8,7 @@ export type TutorialStep =
   | 'awaiting-value'
   | 'showing-explanation'
   | 'awaiting-modal-close'
+  | 'awaiting-compass-pills'
   | 'complete';
 
 interface SelectedValue {
@@ -58,14 +59,22 @@ export function useDay2Tutorial() {
     }
   }, [tutorialStep]);
 
-  // Handle main modal being closed (tutorial completion)
+  // Handle main modal being closed (advance to compass pills step)
   const onModalClosed = useCallback(() => {
     if (tutorialStep === 'awaiting-modal-close') {
-      console.log('[Tutorial] PlayerCardModal closed, completing tutorial');
+      console.log('[Tutorial] PlayerCardModal closed, advancing to compass pills step');
+      setTutorialStep('awaiting-compass-pills');
+      setSelectedValue(null);
+    }
+  }, [tutorialStep]);
+
+  // Handle compass pills button being clicked (tutorial completion)
+  const onCompassPillsClicked = useCallback(() => {
+    if (tutorialStep === 'awaiting-compass-pills') {
+      console.log('[Tutorial] Compass pills clicked, completing tutorial');
       setTutorialStep('complete');
       localStorage.setItem(TUTORIAL_STORAGE_KEY, 'true');
       setTutorialCompleted(true);
-      setSelectedValue(null);
     }
   }, [tutorialStep]);
 
@@ -91,7 +100,7 @@ export function useDay2Tutorial() {
     tutorialActive: tutorialStep !== 'inactive' && tutorialStep !== 'complete',
     tutorialCompleted,
     selectedValue,
-    shouldShowOverlay: tutorialStep === 'awaiting-avatar' || tutorialStep === 'awaiting-value',
+    shouldShowOverlay: tutorialStep === 'awaiting-avatar' || tutorialStep === 'awaiting-value' || tutorialStep === 'awaiting-compass-pills',
     shouldShowValueHighlight: tutorialStep === 'awaiting-value',
     shouldShowExplanation: tutorialStep === 'showing-explanation' && selectedValue !== null,
     shouldDisableModalClose: tutorialStep === 'showing-explanation', // Only disable during explanation, NOT during awaiting-modal-close
@@ -102,6 +111,7 @@ export function useDay2Tutorial() {
     onValueClicked,
     onExplanationClosed,
     onModalClosed,
+    onCompassPillsClicked,
     completeTutorial,
     resetTutorial,
   };

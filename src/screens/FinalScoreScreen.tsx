@@ -217,7 +217,7 @@ export default function FinalScoreScreen({ push }: Props) {
       displayValuesRef.current[isFinalStep ? sequence.length : step] ?? 0;
 
     if (isFinalStep) {
-      playSfx("drumroll");
+      playSfx("drumroll", 0.3); // 70% volume reduction
     }
 
     const tick = (timestamp: number) => {

@@ -10,6 +10,10 @@ type Props = {
   effectPills: CompassEffectPing[];
   loading: boolean;
   color?: string;
+  // Tutorial props
+  tutorialMode?: boolean;
+  tutorialPillsButtonRef?: (element: HTMLElement | null) => void;
+  onTutorialPillsClick?: () => void;
 };
 
 /** Spinner + stacked pills ABOVE the mirror card.
@@ -17,7 +21,14 @@ type Props = {
  *  - Clicking "+" expands; clicking X button or any pill collapses again.
  *  - Container is pointer-events-none; only controls are clickable.
  *  - Pills animate from/to button position for smooth spatial transitions. */
-export default function CompassPillsOverlay({ effectPills, loading, color }: Props) {
+export default function CompassPillsOverlay({
+  effectPills,
+  loading,
+  color,
+  tutorialMode = false,
+  tutorialPillsButtonRef,
+  onTutorialPillsClick,
+}: Props) {
   const { playSfx } = useAudioManager();
 
   // Track expand/collapse
@@ -175,8 +186,14 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
             <motion.button
               key="pills-collapsed"
               type="button"
-              onClick={() => setExpanded(true)}
-              className="
+              ref={tutorialMode && tutorialPillsButtonRef ? tutorialPillsButtonRef : undefined}
+              onClick={() => {
+                setExpanded(true);
+                if (tutorialMode && onTutorialPillsClick) {
+                  onTutorialPillsClick();
+                }
+              }}
+              className={`
                 pointer-events-auto
                 absolute top-1/2 -translate-y-1/2 translate-x-1/2
                 inline-flex items-center justify-center
@@ -184,7 +201,8 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
                 text-white text-sm font-bold
                 focus:outline-none
                 border border-white/30
-              "
+                ${tutorialMode ? 'ring-2 ring-yellow-400 animate-pulse z-50' : ''}
+              `}
               aria-label="Show effects"
               title="Show effects"
               style={{
