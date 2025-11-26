@@ -14,9 +14,8 @@ export type ResourceBarScoreDetails = {
   total: number;
   maxTotal: number;
   components: Array<{
-    id: "people" | "middle" | "mom" | "corruption";
+    id: "people" | "middle" | "mom";
     label: string;
-    tierLabel?: string;  // Optional tier label for corruption (shown on second line)
     valueLabel: string;
     points: number;
     maxPoints: number;
@@ -32,6 +31,14 @@ type Props = {
   goalStatus?: RoleGoalStatus;
   scoreDetails: ResourceBarScoreDetails;
   avatarSrc?: string | null; // Player avatar image
+  // Tutorial props
+  tutorialMode?: boolean;
+  tutorialDisableClose?: boolean; // Controls whether modal can be closed during tutorial
+  onTutorialAvatarClick?: () => void;
+  onTutorialValueClick?: (value: any) => void;
+  onTutorialModalClose?: () => void;
+  tutorialValueRef?: (element: HTMLElement | null) => void;
+  avatarButtonRef?: (element: HTMLElement | null) => void;
 };
 
 export default function ResourceBar({
@@ -43,6 +50,13 @@ export default function ResourceBar({
   goalStatus = "uncompleted",
   scoreDetails,
   avatarSrc = null,
+  tutorialMode = false,
+  tutorialDisableClose = false,
+  onTutorialAvatarClick,
+  onTutorialValueClick,
+  onTutorialModalClose,
+  tutorialValueRef,
+  avatarButtonRef,
 }: Props) {
   // Check if modifiers (difficulty + goals) are enabled
   const enableModifiers = useSettingsStore((s) => s.enableModifiers);
@@ -53,6 +67,22 @@ export default function ResourceBar({
   const [imgError, setImgError] = useState(false);
   const character = useRoleStore((s) => s.character);
   const playerName = character?.name || "Unknown Leader";
+
+  // Handle modal open during tutorial
+  const handleAvatarClick = () => {
+    setIsModalOpen(true);
+    if (tutorialMode && onTutorialAvatarClick) {
+      onTutorialAvatarClick();
+    }
+  };
+
+  // Handle modal close during tutorial
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    if (tutorialMode && onTutorialModalClose) {
+      onTutorialModalClose();
+    }
+  };
 
   // --- Animated counter: prev -> budget over 2s (ease-out) ---
   const [displayBudget, setDisplayBudget] = React.useState(budget);
@@ -169,8 +199,13 @@ export default function ResourceBar({
 
         {/* Player Avatar Section */}
         <button
-          onClick={() => setIsModalOpen(true)}
-          className="shrink-0 rounded-xl overflow-hidden ring-1 ring-white/15 bg-white/5 hover:ring-white/30 hover:bg-white/10 transition-all duration-200"
+          ref={avatarButtonRef}
+          onClick={handleAvatarClick}
+          className={`shrink-0 rounded-xl overflow-hidden ring-1 transition-all duration-200 ${
+            tutorialMode
+              ? 'ring-yellow-400 ring-2 bg-white/10 z-50 relative'
+              : 'ring-white/15 bg-white/5 hover:ring-white/30 hover:bg-white/10'
+          }`}
           style={{ width: 80, height: 80, minWidth: 80 }}
           aria-label={`View ${playerName}'s character information`}
           title={`View ${playerName}'s character card`}
@@ -196,8 +231,12 @@ export default function ResourceBar({
       {/* Player Card Modal */}
       <PlayerCardModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleModalClose}
         avatarSrc={avatarSrc}
+        tutorialMode={tutorialMode}
+        tutorialDisableClose={tutorialDisableClose}
+        onTutorialValueClick={onTutorialValueClick}
+        tutorialValueRef={tutorialValueRef}
       />
     </>
   );
@@ -399,14 +438,7 @@ function ScorePill({
                 key={comp.id}
                 className="flex items-center justify-between gap-3 text-white/80"
               >
-                <span className="truncate">
-                  {comp.label}
-                  {comp.tierLabel && (
-                    <span className="block text-xs text-white/60 mt-0.5">
-                      {comp.tierLabel}
-                    </span>
-                  )}
-                </span>
+                <span className="truncate">{comp.label}</span>
                 <span className="tabular-nums font-semibold text-white/90">
                   {formatPoints(comp.points)} pts
                 </span>

@@ -72,6 +72,7 @@ export default function ActionDeck({
     attachCardRef,
     openSuggestModal,
     closeSuggestModal,
+    closeModalAfterSuccess,
     startConfirmationFlow,
     startSuggestConfirmationFlow,
     logSuggestionSubmitted,
@@ -92,31 +93,61 @@ export default function ActionDeck({
     setValidatingSuggest,
     setSuggestError,
     onConfirmSuggestion: async () => {
+      debugLog("onConfirmSuggestion: STARTED");
+
+      // Validate that onSuggest prop exists
+      if (!onSuggest) {
+        debugLog("onConfirmSuggestion: CRITICAL ERROR - onSuggest prop is undefined");
+        throw new Error("onSuggest callback is required but was not provided");
+      }
+
       await startSuggestConfirmationFlow();
+      debugLog("onConfirmSuggestion: confirmation flow completed");
 
       // Skip coin animation if budget is disabled
       if (!showBudget) {
-        debugLog("handleConfirmSuggestion: budget disabled, skipping coin animation");
-        onSuggest?.(suggestText);
+        debugLog("onConfirmSuggestion: budget disabled, skipping coin animation");
+        await onSuggest(suggestText);
+        closeModalAfterSuccess(); // Close modal after parent handler succeeds
+        debugLog("onConfirmSuggestion: COMPLETED (no budget)");
+        return;
+      }
+
+      // Validate ref exists before animation
+      if (!suggestRef.current) {
+        debugLog("onConfirmSuggestion: WARNING - suggestRef.current is null, skipping animation");
+        await onSuggest(suggestText);
+        closeModalAfterSuccess(); // Close modal after parent handler succeeds
+        debugLog("onConfirmSuggestion: COMPLETED (no ref)");
         return;
       }
 
       // Coins + budget counter should start at the same time for suggestions
       if (suggestCost < 0) {
         // from budget → to pill
+        debugLog("onConfirmSuggestion: starting coin animation (budget → pill)");
         syncCoinAndBudget(
           () => getBudgetAnchorRect(),
           () => getCenterRect(suggestRef.current),
-          () => onSuggest?.(suggestText),
+          () => {
+            onSuggest(suggestText);
+            closeModalAfterSuccess(); // Close modal after parent handler succeeds
+            debugLog("onConfirmSuggestion: COMPLETED (with animation)");
+          },
           triggerCoinFlight,
           debugLog
         );
       } else {
         // from pill → to budget
+        debugLog("onConfirmSuggestion: starting coin animation (pill → budget)");
         syncCoinAndBudget(
           () => getCenterRect(suggestRef.current),
           () => getBudgetAnchorRect(),
-          () => onSuggest?.(suggestText),
+          () => {
+            onSuggest(suggestText);
+            closeModalAfterSuccess(); // Close modal after parent handler succeeds
+            debugLog("onConfirmSuggestion: COMPLETED (with animation)");
+          },
           triggerCoinFlight,
           debugLog
         );
@@ -207,8 +238,18 @@ export default function ActionDeck({
     // Log suggestion submission with typing duration + cost/budget data
     logSuggestionSubmitted(suggestCost, budget);
 
-    // Validate and confirm
-    await suggestion.validateAndConfirmSuggestion(suggestText);
+    try {
+      // Validate and confirm
+      debugLog("handleConfirmSuggestion: calling validateAndConfirmSuggestion");
+      await suggestion.validateAndConfirmSuggestion(suggestText);
+      debugLog("handleConfirmSuggestion: validation completed");
+    } catch (err: any) {
+      // This should rarely happen since validation handles its own errors
+      // But if it does, log it and set error state
+      debugLog("handleConfirmSuggestion: UNCAUGHT ERROR", err);
+      setSuggestError(err?.message || "An unexpected error occurred");
+      setValidatingSuggest(false);
+    }
   };
 
   return (

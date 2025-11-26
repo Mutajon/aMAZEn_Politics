@@ -5,6 +5,7 @@ import { bgStyleWithRoleImage } from "../lib/ui";
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
 import { useSettingsStore } from "../store/settingsStore";
+import { useMirrorDialogueStore } from "../store/mirrorDialogueStore";
 import MirrorBubble from "../components/MirrorBubble";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLogger } from "../hooks/useLogger";
@@ -68,6 +69,10 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
   const resetCompass = useCompassStore((s) => s.reset);
 
+  // Check if this is the first time visiting mirror dialogue
+  const firstMirrorDialogue = useMirrorDialogueStore((s) => s.firstMirrorDialogue);
+  const markMirrorDialogueCompleted = useMirrorDialogueStore((s) => s.markMirrorDialogueCompleted);
+
   // Create role-based background style
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
 
@@ -93,15 +98,26 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
     return baseKey;
   };
 
-  // script - memoized to update when character gender or name changes
+  // script - memoized to update when character gender, name, or visit status changes
   const playerName = character?.name || lang(getGenderKey("PLAYER_DEFAULT_NAME"));
-  const script = useMemo<Array<{ side: "mirror" | "player"; text: string; italic?: boolean }>>(() => [
-    { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_1")), italic: true },
-    { side: "player", text: lang(getGenderKey("MIRROR_DIALOGUE_2")) },
-    { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_3")).replace("{playerName}", playerName), italic: true },
-    { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_4")), italic: true },
-    { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_5")), italic: true },
-  ], [character?.gender, character?.name, lang]);
+  const script = useMemo<Array<{ side: "mirror" | "player"; text: string; italic?: boolean }>>(() => {
+    // First-time dialogue (full 5-message conversation)
+    if (firstMirrorDialogue) {
+      return [
+        { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_1")), italic: true },
+        { side: "player", text: lang(getGenderKey("MIRROR_DIALOGUE_2")) },
+        { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_3")).replace("{playerName}", playerName), italic: true },
+        { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_4")), italic: true },
+        { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_5")), italic: true },
+      ];
+    }
+
+    // Returning player dialogue (abbreviated 2-message version)
+    return [
+      { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_RETURN_1")), italic: true },
+      { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_RETURN_2")), italic: true },
+    ];
+  }, [character?.gender, character?.name, lang, firstMirrorDialogue]);
 
   const [chatIndex, setChatIndex] = useState(0);
 
@@ -188,6 +204,22 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ type: "spring", stiffness: 280, damping: 22 }}
                       onClick={() => {
+                        // Mark dialogue as completed if this is the first time
+                        if (firstMirrorDialogue) {
+                          markMirrorDialogueCompleted();
+                          logger.log(
+                            'mirror_dialogue_first_visit_completed',
+                            { playerName, character: character?.name },
+                            'User completed mirror dialogue for the first time'
+                          );
+                        } else {
+                          logger.log(
+                            'mirror_dialogue_return_visit',
+                            { playerName, character: character?.name },
+                            'Returning player completed mirror dialogue'
+                          );
+                        }
+
                         logger.log('button_click_mirror_dialogue_continue', "Sure, let's go", 'User clicked continue to compass quiz');
                         push("/compass-quiz");
                       }}

@@ -116,15 +116,16 @@ export default function ActionDeckContent({
   const suggestTextValid = suggestText.trim().length >= 4;
 
   // Auto-open suggest modal in full autonomy mode
+  // FIX: Add validatingSuggest check to prevent auto-reopen after validation failure
   useEffect(() => {
-    if (!config.showAIOptions && config.showCustomAction && !isSuggestOpen && !confirmingId) {
+    if (!config.showAIOptions && config.showCustomAction && !isSuggestOpen && !confirmingId && !validatingSuggest) {
       // Open modal after brief delay to allow animations to settle
       const timer = setTimeout(() => {
         onOpenSuggest();
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [config.showAIOptions, config.showCustomAction, isSuggestOpen, confirmingId, onOpenSuggest]);
+  }, [config.showAIOptions, config.showCustomAction, isSuggestOpen, confirmingId, validatingSuggest, onOpenSuggest]);
 
   // Wrapper handlers with click sound + logging
   const handleSelectCard = (id: string) => {
@@ -399,7 +400,11 @@ export default function ActionDeckContent({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              <div className={OVERLAY_BACKDROP} onClick={handleCloseSuggest} />
+              <div className={OVERLAY_BACKDROP} onClick={() => {
+                if (!validatingSuggest) {
+                  handleCloseSuggest();
+                }
+              }} />
               <motion.div
                 className={`${CARD_BASE} bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 w-[96%] max-w-md px-4 py-4 relative`}
                 initial={{ y: 30, scale: 0.98 }}
@@ -407,6 +412,17 @@ export default function ActionDeckContent({
                 exit={{ y: 16, scale: 0.98 }}
                 transition={{ type: "tween", duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               >
+                {/* Loading overlay - shows during validation */}
+                {validatingSuggest && (
+                  <div className="absolute inset-0 bg-slate-950/90 rounded-2xl flex flex-col items-center justify-center gap-3 z-10">
+                    <div className="w-8 h-8 border-3 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin"></div>
+                    <div className="text-cyan-400 text-sm font-medium">Validating your action...</div>
+                    <div className="text-cyan-400/60 text-xs max-w-[80%] text-center">
+                      This may take up to 15 seconds
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between">
                   <div className="text-[13px] font-semibold text-white">Suggest your own</div>
                   {showBudget && (
@@ -441,13 +457,17 @@ export default function ActionDeckContent({
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
-                        onConfirmSuggestion();
+                        if (!validatingSuggest && canAffordSuggestion && suggestTextValid) {
+                          handleConfirmSuggestion();
+                        }
                       }
                     }}
+                    disabled={validatingSuggest}
                   />
                   {suggestError && (
-                    <div className="mt-2 text-[12px] text-rose-200">
-                      {suggestError}
+                    <div className="mt-2 text-[12px] text-rose-200 bg-rose-950/30 rounded-lg px-3 py-2 border border-rose-500/30">
+                      <div className="font-semibold mb-1">Error:</div>
+                      <div>{suggestError}</div>
                     </div>
                   )}
                 </div>
@@ -455,7 +475,7 @@ export default function ActionDeckContent({
                 <div className="mt-3 flex items-center justify-end gap-2">
                   <button
                     type="button"
-                    className="px-3 py-1.5 rounded-full bg-white/10 ring-1 ring-white/15 text-white text-[12px]"
+                    className="px-3 py-1.5 rounded-full bg-white/10 ring-1 ring-white/15 text-white text-[12px] disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={handleCloseSuggest}
                     disabled={validatingSuggest}
                   >
@@ -463,7 +483,7 @@ export default function ActionDeckContent({
                   </button>
                   <button
                     type="button"
-                    className={CONFIRM_BTN_CLASS}
+                    className={`${CONFIRM_BTN_CLASS} disabled:opacity-50 disabled:cursor-not-allowed`}
                     disabled={validatingSuggest || !canAffordSuggestion || !suggestTextValid}
                     onClick={handleConfirmSuggestion}
                   >

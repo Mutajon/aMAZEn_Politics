@@ -1,6 +1,7 @@
 // src/components/event/CompassPillsOverlay.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react";
 import type { CompassEffectPing } from "../MiniCompass";
 import { COMPONENTS, PALETTE } from "../../data/compass-data";
 import { useAudioManager } from "../../hooks/useAudioManager";
@@ -13,7 +14,7 @@ type Props = {
 
 /** Spinner + stacked pills ABOVE the mirror card.
  *  - Shows pills for ~2s, then collapses to a small "+" button.
- *  - Clicking "+" expands; clicking any pill collapses again.
+ *  - Clicking "+" expands; clicking X button or any pill collapses again.
  *  - Container is pointer-events-none; only controls are clickable.
  *  - Pills animate from/to button position for smooth spatial transitions. */
 export default function CompassPillsOverlay({ effectPills, loading, color }: Props) {
@@ -85,6 +86,34 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
                 transform: "translate(-50%, -50%)",
               }}
             >
+              {/* Close button */}
+              <motion.button
+                type="button"
+                onClick={() => setExpanded(false)}
+                className="
+                  absolute -top-1 -left-20 z-10
+                  w-8 h-8 rounded-full
+                  bg-white/20 hover:bg-white/30
+                  backdrop-blur-sm border border-white/40
+                  flex items-center justify-center
+                  transition-colors cursor-pointer
+                  focus:outline-none
+                "
+                style={{
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+                }}
+                aria-label="Close compass effects"
+                title="Close"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                transition={{ duration: 0.2 }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <X className="w-5 h-5 text-white" />
+              </motion.button>
+
               {effectPills.map((p, index) => {
                 const label = COMPONENTS[p.prop][p.idx]?.short ?? "";
                 const bg = (PALETTE as any)[p.prop]?.base ?? "#fff";

@@ -3,14 +3,17 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import "./App.css";
 import { useSettingsStore } from "./store/settingsStore";
 import { usePastGamesStore } from "./store/pastGamesStore";
 import { useFragmentsStore } from "./store/fragmentsStore";
+import { useMirrorDialogueStore } from "./store/mirrorDialogueStore";
 import { useLoggingStore, resetLoggingStore } from "./store/loggingStore";
 import { useDilemmaStore } from "./store/dilemmaStore";
 import { useCompassStore } from "./store/compassStore";
 import { useRoleStore } from "./store/roleStore";
 import { useHighscoreStore } from "./store/highscoreStore";
+import { resetDay2Tutorial } from "./hooks/useDay2Tutorial";
 
 // Disable StrictMode in development to avoid double-invoked effects (which fire duplicate API calls).
 const useStrict = import.meta.env.MODE !== "development";
@@ -100,30 +103,6 @@ const useStrict = import.meta.env.MODE !== "development";
   }
 };
 
-// Corruption tracking toggle commands
-(window as any).enableCorruption = () => {
-  useSettingsStore.getState().setCorruptionTrackingEnabled(true);
-  console.log('✅ Corruption tracking enabled immediately (no refresh needed).');
-  console.log('🔸 Features: Corruption pills appear on Day 2+, AI judges power misuse');
-  console.log('💡 Corruption level tracked internally (0-100 scale)');
-};
-
-(window as any).disableCorruption = () => {
-  useSettingsStore.getState().setCorruptionTrackingEnabled(false);
-  console.log('❌ Corruption tracking disabled immediately (no refresh needed).');
-};
-
-(window as any).toggleCorruption = () => {
-  const current = useSettingsStore.getState().corruptionTrackingEnabled;
-  useSettingsStore.getState().setCorruptionTrackingEnabled(!current);
-  if (!current) {
-    console.log('✅ Corruption tracking enabled immediately (no refresh needed).');
-    console.log('🔸 Features: Corruption pills appear on Day 2+, AI judges power misuse');
-  } else {
-    console.log('❌ Corruption tracking disabled immediately (no refresh needed).');
-  }
-};
-
 // Democracy rating access (hidden axis for analysis)
 (window as any).showDemocracy = () => {
   const democracyRating = (window as any).__democracyRating;
@@ -168,7 +147,7 @@ const useStrict = import.meta.env.MODE !== "development";
     console.log(`[${index + 1}] ${game.playerName} — ${game.roleTitle}`);
     console.log(`    System: ${game.systemName} | Score: ${game.finalScore}`);
     console.log(`    Support: People=${game.supportPeople} Middle=${game.supportMiddle} MoM=${game.supportMom}`);
-    console.log(`    Corruption: ${game.corruptionLevel} | Date: ${date}`);
+    console.log(`    Date: ${date}`);
     console.log(`    Legacy: "${game.legacy}"`);
     console.log(`    Snapshot Events: ${game.snapshotHighlights.length} highlights`);
     console.log(`    Top Compass: ${game.topCompassValues.length} values`);
@@ -301,6 +280,27 @@ const useStrict = import.meta.env.MODE !== "development";
   }
 };
 
+(window as any).resetMirrorDialogue = () => {
+  const currentState = useMirrorDialogueStore.getState().firstMirrorDialogue;
+
+  if (currentState) {
+    console.log('ℹ️  Mirror dialogue flag is already true (will show full dialogue).');
+    return;
+  }
+
+  const confirmed = confirm(
+    'Reset mirror dialogue flag? This will make the next mirror dialogue visit show the full conversation again.'
+  );
+
+  if (confirmed) {
+    useMirrorDialogueStore.getState().resetMirrorDialogue();
+    console.log('✅ Mirror dialogue flag reset to true. Next visit will show full dialogue.');
+    console.log('💡 Navigate to the mirror dialogue screen to see the change.');
+  } else {
+    console.log('❌ Reset cancelled.');
+  }
+};
+
 // ========================================================================
 // Experiment Mode Management
 // ========================================================================
@@ -329,6 +329,24 @@ const useStrict = import.meta.env.MODE !== "development";
 
 (window as any).clearExperimentProgress = (window as any).resetExperimentProgress;
 
+// Skip to specific scenarios for testing
+(window as any).skipToNorthAmerica = () => {
+  useLoggingStore.getState().markExperimentRoleCompleted('Athens — Shadows of War (-431)');
+  useDilemmaStore.getState().reset();
+  useRoleStore.getState().reset();
+  console.log('✅ Athens marked complete. North America unlocked.');
+  console.log('💡 Navigate to /role to start North America scenario.');
+};
+
+(window as any).skipToMars = () => {
+  useLoggingStore.getState().markExperimentRoleCompleted('Athens — Shadows of War (-431)');
+  useLoggingStore.getState().markExperimentRoleCompleted('North America — The First Frontier (1607)');
+  useDilemmaStore.getState().reset();
+  useRoleStore.getState().reset();
+  console.log('✅ Athens + North America marked complete. Mars unlocked.');
+  console.log('💡 Navigate to /role to start Mars scenario.');
+};
+
 // ========================================================================
 // Complete Reset (First-Time Player Experience)
 // ========================================================================
@@ -344,7 +362,11 @@ const useStrict = import.meta.env.MODE !== "development";
     usePastGamesStore.getState().clearAll();
     useFragmentsStore.getState().clearFragments();
     useFragmentsStore.getState().resetIntro();
+    useMirrorDialogueStore.getState().resetMirrorDialogue();
     useHighscoreStore.getState().reset();
+
+    // Tutorial systems
+    resetDay2Tutorial();
 
     // User identity & treatment
     resetLoggingStore(); // Generates new userId
@@ -359,6 +381,8 @@ const useStrict = import.meta.env.MODE !== "development";
     console.log('   → Experiment progress reset');
     console.log('   → Past games cleared');
     console.log('   → Fragments cleared, intro reset');
+    console.log('   → Mirror dialogue reset');
+    console.log('   → Day 2 tutorial reset');
     console.log('   → Highscores reset to defaults');
     console.log('   → New anonymous user ID generated');
     console.log('   → Treatment reset to semiAutonomy');
@@ -366,6 +390,13 @@ const useStrict = import.meta.env.MODE !== "development";
     console.log('💾 User preferences preserved (audio, language, display)');
     console.log('💡 Refresh the page to start fresh!');
   }
+};
+
+// Tutorial management
+(window as any).resetDay2Tutorial = () => {
+  resetDay2Tutorial();
+  console.log('✅ Day 2 tutorial reset');
+  console.log('💡 Tutorial will show again on next Day 2 playthrough');
 };
 
 // HIDDEN FOR EXPERIMENTAL DISTRIBUTION
@@ -380,9 +411,6 @@ const useStrict = import.meta.env.MODE !== "development";
 // console.log("  skipPreviousContext()     - Skip Day 2+ context (diagnose AI failures)");
 // console.log("  includePreviousContext()  - Include Day 2+ context (normal behavior)");
 // console.log("  togglePreviousContext()   - Toggle previous context on/off");
-// console.log("  enableCorruption()        - Enable corruption tracking (AI judges power misuse)");
-// console.log("  disableCorruption()       - Disable corruption tracking");
-// console.log("  toggleCorruption()        - Toggle corruption tracking on/off");
 // ----------------------------------------------------------------
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

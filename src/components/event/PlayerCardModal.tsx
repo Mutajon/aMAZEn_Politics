@@ -1,10 +1,9 @@
 // src/components/event/PlayerCardModal.tsx
-// Modal displaying player character information, compass values, and corruption level
+// Modal displaying player character information and compass values
 //
 // Features:
 // - Shows player avatar, name, role, political system in header
 // - Displays top 2 values for each compass dimension (what/whence/how/whither)
-// - Shows current corruption level with flavor text
 // - Click outside or X button to close
 // - Animated with Framer Motion
 // - Reads live data from stores (compass values update in real-time)
@@ -12,25 +11,33 @@
 // Connected to:
 // - src/components/event/MirrorWithAvatar.tsx: Opened by clicking player avatar
 // - src/lib/compassHelpers.ts: Extracts top compass values
-// - src/lib/corruptionLevels.ts: Maps corruption scores to tiers
 // - src/data/compass-data.ts: Compass component definitions
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, User } from "lucide-react";
-import { PROPERTIES, PALETTE } from "../../data/compass-data";
+import { PROPERTIES, PALETTE, COMPONENTS, type PropKey } from "../../data/compass-data";
 import { getAllTopCompassValues, type CompassComponentValue } from "../../lib/compassHelpers";
-import { getCorruptionInfo } from "../../lib/corruptionLevels";
 import { useRoleStore } from "../../store/roleStore";
 import { useCompassStore } from "../../store/compassStore";
-import { useDilemmaStore } from "../../store/dilemmaStore";
-import { normalizeCorruptionLevel } from "../../lib/scoring";
+import { ValueExplanationModal } from "./ValueExplanationModal";
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
   avatarSrc?: string | null;
+  // Tutorial props
+  tutorialMode?: boolean;
+  tutorialDisableClose?: boolean; // Separate flag to control whether modal can be closed during tutorial
+  onTutorialValueClick?: (value: { short: string; full: string; dimension: PropKey; index: number }) => void;
+  tutorialValueRef?: (element: HTMLElement | null) => void;
 };
+
+interface SelectedValueForExplanation {
+  short: string;
+  full: string;
+  dimension: PropKey;
+}
 
 /**
  * Renders a single compass dimension box showing top values
@@ -40,11 +47,21 @@ function CompassBox({
   subtitle,
   color,
   topValues,
+  propKey: _propKey,
+  tutorialMode = false,
+  highlightedIndex = -1,
+  onValueClick,
+  valueRef,
 }: {
   title: string;
   subtitle: string;
   color: string;
   topValues: CompassComponentValue[];
+  propKey: PropKey;
+  tutorialMode?: boolean;
+  highlightedIndex?: number;
+  onValueClick?: (value: CompassComponentValue, idx: number) => void;
+  valueRef?: (element: HTMLElement | null) => void;
 }) {
   return (
     <div
@@ -67,24 +84,34 @@ function CompassBox({
         {topValues.length === 0 ? (
           <p className="text-sm text-white/50 italic">Yet to be determined...</p>
         ) : (
-          topValues.map((component, idx) => (
-            <div
-              key={idx}
-              className="flex items-center justify-between gap-2 rounded-lg px-3 py-2"
-              style={{ backgroundColor: `${color}10` }}
-            >
-              <span className="text-sm text-white/90 font-medium">
-                {component.short}
-              </span>
-              <div
-                className="h-2 rounded-full min-w-[40px] max-w-[80px] flex-shrink-0"
-                style={{
-                  backgroundColor: `${color}40`,
-                  width: `${Math.max(40, component.value * 8)}px`,
-                }}
-              />
-            </div>
-          ))
+          topValues.map((component, idx) => {
+            const isHighlighted = tutorialMode && highlightedIndex === idx;
+
+            return (
+              <button
+                key={idx}
+                ref={isHighlighted && valueRef ? valueRef : undefined}
+                onClick={() => onValueClick && onValueClick(component, idx)}
+                className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity ${
+                  isHighlighted
+                    ? 'ring-2 ring-yellow-400 animate-pulse hover:ring-yellow-300 transition-all transform scale-105'
+                    : ''
+                }`}
+                style={{ backgroundColor: `${color}10` }}
+              >
+                <span className="text-sm text-white/90 font-medium">
+                  {component.short}
+                </span>
+                <div
+                  className="h-2 rounded-full min-w-[40px] max-w-[80px] flex-shrink-0"
+                  style={{
+                    backgroundColor: `${color}40`,
+                    width: `${Math.max(40, component.value * 8)}px`,
+                  }}
+                />
+              </button>
+            );
+          })
         )}
       </div>
     </div>
@@ -95,9 +122,16 @@ export default function PlayerCardModal({
   isOpen,
   onClose,
   avatarSrc,
+  tutorialMode = false,
+  tutorialDisableClose = false,
+  onTutorialValueClick,
+  tutorialValueRef,
 }: Props) {
   // Avatar error handling
   const [imgError, setImgError] = useState(false);
+
+  // Value explanation modal (permanent feature - works outside tutorial too)
+  const [selectedValueForExplanation, setSelectedValueForExplanation] = useState<SelectedValueForExplanation | null>(null);
 
   // Read live data from stores
   const character = useRoleStore((s) => s.character);
@@ -106,16 +140,65 @@ export default function PlayerCardModal({
   const roleYear = useRoleStore((s) => s.roleYear);
   const roleDescription = useRoleStore((s) => s.roleDescription);
   const compassValues = useCompassStore((s) => s.values); // Live compass values
-  const rawCorruptionLevel = useDilemmaStore((s) => s.corruptionLevel);
+
+  // Tutorial: select a random value to highlight
+  const [tutorialTarget, setTutorialTarget] = useState<{ propKey: PropKey; index: number } | null>(null);
+
+  useEffect(() => {
+    if (tutorialMode && isOpen) {
+      const topValues = getAllTopCompassValues(compassValues, 2);
+
+      // Collect all available values from all dimensions
+      const availableValues: { propKey: PropKey; index: number }[] = [];
+      PROPERTIES.forEach((prop) => {
+        const values = topValues[prop.key];
+        values.forEach((_, idx) => {
+          availableValues.push({ propKey: prop.key, index: idx });
+        });
+      });
+
+      // Pick a random value
+      if (availableValues.length > 0) {
+        const randomIndex = Math.floor(Math.random() * availableValues.length);
+        const selected = availableValues[randomIndex];
+        setTutorialTarget(selected);
+        console.log('[PlayerCardModal] Tutorial target selected:', selected);
+      }
+    } else {
+      setTutorialTarget(null);
+    }
+  }, [tutorialMode, isOpen]);
 
   if (!isOpen) return null;
 
   // Compute derived values
   const playerName = character?.name || "Unknown Leader";
   const systemName = analysis?.systemName || "Unknown System";
-  const normalizedCorruption = normalizeCorruptionLevel(rawCorruptionLevel);
   const topValues = getAllTopCompassValues(compassValues, 2);
-  const corruptionInfo = getCorruptionInfo(normalizedCorruption);
+
+  // Handle value click (works in both tutorial and normal mode)
+  const handleValueClick = (value: CompassComponentValue, propKey: PropKey, idx: number) => {
+    // Get the full explanation from COMPONENTS
+    const componentData = COMPONENTS[propKey].find((c) => c.short === value.short);
+    if (componentData) {
+      // Always show explanation modal (permanent feature)
+      setSelectedValueForExplanation({
+        short: componentData.short,
+        full: componentData.full,
+        dimension: propKey,
+      });
+
+      // Also trigger tutorial callback if in tutorial mode
+      if (tutorialMode && onTutorialValueClick) {
+        onTutorialValueClick({
+          short: componentData.short,
+          full: componentData.full,
+          dimension: propKey,
+          index: idx,
+        });
+      }
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -125,7 +208,7 @@ export default function PlayerCardModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={onClose}
+          onClick={tutorialDisableClose ? undefined : onClose}
           className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         />
 
@@ -140,11 +223,14 @@ export default function PlayerCardModal({
         >
           {/* Header */}
           <div className="sticky top-0 z-10 bg-gradient-to-b from-slate-900/95 to-transparent backdrop-blur-sm px-6 pt-6 pb-4 border-b border-white/10">
-            {/* Close Button */}
+            {/* Close Button - disabled during tutorial until explanation is viewed */}
             <button
-              onClick={onClose}
-              className="absolute top-4 right-4 p-2 rounded-lg hover:bg-white/10 transition-colors z-20"
+              onClick={tutorialDisableClose ? undefined : onClose}
+              className={`absolute top-4 right-4 p-2 rounded-lg transition-colors z-20 ${
+                tutorialDisableClose ? 'opacity-30 cursor-not-allowed' : 'hover:bg-white/10'
+              }`}
               aria-label="Close"
+              disabled={tutorialDisableClose}
             >
               <X className="w-5 h-5 text-white/70" />
             </button>
@@ -207,52 +293,41 @@ export default function PlayerCardModal({
                 {PROPERTIES.map((prop) => (
                   <CompassBox
                     key={prop.key}
+                    propKey={prop.key}
                     title={prop.title}
                     subtitle={prop.subtitle}
                     color={PALETTE[prop.key].base}
                     topValues={topValues[prop.key]}
+                    tutorialMode={tutorialMode}
+                    highlightedIndex={
+                      tutorialMode && tutorialTarget?.propKey === prop.key
+                        ? tutorialTarget.index
+                        : -1
+                    }
+                    onValueClick={(value, idx) => handleValueClick(value, prop.key, idx)}
+                    valueRef={
+                      tutorialMode && tutorialTarget?.propKey === prop.key
+                        ? tutorialValueRef
+                        : undefined
+                    }
                   />
                 ))}
-              </div>
-            </div>
-
-            {/* Corruption Section */}
-            <div>
-              <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3">
-                Corruption Level
-              </h3>
-              <div
-                className="rounded-xl p-5 border-2"
-                style={{
-                  backgroundColor: `${corruptionInfo.color}10`,
-                  borderColor: `${corruptionInfo.color}40`,
-                }}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: corruptionInfo.color }}
-                    />
-                    <span
-                      className="text-lg font-bold"
-                      style={{ color: corruptionInfo.color }}
-                    >
-                      {corruptionInfo.label}
-                    </span>
-                  </div>
-                  <div className="text-sm text-white/60">
-                    {normalizedCorruption.toFixed(1)} / 10
-                  </div>
-                </div>
-                <p className="text-white/80 italic leading-relaxed">
-                  {corruptionInfo.flavor}
-                </p>
               </div>
             </div>
           </div>
         </motion.div>
       </div>
+
+      {/* Value Explanation Modal - Permanent feature (works outside tutorial) */}
+      {selectedValueForExplanation && (
+        <ValueExplanationModal
+          value={selectedValueForExplanation}
+          onClose={() => {
+            setSelectedValueForExplanation(null);
+            // If in tutorial mode, the tutorial callback was already triggered
+          }}
+        />
+      )}
     </AnimatePresence>
   );
 }

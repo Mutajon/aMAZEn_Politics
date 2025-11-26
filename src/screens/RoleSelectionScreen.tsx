@@ -580,7 +580,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                     disabled={scenarioSubmitting}
                     className="rounded-xl px-5 py-2.5 text-sm font-medium bg-white/10 text-white hover:bg-white/15 transition-colors disabled:opacity-50"
                   >
-                    Cancel
+                    {lang("CANCEL")}
                   </button>
                   <button
                     type="submit"
@@ -591,7 +591,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                         : "bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] hover:from-amber-400 hover:to-amber-600"
                     }`}
                   >
-                    {scenarioSubmitting ? "Submitting..." : "Submit Suggestion"}
+                    {scenarioSubmitting ? lang("SUBMITTING") : lang("SUBMIT_SUGGESTION")}
                   </button>
                 </div>
               </form>
@@ -602,7 +602,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
 
       {/* Gatekeeper tutorial hint */}
       <Gatekeeper
-        text="So, who would you like to be this time?"
+        text={lang("ROLE_SELECTION_GATEKEEPER")}
         isVisible={showGatekeeper}
         onDismiss={() => setShowGatekeeper(false)}
       />

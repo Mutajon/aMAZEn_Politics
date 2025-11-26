@@ -1,6 +1,6 @@
 // src/screens/FinalScoreScreen.tsx
 // Simplified final score screen aligned with the live scoring schema.
-// Shows four animated components (People, Power Holders, Personal Anchor, Corruption)
+// Shows three animated components (People, Power Holders, Personal Anchor)
 // followed by the total score, hall-of-fame handling, and end-of-run actions.
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -9,7 +9,6 @@ import {
   Users,
   Building2,
   Heart,
-  ShieldCheck,
   Trophy,
   RotateCcw,
   ArrowRight,
@@ -46,7 +45,7 @@ type Props = {
   push: PushFn;
 };
 
-type CategoryKey = "people" | "middle" | "mom" | "corruption";
+type CategoryKey = "people" | "middle" | "mom";
 
 type CategoryRenderInfo = {
   key: CategoryKey;
@@ -135,14 +134,6 @@ export default function FinalScoreScreen({ push }: Props) {
         maxPoints: breakdown.support.mom.maxPoints,
         icon: <Heart className="h-6 w-6" />,
       },
-      {
-        key: "corruption",
-        label: lang("FINAL_SCORE_CORRUPTION"),
-        detail: `${breakdown.corruption.normalizedLevel.toFixed(1)}/10`,
-        points: breakdown.corruption.points,
-        maxPoints: breakdown.corruption.maxPoints,
-        icon: <ShieldCheck className="h-6 w-6" />,
-      },
     ],
     [
       breakdown.support.people.points,
@@ -151,9 +142,6 @@ export default function FinalScoreScreen({ push }: Props) {
       breakdown.support.middle.percent,
       breakdown.support.mom.points,
       breakdown.support.mom.percent,
-      breakdown.corruption.points,
-      breakdown.corruption.normalizedLevel,
-      breakdown.corruption.maxPoints,
       lang,
       midLabel,
     ]

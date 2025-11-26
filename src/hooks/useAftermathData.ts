@@ -70,7 +70,7 @@ export function useAftermathData() {
 
     try {
       // Collect data from stores
-      const { character, selectedRole, analysis, roleTitle } = useRoleStore.getState();
+      const { character, selectedRole, analysis, roleTitle, roleDescription } = useRoleStore.getState();
       const {
         gameId,
         dilemmaHistory,
@@ -84,7 +84,7 @@ export function useAftermathData() {
       const playerName = character?.name || "Leader";
 
       // Extract role, setting, and system (fallback to generic values)
-      const role = selectedRole || "Unknown Role";
+      const role = roleDescription || selectedRole || "Unknown Role";
       const setting = roleTitle || selectedRole || "Unknown Setting"; // roleTitle contains legacyKey (e.g., "Athens — Shadows of War (-431)")
       const systemName = analysis?.systemName || "Unknown System";
 

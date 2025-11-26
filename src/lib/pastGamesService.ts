@@ -135,7 +135,6 @@ export function buildPastGameEntry(
   const supportPeople = dilemmaStore.supportPeople;
   const supportMiddle = dilemmaStore.supportMiddle;
   const supportMom = dilemmaStore.supportMom;
-  const corruptionLevel = dilemmaStore.corruptionLevel;
 
   // Extract aftermath highlights
   const legacy = aftermathData.legacy;
@@ -171,7 +170,6 @@ export function buildPastGameEntry(
     supportPeople,
     supportMiddle,
     supportMom,
-    corruptionLevel,
 
     // Aftermath Highlights
     legacy,

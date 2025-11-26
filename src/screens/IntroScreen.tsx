@@ -10,33 +10,33 @@ import EmptyFragmentPopup from "../components/fragments/EmptyFragmentPopup";
 import { useFragmentsStore } from "../store/fragmentsStore";
 import type { PastGameEntry } from "../lib/types/pastGames";
 import { audioManager, type VoKey } from "../lib/audioManager";
+import { useLang } from "../i18n/lang";
 
-const dialogLines = [
-  "Oh! Another one. Lost.",
-  "I can see it in your eyes. The blank confusion of a soul Name-Washed.",
-  "You don't remember where you are, or who you were. That's a problem.",
-  "Let me save us both some time: I am the Gatekeeper, and this is the Crossroad of Consciousness.",
-  "A place Where people transition from the world of the living to their eternal rest.",
-  "Yes, you are dead. My condolences.",
-  "But your bigger issue is the Amnesia of the Self. You cannot proceed to rest until you recall your true nature.",
-  "That's where I come in.",
-  "I offer you a short trip back to the world of the living. Seven days. Be whoever you want.",
-  "A chance to test your values, remember who you are.",
-  "Each venture will give you a fragment of yourself.",
-  "Gather three such Fragments, and your true Name will be woven.",
-  "Your self will be complete, and you'll be ready to move on.",
-  "What's the catch?",
-  "I come with you. Every decision you make, every motive you hide, I will observe and collect.",
-  "I need it to pay an old debt, so that I too can finally leave this place.",
-  "So, Interested?",
-  "Good. Because you don't really have a choice.",
-  "Let me know when you are ready.",
+// Get dialog lines from translations (function to be called inside component)
+const getDialogLines = (lang: (key: string) => string) => [
+  lang("INTRO_LINE_0"),
+  lang("INTRO_LINE_1"),
+  lang("INTRO_LINE_2"),
+  lang("INTRO_LINE_3"),
+  lang("INTRO_LINE_4"),
+  lang("INTRO_LINE_5"),
+  lang("INTRO_LINE_6"),
+  lang("INTRO_LINE_7"),
+  lang("INTRO_LINE_8"),
+  lang("INTRO_LINE_9"),
+  lang("INTRO_LINE_10"),
+  lang("INTRO_LINE_11"),
+  lang("INTRO_LINE_12"),
+  lang("INTRO_LINE_13"),
+  lang("INTRO_LINE_14"),
+  lang("INTRO_LINE_15"),
+  lang("INTRO_LINE_16"),
+  lang("INTRO_LINE_17"),
+  lang("INTRO_LINE_18"),
 ];
 
-// Find fragment reveal line by text content (resilient to dialog changes)
-const FRAGMENT_LINE_INDEX = dialogLines.findIndex(
-  (line) => line.includes("Gather") && line.includes("Fragments")
-);
+// Fragment reveal line index (line 11: "Gather three such Fragments...")
+const FRAGMENT_LINE_INDEX = 11;
 
 // Voiceover mapping: line index → audio key
 // Returns voiceover key if audio exists for this line, null otherwise
@@ -75,6 +75,9 @@ const etherPlaceBackground = {
 
 export default function IntroScreen({ push }: { push: PushFn }) {
   const logger = useLogger();
+  const lang = useLang();
+  const dialogLines = getDialogLines(lang);
+  
   const [showGatekeeper, setShowGatekeeper] = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [isLastLine, setIsLastLine] = useState(false);
@@ -84,9 +87,15 @@ export default function IntroScreen({ push }: { push: PushFn }) {
   const fragmentCount = useFragmentsStore((s) => s.getFragmentCount());
   const hasAllFragments = useFragmentsStore((s) => s.hasCompletedThreeFragments());
   const markIntroCompleted = useFragmentsStore((s) => s.markIntroCompleted);
+  const setPreferredFragment = useFragmentsStore((s) => s.setPreferredFragment);
+  const hasSelectedPreferred = useFragmentsStore((s) => s.hasSelectedPreferred());
   const [selectedFragment, setSelectedFragment] = useState<PastGameEntry | null>(null);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [isEmptySlotPopupOpen, setIsEmptySlotPopupOpen] = useState(false);
+
+  // Final fragment selection flow state
+  const [showWhichVersionMessage, setShowWhichVersionMessage] = useState(false);
+  const [showFinalRestMessage, setShowFinalRestMessage] = useState(hasSelectedPreferred);
 
   // Fragment reveal pause state
   const [isFragmentPause, setIsFragmentPause] = useState(false);
@@ -99,12 +108,21 @@ export default function IntroScreen({ push }: { push: PushFn }) {
       return dialogLines[currentLineIndex];
     }
 
-    // Returning visit - show abbreviated message
+    // Returning visit with all fragments - special flow
     if (hasAllFragments) {
+      // Already selected preferred → final rest message
+      if (showFinalRestMessage) {
+        return "Thank you! You can now go to rest, finally knowing who you are.";
+      }
+      // Clicked once → show "which version" message
+      if (showWhichVersionMessage) {
+        return "Now explore your fragments by clicking on them. Which version of yourself do you like the most?";
+      }
+      // Initial message
       return "You have collected all the required fragments. You are ready to move on to your eternal rest.";
     }
 
-    return "Ready for another trip to the world of the living?";
+    return lang("INTRO_RETURN_MESSAGE");
   };
 
   const shouldShowFragments = firstIntro
@@ -125,11 +143,6 @@ export default function IntroScreen({ push }: { push: PushFn }) {
         const voKey = getVoiceoverKey(0);
         if (voKey) {
           audioManager.playVoiceover(voKey);
-          logger.logSystem(
-            "gatekeeper_voiceover_started",
-            { lineIndex: 0, voiceoverKey: voKey },
-            "Started voiceover for line 0"
-          );
         }
       } else {
         // Returning visit - play appropriate message
@@ -137,18 +150,7 @@ export default function IntroScreen({ push }: { push: PushFn }) {
           ? 'gatekeeper-return-complete'
           : 'gatekeeper-return-incomplete';
         audioManager.playVoiceover(voKey);
-        logger.logSystem(
-          "gatekeeper_voiceover_started",
-          { visitType: 'returning', fragmentCount, voiceoverKey: voKey },
-          `Started voiceover for returning visit (${fragmentCount} fragments)`
-        );
       }
-
-      logger.logSystem(
-        "intro_gatekeeper_shown",
-        { delay: 1000 },
-        "Gatekeeper appeared on intro screen after 1 second delay"
-      );
     }, 1000);
     return () => clearTimeout(timer);
   }, [logger, firstIntro, fragmentCount, hasAllFragments]);
@@ -165,8 +167,29 @@ export default function IntroScreen({ push }: { push: PushFn }) {
 
   // Handle gatekeeper dismissal (click to advance)
   const handleGatekeeperClick = () => {
-    // Returning visit - show "I'm ready" button immediately (don't wait for animation)
+    // Returning visit
     if (!firstIntro) {
+      // All fragments collected - special flow
+      if (hasAllFragments) {
+        // Already showing final rest message - do nothing
+        if (showFinalRestMessage) {
+          return;
+        }
+        // First click - transition to "which version" message
+        if (!showWhichVersionMessage) {
+          setShowWhichVersionMessage(true);
+          audioManager.playVoiceover('gatekeeper-which-version');
+          logger.log(
+            "intro_which_version_shown",
+            { fragmentCount },
+            "Showing 'which version' message - waiting for fragment selection"
+          );
+          return;
+        }
+        // Already in "which version" mode - do nothing (wait for selection)
+        return;
+      }
+      // Not all fragments - show ready button
       setIsLastLine(true);
       logger.log(
         "intro_return_visit",
@@ -199,11 +222,6 @@ export default function IntroScreen({ push }: { push: PushFn }) {
       const voKey = getVoiceoverKey(nextIndex);
       if (voKey) {
         audioManager.playVoiceover(voKey);
-        logger.logSystem(
-          "gatekeeper_voiceover_started",
-          { lineIndex: nextIndex, voiceoverKey: voKey },
-          `Started voiceover for line ${nextIndex}`
-        );
       }
 
       logger.log(
@@ -230,22 +248,12 @@ export default function IntroScreen({ push }: { push: PushFn }) {
 
     // Stop current voiceover
     audioManager.stopVoiceover();
-    logger.logSystem(
-      "gatekeeper_voiceover_stopped",
-      { lineIndex: currentLineIndex, reason: "skip" },
-      "Stopped voiceover (user skipped)"
-    );
 
     // Play last line voiceover (line 18)
     const lastLineIndex = dialogLines.length - 1; // Line 18
     const voKey = getVoiceoverKey(lastLineIndex);
     if (voKey) {
       audioManager.playVoiceover(voKey);
-      logger.logSystem(
-        "gatekeeper_voiceover_started",
-        { lineIndex: lastLineIndex, voiceoverKey: voKey },
-        `Started voiceover for last line ${lastLineIndex}`
-      );
     }
 
     setFragmentsRevealed(true); // Mark as revealed
@@ -298,6 +306,21 @@ export default function IntroScreen({ push }: { push: PushFn }) {
     setSelectedFragment(null);
   };
 
+  // Handle preferred fragment selection
+  const handleSelectPreferred = (gameId: string) => {
+    const roleTitle = selectedFragment?.roleTitle || "Unknown";
+    setPreferredFragment(gameId);
+    setIsPopupOpen(false);
+    setSelectedFragment(null);
+    setShowFinalRestMessage(true);
+    audioManager.playVoiceover('gatekeeper-rest');
+    logger.log(
+      "preferred_fragment_selected",
+      { roleTitle, gameId, fragmentCount },
+      `User selected preferred fragment: ${roleTitle}`
+    );
+  };
+
   // Handle empty slot click
   const handleEmptySlotClick = () => {
     setIsEmptySlotPopupOpen(true);
@@ -329,11 +352,6 @@ export default function IntroScreen({ push }: { push: PushFn }) {
       const voKey = getVoiceoverKey(nextIndex);
       if (voKey) {
         audioManager.playVoiceover(voKey);
-        logger.logSystem(
-          "gatekeeper_voiceover_started",
-          { lineIndex: nextIndex, voiceoverKey: voKey },
-          `Started voiceover for line ${nextIndex}`
-        );
       }
 
       logger.log(
@@ -388,6 +406,8 @@ export default function IntroScreen({ push }: { push: PushFn }) {
         isOpen={isPopupOpen}
         fragment={selectedFragment}
         onClose={handlePopupClose}
+        showSelectionButton={hasAllFragments && !hasSelectedPreferred && showWhichVersionMessage}
+        onSelectPreferred={handleSelectPreferred}
       />
 
       {/* Empty Fragment Popup */}
@@ -423,12 +443,12 @@ export default function IntroScreen({ push }: { push: PushFn }) {
           className="fixed bottom-8 left-8 px-4 py-2 text-sm font-medium text-white/70 hover:text-white/90 underline underline-offset-2 transition-colors"
           style={{ zIndex: 40 }}
         >
-          Skip
+          {lang("INTRO_SKIP_BUTTON")}
         </motion.button>
       )}
 
-      {/* "I'm ready" button - shown when last line is reached */}
-      {isLastLine && (
+      {/* "I'm ready" button - shown when last line is reached, but NOT when all fragments collected */}
+      {isLastLine && !hasAllFragments && (
         <motion.button
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -446,7 +466,7 @@ export default function IntroScreen({ push }: { push: PushFn }) {
           className="fixed bottom-8 left-8 rounded-full px-8 py-3 font-bold text-lg bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg"
           style={{ zIndex: 150 }}
         >
-          I'm ready
+          {lang("INTRO_READY_BUTTON")}
         </motion.button>
       )}
     </div>

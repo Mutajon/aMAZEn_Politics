@@ -12,6 +12,7 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useSettingsStore } from "../store/settingsStore";
+import { useCompassStore } from "../store/compassStore";
 import { useEventDataCollector } from "../hooks/useEventDataCollector";
 import { useEventNarration } from "../hooks/useEventNarration";
 import { useNarrator } from "../hooks/useNarrator";
@@ -26,7 +27,6 @@ import { DynamicParameters, buildDynamicParamsItems } from "../components/event/
 import DilemmaCard from "../components/event/DilemmaCard";
 import MirrorCard from "../components/event/MirrorCard";
 import CompassPillsOverlay from "../components/event/CompassPillsOverlay";
-import CorruptionPill from "../components/event/CorruptionPill";
 import ActionDeck, { type ActionCard } from "../components/event/ActionDeck";
 import CrisisWarningBanner, { type CrisisInfo } from "../components/event/CrisisWarningBanner";
 import { actionsToDeckCards } from "../components/event/actionVisuals";
@@ -34,7 +34,6 @@ import { useCoinFlights, CoinFlightOverlay } from "../components/event/CoinFligh
 import { AnimatePresence } from "framer-motion";
 import { bgStyleWithRoleImage } from "../lib/ui";
 import { calculateLiveScoreBreakdown } from "../lib/scoring";
-import { getCorruptionInfo } from "../lib/corruptionLevels";
 import { Building2, Heart, Users } from "lucide-react";
 import type { CompassEffectPing } from "../components/MiniCompass";
 import { loadEventScreenSnapshot, clearEventScreenSnapshot } from "../lib/eventScreenSnapshot";
@@ -47,6 +46,9 @@ import { useSessionLogger } from "../hooks/useSessionLogger";
 import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import ReasoningModal from "../components/event/ReasoningModal";
 import SelfJudgmentModal from "../components/event/SelfJudgmentModal";
+import { useDay2Tutorial } from "../hooks/useDay2Tutorial";
+import { TutorialOverlay } from "../components/event/TutorialOverlay";
+import { ValueExplanationModal } from "../components/event/ValueExplanationModal";
 
 type Props = {
   push: (path: string) => void;
@@ -56,7 +58,7 @@ export default function EventScreen3({ push }: Props) {
   const lang = useLang();
 
   // Global state (read only - single source of truth)
-  const { day, totalDays, budget, supportPeople, supportMiddle, supportMom, corruptionLevel, score, crisisMode: storedCrisisMode } = useDilemmaStore();
+  const { day, totalDays, budget, supportPeople, supportMiddle, supportMom, score, crisisMode: storedCrisisMode } = useDilemmaStore();
   const { character, roleBackgroundImage, analysis } = useRoleStore();
   const selectedRoleKey = useRoleStore((s) => s.selectedRole);
   const roleProgress = useRoleProgressStore((s) =>
@@ -113,7 +115,7 @@ export default function EventScreen3({ push }: Props) {
   } = useEventDataCollector();
 
   // Narration integration - prepares TTS when dilemma loads, provides canShowDilemma flag
-  const { canShowDilemma, startNarrationIfReady } = useEventNarration();
+  const { canShowDilemma, startNarrationIfReady, speaking } = useEventNarration();
 
   // Global narration stop (for stopping audio when navigating away or opening modals)
   const { stop: stopNarration } = useNarrator();
@@ -122,7 +124,7 @@ export default function EventScreen3({ push }: Props) {
   const { progress, start: startProgress, reset: resetProgress, notifyReady } = useLoadingProgress();
 
   // Phase tracking
-  const [phase, setPhase] = useState<'collecting' | 'presenting' | 'interacting' | 'reasoning' | 'cleaning' | 'confirming'>('collecting');
+  const [phase, setPhase] = useState<'collecting' | 'presenting' | 'interacting' | 'reasoning' | 'confirming'>('collecting');
 
   // Presentation step tracking (controls what's visible)
   const [presentationStep, setPresentationStep] = useState<number>(-1);
@@ -156,6 +158,19 @@ export default function EventScreen3({ push }: Props) {
   // Self-judgment modal (Day 8 only)
   const [showSelfJudgmentModal, setShowSelfJudgmentModal] = useState(false);
 
+  // Tutorial system (Day 2 only)
+  const tutorial = useDay2Tutorial();
+  const [tutorialAvatarRef, setTutorialAvatarRef] = useState<HTMLElement | null>(null);
+  const [tutorialValueRef, setTutorialValueRef] = useState<HTMLElement | null>(null);
+  const [narrationWasPlaying, setNarrationWasPlaying] = useState(false);
+
+  // Debug: Log when tutorial value ref is set
+  useEffect(() => {
+    if (tutorialValueRef && day === 2) {
+      console.log('[EventScreen3] Tutorial value ref set:', tutorialValueRef);
+    }
+  }, [tutorialValueRef, day]);
+
   // Navigation guard - prevent back button during gameplay
   useNavigationGuard({
     enabled: true,
@@ -168,9 +183,6 @@ export default function EventScreen3({ push }: Props) {
 
   // Compass pills state (for visual display during Step 4A)
   const [showCompassPills, setShowCompassPills] = useState(false);
-
-  // Corruption pill state (for visual display during Step 4A, Day 2+)
-  const [showCorruptionPill, setShowCorruptionPill] = useState(false);
 
   // Snapshot restoration flag (prevents collection when restored)
   const [restoredFromSnapshot, setRestoredFromSnapshot] = useState(false);
@@ -195,23 +207,11 @@ export default function EventScreen3({ push }: Props) {
     return pills;
   }, [pendingCompassPills]);
 
-  // Extract corruption pill data (Day 2+ only, feature flag gated)
-  const corruptionTrackingEnabled = useSettingsStore((s) => s.corruptionTrackingEnabled);
-  const corruptionPillData = useMemo(() => {
-    if (!corruptionTrackingEnabled) return null;
-    if (!collectedData?.corruptionShift || day === 1) return null;
-    if (Math.abs(collectedData.corruptionShift.delta) < 0.1) return null; // Ignore tiny changes
-
-    console.log(`[EventScreen3] 🔸 Corruption pill data:`, collectedData.corruptionShift);
-    return collectedData.corruptionShift;
-  }, [collectedData?.corruptionShift, day, corruptionTrackingEnabled]);
-
   const scoreDetails: ResourceBarScoreDetails = useMemo(() => {
     const breakdown = calculateLiveScoreBreakdown({
       supportPeople,
       supportMiddle,
       supportMom,
-      corruptionLevel,
     });
 
     const middleLabel =
@@ -242,21 +242,12 @@ export default function EventScreen3({ push }: Props) {
           points: breakdown.support.mom.points,
           maxPoints: breakdown.support.mom.maxPoints,
         },
-        {
-          id: "corruption" as const,
-          label: lang("FINAL_SCORE_CORRUPTION"),
-          tierLabel: getCorruptionInfo(breakdown.corruption.normalizedLevel).label,
-          valueLabel: `${breakdown.corruption.normalizedLevel.toFixed(1)}/10`,
-          points: breakdown.corruption.points,
-          maxPoints: breakdown.corruption.maxPoints,
-        },
       ],
     } as const;
   }, [
     supportPeople,
     supportMiddle,
     supportMom,
-    corruptionLevel,
     analysis?.challengerSeat?.name,
     lang,
   ]);
@@ -436,20 +427,35 @@ export default function EventScreen3({ push }: Props) {
   }, [phase, day, compassPings.length, showCompassPills]);
 
   // ========================================================================
-  // EFFECT 4B: Show/hide corruption pill based on phase and data availability
+  // EFFECT 5A: Track when narration starts playing (for tutorial timing)
   // ========================================================================
   useEffect(() => {
-    // Show corruption pill when interacting AND data exists AND it's Day 2+ AND feature enabled
-    const shouldShow = phase === 'interacting' && corruptionPillData !== null && day > 1 && corruptionTrackingEnabled;
-
-    if (shouldShow !== showCorruptionPill) {
-      console.log(`[EventScreen3] 🔸 Corruption pill visibility: ${shouldShow} (phase: ${phase}, day: ${day}, enabled: ${corruptionTrackingEnabled})`);
-      setShowCorruptionPill(shouldShow);
+    if (speaking && day === 2) {
+      setNarrationWasPlaying(true);
     }
-  }, [phase, day, corruptionPillData, corruptionTrackingEnabled, showCorruptionPill]);
+  }, [speaking, day]);
 
   // ========================================================================
-  // EFFECT 5: Redirect to downfall screen when terminal crisis occurs
+  // EFFECT 5B: Trigger Day 2 tutorial when narration completes
+  // ========================================================================
+  useEffect(() => {
+    if (day === 2 && phase === 'interacting' && !tutorial.tutorialCompleted) {
+      // Only start if narration was playing and is now done
+      const narrationComplete = narrationWasPlaying && !speaking;
+
+      if (narrationComplete) {
+        const timer = setTimeout(() => {
+          console.log('[EventScreen3] 🎓 Starting Day 2 tutorial (narration complete)');
+          tutorial.startTutorial();
+        }, 500);
+
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [day, phase, narrationWasPlaying, speaking, tutorial.tutorialCompleted, tutorial.startTutorial]);
+
+  // ========================================================================
+  // EFFECT 6: Redirect to downfall screen when terminal crisis occurs
   // ========================================================================
   useEffect(() => {
     // Check if game ended with downfall crisis (all 3 tracks < 20%)
@@ -477,44 +483,137 @@ export default function EventScreen3({ push }: Props) {
   };
 
   /**
-   * Handle reasoning submission
+   * Handle reasoning submission - analyzes reasoning text with compass API
    */
-  const handleReasoningSubmit = async (reasoningText: string) => {
-    if (!reasoningModalAction) return;
+  const handleReasoningSubmit = async (reasoningText: string): Promise<{ pills: any[]; message: string } | null> => {
+    if (!reasoningModalAction) return null;
 
     setIsSubmittingReasoning(true);
 
-    // Store reasoning in dilemmaStore
-    addReasoningEntry({
-      day,
-      actionId: reasoningModalAction.id,
-      actionTitle: reasoningModalAction.title,
-      actionDescription: reasoningModalAction.summary,
-      reasoningText,
-    });
+    try {
+      // Get current game and dilemma context
+      const gameId = useDilemmaStore.getState().gameId;
+      const dilemma = collectedData?.dilemma;
 
-    // Log reasoning stored
-    logger.logSystem(
-      "reasoning_stored",
-      {
+      if (!gameId || !dilemma) {
+        console.error('[EventScreen3] Missing gameId or dilemma for reasoning analysis');
+        return null;
+      }
+
+      // Log analysis start
+      logger.log('reasoning_compass_analysis_started', {
         day,
         actionId: reasoningModalAction.id,
-        entryCount: useDilemmaStore.getState().reasoningHistory.length,
-        willSendToAI: true,
-      },
-      `Reasoning entry added to history (total: ${useDilemmaStore.getState().reasoningHistory.length})`
-    );
+        reasoningLength: reasoningText.length,
+        wordCount: reasoningText.split(/\s+/).length
+      }, 'Starting reasoning compass analysis');
 
-    setIsSubmittingReasoning(false);
+      // Call compass conversation API for reasoning analysis
+      const response = await fetch('/api/compass-conversation/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gameId,
+          action: {
+            title: dilemma.title,
+            summary: dilemma.description
+          },
+          reasoning: {
+            text: reasoningText,
+            selectedAction: reasoningModalAction.title
+          },
+          gameContext: {
+            setting: useRoleStore.getState().roleIntro?.split('.')[0] || 'Unknown setting',
+            role: useRoleStore.getState().roleScope,
+            systemName: useRoleStore.getState().analysis?.systemName || 'Unknown system'
+          },
+          debugMode
+        })
+      });
 
-    // Close modal and clear action (prevents ghost appearances on subsequent days)
-    setShowReasoningModal(false);
-    setReasoningModalAction(null);
+      if (!response.ok) {
+        throw new Error(`Compass analysis failed (${response.status})`);
+      }
 
-    // Resolve the promise to continue game flow
-    if (reasoningResolveRef.current) {
-      reasoningResolveRef.current();
-      reasoningResolveRef.current = null;
+      const data = await response.json();
+      const hints = data.compassHints || [];
+
+      // Convert hints to CompassPill format
+      const pills = hints.map((hint: any) => ({
+        prop: hint.prop,
+        idx: hint.idx,
+        delta: hint.polarity
+      }));
+
+      // Update compass store with new values
+      const compassStore = useCompassStore.getState();
+      pills.forEach((pill: any) => {
+        const currentValue = compassStore.values[pill.prop][pill.idx];
+        const newValue = Math.max(0, Math.min(10, currentValue + pill.delta));
+        compassStore.setValue(pill.prop, pill.idx, newValue);
+      });
+
+      // Store reasoning entry in dilemmaStore
+      addReasoningEntry({
+        day,
+        actionId: reasoningModalAction.id,
+        actionTitle: reasoningModalAction.title,
+        actionDescription: reasoningModalAction.summary,
+        reasoningText,
+      });
+
+      // Log successful analysis
+      logger.log('reasoning_compass_analysis_completed', {
+        day,
+        actionId: reasoningModalAction.id,
+        pillsCount: pills.length,
+        dimensions: pills.map((p: any) => `${p.prop}:${p.idx}`),
+        entryCount: useDilemmaStore.getState().reasoningHistory.length
+      }, `Reasoning compass analysis completed with ${pills.length} pills`);
+
+      // Pick a random thank-you message
+      const thankYouMessages = [
+        "Ah, thank you—your thought now curls up nicely in my collection.",
+        "Gratitude, traveler. I've tucked your thought among the others.",
+        "Thank you. Your thought has found its shelf in my curious archive.",
+        "Much obliged—your thought now wanders my halls with the rest.",
+        "I appreciate the offering; your thought has joined my growing hoard.",
+        "Thank you. Another thought slips into my vault of oddities.",
+        "My thanks—your thought is now bottled and labeled accordingly.",
+        "Cheers, wanderer. Your thought now chatters with its new neighbors.",
+        "Thank you. I've added your thought to the maze—may it not get lost.",
+        "Grateful, I am. Your thought now hums quietly in my collection."
+      ];
+      const randomMessage = thankYouMessages[Math.floor(Math.random() * thankYouMessages.length)];
+
+      setIsSubmittingReasoning(false);
+
+      // Return pills and message for modal to display
+      return { pills, message: randomMessage };
+
+    } catch (error) {
+      console.error('[EventScreen3] Reasoning compass analysis failed:', error);
+
+      // Log error
+      logger.log('reasoning_compass_analysis_failed', {
+        day,
+        actionId: reasoningModalAction.id,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }, 'Reasoning compass analysis failed');
+
+      // Still store reasoning entry even if analysis fails
+      addReasoningEntry({
+        day,
+        actionId: reasoningModalAction.id,
+        actionTitle: reasoningModalAction.title,
+        actionDescription: reasoningModalAction.summary,
+        reasoningText,
+      });
+
+      setIsSubmittingReasoning(false);
+
+      // Return null to indicate failure (modal will show fallback message)
+      return null;
     }
   };
 
@@ -533,11 +632,17 @@ export default function EventScreen3({ push }: Props) {
   };
 
   /**
-   * Handle reasoning modal close
+   * Handle reasoning modal close - called after pills are shown and user clicks Close
    */
   const handleReasoningClose = () => {
     setShowReasoningModal(false);
     setReasoningModalAction(null);
+
+    // Resolve the promise to continue game flow
+    if (reasoningResolveRef.current) {
+      reasoningResolveRef.current();
+      reasoningResolveRef.current = null;
+    }
   };
 
   /**
@@ -582,19 +687,22 @@ export default function EventScreen3({ push }: Props) {
     const shouldShowReasoning = reasoning.shouldShowReasoning();
 
     if (shouldShowReasoning) {
-      console.log('[EventScreen3] 💭 Reasoning required - entering reasoning phase');
+      console.log('[EventScreen3] 💭 Reasoning required - temporarily hiding loading for modal');
 
-      // Enter reasoning phase
+      // Temporarily hide loading overlay by switching to reasoning phase
       setPhase('reasoning');
 
       // Show reasoning modal and wait for completion
       await showReasoningModalForAction(actionCard);
 
-      console.log('[EventScreen3] ✅ Reasoning complete - continuing to cleaning');
+      console.log('[EventScreen3] ✅ Reasoning complete - resuming loading overlay');
+
+      // Return to confirming phase to show loading overlay again
+      setPhase('confirming');
     }
 
-    // Advance to cleaning phase
-    setPhase('cleaning');
+    // Keep phase as 'confirming' during cleanup (loading overlay stays visible)
+    console.log('[EventScreen3] 🔄 Starting cleanup with loading overlay visible...');
 
     // Run cleaner (handles: save choice, update budget, coin animation, advance day)
     await cleanAndAdvanceDay(actionCard, clearFlights);
@@ -661,19 +769,22 @@ export default function EventScreen3({ push }: Props) {
     const shouldShowReasoning = reasoning.shouldShowReasoning();
 
     if (shouldShowReasoning) {
-      console.log('[EventScreen3] 💭 Reasoning required - entering reasoning phase');
+      console.log('[EventScreen3] 💭 Reasoning required - temporarily hiding loading for modal');
 
-      // Enter reasoning phase
+      // Temporarily hide loading overlay by switching to reasoning phase
       setPhase('reasoning');
 
       // Show reasoning modal and wait for completion
       await showReasoningModalForAction(suggestionCard);
 
-      console.log('[EventScreen3] ✅ Reasoning complete - continuing to cleaning');
+      console.log('[EventScreen3] ✅ Reasoning complete - resuming loading overlay');
+
+      // Return to confirming phase to show loading overlay again
+      setPhase('confirming');
     }
 
-    // Advance to cleaning phase
-    setPhase('cleaning');
+    // Keep phase as 'confirming' during cleanup (loading overlay stays visible)
+    console.log('[EventScreen3] 🔄 Starting cleanup with loading overlay visible...');
 
     // Run cleaner (handles: save choice, update budget, wait for animation, advance day)
     await cleanAndAdvanceDay(suggestionCard, clearFlights);
@@ -787,9 +898,9 @@ export default function EventScreen3({ push }: Props) {
   }
 
   // ========================================================================
-  // RENDER: Presenting/Interacting/Reasoning/Cleaning Phase
+  // RENDER: Presenting/Interacting/Reasoning Phase
   // ========================================================================
-  if (collectedData && (phase === 'presenting' || phase === 'interacting' || phase === 'reasoning' || phase === 'cleaning')) {
+  if (collectedData && (phase === 'presenting' || phase === 'interacting' || phase === 'reasoning')) {
     // Calculate derived values
     const daysLeft = totalDays - day + 1;
 
@@ -847,6 +958,13 @@ export default function EventScreen3({ push }: Props) {
               score={score}
               scoreDetails={scoreDetails}
               avatarSrc={character?.avatarUrl || null}
+              tutorialMode={tutorial.tutorialActive}
+              tutorialDisableClose={tutorial.shouldDisableModalClose}
+              onTutorialAvatarClick={tutorial.onAvatarOpened}
+              onTutorialValueClick={tutorial.onValueClicked}
+              onTutorialModalClose={tutorial.onModalClosed}
+              tutorialValueRef={(el) => setTutorialValueRef(el)}
+              avatarButtonRef={(el) => setTutorialAvatarRef(el)}
             />
           )}
 
@@ -919,14 +1037,6 @@ export default function EventScreen3({ push }: Props) {
                   color="#7de8ff"
                 />
               )}
-              {/* Corruption Pill - appears at Step 4A (Day 2+, if feature enabled) */}
-              {showCorruptionPill && corruptionPillData && (
-                <CorruptionPill
-                  delta={corruptionPillData.delta}
-                  reason={corruptionPillData.reason}
-                  newLevel={corruptionPillData.newLevel}
-                />
-              )}
             </div>
           )}
 
@@ -996,6 +1106,26 @@ export default function EventScreen3({ push }: Props) {
             push('/aftermath');
           }}
         />
+
+        {/* Tutorial Overlay - Day 2 only */}
+        {tutorial.shouldShowOverlay && (
+          <TutorialOverlay
+            step={tutorial.tutorialStep}
+            targetElement={
+              tutorial.tutorialStep === 'awaiting-avatar'
+                ? tutorialAvatarRef
+                : tutorialValueRef
+            }
+          />
+        )}
+
+        {/* Value Explanation Modal - Tutorial only */}
+        {tutorial.shouldShowExplanation && tutorial.selectedValue && (
+          <ValueExplanationModal
+            value={tutorial.selectedValue}
+            onClose={tutorial.onExplanationClosed}
+          />
+        )}
       </div>
     );
   }

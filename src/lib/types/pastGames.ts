@@ -50,7 +50,6 @@ export interface PastGameEntry {
   supportPeople: number; // 0-100
   supportMiddle: number; // 0-100
   supportMom: number; // 0-100 (Men of Means)
-  corruptionLevel: number; // 0-100
 
   // Aftermath Highlights
   legacy: string; // "You will be remembered as..." sentence

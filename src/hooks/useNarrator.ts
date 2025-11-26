@@ -32,12 +32,19 @@ const log = (...a: unknown[]) => console.log("[Narrator/OAI]", ...a);
 let globalAudioRef: HTMLAudioElement | null = null;
 let globalObjectUrlRef: string | null = null;
 let globalAbortRef: AbortController | null = null;
+let globalIsPlayingRef = false;
 
 export function useNarrator() {
   const { narrationEnabled } = useSettingsStore();
   const [speaking, setSpeaking] = useState(false);
 
   const _cleanup = useCallback(() => {
+    // Smart cleanup: Don't interrupt actively playing audio
+    if (globalIsPlayingRef) {
+      log("_cleanup() skipped - audio is actively playing");
+      return;
+    }
+
     try { globalAudioRef?.pause?.(); } catch {}
     globalAudioRef = null;
 
@@ -54,6 +61,7 @@ export function useNarrator() {
 
   const stop = useCallback(() => {
     log("stop()");
+    globalIsPlayingRef = false; // Force stop regardless of playing state
     _cleanup();
   }, [_cleanup]);
 
@@ -165,15 +173,32 @@ export function useNarrator() {
         if (disposed) return;
         // register as the active audio in global ref
         globalAudioRef = audio;
-        audio.onplay = () => { setSpeaking(true); log("play start"); };
-        audio.onended = () => { setSpeaking(false); log("play end"); };
-        audio.onerror = (e) => { setSpeaking(false); console.warn("[Narrator/OAI] audio error", e); };
+        audio.onplay = () => {
+          globalIsPlayingRef = true;
+          setSpeaking(true);
+          log("play start");
+        };
+        audio.onended = () => {
+          globalIsPlayingRef = false;
+          setSpeaking(false);
+          log("play end");
+        };
+        audio.onpause = () => {
+          globalIsPlayingRef = false;
+          log("play paused");
+        };
+        audio.onerror = (e) => {
+          globalIsPlayingRef = false;
+          setSpeaking(false);
+          console.warn("[Narrator/OAI] audio error", e);
+        };
         await audio.play();
       };
 
       const dispose = () => {
         if (disposed) return;
         disposed = true;
+        globalIsPlayingRef = false;
         try { audio.pause(); } catch {}
         audio.src = "";
         if (globalObjectUrlRef) {
