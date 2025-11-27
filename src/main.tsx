@@ -414,6 +414,64 @@ const useStrict = import.meta.env.MODE !== "development";
   console.log('💡 Tutorial will show again on next Day 2 playthrough');
 };
 
+// Compass values display
+(window as any).getCompass = () => {
+  const { values, initialCompassSnapshot } = useCompassStore.getState();
+
+  // Component names for each dimension (10 per dimension)
+  const labels: Record<string, string[]> = {
+    what: ['Truth/Trust', 'Liberty/Agency', 'Equality/Equity', 'Care/Solidarity', 'Create/Courage',
+           'Wellbeing', 'Security/Safety', 'Freedom/Responsibility', 'Honor/Sacrifice', 'Sacred/Awe'],
+    whence: ['Evidence', 'Public Reason', 'Personal', 'Tradition', 'Revelation',
+             'Nature', 'Pragmatism', 'Aesthesis', 'Fidelity', 'Law (Office)'],
+    how: ['Law/Std.', 'Deliberation', 'Mobilize', 'Markets', 'Mutual Aid',
+          'Ritual', 'Design', 'Enforce', 'Civic Culture', 'Philanthropy'],
+    whither: ['Self', 'Family', 'Friends', 'In-Group', 'Nation',
+              'Civiliz.', 'Humanity', 'Earth', 'Cosmos', 'God'],
+  };
+
+  const dimensionNames: Record<string, string> = {
+    what: 'WHAT (Values)',
+    whence: 'WHENCE (Sources)',
+    how: 'HOW (Methods)',
+    whither: 'WHITHER (Beneficiaries)',
+  };
+
+  console.log('🧭 COMPASS VALUES (0-10 scale):');
+  console.log('');
+
+  let totalSum = 0;
+  for (const dim of ['what', 'whence', 'how', 'whither'] as const) {
+    console.log(`📊 ${dimensionNames[dim]}:`);
+    const vals = values[dim];
+    const dimLabels = labels[dim];
+
+    for (let i = 0; i < 10; i++) {
+      const val = vals[i] ?? 0;
+      totalSum += val;
+      const bar = '█'.repeat(val) + '░'.repeat(10 - val);
+      const initial = initialCompassSnapshot ? initialCompassSnapshot[dim][i] : null;
+      const delta = initial !== null ? val - initial : null;
+      const deltaStr = delta !== null && delta !== 0
+        ? ` (${delta > 0 ? '+' : ''}${delta})`
+        : '';
+      console.log(`  ${dimLabels[i].padEnd(22)} ${bar} ${val}${deltaStr}`);
+    }
+    console.log('');
+  }
+
+  console.log(`📈 Total compass points: ${totalSum}/400`);
+  if (initialCompassSnapshot) {
+    const initialSum = Object.values(initialCompassSnapshot).flat().reduce((a, b) => a + b, 0);
+    const change = totalSum - initialSum;
+    console.log(`   Change since quiz: ${change > 0 ? '+' : ''}${change}`);
+  }
+  console.log('');
+  console.log('💡 Values change based on your choices during gameplay');
+
+  return values;
+};
+
 // HIDDEN FOR EXPERIMENTAL DISTRIBUTION
 // Console commands are still available but not advertised to users
 // Log available commands

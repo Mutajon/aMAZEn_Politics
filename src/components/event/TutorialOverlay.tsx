@@ -82,22 +82,21 @@ export function TutorialOverlay({ step, targetElement }: TutorialOverlayProps) {
           },
         });
       } else if (step === 'awaiting-compass-pills') {
-        if (!targetElement) {
-          console.log('[TutorialOverlay] WARNING: Compass pills ref not ready (polling should have prevented this)');
-          return; // Early return - polling should ensure ref is ready
-        }
-        const rect = targetElement.getBoundingClientRect();
-        // Compass pills button is at right edge, point arrow from left side
+        // Use fixed position - pills button is at right edge, vertically centered in MirrorCard area
+        // This avoids race condition where ref isn't ready when AnimatePresence is still animating
+        const pillsX = window.innerWidth - 40; // Right edge with some padding
+        const pillsY = window.innerHeight * 0.58; // Approximate vertical center of MirrorCard area
+
         setArrowConfig({
-          message: 'Click here to see the latest changes to your values',
+          message: 'Click here to see the most recent change to your values',
           arrowDirection: 'right',
           arrowPosition: {
-            x: rect.left - 60,
-            y: rect.top + rect.height / 2,
+            x: pillsX - 60,
+            y: pillsY,
           },
           textPosition: {
-            x: Math.max(20, rect.left - 380),
-            y: rect.top + rect.height / 2 - 40,
+            x: Math.max(20, pillsX - 380),
+            y: pillsY - 40,
           },
         });
       }

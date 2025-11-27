@@ -15,6 +15,7 @@ import {
   startCleanupTask
 } from "./conversationStore.mjs";
 import { getCountersCollection, incrementCounter, getUsersCollection, getScenarioSuggestionsCollection } from "./db/mongodb.mjs";
+import { getTheoryPrompt } from "./theory-loader.mjs";
 
 // -------------------- Process Error Handlers ---------------------------
 /**
@@ -2705,7 +2706,7 @@ Decisions: for each decision, provide:
 - liberalism: rate THIS SPECIFIC DECISION on liberalism (very-low|low|medium|high|very-high)
 - democracy: rate THIS SPECIFIC DECISION on democracy (very-low|low|medium|high|very-high)
 
-RATING FRAMEWORK:
+${getTheoryPrompt()}RATING FRAMEWORK (use the theoretical frameworks above for detailed guidance):
 
 1. Autonomy ↔ Heteronomy (Who decides?)
    - High Autonomy: Self-direction, owned reasons ("I choose because…"), empowering individual/group choice, decentralized decision-making, willingness to accept responsibility for consequences.
@@ -2832,6 +2833,19 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
     // Normalize and validate response
     const validRatings = ["very-low", "low", "medium", "high", "very-high"];
     const validTypes = ["positive", "negative"];
+
+    // Fallback values when AI returns null or incomplete data
+    const fallback = {
+      intro: "After many years of rule, the leader passed into history.",
+      snapshot: [
+        { type: "positive", icon: "🏛️", text: "Governed their people", context: "Overall reign" },
+        { type: "negative", icon: "⚠️", text: "Faced challenges", context: "Overall reign" }
+      ],
+      decisions: [],
+      valuesSummary: "A leader who navigated complex political terrain.",
+      haiku: "Power came and went\nDecisions echo through time\nHistory records"
+    };
+
     const response = {
       intro: String(result?.intro || fallback.intro).slice(0, 500),
       snapshot: Array.isArray(result?.snapshot)

@@ -75,6 +75,24 @@ getDemocracy()       // Alias for showDemocracy()
 
 ---
 
+## Compass Values
+
+View current 4D political compass values with visual bars.
+
+```javascript
+getCompass()         // Display all 40 compass values with visual bars
+```
+
+**Output Includes**:
+- All 4 dimensions: What (Values), Whence (Sources), How (Methods), Whither (Beneficiaries)
+- 10 components per dimension with 0-10 scale bars
+- Change indicators from initial quiz values (e.g., `+2`, `-1`)
+- Total compass points out of 400
+
+**Use Case**: Debug compass changes during gameplay, verify quiz initialization.
+
+---
+
 ## Past Games Storage
 
 Manage saved game history (max 10 games, localStorage).
