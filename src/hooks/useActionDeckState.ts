@@ -65,6 +65,9 @@ export function useActionDeckState(actions: ActionCard[]) {
   // Typing timing tracker for custom action suggestions
   const suggestTypingTimingIdRef = useRef<string | null>(null);
 
+  // Track previous action IDs to detect actual content changes vs reference changes
+  const prevActionsRef = useRef<string>("");
+
   // Measure deck height when actions change
   useLayoutEffect(() => {
     const measure = () => {
@@ -77,8 +80,19 @@ export function useActionDeckState(actions: ActionCard[]) {
     setLockHeight(false);
   }, [actions]);
 
-  // Reset visuals when the actions (dilemma) change
+  // Reset visuals when the actions (dilemma) actually change (not just reference)
+  // This prevents the modal from closing during validation when parent re-renders
+  // with a new array reference but same content
   useEffect(() => {
+    // Compare by action IDs to detect actual content change vs reference change
+    const actionIds = actions.map(a => a.id).join(",");
+    if (actionIds === prevActionsRef.current) {
+      // Same action IDs, skip reset - prevents closing modal during validation
+      return;
+    }
+    prevActionsRef.current = actionIds;
+
+    // Only reset when actions actually change (new dilemma)
     setSelected(null);
     setConfirmingId(null);
     setOthersDown(false);

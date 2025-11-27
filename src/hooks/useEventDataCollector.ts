@@ -51,6 +51,8 @@ export type Phase1Data = {
   dilemma: Dilemma;
   supportEffects: SupportEffect[] | null; // Included in dilemma response on Day 2+
   newsItems: TickerItem[]; // Empty array (disabled)
+  valueTargeted?: string; // The compass value being tested by this dilemma (for trap context)
+  axisExplored?: string;  // The political axis being explored
 };
 
 // PHASE 2: Secondary data - loads in background while user reads
@@ -151,6 +153,8 @@ async function fetchGameTurn(): Promise<{
   compassPills: CompassPill[] | null;
   dynamicParams: DynamicParam[] | null;
   mirrorText: string;
+  valueTargeted?: string;  // The compass value being tested by this dilemma
+  axisExplored?: string;   // The political axis being explored
 }> {
   const {
     gameId,
@@ -491,7 +495,11 @@ async function fetchGameTurn(): Promise<{
   // Extract mirror advice
   const mirrorText = String(data.mirrorAdvice || "The mirror squints, light pooling in the glass...");
 
-  console.log(`[fetchGameTurn] ✅ Unified response received: ${data.actions.length} actions, 0 pills (pills fetched separately), ${dynamicParams.length} params`);
+  // Extract value trap context (for compass analysis)
+  const valueTargeted = data.valueTargeted || undefined;
+  const axisExplored = data.axisExplored || undefined;
+
+  console.log(`[fetchGameTurn] ✅ Unified response received: ${data.actions.length} actions, 0 pills (pills fetched separately), ${dynamicParams.length} params, valueTargeted=${valueTargeted || 'N/A'}`);
 
   return {
     dilemma,
@@ -499,7 +507,9 @@ async function fetchGameTurn(): Promise<{
     newsItems: [], // Empty array (disabled)
     compassPills,
     dynamicParams,
-    mirrorText
+    mirrorText,
+    valueTargeted,
+    axisExplored
   };
 }
 
@@ -541,9 +551,17 @@ function transformCompassHints(rawHints: any): CompassPill[] {
   return pills;
 }
 
+// Trap context for compass analysis - tells the analyzer which value is being tested
+export type TrapContext = {
+  valueTargeted: string;           // The compass value being tested (e.g., "Truth/Trust")
+  dilemmaTitle: string;            // The dilemma title for context
+  dilemmaDescription?: string;     // The dilemma description for context
+};
+
 export async function fetchCompassHintsForAction(
   gameId: string,
-  action: { title: string; summary: string }
+  action: { title: string; summary: string },
+  trapContext?: TrapContext        // NEW: Pass the value trap context for better analysis
 ): Promise<CompassPill[]> {
   try {
     // Get game context and debug mode from stores
@@ -561,7 +579,7 @@ export async function fetchCompassHintsForAction(
       systemName: roleState.analysis?.systemName || "Divine Right Monarchy"
     };
 
-    console.log(`[fetchCompassHintsForAction] Calling /api/compass-conversation/analyze for gameId=${gameId}`);
+    console.log(`[fetchCompassHintsForAction] Calling /api/compass-conversation/analyze for gameId=${gameId}, trapContext=${trapContext?.valueTargeted || 'none'}`);
 
     const response = await fetch("/api/compass-conversation/analyze", {
       method: "POST",
@@ -570,7 +588,8 @@ export async function fetchCompassHintsForAction(
         gameId,
         action,
         gameContext,
-        debugMode
+        debugMode,
+        trapContext  // NEW: Include trap context for value-aware analysis
       })
     });
 

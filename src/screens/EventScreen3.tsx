@@ -516,6 +516,13 @@ export default function EventScreen3({ push }: Props) {
         wordCount: reasoningText.split(/\s+/).length
       }, 'Starting reasoning compass analysis');
 
+      // Build trap context for value-aware analysis
+      const trapContext = collectedData?.valueTargeted ? {
+        valueTargeted: collectedData.valueTargeted,
+        dilemmaTitle: dilemma.title,
+        dilemmaDescription: dilemma.description
+      } : undefined;
+
       // Call compass conversation API for reasoning analysis
       const response = await fetch('/api/compass-conversation/analyze', {
         method: 'POST',
@@ -535,6 +542,7 @@ export default function EventScreen3({ push }: Props) {
             role: useRoleStore.getState().roleScope,
             systemName: useRoleStore.getState().analysis?.systemName || 'Unknown system'
           },
+          trapContext,  // NEW: Include trap context for value-aware analysis
           debugMode
         })
       });
@@ -712,8 +720,15 @@ export default function EventScreen3({ push }: Props) {
     // Keep phase as 'confirming' during cleanup (loading overlay stays visible)
     console.log('[EventScreen3] 🔄 Starting cleanup with loading overlay visible...');
 
+    // Build trap context for value-aware compass analysis
+    const trapContext = collectedData?.valueTargeted && collectedData?.dilemma ? {
+      valueTargeted: collectedData.valueTargeted,
+      dilemmaTitle: collectedData.dilemma.title,
+      dilemmaDescription: collectedData.dilemma.description
+    } : undefined;
+
     // Run cleaner (handles: save choice, update budget, coin animation, advance day)
-    await cleanAndAdvanceDay(actionCard, clearFlights);
+    await cleanAndAdvanceDay(actionCard, clearFlights, trapContext);
 
     // After cleaning complete, reset to collecting phase for next day
     setPhase('collecting');
@@ -794,8 +809,15 @@ export default function EventScreen3({ push }: Props) {
     // Keep phase as 'confirming' during cleanup (loading overlay stays visible)
     console.log('[EventScreen3] 🔄 Starting cleanup with loading overlay visible...');
 
+    // Build trap context for value-aware compass analysis (same as regular actions)
+    const trapContext = collectedData?.valueTargeted && collectedData?.dilemma ? {
+      valueTargeted: collectedData.valueTargeted,
+      dilemmaTitle: collectedData.dilemma.title,
+      dilemmaDescription: collectedData.dilemma.description
+    } : undefined;
+
     // Run cleaner (handles: save choice, update budget, wait for animation, advance day)
-    await cleanAndAdvanceDay(suggestionCard, clearFlights);
+    await cleanAndAdvanceDay(suggestionCard, clearFlights, trapContext);
 
     // After cleaning complete, reset to collecting phase for next day
     setPhase('collecting');

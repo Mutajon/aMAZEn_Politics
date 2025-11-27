@@ -349,7 +349,8 @@ const MODEL_DILEMMA_PREMIUM = process.env.MODEL_DILEMMA_PREMIUM || "gpt-5";
 const MODEL_DILEMMA_ANTHROPIC = process.env.MODEL_DILEMMA_ANTHROPIC || ""; // No fallback - must be set in .env
 const MODEL_DILEMMA_XAI = process.env.MODEL_DILEMMA_XAI || ""; // No fallback - must be set in .env
 const MODEL_DILEMMA_GEMINI = process.env.MODEL_DILEMMA_GEMINI || ""; // No fallback - must be set in .env
-const MODEL_COMPASS_HINTS = process.env.MODEL_COMPASS_HINTS || "gpt-5-mini";
+const MODEL_VALIDATE_GEMINI = process.env.MODEL_VALIDATE_GEMINI || "gemini-2.5-flash"; // Gemini model for suggestion validation
+const MODEL_COMPASS_HINTS = process.env.MODEL_COMPASS_HINTS || "gemini-2.5-flash"; // Changed to Gemini for consistency with dilemma/aftermath
 
 
 // Image model
@@ -743,6 +744,59 @@ async function aiJSON({ system, user, model = CHAT_MODEL_DEFAULT, temperature = 
     }
 
     // Not a quota error, or already tried fallback model
+    return fallback;
+  }
+}
+
+
+/**
+ * aiJSONGemini: Call Gemini API and parse JSON from the response
+ * Similar to aiJSON but uses Google's Gemini API via OpenAI-compatible endpoint
+ */
+async function aiJSONGemini({ system, user, model = MODEL_VALIDATE_GEMINI, temperature = 0, fallback = null }) {
+  try {
+    console.log(`[GEMINI-JSON] Calling Gemini API with model: ${model}`);
+
+    const messages = [
+      { role: "system", content: system },
+      { role: "user", content: user }
+    ];
+
+    const response = await fetch(GEMINI_CHAT_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${GEMINI_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        temperature: temperature,
+        max_tokens: 1024, // Validation responses are small
+        stream: false
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[GEMINI-JSON] API error ${response.status}: ${errorText}`);
+      return fallback;
+    }
+
+    const data = await response.json();
+    const text = data?.choices?.[0]?.message?.content ?? "";
+
+    console.log(`[GEMINI-JSON] Raw response: ${text.substring(0, 200)}...`);
+
+    const parsed = safeParseJSON(text, { debugTag: "aiJSONGemini" });
+    if (parsed) {
+      return parsed;
+    }
+
+    console.warn("[GEMINI-JSON] Failed to parse JSON from response, using fallback");
+    return fallback;
+  } catch (err) {
+    console.error("[GEMINI-JSON] Error:", err?.message || err);
     return fallback;
   }
 }
@@ -2158,6 +2212,23 @@ function analyzeSystemType(systemName) {
 
 
 /**
+ * Strip markdown code block markers from text
+ * Handles: ```json, ```, and similar patterns that Gemini often wraps JSON responses in
+ */
+function stripMarkdownCodeBlocks(text) {
+  if (typeof text !== "string") return text;
+
+  // Remove opening code block: ```json or ``` at start (with optional language identifier)
+  let result = text.replace(/^```(?:json|javascript|js)?\s*\n?/i, '');
+
+  // Remove closing code block: ``` at end
+  result = result.replace(/\n?```\s*$/i, '');
+
+  return result.trim();
+}
+
+
+/**
  * Strip line (//) and block (/* ... *\/) style comments from a JSON-like string without touching quoted content
  */
 function stripJsonComments(text) {
@@ -2286,6 +2357,13 @@ function safeParseJSON(text, { debugTag = "safeParseJSON", maxLogLength = 400 } 
     return null;
   }
 
+  // Strip markdown code blocks first (Gemini often wraps JSON in ```json ... ```)
+  const stripped = stripMarkdownCodeBlocks(text);
+  if (stripped !== text) {
+    console.log(`[${debugTag}] Stripped markdown code blocks from response`);
+    text = stripped;
+  }
+
   const logFailure = (stage, error, sample) => {
     const snippet = sample && sample.length > maxLogLength ? `${sample.slice(0, maxLogLength)}…` : sample;
     console.warn(`[${debugTag}] JSON parse failed at stage=${stage}: ${error?.message || error}`);
@@ -2406,15 +2484,12 @@ app.post("/api/validate-suggestion", async (req, res) => {
       roleScope
     });
 
-    const model =
-      process.env.MODEL_VALIDATE ||
-      process.env.CHAT_MODEL ||
-      "gpt-5-mini";
-
-    const raw = await aiJSON({
+    // Use Gemini for validation (gemini-2.5-flash)
+    console.log(`[validate-suggestion] Using Gemini model: ${MODEL_VALIDATE_GEMINI}`);
+    const raw = await aiJSONGemini({
       system,
       user,
-      model,
+      model: MODEL_VALIDATE_GEMINI,
       temperature: 0,
       fallback: { valid: true, reason: "Accepted (fallback)" }
     });
@@ -2820,11 +2895,26 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
 
     // Call AI with dilemma model (NO temperature override - use default)
     // No fallback - let errors propagate so frontend can show retry button
-    const result = await aiJSON({
-      system,
-      user,
-      model: MODEL_DILEMMA
-    });
+    // Use provider-aware routing (same pattern as game-turn-v2)
+    const useGemini = process.env.AI_PROVIDER === 'gemini' || MODEL_DILEMMA_GEMINI;
+
+    let result;
+    if (useGemini && MODEL_DILEMMA_GEMINI) {
+      // Use Gemini API
+      const messages = [
+        { role: "system", content: system },
+        { role: "user", content: user }
+      ];
+      const aiResponse = await callGeminiChat(messages, MODEL_DILEMMA_GEMINI);
+      result = aiResponse?.content ? safeParseJSON(aiResponse.content, { debugTag: "aftermath-gemini" }) : null;
+    } else {
+      // Use OpenAI API (original behavior)
+      result = await aiJSON({
+        system,
+        user,
+        model: MODEL_DILEMMA
+      });
+    }
 
     if (debug) {
       console.log("[/api/aftermath] AI response:", result);
@@ -3723,11 +3813,13 @@ Rules:
 - ALWAYS reference at least ONE specific value from player's "what" or "how" values
 - Create tension - show how dilemma challenges or contradicts their stated values
 - Never preach - just highlight the contradiction or irony
-- Use the actual value name: "your precious Honor", "that Truth you claim to value"
+- IMPORTANT: Do NOT use the exact compass value names (e.g., "Truth/Trust", "Liberty/Agency", "Deliberation"). Instead, paraphrase into natural, conversational language: "your sense of truth", "your love of freedom", "your careful deliberation"
 - 1 sentence, 20-25 words, dry/mocking tone
 
 BAD: "I wonder how you'll handle this crisis."
-GOOD: "Your beloved Deliberation might be a luxury when soldiers are dying by the minute."
+BAD: "Your Truth/Trust is being tested." (uses exact system nomenclature)
+GOOD: "Your sense of truth might be a luxury when the crowd demands blood."
+GOOD: "I see your careful deliberation — charming, while soldiers bleed."
 
 
 8. OUTPUT FORMAT
@@ -4027,24 +4119,22 @@ NOT: "manage the situation," "respond to the challenge," "address the crisis"
 
 
 ─────────────────────────────────────────
-STEP 3: BRIDGE FROM PREVIOUS DAY
+STEP 3: BRIDGE FROM PREVIOUS DAY (SHOW RESOLUTION)
 ─────────────────────────────────────────
 
-Days 2-7 MUST acknowledge the previous day's decision in 1-2 sentences.
-You have two options:
+Days 2-7: In ONE SENTENCE, close yesterday's story by showing the OUTCOME of the player's choice - not just what they did, but what happened because of it. Then introduce the new problem.
 
-OPTION A: Direct Consequence
-Show a concrete result of yesterday's action, then introduce related complication.
-Example: "Yesterday you executed the general. His son now leads a rebel faction and demands your head."
+Vary your phrasing naturally:
+- "Following your decision to X, Y happened..."
+- "Because you insisted on X, Y..."
+- "Your choice to X paid off - Y. But now..."
+- "The X you ordered worked - Y. However..."
 
-OPTION B: Conclude & Shift
-Conclude yesterday's decision, then introduce a NEW dilemma (different tension).
-Example: "Yesterday you executed the general. The army is quiet now, obedient. But your sister arrives with terrible news: famine in the southern provinces."
+BAD: "Yesterday you arrested the priest. Today, a plague arrives." (no outcome)
+GOOD: "Following your arrest of the priest, he confessed and named his conspirators - they rot in your dungeons now. But this morning, foreign ships appear on the horizon."
+GOOD: "Because you showed mercy to the thief, word spread - you're seen as just. The nobleman whose gold was stolen now demands an audience."
 
-BAD BRIDGING: "Yesterday you lowered taxes. Today, there are tensions about religion."
-GOOD BRIDGING: "Yesterday you lowered taxes. The priests, now unpaid, refuse to bless your troops before battle."
-
-The previous decision must MATTER. Show consequence or closure. Don't just mention it and move on.
+Show what HAPPENED because of the choice, then pivot to the new problem.
 
 
 3. CONSTRAINTS
@@ -4088,20 +4178,22 @@ DYNAMIC PARAMETERS (Days 2-7):
 
 THE MIRROR'S ROLE (All Days):
 - The Mirror is a light-hearted companion who surfaces value tensions with dry humor
-- MUST reference the player's specific value BY NAME from their top 8 values
+- MUST reference the player's specific value from their top 8 values, but NEVER use the exact compass nomenclature (e.g., "Truth/Trust", "Care/Solidarity", "Law/Std."). Instead, paraphrase naturally: "your sense of truth", "your care for others", "your faith in the law"
 - Tone: amused, teasing, observant - NOT preachy or judgmental
 - First person perspective: "I see..." "I wonder..." "I notice..."
 - Length: 20-25 words exactly
 
 GOOD Mirror Examples:
-- "I see you chose Honor over pragmatism. Your ancestors would approve, but I wonder if your treasury will."
+- "I see you chose honor over pragmatism. Your ancestors would approve, but I wonder if your treasury will."
 - "Loyalty to family, hm? Noble. Though I notice the people outside your door don't share your bloodline."
 - "Freedom for all, you say. I'm curious how long that lasts when the grain runs out."
 
 BAD Mirror Examples (DO NOT DO THIS):
-- "That was an interesting choice." (too vague, no value name)
+- "That was an interesting choice." (too vague, no value reference)
 - "I wonder how this will play out." (no value reference)
 - "Your commitment to your ideals is admirable." (too generic, preachy)
+- "Your Truth/Trust is in conflict here." (uses exact compass nomenclature - sounds robotic)
+- "Your Liberty/Agency matters to you." (uses slash notation from system - unnatural)
 
 
 4. OUTPUT FORMAT
@@ -4213,29 +4305,24 @@ Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
     prompt += `DAY ${day} of 7\n\nPrevious action: "${playerChoice.title}" - ${playerChoice.description}${compassUpdateText}\n\n`;
 
     if (day === 7) {
-      prompt += `This is the final day: clearly remind the player that their borrowed time in this world is almost over and this is their last decisive act.
+      prompt += `This is the final day. Make this dilemma especially tough and epic - a climactic choice worthy of the player's last act in this world. The stakes should feel monumental. Remind them their borrowed time is almost over.
 
-In ONE SHORT SENTENCE, acknowledge the previous action and its immediate consequence.
-Then introduce a NEW dilemma from a DIFFERENT underlying issue.
+In ONE SENTENCE, close yesterday's story by showing the OUTCOME (not just the action). Vary phrasing naturally. Then introduce the final dilemma.
 
-CRITICAL: Follow Golden Rules B & C:
-- Do NOT repeat the same tension. If yesterday was about [topic X], today must be about something completely different.
-- Design actions that explore autonomy vs. heteronomy (one autonomous/risky, one obedient/safe, one transactional).
+CRITICAL: Follow Golden Rules B & C - different tension from yesterday, actions exploring autonomy vs. heteronomy.
 
 STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player RIGHT NOW.`;
     } else if (day === 8) {
       prompt += `This is Day 8 - the aftermath. Follow the system prompt instructions for Day 8.`;
     } else {
-      prompt += `In ONE SHORT SENTENCE, acknowledge the previous action and its immediate consequence.
+      prompt += `In ONE SENTENCE, close yesterday's story by showing the OUTCOME of the choice (not just the action). Vary phrasing naturally - don't always start with "Yesterday you..."
+
 Then introduce a NEW dilemma from a DIFFERENT underlying issue.
 
-CRITICAL: Follow Golden Rules B & C:
-- Do NOT repeat the same tension. If yesterday was about [topic X], today must be about something completely different.
-- Design actions that explore autonomy vs. heteronomy (one autonomous/risky, one obedient/safe, one transactional).
+CRITICAL: Follow Golden Rules B & C - different tension from yesterday, actions exploring autonomy vs. heteronomy.
 
-DO NOT summarize the general situation.
-DO NOT write about "debates" or "rising tensions."
-STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player or their interests RIGHT NOW.
+DO NOT summarize the general situation or write about "debates" or "rising tensions."
+STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player RIGHT NOW.
 
 Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
     }
@@ -5104,9 +5191,14 @@ app.post("/api/compass-conversation/analyze", async (req, res) => {
       return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
     }
 
-    const { gameId, action, reasoning, gameContext, debugMode = false } = req.body || {};
+    const { gameId, action, reasoning, gameContext, trapContext, debugMode = false } = req.body || {};
     const actionTitle = typeof action?.title === "string" ? action.title.trim().slice(0, 160) : "";
     const actionSummary = typeof action?.summary === "string" ? action.summary.trim().slice(0, 400) : "";
+
+    // Extract trap context for value-aware analysis
+    const valueTargeted = typeof trapContext?.valueTargeted === "string" ? trapContext.valueTargeted.trim() : "";
+    const trapDilemmaTitle = typeof trapContext?.dilemmaTitle === "string" ? trapContext.dilemmaTitle.trim().slice(0, 200) : "";
+    const trapDilemmaDescription = typeof trapContext?.dilemmaDescription === "string" ? trapContext.dilemmaDescription.trim().slice(0, 500) : "";
 
     // Check if this is reasoning analysis
     const isReasoningAnalysis = reasoning?.text;
@@ -5131,15 +5223,33 @@ app.post("/api/compass-conversation/analyze", async (req, res) => {
       console.log(`[CompassConversation] Dilemma: "${actionTitle}"`);
       console.log(`[CompassConversation] Selected Action: "${selectedAction}"`);
       console.log(`[CompassConversation] Reasoning: "${reasoningText.substring(0, 100)}${reasoningText.length > 100 ? '...' : ''}"`);
+      if (valueTargeted) {
+        console.log(`[CompassConversation] 🎯 Value Trap: "${valueTargeted}"`);
+      }
     } else {
       console.log(`\n[CompassConversation] 🔍 Analyzing action for gameId=${gameId}`);
       console.log(`[CompassConversation] Action: "${actionTitle}"`);
+      if (valueTargeted) {
+        console.log(`[CompassConversation] 🎯 Value Trap: "${valueTargeted}"`);
+      }
     }
 
     // Get conversation
     const conversation = getConversation(`compass-${gameId}`);
     if (!conversation || !conversation.meta.messages) {
       console.warn(`[CompassConversation] ⚠️ No conversation found, falling back to non-stateful analysis`);
+
+      // Build trap context section for fallback mode
+      const fallbackTrapContext = valueTargeted ? `
+VALUE TRAP CONTEXT:
+This dilemma was designed to test the player's "${valueTargeted}" value.
+${trapDilemmaTitle ? `The trap setup: "${trapDilemmaTitle}"${trapDilemmaDescription ? ` - ${trapDilemmaDescription}` : ''}` : ''}
+
+MANDATORY: Your analysis MUST include a compass hint for the trapped value (${valueTargeted}).
+- If the action SUPPORTS the trapped value → positive polarity (+1 or +2)
+- If the action CONTRADICTS/BETRAYS the trapped value → negative polarity (-1 or -2)
+
+` : '';
 
       // Fallback: Create one-off analysis without stored state
       const fallbackSystemPrompt = `You translate player decisions into political compass hints.
@@ -5150,7 +5260,7 @@ Return 2-6 compass hints as JSON: {"compassHints": [{"prop": "what|whence|how|wh
 
       let fallbackUserPrompt;
       if (isReasoningAnalysis) {
-        fallbackUserPrompt = `CURRENT DILEMMA:
+        fallbackUserPrompt = `${fallbackTrapContext}CURRENT DILEMMA:
 TITLE: ${actionTitle}${actionSummary ? `\nDESCRIPTION: ${actionSummary}` : ''}
 
 PLAYER'S SELECTED ACTION: ${selectedAction}
@@ -5160,7 +5270,7 @@ PLAYER'S REASONING FOR THIS CHOICE:
 
 Analyze the player's reasoning text for political compass values. What values does their explanation reveal?`;
       } else {
-        fallbackUserPrompt = `Analyze this action:
+        fallbackUserPrompt = `${fallbackTrapContext}Analyze this action:
 TITLE: ${actionTitle}${actionSummary ? `\nSUMMARY: ${actionSummary}` : ''}`;
       }
 
@@ -5169,7 +5279,7 @@ TITLE: ${actionTitle}${actionSummary ? `\nSUMMARY: ${actionSummary}` : ''}`;
         { role: "user", content: fallbackUserPrompt }
       ];
 
-      const aiResponse = await callOpenAIChat(messages, MODEL_COMPASS_HINTS);
+      const aiResponse = await callGeminiChat(messages, MODEL_COMPASS_HINTS);
       const parsed = parseCompassHintsResponse(aiResponse.content);
 
       return res.json({ compassHints: parsed.compassHints || [] });
@@ -5181,13 +5291,27 @@ TITLE: ${actionTitle}${actionSummary ? `\nSUMMARY: ${actionSummary}` : ''}`;
     const playerRole = gameContext?.role || storedContext.role || "Unknown role";
     const politicalSystem = gameContext?.systemName || storedContext.systemName || "Unknown system";
 
+    // Build trap context section if provided (for value-aware analysis)
+    const trapContextSection = valueTargeted ? `
+VALUE TRAP CONTEXT:
+This dilemma was designed to test the player's "${valueTargeted}" value.
+The trap setup: "${trapDilemmaTitle}"${trapDilemmaDescription ? ` - ${trapDilemmaDescription}` : ''}
+
+MANDATORY: Your analysis MUST include a compass hint for the trapped value (${valueTargeted}).
+- If the action SUPPORTS the trapped value → positive polarity (+1 or +2)
+- If the action CONTRADICTS/BETRAYS the trapped value → negative polarity (-1 or -2)
+- This hint is REQUIRED in addition to any other relevant values you identify
+
+Continue to analyze other relevant values as well - the trapped value is mandatory but not exclusive.
+` : '';
+
     // Build enhanced user prompt with full context
     let userPrompt;
     if (isReasoningAnalysis) {
       userPrompt = `SCENARIO CONTEXT: ${scenarioContext}
 PLAYER ROLE: ${playerRole}
 POLITICAL SYSTEM: ${politicalSystem}
-
+${trapContextSection}
 CURRENT DILEMMA:
 TITLE: ${actionTitle}${actionSummary ? `
 DESCRIPTION: ${actionSummary}` : ''}
@@ -5209,7 +5333,7 @@ Return JSON in this shape:
       userPrompt = `SCENARIO CONTEXT: ${scenarioContext}
 PLAYER ROLE: ${playerRole}
 POLITICAL SYSTEM: ${politicalSystem}
-
+${trapContextSection}
 ACTION:
 TITLE: ${actionTitle}${actionSummary ? `
 SUMMARY: ${actionSummary}` : ''}
@@ -5263,8 +5387,8 @@ Return JSON in this shape:
       { role: "user", content: userPrompt }
     ];
 
-    // Call AI
-    const aiResponse = await callOpenAIChat(messages, MODEL_COMPASS_HINTS);
+    // Call AI (using Gemini for consistency with dilemma/aftermath)
+    const aiResponse = await callGeminiChat(messages, MODEL_COMPASS_HINTS);
     const content = aiResponse?.content;
 
     if (!content) {
