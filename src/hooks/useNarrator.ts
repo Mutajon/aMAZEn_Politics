@@ -1,7 +1,7 @@
 // src/hooks/useNarrator.ts
 // Gemini-backed TTS narrator with "prepare()" for exact A/V sync.
-// - prepare(text) → returns a Prepared handle that resolves once audio is fully buffered
-//   (canplaythrough). You decide exactly when to start() it (e.g., on fade-in start).
+// - prepare(text) → returns a Prepared handle that resolves once audio has enough data to play
+//   (canplay). You decide exactly when to start() it (e.g., on fade-in start).
 // - speak(text) is kept for convenience (prepare + start immediately).
 // - prime() should be called from a user gesture (Splash "Start!") to unlock mobile audio.
 // - All requests go to /api/tts on your server; the API key never touches the client.
@@ -152,19 +152,19 @@ export function useNarrator() {
       audio.preload = "auto";
       audio.volume = volume;
 
-      // Wait for 'canplaythrough' so we know the buffer is ready
+      // Wait for 'canplay' (not 'canplaythrough') for faster start - allows playback to begin sooner
       await new Promise<void>((resolve, reject) => {
         const onReady = () => {
-          audio.removeEventListener("canplaythrough", onReady);
+          audio.removeEventListener("canplay", onReady);
           audio.removeEventListener("error", onErr);
           resolve();
         };
         const onErr = () => {
-          audio.removeEventListener("canplaythrough", onReady);
+          audio.removeEventListener("canplay", onReady);
           audio.removeEventListener("error", onErr);
           reject(new Error("Audio element error"));
         };
-        audio.addEventListener("canplaythrough", onReady, { once: true });
+        audio.addEventListener("canplay", onReady, { once: true });
         audio.addEventListener("error", onErr, { once: true });
         // Nudge the decoder on some browsers
         audio.load();

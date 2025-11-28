@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useLayoutEffect } from 'react';
 import type { TutorialStep } from '../../hooks/useDay2Tutorial';
 
 interface TutorialOverlayProps {
@@ -15,32 +15,69 @@ interface ArrowConfig {
   textPosition: { x: number; y: number };
 }
 
+// Message box dimensions
+const MESSAGE_WIDTH = 280;
+const MESSAGE_HEIGHT = 100;
+const MOBILE_BREAKPOINT = 640;
+const PADDING = 20;
+
 export function TutorialOverlay({ step, targetElement }: TutorialOverlayProps) {
   const [arrowConfig, setArrowConfig] = useState<ArrowConfig | null>(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < MOBILE_BREAKPOINT);
+
+  // Scroll target element into view when step changes
+  useLayoutEffect(() => {
+    if (targetElement && (step === 'awaiting-avatar' || step === 'awaiting-compass-pills')) {
+      targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [step, targetElement]);
 
   useEffect(() => {
     const updatePosition = () => {
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const isMobile = viewportWidth < MOBILE_BREAKPOINT;
+
       if (step === 'awaiting-avatar') {
         if (!targetElement) return;
         const rect = targetElement.getBoundingClientRect();
-        // Avatar is at top-right, point arrow from left side
-        setArrowConfig({
-          message: 'Click on your avatar to see the current top values exhibited by your actions',
-          arrowDirection: 'right',
-          arrowPosition: {
-            x: rect.left - 60,
-            y: rect.top + rect.height / 2,
-          },
-          textPosition: {
-            x: Math.max(20, rect.left - 380),
-            y: rect.top + rect.height / 2 - 40,
-          },
-        });
+
+        if (isMobile) {
+          // Mobile: Center message below avatar, arrow points up toward avatar
+          setArrowConfig({
+            message: 'Click on your avatar to see the current top values exhibited by your actions',
+            arrowDirection: 'up',
+            arrowPosition: {
+              x: rect.left + rect.width / 2,
+              y: rect.bottom + 20,
+            },
+            textPosition: {
+              x: Math.max(PADDING, (viewportWidth - MESSAGE_WIDTH) / 2),
+              y: rect.bottom + 70,
+            },
+          });
+        } else {
+          // Desktop: Keep existing left-of-avatar positioning
+          setArrowConfig({
+            message: 'Click on your avatar to see the current top values exhibited by your actions',
+            arrowDirection: 'right',
+            arrowPosition: {
+              x: rect.left - 60,
+              y: rect.top + rect.height / 2,
+            },
+            textPosition: {
+              x: Math.max(PADDING, rect.left - 380),
+              y: rect.top + rect.height / 2 - 40,
+            },
+          });
+        }
       } else if (step === 'awaiting-value') {
         if (!targetElement) return;
         const rect = targetElement.getBoundingClientRect();
         // Value is inside modal, point from above or below depending on position
-        const isInUpperHalf = rect.top < window.innerHeight / 2;
+        const isInUpperHalf = rect.top < viewportHeight / 2;
+        const messageWidth = isMobile ? MESSAGE_WIDTH - 40 : MESSAGE_WIDTH;
+
         setArrowConfig({
           message: 'Click on a value for further details',
           arrowDirection: isInUpperHalf ? 'down' : 'up',
@@ -49,58 +86,75 @@ export function TutorialOverlay({ step, targetElement }: TutorialOverlayProps) {
             y: isInUpperHalf ? rect.top - 40 : rect.bottom + 40,
           },
           textPosition: {
-            x: Math.max(20, Math.min(window.innerWidth - 320, rect.left + rect.width / 2 - 150)),
+            x: Math.max(PADDING, Math.min(viewportWidth - messageWidth - PADDING, rect.left + rect.width / 2 - messageWidth / 2)),
             y: isInUpperHalf ? rect.top - 120 : rect.bottom + 60,
           },
         });
       } else if (step === 'showing-explanation') {
         // Show helpful message while explanation modal is open (no target element needed)
+        const messageWidth = isMobile ? MESSAGE_WIDTH - 40 : MESSAGE_WIDTH;
         setArrowConfig({
           message: 'Read the value explanation, then click anywhere to close',
           arrowDirection: 'down',
           arrowPosition: {
-            x: window.innerWidth / 2,
+            x: viewportWidth / 2,
             y: 100,
           },
           textPosition: {
-            x: Math.max(20, window.innerWidth / 2 - 150),
+            x: Math.max(PADDING, (viewportWidth - messageWidth) / 2),
             y: 120,
           },
         });
       } else if (step === 'awaiting-modal-close') {
         // After explanation closed, tell user to close the PlayerCardModal
+        const messageWidth = isMobile ? MESSAGE_WIDTH - 40 : MESSAGE_WIDTH;
         setArrowConfig({
           message: 'Now close this modal to continue',
           arrowDirection: 'down',
           arrowPosition: {
-            x: window.innerWidth / 2,
+            x: viewportWidth / 2,
             y: 100,
           },
           textPosition: {
-            x: Math.max(20, window.innerWidth / 2 - 200),
+            x: Math.max(PADDING, (viewportWidth - messageWidth) / 2),
             y: 120,
           },
         });
       } else if (step === 'awaiting-compass-pills') {
-        // Show message only (no arrow) - the pulsing button highlight is sufficient
-        const pillsX = window.innerWidth - 40; // Right edge with some padding
-        const pillsY = window.innerHeight * 0.75; // Adjusted to match actual MirrorCard position
+        // Use actual element ref for positioning (no more hardcoded values)
+        if (!targetElement) {
+          console.warn('[TutorialOverlay] Compass pills ref not available');
+          return;
+        }
 
+        const rect = targetElement.getBoundingClientRect();
+        const messageWidth = isMobile ? MESSAGE_WIDTH - 40 : MESSAGE_WIDTH;
+
+        // Position message to the left of the button, with arrow pointing right
         setArrowConfig({
           message: 'Click here to see the most recent change to your values',
-          arrowDirection: 'none',
-          arrowPosition: { x: 0, y: 0 }, // Not used when direction is 'none'
+          arrowDirection: 'right',
+          arrowPosition: {
+            x: rect.left - 50,
+            y: rect.top + rect.height / 2,
+          },
           textPosition: {
-            x: Math.max(20, pillsX - 320),
-            y: pillsY - 40,
+            x: Math.max(PADDING, rect.left - messageWidth - 70),
+            y: rect.top + rect.height / 2 - MESSAGE_HEIGHT / 2,
           },
         });
       }
     };
 
     updatePosition();
-    window.addEventListener('resize', updatePosition);
-    return () => window.removeEventListener('resize', updatePosition);
+
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+      updatePosition();
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [step, targetElement]);
 
   if (step === 'inactive' || step === 'complete') {
@@ -131,7 +185,7 @@ export function TutorialOverlay({ step, targetElement }: TutorialOverlayProps) {
               style={{
                 left: arrowConfig.textPosition.x,
                 top: arrowConfig.textPosition.y,
-                maxWidth: 300,
+                maxWidth: isMobile ? MESSAGE_WIDTH - 40 : MESSAGE_WIDTH + 20,
                 zIndex: 50,
               }}
             >

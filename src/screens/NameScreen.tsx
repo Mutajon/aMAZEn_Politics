@@ -139,11 +139,11 @@ function buildFullPrompt(
   const genderedRole = genderizeRole(role, gender);
   const genderWord = gender === "male" ? "male " : gender === "female" ? "female " : "";
   const subject = `a ${genderWord}${genderedRole}`.trim();
-  const head = `a close-up portrait of the face of ${subject}`;
+  const head = `a fictional game avatar, close-up portrait of the face of ${subject}`;
   const physicalClean = physical.trim().replace(/^[,.\s]+/, "");
   const withPhysical = physicalClean ? `${head}, ${physicalClean}` : head;
   const bg = bgObject ? `, with a ${bgObject} in the background` : "";
-  const tail = ", colored cartoon with strong lines";
+  const tail = ". Use only the following style: colored cartoon with strong lines";
   return `${withPhysical}${bg}${tail}`;
 }
 
