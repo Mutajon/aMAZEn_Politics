@@ -1,39 +1,42 @@
 // src/components/LoadingOverlay.tsx
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRotatingText } from "../hooks/useRotatingText";
+import { createTranslatedConst, useTranslatedConst } from "../i18n/useTranslatedConst";
 
 /** Optional shared list you asked for (exported for convenience). */
 export type RichQuote = { text: string; author: string };
-export const POLITICS_QUOTES: RichQuote[] = [
-  { author: "Winston Churchill", text: "Democracy is the worst form of government, except for all the others." },
-  { author: "Mark Twain", text: "Suppose you were an idiot, and suppose you were a member of Congress; but I repeat myself." },
-  { author: "Groucho Marx", text: "Politics is the art of looking for trouble, finding it everywhere, diagnosing it incorrectly, and applying the wrong remedies." },
-  { author: "George Bernard Shaw", text: "He knows nothing and thinks he knows everything. That points clearly to a political career." },
-  { author: "Oscar Wilde", text: "Democracy means simply the bludgeoning of the people by the people for the people." },
-  { author: "Will Rogers", text: "I don’t make jokes. I just watch the government and report the facts." },
-  { author: "Franklin D. Roosevelt", text: "In politics, nothing happens by accident. If it happens, you can bet it was planned that way." },
-  { author: "Thomas Jefferson", text: "Whenever a man has cast a longing eye on offices, a rottenness begins in his conduct." },
-  { author: "Ronald Reagan", text: "The nine most terrifying words in the English language are: I’m from the government and I’m here to help." },
-  { author: "Harry S. Truman", text: "If you want a friend in Washington, get a dog." },
-  { author: "Adlai Stevenson", text: "In America, anybody can be president. That’s one of the risks you take." },
-  { author: "Voltaire", text: "In general, the art of government consists of taking as much money as possible from one class of citizens to give to another." },
-  { author: "Abraham Lincoln", text: "You can fool all the people some of the time, and some of the people all the time, but you cannot fool all the people all the time." },
-  { author: "P. J. O’Rourke", text: "Giving money and power to government is like giving whiskey and car keys to teenage boys." },
-  { author: "Machiavelli", text: "Politics have no relation to morals." },
-  { author: "John Adams", text: "Because power corrupts, society’s demands for moral authority and character increase as the importance of the position increases." },
-  { author: "Margaret Thatcher", text: "Being powerful is like being a lady. If you have to tell people you are, you aren’t." },
-  { author: "Napoleon Bonaparte", text: "In politics, stupidity is not a handicap." },
-  { author: "Alan Mooe", text: "People shouldn't be afraid of their government. Governments should be afraid of their people." },
-  { author: "Unknown", text: "Politicians and diapers must be changed often, and for the same reason." },
-  { author: "James Bovard", text: "Democracy must be something more than two wolves and a sheep voting on what to have for dinner." },
-  { author: "Otto von Bismarck", text: "People never lie so much as after a hunt, during a war, or before an election." },
-  { author: "George Bernard Shaw", text: "Democracy is a device that ensures we shall be governed no better than we deserve." },
-  { author: "Winston Churchill", text: "Some men change their party for the sake of their principles; others their principles for the sake of their party." },
-  { author: "Abraham Lincoln", text: "Democracy is the rule of the people, by the people and for the people." },
-  { author: "Charles De Gaulle", text: "Since a politician never believes what he says, he is surprised when others believe him." },
-  { author: "Plato", text: "One of the penalties for refusing to participate in politics is that you end up being governed by your inferiors." },
-];
+
+// Translated quotes using i18n
+export const POLITICS_QUOTES = createTranslatedConst((lang): RichQuote[] => [
+  { author: lang("POLITICS_QUOTE_1_AUTHOR"), text: lang("POLITICS_QUOTE_1_TEXT") },
+  { author: lang("POLITICS_QUOTE_2_AUTHOR"), text: lang("POLITICS_QUOTE_2_TEXT") },
+  { author: lang("POLITICS_QUOTE_3_AUTHOR"), text: lang("POLITICS_QUOTE_3_TEXT") },
+  { author: lang("POLITICS_QUOTE_4_AUTHOR"), text: lang("POLITICS_QUOTE_4_TEXT") },
+  { author: lang("POLITICS_QUOTE_5_AUTHOR"), text: lang("POLITICS_QUOTE_5_TEXT") },
+  { author: lang("POLITICS_QUOTE_6_AUTHOR"), text: lang("POLITICS_QUOTE_6_TEXT") },
+  { author: lang("POLITICS_QUOTE_7_AUTHOR"), text: lang("POLITICS_QUOTE_7_TEXT") },
+  { author: lang("POLITICS_QUOTE_8_AUTHOR"), text: lang("POLITICS_QUOTE_8_TEXT") },
+  { author: lang("POLITICS_QUOTE_9_AUTHOR"), text: lang("POLITICS_QUOTE_9_TEXT") },
+  { author: lang("POLITICS_QUOTE_10_AUTHOR"), text: lang("POLITICS_QUOTE_10_TEXT") },
+  { author: lang("POLITICS_QUOTE_11_AUTHOR"), text: lang("POLITICS_QUOTE_11_TEXT") },
+  { author: lang("POLITICS_QUOTE_12_AUTHOR"), text: lang("POLITICS_QUOTE_12_TEXT") },
+  { author: lang("POLITICS_QUOTE_13_AUTHOR"), text: lang("POLITICS_QUOTE_13_TEXT") },
+  { author: lang("POLITICS_QUOTE_14_AUTHOR"), text: lang("POLITICS_QUOTE_14_TEXT") },
+  { author: lang("POLITICS_QUOTE_15_AUTHOR"), text: lang("POLITICS_QUOTE_15_TEXT") },
+  { author: lang("POLITICS_QUOTE_16_AUTHOR"), text: lang("POLITICS_QUOTE_16_TEXT") },
+  { author: lang("POLITICS_QUOTE_17_AUTHOR"), text: lang("POLITICS_QUOTE_17_TEXT") },
+  { author: lang("POLITICS_QUOTE_18_AUTHOR"), text: lang("POLITICS_QUOTE_18_TEXT") },
+  { author: lang("POLITICS_QUOTE_19_AUTHOR"), text: lang("POLITICS_QUOTE_19_TEXT") },
+  { author: lang("POLITICS_QUOTE_20_AUTHOR"), text: lang("POLITICS_QUOTE_20_TEXT") },
+  { author: lang("POLITICS_QUOTE_21_AUTHOR"), text: lang("POLITICS_QUOTE_21_TEXT") },
+  { author: lang("POLITICS_QUOTE_22_AUTHOR"), text: lang("POLITICS_QUOTE_22_TEXT") },
+  { author: lang("POLITICS_QUOTE_23_AUTHOR"), text: lang("POLITICS_QUOTE_23_TEXT") },
+  { author: lang("POLITICS_QUOTE_24_AUTHOR"), text: lang("POLITICS_QUOTE_24_TEXT") },
+  { author: lang("POLITICS_QUOTE_25_AUTHOR"), text: lang("POLITICS_QUOTE_25_TEXT") },
+  { author: lang("POLITICS_QUOTE_26_AUTHOR"), text: lang("POLITICS_QUOTE_26_TEXT") },
+  { author: lang("POLITICS_QUOTE_27_AUTHOR"), text: lang("POLITICS_QUOTE_27_TEXT") },
+]);
 
 type Props = {
   visible: boolean;
@@ -58,11 +61,23 @@ export default function LoadingOverlay({
   visible,
   title = "Working on it…",
   quotes,                                 // legacy
-  quotesRich = POLITICS_QUOTES,           // default to the list you provided
+  quotesRich,                             // can be provided, or will use default translated quotes
   periodMs = 7500,
   onCancel,
   dismissible = false,
 }: Props) {
+  // Get translated quotes using the hook - memoized to prevent re-creation
+  const translatedQuotes = useTranslatedConst(POLITICS_QUOTES);
+  
+  // Memoize the effective quotes to prevent unnecessary re-renders
+  const effectiveQuotesRich = useMemo(() => {
+    return quotesRich ?? translatedQuotes;
+  }, [quotesRich, translatedQuotes]);
+  
+  // Use ref to track if we've initialized for this visibility session
+  const initializedRef = useRef(false);
+  const quotesRef = useRef<RichQuote[]>([]);
+  
   /** MODE A: legacy strings (no author line). */
   const legacyQuote = useRotatingText(quotes ?? [], periodMs);
 
@@ -71,29 +86,62 @@ export default function LoadingOverlay({
   const [idx, setIdx] = useState(0);
   const timerRef = useRef<number | null>(null);
 
+  // Update quotes ref when they change
+  // If overlay is visible but not initialized yet, initialize now
+  useEffect(() => {
+    if (effectiveQuotesRich && effectiveQuotesRich.length > 0) {
+      const wasEmpty = quotesRef.current.length === 0;
+      quotesRef.current = effectiveQuotesRich;
+      
+      // If overlay is visible but we haven't initialized (quotes just loaded), initialize now
+      if (visible && !initializedRef.current && wasEmpty) {
+        const shuffled = shuffle(Array.from({ length: effectiveQuotesRich.length }, (_, i) => i));
+        setOrder(shuffled);
+        setIdx(0);
+        initializedRef.current = true;
+        
+        if (timerRef.current) window.clearInterval(timerRef.current);
+        timerRef.current = window.setInterval(() => {
+          setIdx((i) => (i + 1) % shuffled.length);
+        }, periodMs) as unknown as number;
+      }
+    }
+  }, [effectiveQuotesRich, visible, periodMs]);
+
   // Start a fresh random order every time the overlay becomes visible
+  // Only shuffle once when visible changes from false to true - NOT when quotes change
   useEffect(() => {
     if (!visible) {
-      // stop timer when hidden
+      // stop timer when hidden and reset initialization flag
       if (timerRef.current) window.clearInterval(timerRef.current);
       timerRef.current = null;
+      initializedRef.current = false;
       return;
     }
-    // pick which mode we’re in: rich if provided or fall back to legacy
-    if (quotesRich && quotesRich.length > 0) {
-      const shuffled = shuffle(Array.from({ length: quotesRich.length }, (_, i) => i));
-      setOrder(shuffled);
-      setIdx(0);
-      if (timerRef.current) window.clearInterval(timerRef.current);
-      timerRef.current = window.setInterval(() => {
-        setIdx((i) => (i + 1) % shuffled.length);
-      }, periodMs) as unknown as number;
+    
+    // Only initialize once when overlay becomes visible
+    // Use the ref to get current quotes (which are updated separately)
+    if (!initializedRef.current) {
+      const quotesToUse = quotesRef.current.length > 0 ? quotesRef.current : effectiveQuotesRich;
+      if (quotesToUse && quotesToUse.length > 0) {
+        const shuffled = shuffle(Array.from({ length: quotesToUse.length }, (_, i) => i));
+        setOrder(shuffled);
+        setIdx(0);
+        initializedRef.current = true;
+        
+        if (timerRef.current) window.clearInterval(timerRef.current);
+        timerRef.current = window.setInterval(() => {
+          setIdx((i) => (i + 1) % shuffled.length);
+        }, periodMs) as unknown as number;
+      }
     }
+    
     return () => {
       if (timerRef.current) window.clearInterval(timerRef.current);
       timerRef.current = null;
     };
-  }, [visible, quotesRich, periodMs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, periodMs]); // Only depend on visible and periodMs, not quotes
 
   // Prevent page scroll while visible
   useEffect(() => {
@@ -117,8 +165,8 @@ export default function LoadingOverlay({
 
   // Current rich quote (if in rich mode)
   const currentRich: RichQuote | null =
-    quotesRich && quotesRich.length > 0 && order.length > 0
-      ? quotesRich[order[idx]]
+    effectiveQuotesRich && effectiveQuotesRich.length > 0 && order.length > 0
+      ? effectiveQuotesRich[order[idx]]
       : null;
 
   return (

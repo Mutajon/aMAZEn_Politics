@@ -100,9 +100,27 @@ export function translateQuizQuestion(
 }
 
 /**
- * Translates quiz answer based on quiz ID and answer index
+ * Translates quiz answer based on quiz ID and answer index with gender awareness
  */
-export function translateQuizAnswer(quizId: string, answerIndex: number, answer: string, lang: (key: string) => string): string {
+export function translateQuizAnswer(
+  quizId: string, 
+  answerIndex: number, 
+  answer: string, 
+  lang: (key: string) => string,
+  gender?: "male" | "female" | "any"
+): string {
+  // Try gender-specific key first
+  if (gender === "female") {
+    const femaleKey = `${quizId}_A${answerIndex + 1}_FEMALE`;
+    const femaleTranslated = lang(femaleKey);
+    if (femaleTranslated !== femaleKey) return femaleTranslated;
+  } else if (gender === "male") {
+    const maleKey = `${quizId}_A${answerIndex + 1}_MALE`;
+    const maleTranslated = lang(maleKey);
+    if (maleTranslated !== maleKey) return maleTranslated;
+  }
+  
+  // Fall back to base key
   const key = `${quizId}_A${answerIndex + 1}`;
   const translated = lang(key);
   return translated !== key ? translated : answer;

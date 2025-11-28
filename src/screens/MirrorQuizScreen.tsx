@@ -488,7 +488,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
                               }
                             }}
                           >
-                            {translateQuizAnswer(quiz[idx].id, i, opt.a, lang)}
+                            {translateQuizAnswer(quiz[idx].id, i, opt.a, lang, character?.gender)}
                           </motion.button>
                         );
                       })}
