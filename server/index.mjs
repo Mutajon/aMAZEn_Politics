@@ -1041,7 +1041,7 @@ app.get("/api/_ping", (_req, res) => {
 // -------------------- Intro paragraph (role-based) -------------------------
 app.post("/api/intro-paragraph", async (req, res) => {
   try {
-    if (!OPENAI_KEY) return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
+    if (!GEMINI_KEY) return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
 
     const {
       role,
@@ -1667,31 +1667,25 @@ Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setti
 app.post("/api/generate-avatar", async (req, res) => {
   try {
     const prompt = String(req.body?.prompt || "").trim();
-    const useXAI = !!req.body?.useXAI;
-    const useGemini = !!req.body?.useGemini;
 
     if (!prompt) return res.status(400).json({ error: "Missing prompt" });
 
-    // --- Gemini/Imagen provider (no fallback to OpenAI) ---
-    const shouldUseGemini = useGemini && GEMINI_KEY && IMAGE_MODEL_GEMINI;
-    if (shouldUseGemini) {
-      console.log(`[generate-avatar] Using Gemini/Imagen with model ${IMAGE_MODEL_GEMINI}`);
-      try {
-        const b64 = await callGeminiImageGeneration(prompt, IMAGE_MODEL_GEMINI);
-        const dataUrl = `data:image/png;base64,${b64}`;
-        return res.json({ dataUrl });
-      } catch (geminiErr) {
-        console.error(`[generate-avatar] Gemini/Imagen failed: ${geminiErr.message}`);
-        return res.status(503).json({ error: "Image generation unavailable", retryable: true });
-      }
-    } else if (useGemini && !shouldUseGemini) {
-      console.warn("[generate-avatar] Gemini requested but not configured");
+    // Always use Gemini for image generation
+    if (!GEMINI_KEY) {
+      console.error("[generate-avatar] GEMINI_API_KEY not configured");
       return res.status(503).json({ error: "Image provider not configured", retryable: false });
     }
 
-    // No provider configured
-    console.error("[generate-avatar] No image provider configured");
-    return res.status(503).json({ error: "No image provider configured", retryable: false });
+    const imageModel = IMAGE_MODEL_GEMINI || "imagen-3.0-generate-001";
+    console.log(`[generate-avatar] Using Gemini/Imagen with model ${imageModel}`);
+    try {
+      const b64 = await callGeminiImageGeneration(prompt, imageModel);
+      const dataUrl = `data:image/png;base64,${b64}`;
+      return res.json({ dataUrl });
+    } catch (geminiErr) {
+      console.error(`[generate-avatar] Gemini/Imagen failed: ${geminiErr.message}`);
+      return res.status(503).json({ error: "Image generation unavailable", retryable: true });
+    }
   } catch (e) {
     console.error("Error in /api/generate-avatar:", e?.message || e);
     res.status(502).json({ error: "avatar generation failed" });
@@ -5189,8 +5183,8 @@ function validateCompassHints(hints) {
  */
 app.post("/api/compass-conversation/init", async (req, res) => {
   try {
-    if (!OPENAI_KEY) {
-      return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
+    if (!GEMINI_KEY) {
+      return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
     }
 
     const { gameId, gameContext, debugMode = false } = req.body || {};
@@ -5325,8 +5319,8 @@ Wait for SCENARIO CONTEXT, PLAYER ROLE, POLITICAL SYSTEM, and ACTION.`;
  */
 app.post("/api/compass-conversation/analyze", async (req, res) => {
   try {
-    if (!OPENAI_KEY) {
-      return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
+    if (!GEMINI_KEY) {
+      return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
     }
 
     const { gameId, action, reasoning, gameContext, trapContext, debugMode = false } = req.body || {};
