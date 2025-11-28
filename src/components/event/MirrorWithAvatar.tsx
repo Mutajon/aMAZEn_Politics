@@ -55,7 +55,7 @@ export default function MirrorWithAvatar({
       <div className={`flex items-center gap-4 ${className || ""}`}>
         {/* MirrorCard - flexible width */}
         <div className="flex-grow min-w-0">
-          <MirrorCard text={text} italic={italic} onExploreClick={onExploreClick} />
+          <MirrorCard text={text} italic={italic} onExploreClick={onExploreClick} avatarUrl={resolvedSrc} />
         </div>
 
         {/* Player Avatar - fixed size, clickable */}

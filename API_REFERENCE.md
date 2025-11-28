@@ -604,34 +604,25 @@ Complete reference for all backend API endpoints.
 
 ### POST `/api/tts`
 
-**Text-to-speech narration generation.**
+**Text-to-speech narration generation using Gemini TTS.**
 
 **Request Body**:
 ```typescript
 {
   text: string;
-  voice?: string;                  // alloy, echo, fable, onyx, nova, shimmer
-  instructions?: string;           // Tone/style control (gpt-4o-mini-tts only)
-  format?: string;                 // mp3, opus, aac, flac
+  voice?: string;                  // Gemini voices: enceladus, puck, charon, kore, zephyr, etc.
 }
 ```
 
 **Response**:
-```typescript
-{
-  audio: Buffer;                   // Audio file binary
-  contentType: string;             // audio/mpeg, etc.
-}
-```
+- Returns WAV audio binary with `Content-Type: audio/wav`
 
-**Models**:
-- `gpt-4o-mini-tts` (default, supports instructions)
-- `tts-1` (basic)
-- `tts-1-hd` (high quality)
+**Model**: `gemini-2.5-flash-preview-tts`
 
-**Per-Screen Instructions**:
-- Dilemmas: "Speak as dramatic political narrator with gravitas"
-- Aftermath: "Speak in solemn, reflective tone"
+**Available Voices**:
+enceladus, puck, charon, kore, zephyr, fenrir, leda, orus, aoede, callirrhoe, autonoe, iapetus, umbriel, algieba, despina, erinome, algenib, rasalgethi, laomedeia, achernar, alnilam, schedar, gacrux, pulcherrima, achird, zubenelgenubi, vindemiatrix, sadachbia, sadaltager, sulafat
+
+**Default Voice**: Configured via `TTS_VOICE` env var (default: `enceladus`)
 
 **Environment Variables**:
 - `TTS_MODEL` - Model name

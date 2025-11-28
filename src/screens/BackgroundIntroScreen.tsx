@@ -5,6 +5,7 @@ import { bgStyleWithRoleImage } from "../lib/ui";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNarrator } from "../hooks/useNarrator";
 import type { PreparedTTS } from "../hooks/useNarrator";
+import { TTS_VOICE } from "../lib/ttsConfig";
 import { useSettingsStore } from "../store/settingsStore";
 import { useRoleStore } from "../store/roleStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
@@ -113,7 +114,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
     (async () => {
       try {
         if (narrationEnabled) {
-          const p = await narrator.prepare(DEFAULT_LINE, { voiceName: "onyx", format: "mp3" });
+          const p = await narrator.prepare(DEFAULT_LINE, { voiceName: TTS_VOICE });
           if (cancelled) { p.dispose(); return; }
           preparedDefaultRef.current = p;
         }
@@ -177,7 +178,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
 
           // Prepare the TTS for the paragraph ahead of time (only if narration enabled)
           if (narrationEnabled) {
-            const p = await narrator.prepare(paragraph, { voiceName: "onyx", format: "mp3" });
+            const p = await narrator.prepare(paragraph, { voiceName: TTS_VOICE });
             if (cancelled) { p.dispose(); return; }
             preparedIntroRef.current = p;
           }
@@ -345,7 +346,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
       }
 
       try {
-        const p = await narrator.prepare(para, { voiceName: "onyx", format: "mp3" });
+        const p = await narrator.prepare(para, { voiceName: TTS_VOICE });
         if (cancelled) { p.dispose(); return; }
         preparedIntroRef.current = p;
         setPhase("ready"); // will start playback on fade-in animation

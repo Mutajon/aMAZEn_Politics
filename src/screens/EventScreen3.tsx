@@ -1062,6 +1062,7 @@ export default function EventScreen3({ push }: Props) {
             <div className="relative">
               <MirrorCard
                 text={collectedData.mirrorText}
+                avatarUrl={character?.avatarUrl}
                 // onExploreClick temporarily removed - navigation bugs prevent safe return to EventScreen
               />
               {/* Compass Pills Overlay - appears at Step 4A (Day 2+) */}

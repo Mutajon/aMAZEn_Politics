@@ -87,6 +87,10 @@ type SettingsState = {
   experimentMode: boolean;
   setExperimentMode: (v: boolean) => void;
   toggleExperimentMode: () => void;
+
+  // --- NEW: Mobile device detection (session-only) ---
+  isMobileDevice: boolean;
+  setIsMobileDevice: (v: boolean) => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -177,6 +181,10 @@ export const useSettingsStore = create<SettingsState>()(
       experimentMode: true,
       setExperimentMode: (v) => set({ experimentMode: v }),
       toggleExperimentMode: () => set({ experimentMode: !get().experimentMode }),
+
+      // NEW: Mobile device detection (default false, session-only - NOT persisted)
+      isMobileDevice: false,
+      setIsMobileDevice: (v) => set({ isMobileDevice: v }),
     }),
     {
       // Bump key so no stale objects hide the new fields

@@ -22,6 +22,7 @@ import { useTimingLogger } from "../hooks/useTimingLogger";
 import { useLang } from "../i18n/lang";
 import { translateQuizQuestion, translateQuizAnswer } from "../i18n/translateGameData";
 import { useLoggingStore } from "../store/loggingStore";
+import { MirrorImage, MirrorReflection } from "../components/MirrorWithReflection";
 
 
 /** placeholder avatar for images OFF */
@@ -40,8 +41,6 @@ const DEFAULT_AVATAR_DATA_URL =
       <rect x='26' y='78' width='76' height='30' rx='14' fill='rgba(0,0,0,0.25)'/>
     </svg>`
   );
-
-const MIRROR_SRC = "/assets/images/mirror.png";
 
 // Mirror shimmer effect configuration (matching MirrorCard.tsx)
 const MIRROR_SHIMMER_ENABLED = true;
@@ -323,13 +322,9 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
             className="relative self-start"
             style={{ width: MIRROR_SIZE, height: MIRROR_SIZE }}
           >
-            <motion.img
+            {/* Shimmer wrapper - only contains the mirror image */}
+            <motion.div
               key={mirrorShimmerTrigger}
-              src={MIRROR_SRC}
-              alt="Mystic mirror"
-              width={MIRROR_SIZE}
-              height={MIRROR_SIZE}
-              className="rounded-full object-cover"
               animate={
                 MIRROR_SHIMMER_ENABLED
                   ? {
@@ -348,6 +343,14 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
                 ease: "easeInOut",
                 times: [0, 0.25, 0.5, 0.75, 1],
               }}
+            >
+              <MirrorImage mirrorSize={MIRROR_SIZE} />
+            </motion.div>
+
+            {/* Reflection overlay - outside shimmer wrapper to avoid filter interference */}
+            <MirrorReflection
+              mirrorSize={MIRROR_SIZE}
+              avatarUrl={displayAvatar}
             />
 
             {/* Compass Pills Overlay - displays pings above mirror image */}

@@ -1,5 +1,5 @@
 // src/hooks/useNarrator.ts
-// OpenAI-backed TTS narrator with "prepare()" for exact A/V sync.
+// Gemini-backed TTS narrator with "prepare()" for exact A/V sync.
 // - prepare(text) → returns a Prepared handle that resolves once audio is fully buffered
 //   (canplaythrough). You decide exactly when to start() it (e.g., on fade-in start).
 // - speak(text) is kept for convenience (prepare + start immediately).
@@ -8,12 +8,13 @@
 
 import { useCallback, useState } from "react";
 import { useSettingsStore } from "../store/settingsStore";
+import { TTS_VOICE } from "../lib/ttsConfig";
 
 type SpeakOptions = {
-  voiceName?: string;           // OpenAI voice name; default "onyx"
+  voiceName?: string;           // Gemini voice name; default from VITE_TTS_VOICE env var
   format?: "mp3" | "opus" | "aac" | "flac";
   volume?: number;              // 0..1
-  instructions?: string;        // Optional: Style/tone instructions (only for gpt-4o-mini-tts and newer models)
+  instructions?: string;        // Optional: Style/tone instructions (prepended to text for Gemini)
 };
 
 export type PreparedTTS = {
@@ -107,7 +108,7 @@ export function useNarrator() {
       _cleanup();
       globalAbortRef = new AbortController();
 
-      const voice = (opts.voiceName || "onyx").toLowerCase();
+      const voice = opts.voiceName || TTS_VOICE;
       const format = opts.format || "mp3";
       const volume = typeof opts.volume === "number" ? Math.max(0, Math.min(1, opts.volume)) : 1;
       const instructions = opts.instructions;
@@ -137,10 +138,12 @@ export function useNarrator() {
 
       const buf = await r.arrayBuffer();
       const type =
+        format === "wav" ? "audio/wav" :
         format === "aac" ? "audio/aac" :
         format === "flac" ? "audio/flac" :
         format === "opus" ? "audio/ogg" :
-        "audio/mpeg";
+        format === "mp3" ? "audio/mpeg" :
+        "audio/wav";  // Default to WAV for Gemini TTS
       const blob = new Blob([buf], { type });
       const url = URL.createObjectURL(blob);
 

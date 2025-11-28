@@ -13,40 +13,29 @@
 // 🔧 Easy knobs (edit these first - Mobile-first responsive):
 const TITLE_CLASS = "text-sm md:text-base font-semibold text-white/95";
 const DESC_CLASS  = "text-[13px] md:text-[14px] leading-snug text-white/85";
-const CARD_PAD    = "px-2 py-2 md:px-3 md:py-3"; // overall padding (mobile → desktop)
+const CARD_PAD    = "px-3 py-2 md:px-4 md:py-3"; // uniform padding
 const CARD_TONE   = "border-slate-700/50 bg-black/60 backdrop-blur-sm ring-1 ring-amber-400/40 rounded-2xl shadow-sm";
 
 import { motion } from "framer-motion";
 import { MessageCircle } from "lucide-react";
 import { useInquiring } from "../../hooks/useInquiring";
 import InquiringModal from "./InquiringModal";
-import { SpeakerAvatar } from "./SpeakerAvatar";
-import { SpeakerDescriptionModal } from "./SpeakerDescriptionModal";
 import { getTreatmentConfig } from "../../data/experimentConfig";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useDilemmaStore } from "../../store/dilemmaStore";
-import { useRoleStore } from "../../store/roleStore";
-import { getConfidantByLegacyKey } from "../../data/confidants";
-import { useLogger } from "../../hooks/useLogger";
-import { useState } from "react";
 import type { TreatmentType } from "../../data/experimentConfig";
 
 export type DilemmaProps = {
   title: string;
   description: string; // keep it ~2–3 sentences
-  speaker?: string; // Speaker name from AI or predefined
-  speakerDescription?: string; // AI-generated description for custom roles
+  speaker?: string; // Speaker name from AI or predefined (unused, kept for API compatibility)
+  speakerDescription?: string; // AI-generated description (unused, kept for API compatibility)
 };
 
-export default function DilemmaCard({ title, description, speaker, speakerDescription }: DilemmaProps) {
+export default function DilemmaCard({ title, description }: DilemmaProps) {
   const treatment = useSettingsStore(state => state.treatment) as TreatmentType;
   const config = getTreatmentConfig(treatment);
   const inquiryCreditsRemaining = useDilemmaStore(state => state.inquiryCreditsRemaining);
-  const selectedRole = useRoleStore(state => state.selectedRole);
-  const roleTitle = useRoleStore(state => state.roleTitle);
-  const logger = useLogger();
-
-  const [isSpeakerModalOpen, setIsSpeakerModalOpen] = useState(false);
 
   const {
     isOpen,
@@ -66,90 +55,39 @@ export default function DilemmaCard({ title, description, speaker, speakerDescri
   const showInquiryButton = config.inquiryTokensPerDilemma > 0;
   const hasCredits = inquiryCreditsRemaining > 0;
 
-  // Determine speaker info
-  const confidant = selectedRole ? getConfidantByLegacyKey(selectedRole) : undefined;
-
-  // OVERRIDE: Always use "The Gatekeeper" for all roles
-  const speakerName = "The Gatekeeper";
-  const speakerDescText = "A being made of faint, shifting light. He was trapped here because he had once failed to uncover his true self. Every lost soul that arrived, begging for a name they couldn't remember, was a chance for him to pay his endless debt. He gave them new lives: seven-day threads of existence. Only their success could possibly free him from his own long-dead failure...";
-  const speakerImageId = "gatekeeper"; // Use gatekeeper imageId
-
-  // Original implementation (commented out):
-  // const speakerName = speaker || confidant?.name || "";
-  // const speakerDescText = speakerDescription || confidant?.description || "";
-  // const speakerImageId = confidant?.imageId;
-
-  // Show speaker avatar only if we have a speaker name
-  const showSpeaker = !!speakerName;
-
-  const handleSpeakerClick = () => {
-    logger.log('speaker_avatar_clicked', {
-      speakerName,
-      hasImage: !!speakerImageId,
-      roleTitle: roleTitle || 'custom'
-    }, `User clicked speaker avatar for ${speakerName}`);
-    setIsSpeakerModalOpen(true);
-  };
-
   return (
     <>
-      {/* Speaker Avatar + Dilemma Card Layout - "Breaking the Frame" Design */}
       <motion.div
-        className={`relative ${CARD_TONE} ${CARD_PAD} ${showSpeaker ? 'pl-[80px] md:pl-[130px]' : ''}`}
-        style={{
-          overflow: 'visible', // Allow avatar to extend beyond boundaries
-        }}
+        className={`relative ${CARD_TONE} ${CARD_PAD}`}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "tween", duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         aria-label="Current dilemma"
       >
-        {/* Speaker Avatar - positioned absolutely to jut out of card boundaries (smaller on mobile) */}
-        {showSpeaker && (
-          <div
-            className="absolute"
-            style={{
-              left: '-15px',  // Reduced protrusion for tighter composition
-              top: '5px',     // Moved down for better vertical alignment
-              zIndex: 10      // Ensure avatar appears above card background
-            }}
+        <div className={TITLE_CLASS}>{title}</div>
+        <p className={`mt-1 ${DESC_CLASS}`}>{description}</p>
+
+        {/* Inquiry Button - positioned at bottom of card */}
+        {showInquiryButton && (
+          <motion.button
+            onClick={openModal}
+            disabled={!hasCredits}
+            className={`
+              mt-3 w-full px-4 py-2 rounded-lg font-semibold text-sm
+              transition-all duration-200 flex items-center justify-center gap-2
+              ${hasCredits
+                ? 'bg-yellow-500/90 hover:bg-yellow-400 text-gray-900 hover:shadow-lg'
+                : 'bg-gray-600/50 text-gray-400 cursor-not-allowed'}
+            `}
+            whileHover={hasCredits ? { scale: 1.02 } : {}}
+            whileTap={hasCredits ? { scale: 0.98 } : {}}
           >
-            <SpeakerAvatar
-              speakerName={speakerName}
-              imageId={speakerImageId}
-              onClick={handleSpeakerClick}
-              size={100}  // Smaller avatar for mobile (100px instead of 180px)
-            />
-          </div>
+            <MessageCircle className="w-4 h-4" />
+            <span>
+              Inquire more {hasCredits && `(${inquiryCreditsRemaining})`}
+            </span>
+          </motion.button>
         )}
-
-        {/* Dilemma Content - with left margin to prevent speaker avatar overlap */}
-        <div className={showSpeaker ? 'ml-4 md:ml-6' : ''}>
-          <div className={TITLE_CLASS}>{title}</div>
-          <p className={`mt-1 ${DESC_CLASS}`}>{description}</p>
-
-          {/* Inquiry Button - positioned at bottom of card */}
-          {showInquiryButton && (
-            <motion.button
-              onClick={openModal}
-              disabled={!hasCredits}
-              className={`
-                mt-3 w-full px-4 py-2 rounded-lg font-semibold text-sm
-                transition-all duration-200 flex items-center justify-center gap-2
-                ${hasCredits
-                  ? 'bg-yellow-500/90 hover:bg-yellow-400 text-gray-900 hover:shadow-lg'
-                  : 'bg-gray-600/50 text-gray-400 cursor-not-allowed'}
-              `}
-              whileHover={hasCredits ? { scale: 1.02 } : {}}
-              whileTap={hasCredits ? { scale: 0.98 } : {}}
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>
-                Inquire more {hasCredits && `(${inquiryCreditsRemaining})`}
-              </span>
-            </motion.button>
-          )}
-        </div>
       </motion.div>
 
       {/* Inquiry Modal */}
@@ -165,18 +103,6 @@ export default function DilemmaCard({ title, description, speaker, speakerDescri
         latestAnswer={latestAnswer}
         error={error}
       />
-
-      {/* Speaker Description Modal */}
-      {showSpeaker && (
-        <SpeakerDescriptionModal
-          isOpen={isSpeakerModalOpen}
-          onClose={() => setIsSpeakerModalOpen(false)}
-          speakerName={speakerName}
-          speakerDescription={speakerDescText}
-          imageId={speakerImageId}
-          roleTitle={roleTitle || undefined}
-        />
-      )}
     </>
   );
 }

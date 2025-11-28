@@ -130,6 +130,13 @@ export default function App() {
     fetchAndStoreGameSettings();
   }, []);
 
+  // Detect mobile device on app startup (session-only, not persisted)
+  // Specifically targets phones, NOT tablets (tablets treated as desktop)
+  useEffect(() => {
+    const isMobilePhone = /iPhone|Android.*Mobile|webOS|BlackBerry|Opera Mini/i.test(navigator.userAgent);
+    useSettingsStore.getState().setIsMobileDevice(isMobilePhone);
+  }, []);
+
   // The game status is now checked on "Start Game" button click.
 
   // Initialize logging service when consented (unless debug mode)

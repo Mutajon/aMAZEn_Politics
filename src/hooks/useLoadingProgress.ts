@@ -116,6 +116,10 @@ export function useLoadingProgress(): LoadingProgressState & LoadingProgressCont
       catchupTimerRef.current = null;
     }
 
+    // Reset catchup animation refs (FIX: prevents 100% flash on Day 2+)
+    catchupStartProgressRef.current = 0;
+    catchupStartTimeRef.current = null;
+
     setProgress(0);
     setIsAnimatingCatchup(false);
     setIsRunning(false);

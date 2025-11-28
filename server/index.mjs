@@ -354,20 +354,17 @@ const MODEL_COMPASS_HINTS = process.env.MODEL_COMPASS_HINTS || "gemini-2.5-flash
 
 
 // Image model
-const IMAGE_MODEL = process.env.IMAGE_MODEL || "gpt-image-1";
+const IMAGE_MODEL_OPENAI = process.env.IMAGE_MODEL_OPENAI || "gpt-image-1"; // OpenAI model (also used as fallback)
 const IMAGE_MODEL_XAI = process.env.IMAGE_MODEL_XAI || ""; // No fallback - must be set in .env
+const IMAGE_MODEL_GEMINI = process.env.IMAGE_MODEL_GEMINI || ""; // e.g., imagen-3.0-generate-001
+const GEMINI_IMAGE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 const IMAGE_SIZE = process.env.IMAGE_SIZE || "1024x1024";
 const IMAGE_QUALITY = process.env.IMAGE_QUALITY || "low"; // low|medium|high
 
-// --- NEW: TTS model/voice (OpenAI Text-to-Speech) --------------------------
-// Note: "Cove" is not currently available in the public TTS API. If OpenAI
-// exposes it in the future, change TTS_VOICE to "cove".
-const TTS_URL = "https://api.openai.com/v1/audio/speech";
-const TTS_MODEL = process.env.TTS_MODEL || "gpt-4o-mini-tts ";       // tts-1, tts-1-hd, or gpt-4o-mini-tts
-const TTS_VOICE = process.env.TTS_VOICE || "onyx";       // alloy|echo|fable|onyx|nova|shimmer
-const TTS_INSTRUCTIONS = process.env.TTS_INSTRUCTIONS || undefined; // Optional: style/tone instructions (only for gpt-4o-mini-tts)
-const TTS_FORMAT = process.env.TTS_FORMAT || "mp3";       // mp3|opus|aac|flac
-// ---------------------------------------------------------------------------
+// --- Gemini TTS Configuration --------------------------
+const TTS_MODEL = process.env.TTS_MODEL || "gemini-2.5-flash-preview-tts";
+const TTS_VOICE = process.env.TTS_VOICE || "Enceladus";
+// -------------------------------------------------------
 
 // -------------------- Shared AI Prompt Rules --------------------
 // Anti-jargon rules to ensure accessibility across all content generation
@@ -984,7 +981,8 @@ app.get("/api/_ping", (_req, res) => {
       analyze: MODEL_ANALYZE,
       mirror: MODEL_MIRROR,
       mirrorAnthropic: MODEL_MIRROR_ANTHROPIC,
-      image: IMAGE_MODEL,
+      image: IMAGE_MODEL_OPENAI,
+      imageGemini: IMAGE_MODEL_GEMINI,
       imageXAI: IMAGE_MODEL_XAI,
       tts: TTS_MODEL,
       ttsVoice: TTS_VOICE,
@@ -1618,54 +1616,30 @@ app.post("/api/generate-avatar", async (req, res) => {
   try {
     const prompt = String(req.body?.prompt || "").trim();
     const useXAI = !!req.body?.useXAI;
+    const useGemini = !!req.body?.useGemini;
 
     if (!prompt) return res.status(400).json({ error: "Missing prompt" });
 
-    // XAI fallback: XAI/Grok doesn't currently support image generation
-    // Fall back to OpenAI if XAI is requested but not configured
-    const shouldUseXAI = useXAI && XAI_KEY && IMAGE_MODEL_XAI;
-    const imageUrl = shouldUseXAI ? XAI_IMAGE_URL : IMAGE_URL;
-    const imageModel = shouldUseXAI ? IMAGE_MODEL_XAI : IMAGE_MODEL;
-    const apiKey = shouldUseXAI ? XAI_KEY : OPENAI_KEY;
-    const provider = shouldUseXAI ? "XAI" : "OpenAI";
-
-    if (useXAI && !shouldUseXAI) {
-      console.warn("[generate-avatar] XAI requested but not configured - falling back to OpenAI");
+    // --- Gemini/Imagen provider (no fallback to OpenAI) ---
+    const shouldUseGemini = useGemini && GEMINI_KEY && IMAGE_MODEL_GEMINI;
+    if (shouldUseGemini) {
+      console.log(`[generate-avatar] Using Gemini/Imagen with model ${IMAGE_MODEL_GEMINI}`);
+      try {
+        const b64 = await callGeminiImageGeneration(prompt, IMAGE_MODEL_GEMINI);
+        const dataUrl = `data:image/png;base64,${b64}`;
+        return res.json({ dataUrl });
+      } catch (geminiErr) {
+        console.error(`[generate-avatar] Gemini/Imagen failed: ${geminiErr.message}`);
+        return res.status(503).json({ error: "Image generation unavailable", retryable: true });
+      }
+    } else if (useGemini && !shouldUseGemini) {
+      console.warn("[generate-avatar] Gemini requested but not configured");
+      return res.status(503).json({ error: "Image provider not configured", retryable: false });
     }
 
-    console.log(`[generate-avatar] Using ${provider} with model ${imageModel}`);
-
-    // Build request body - XAI doesn't support quality or size parameters
-    const body = {
-      model: imageModel,
-      prompt,
-    };
-
-    // Only add size and quality for OpenAI (XAI doesn't support them)
-    if (!shouldUseXAI) {
-      body.size = IMAGE_SIZE;
-      body.quality = IMAGE_QUALITY;
-    }
-
-    const r = await fetch(imageUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!r.ok) {
-      const t = await r.text().catch(() => "");
-      throw new Error(`${provider} image error ${r.status}: ${t}`);
-    }
-
-    const data = await r.json();
-    const b64 = data?.data?.[0]?.b64_json;
-    if (!b64) throw new Error("No image returned");
-    const dataUrl = `data:image/png;base64,${b64}`;
-    res.json({ dataUrl });
+    // No provider configured
+    console.error("[generate-avatar] No image provider configured");
+    return res.status(503).json({ error: "No image provider configured", retryable: false });
   } catch (e) {
     console.error("Error in /api/generate-avatar:", e?.message || e);
     res.status(502).json({ error: "avatar generation failed" });
@@ -1887,64 +1861,102 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
 });
 
 
-// -------------------- NEW: Text-to-Speech endpoint -----------
-// POST /api/tts { text: string, voice?: string, format?: "mp3"|"opus"|"aac"|"flac", instructions?: string }
-// Returns raw audio bytes with appropriate Content-Type.
+// -------------------- PCM to WAV conversion helper -----------
+/**
+ * Convert raw PCM data to WAV format for browser compatibility
+ * @param {Buffer} pcmData - Raw PCM samples (signed 16-bit little-endian)
+ * @param {number} sampleRate - Sample rate in Hz (24000 for Gemini)
+ * @param {number} numChannels - Number of channels (1 for mono)
+ * @param {number} bitsPerSample - Bits per sample (16)
+ * @returns {Buffer} - WAV file buffer
+ */
+function pcmToWav(pcmData, sampleRate, numChannels, bitsPerSample) {
+  const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+  const blockAlign = numChannels * (bitsPerSample / 8);
+  const dataSize = pcmData.length;
+  const headerSize = 44;
+  const fileSize = headerSize + dataSize;
+
+  const buffer = Buffer.alloc(fileSize);
+  let offset = 0;
+
+  // RIFF header
+  buffer.write("RIFF", offset); offset += 4;
+  buffer.writeUInt32LE(fileSize - 8, offset); offset += 4;
+  buffer.write("WAVE", offset); offset += 4;
+
+  // fmt subchunk
+  buffer.write("fmt ", offset); offset += 4;
+  buffer.writeUInt32LE(16, offset); offset += 4;           // Subchunk1Size (16 for PCM)
+  buffer.writeUInt16LE(1, offset); offset += 2;            // AudioFormat (1 = PCM)
+  buffer.writeUInt16LE(numChannels, offset); offset += 2;  // NumChannels
+  buffer.writeUInt32LE(sampleRate, offset); offset += 4;   // SampleRate
+  buffer.writeUInt32LE(byteRate, offset); offset += 4;     // ByteRate
+  buffer.writeUInt16LE(blockAlign, offset); offset += 2;   // BlockAlign
+  buffer.writeUInt16LE(bitsPerSample, offset); offset += 2; // BitsPerSample
+
+  // data subchunk
+  buffer.write("data", offset); offset += 4;
+  buffer.writeUInt32LE(dataSize, offset); offset += 4;
+
+  // Copy PCM data
+  pcmData.copy(buffer, offset);
+
+  return buffer;
+}
+
+// -------------------- Text-to-Speech endpoint (Gemini TTS) -----------
+// POST /api/tts { text: string, voice?: string }
+// Returns WAV audio bytes
 app.post("/api/tts", async (req, res) => {
   try {
     const text = String(req.body?.text || "").trim();
     if (!text) return res.status(400).json({ error: "Missing 'text'." });
 
-    // If someone passes "cove", we transparently fall back to shimmer (not in API today).
-    let voiceRequested = String(req.body?.voice || TTS_VOICE || "shimmer").trim().toLowerCase();
-    if (voiceRequested === "cove") {
-      console.warn("[server] 'cove' requested but not available in TTS API. Falling back to 'shimmer'.");
-      voiceRequested = "shimmer";
-    }
-    const format = String(req.body?.format || TTS_FORMAT || "mp3").trim().toLowerCase();
+    const voice = String(req.body?.voice || TTS_VOICE || "Enceladus");
+    const model = TTS_MODEL;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
-    // Instructions for tone/style (only supported by gpt-4o-mini-tts and newer models)
-    // Can be overridden per-request, falls back to env var, or undefined if not set
-    const instructions = req.body?.instructions || TTS_INSTRUCTIONS;
+    console.log(`[TTS] Gemini request: voice=${voice}, text length=${text.length}`);
 
-    // Build request body - only include instructions if defined
-    const requestBody = {
-      model: TTS_MODEL,
-      voice: voiceRequested,
-      input: text,
-      response_format: format, // mp3|opus|aac|flac
-    };
-
-    // Only add instructions field if it's defined (optional parameter)
-    if (instructions) {
-      requestBody.instructions = instructions;
-    }
-
-    const r = await fetch(TTS_URL, {
+    const response = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${OPENAI_KEY}`,
         "Content-Type": "application/json",
+        "x-goog-api-key": GEMINI_KEY,
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({
+        contents: [{ parts: [{ text }] }],
+        generationConfig: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: voice }
+            }
+          }
+        }
+      }),
     });
 
-    if (!r.ok) {
-      const t = await r.text().catch(() => "");
-      throw new Error(`OpenAI TTS error ${r.status}: ${t}`);
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      throw new Error(`Gemini TTS error ${response.status}: ${errText}`);
     }
 
-    const buf = Buffer.from(await r.arrayBuffer());
-    const type =
-      format === "wav"  ? "audio/wav"  :
-      format === "aac"  ? "audio/aac"  :
-      format === "flac" ? "audio/flac" :
-      format === "opus" ? "audio/ogg"  :
-                          "audio/mpeg";
+    const json = await response.json();
+    const audioData = json.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!audioData) {
+      throw new Error("No audio data in Gemini TTS response");
+    }
 
-    res.setHeader("Content-Type", type);
+    // Decode base64 PCM and convert to WAV
+    const pcmBuffer = Buffer.from(audioData, "base64");
+    const wavBuffer = pcmToWav(pcmBuffer, 24000, 1, 16);
+
+    res.setHeader("Content-Type", "audio/wav");
     res.setHeader("Cache-Control", "no-store");
-    res.send(buf);
+    res.send(wavBuffer);
+
   } catch (e) {
     console.error("Error in /api/tts:", e?.message || e);
     res.status(502).json({ error: "tts failed" });
@@ -2213,16 +2225,30 @@ function analyzeSystemType(systemName) {
 
 /**
  * Strip markdown code block markers from text
- * Handles: ```json, ```, and similar patterns that Gemini often wraps JSON responses in
+ * Handles: ```json, ```, and variations with trailing whitespace/newlines
+ *
+ * This is critical for Gemini responses which often wrap JSON in markdown blocks
+ * with trailing newlines AFTER the closing ``` that break simple regex patterns
  */
 function stripMarkdownCodeBlocks(text) {
   if (typeof text !== "string") return text;
 
-  // Remove opening code block: ```json or ``` at start (with optional language identifier)
-  let result = text.replace(/^```(?:json|javascript|js)?\s*\n?/i, '');
+  // Method 1: Extract content BETWEEN markdown blocks using capture group
+  // This is the most reliable approach - handles any trailing content after ```
+  const betweenMatch = text.match(/```(?:json|javascript|js)?\s*\n?([\s\S]*?)\n?```[\s\S]*$/i);
+  if (betweenMatch && betweenMatch[1]) {
+    return betweenMatch[1].trim();
+  }
 
-  // Remove closing code block: ``` at end
-  result = result.replace(/\n?```\s*$/i, '');
+  // Method 2: Fallback - strip leading/trailing markers more aggressively
+  let result = text.trim();
+
+  // Remove opening: ``` with optional language identifier
+  result = result.replace(/^```(?:json|javascript|js)?\s*\n?/i, '');
+
+  // Remove closing: ``` with any trailing content (newlines, whitespace, etc)
+  // Using [\s\S]*$ instead of \s*$ to consume ANY content after ```
+  result = result.replace(/\n?```[\s\S]*$/i, '');
 
   return result.trim();
 }
@@ -3458,6 +3484,12 @@ function convertSupportShiftToDeltas(supportShift, currentSupport) {
 
   // Convert each entity's reaction to a random delta within range
   for (const [entity, shift] of Object.entries(supportShift)) {
+    // Skip unexpected entity keys from AI response
+    if (!deltas[entity]) {
+      console.warn(`[SUPPORT-SHIFT] Skipping unexpected entity: ${entity}`);
+      continue;
+    }
+
     const range = REACTION_RANGES[shift.attitudeLevel];
 
     if (!range) {
@@ -3942,7 +3974,11 @@ Tone: amused, observant, challenging, slightly teasing, but always clear.
 
 LANGUAGE RULES:
 - Simple English (CEFR B1-B2), short sentences (8-16 words)
+- Dilemma descriptions: MAX 70 WORDS total
 - NO metaphors, poetic phrasing, idioms, or fancy adjectives
+- NO technical jargon, academic language, or bureaucratic terms
+  BAD: "preliminary audits", "unsanctioned bio-agent trials", "scientific standards demand transparency"
+  GOOD: "the inspectors found out", "illegal experiments", "people want answers"
 - Use concrete language: "Citizens protest" NOT "tensions rise"
 - If a movie camera cannot record it, DO NOT WRITE IT
 
@@ -4183,9 +4219,18 @@ THE MIRROR'S ROLE (All Days):
 - First person perspective: "I see..." "I wonder..." "I notice..."
 - Length: 20-25 words exactly
 
-GOOD Mirror Examples:
-- "I see you chose honor over pragmatism. Your ancestors would approve, but I wonder if your treasury will."
-- "Loyalty to family, hm? Noble. Though I notice the people outside your door don't share your bloodline."
+MIRROR MODE (specified in user prompt for Days 2+):
+- Mode "lastAction": Reflect on the player's PREVIOUS choice and what it reveals about their values. Comment on the tension between what they chose and what they claim to value.
+- Mode "dilemma": Comment on the CURRENT dilemma they're about to face and how it challenges their values.
+
+GOOD "lastAction" Examples (reflecting on previous choice):
+- "I see you chose the treasury over the temple. Your practicality shows, but I wonder what your ancestors think of such pragmatism."
+- "You sided with the nobles again. Your loyalty is touching—though I notice the common folk don't share your enthusiasm."
+- "Mercy for the rebels, hm? Your compassion is admirable. I wonder if the families of the slain guards agree."
+
+GOOD "dilemma" Examples (commenting on current situation):
+- "Ah, another test of your famous sense of justice. I wonder if mercy will win today, or if the law will have its way."
+- "The refugees wait at your gates. Your compassion is admirable—let's see if it survives the grain shortage."
 - "Freedom for all, you say. I'm curious how long that lasts when the grain runs out."
 
 BAD Mirror Examples (DO NOT DO THIS):
@@ -4210,7 +4255,7 @@ DAY 1 SCHEMA:
 {
   "dilemma": {
     "title": "Short title (max 120 chars)",
-    "description": "Game Master narration addressing 'you', ending with direct question (1-3 sentences)",
+    "description": "Game Master narration addressing 'you', ending with direct question (1-3 sentences, MAX 70 WORDS, no jargon)",
     "actions": [
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "sword"},
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "scales"},
@@ -4234,7 +4279,7 @@ DAY 2-7 SCHEMA:
   },
   "dilemma": {
     "title": "Short title (max 120 chars)",
-    "description": "1-2 sentences bridging from previous action + new situation + direct question",
+    "description": "1-2 sentences bridging from previous action + new situation + direct question (MAX 70 WORDS, no jargon)",
     "actions": [
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
@@ -4261,7 +4306,7 @@ DAY 8 SCHEMA (Aftermath):
   },
   "dilemma": {
     "title": "The Aftermath",
-    "description": "EXACTLY 2 sentences describing immediate consequences of Day 7 decision",
+    "description": "EXACTLY 2 sentences describing immediate consequences of Day 7 decision (MAX 70 WORDS, no jargon)",
     "actions": [],
     "topic": "Conclusion",
     "scope": "N/A",
@@ -4280,8 +4325,12 @@ DAY 8 SCHEMA (Aftermath):
 
 /**
  * Build conditional user prompt (Day 1 vs Day 2+)
+ * @param {number} day - Current day (1-8)
+ * @param {object|null} playerChoice - Previous action {title, description}
+ * @param {array|null} currentCompassTopValues - Current top compass values
+ * @param {string} mirrorMode - 'lastAction' or 'dilemma' (default: 'dilemma')
  */
-function buildGameMasterUserPrompt(day, playerChoice = null, currentCompassTopValues = null) {
+function buildGameMasterUserPrompt(day, playerChoice = null, currentCompassTopValues = null, mirrorMode = 'dilemma') {
   // General instruction for all days
   let prompt = `First, carefully review the entire system prompt to understand all context and rules.\n\n`;
 
@@ -4303,6 +4352,14 @@ Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
     }
 
     prompt += `DAY ${day} of 7\n\nPrevious action: "${playerChoice.title}" - ${playerChoice.description}${compassUpdateText}\n\n`;
+
+    // Add mirror mode instruction for Days 2+
+    prompt += `MIRROR MODE FOR THIS TURN: "${mirrorMode}"
+${mirrorMode === 'lastAction'
+  ? `The mirror should reflect on the player's PREVIOUS choice ("${playerChoice.title}") and what it reveals about their values.`
+  : `The mirror should comment on the CURRENT dilemma they're about to face and how it challenges their values.`}
+
+`;
 
     if (day === 7) {
       prompt += `This is the final day. Make this dilemma especially tough and epic - a climactic choice worthy of the player's last act in this world. The stakes should feel monumental. Remind them their borrowed time is almost over.
@@ -4466,58 +4523,82 @@ app.post("/api/game-turn-v2", async (req, res) => {
         console.log("=".repeat(80) + "\n");
       }
 
-      // Call AI
+      // Call AI with retry logic for JSON parsing failures
       const messages = [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
       ];
 
-      let aiResponse;
-      if (useGemini) {
-        aiResponse = await callGeminiChat(messages, MODEL_DILEMMA_GEMINI);
-      } else if (useXAI) {
-        aiResponse = await callXAIChat(messages, MODEL_DILEMMA_XAI);
-      } else {
-        aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
-      }
-
-      const content = aiResponse?.content;
-      if (!content) {
-        throw new Error("No content in AI response");
-      }
-
-      // Debug logging (Day 1 AI response)
-      if (debugMode) {
-        console.log("\n" + "=".repeat(80));
-        console.log("🐛 [DEBUG] Day 1 Raw AI Response:");
-        console.log("=".repeat(80));
-        console.log(content);
-        console.log("=".repeat(80) + "\n");
-      }
-
-      // Parse JSON response with robust error handling
       let parsed;
+      let content;
+      const maxRetries = 1;
 
-      // Try existing safeParseJSON utility first
-      parsed = safeParseJSON(content, { debugTag: "GAME-TURN-V2-DAY1" });
+      for (let retryCount = 0; retryCount <= maxRetries; retryCount++) {
+        // Add correction message on retry
+        if (retryCount > 0) {
+          console.log(`[GAME-TURN-V2] JSON parse failed, retrying Day 1 (attempt ${retryCount + 1}/${maxRetries + 1})...`);
+          messages.push({
+            role: "user",
+            content: "Your response was not valid JSON. Please respond ONLY with the raw JSON object, no markdown code blocks (no ```), no explanations - just the JSON starting with { and ending with }."
+          });
+        }
 
-      // If safeParseJSON fails, try custom comma repair
-      if (!parsed) {
-        console.log('[GAME-TURN-V2] safeParseJSON failed, attempting comma repair...');
-        try {
-          // Extract from markdown code blocks if present
-          const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/```\n?([\s\S]*?)\n?```/);
-          const jsonStr = jsonMatch ? jsonMatch[1] : content;
+        let aiResponse;
+        if (useGemini) {
+          aiResponse = await callGeminiChat(messages, MODEL_DILEMMA_GEMINI);
+        } else if (useXAI) {
+          aiResponse = await callXAIChat(messages, MODEL_DILEMMA_XAI);
+        } else {
+          aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
+        }
 
-          // Fix missing commas: "value"\n"key" -> "value",\n"key"
-          const commaFixed = jsonStr.replace(/("\s*)\n(\s*"[^"]+"\s*:)/g, '$1,\n$2');
-          parsed = JSON.parse(commaFixed);
-          console.log('[GAME-TURN-V2] ✅ Comma repair successful');
-        } catch (commaError) {
-          console.error('[GAME-TURN-V2] All JSON parse attempts failed');
-          console.error('[GAME-TURN-V2] Comma repair error:', commaError);
+        content = aiResponse?.content;
+        if (!content) {
+          throw new Error("No content in AI response");
+        }
+
+        // Debug logging (Day 1 AI response)
+        if (debugMode) {
+          console.log("\n" + "=".repeat(80));
+          console.log(`🐛 [DEBUG] Day 1 Raw AI Response (attempt ${retryCount + 1}):`);
+          console.log("=".repeat(80));
+          console.log(content);
+          console.log("=".repeat(80) + "\n");
+        }
+
+        // Parse JSON response with robust error handling
+        // Try existing safeParseJSON utility first (includes markdown stripping)
+        parsed = safeParseJSON(content, { debugTag: `GAME-TURN-V2-DAY1-ATTEMPT${retryCount + 1}` });
+
+        // If safeParseJSON fails, try custom comma repair
+        if (!parsed) {
+          console.log(`[GAME-TURN-V2] safeParseJSON failed (attempt ${retryCount + 1}), attempting comma repair...`);
+          try {
+            // First strip markdown using our robust function
+            const strippedContent = stripMarkdownCodeBlocks(content);
+
+            // Fix missing commas: "value"\n"key" -> "value",\n"key"
+            const commaFixed = strippedContent.replace(/("\s*)\n(\s*"[^"]+"\s*:)/g, '$1,\n$2');
+            parsed = JSON.parse(commaFixed);
+            console.log('[GAME-TURN-V2] ✅ Comma repair successful');
+          } catch (commaError) {
+            console.error(`[GAME-TURN-V2] Comma repair failed (attempt ${retryCount + 1}):`, commaError.message);
+          }
+        }
+
+        // If parsing succeeded, break out of retry loop
+        if (parsed) {
+          if (retryCount > 0) {
+            console.log(`[GAME-TURN-V2] ✅ JSON parsing succeeded on retry attempt ${retryCount + 1}`);
+          }
+          break;
+        }
+
+        // If this was the last attempt and still no parsed result, throw error
+        if (retryCount === maxRetries && !parsed) {
+          console.error('[GAME-TURN-V2] All JSON parse attempts failed after retries (Day 1)');
           console.error('[GAME-TURN-V2] Raw content:', content);
-          throw new Error(`Failed to parse AI response after all repair attempts: ${commaError.message}`);
+          throw new Error(`Failed to parse AI response after ${maxRetries + 1} attempts`);
         }
       }
 
@@ -4608,8 +4689,12 @@ app.post("/api/game-turn-v2", async (req, res) => {
         console.log(`[GAME-TURN-V2] Day ${day} - Current top values received:`, currentCompassTopValues);
       }
 
-      // Build Day 2+ user prompt with current compass values
-      const userPrompt = buildGameMasterUserPrompt(day, playerChoice, currentCompassTopValues);
+      // Determine mirror mode for Days 2-7 (50/50 random between reflecting on last action vs current dilemma)
+      const mirrorMode = Math.random() < 0.5 ? 'lastAction' : 'dilemma';
+      console.log(`[GAME-TURN-V2] Day ${day} - Mirror mode: ${mirrorMode}`);
+
+      // Build Day 2+ user prompt with current compass values and mirror mode
+      const userPrompt = buildGameMasterUserPrompt(day, playerChoice, currentCompassTopValues, mirrorMode);
 
       // Prepare messages array (history + new user message)
       const messages = [
@@ -4647,53 +4732,77 @@ app.post("/api/game-turn-v2", async (req, res) => {
         console.log("=".repeat(80) + "\n");
       }
 
-      // Call AI
-      let aiResponse;
-      if (useGemini) {
-        aiResponse = await callGeminiChat(messages, MODEL_DILEMMA_GEMINI);
-      } else if (useXAI) {
-        aiResponse = await callXAIChat(messages, MODEL_DILEMMA_XAI);
-      } else {
-        aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
-      }
-
-      const content = aiResponse?.content;
-      if (!content) {
-        throw new Error("No content in AI response");
-      }
-
-      // Debug logging (Day 2+ AI response)
-      if (debugMode) {
-        console.log("\n" + "=".repeat(80));
-        console.log(`🐛 [DEBUG] Day ${day} Raw AI Response:`);
-        console.log("=".repeat(80));
-        console.log(content);
-        console.log("=".repeat(80) + "\n");
-      }
-
-      // Parse JSON response with robust error handling
+      // Call AI with retry logic for JSON parsing failures
       let parsed;
+      let content;
+      const maxRetries = 1;
 
-      // Try existing safeParseJSON utility first
-      parsed = safeParseJSON(content, { debugTag: "GAME-TURN-V2-DAY2+" });
+      for (let retryCount = 0; retryCount <= maxRetries; retryCount++) {
+        // Add correction message on retry
+        if (retryCount > 0) {
+          console.log(`[GAME-TURN-V2] JSON parse failed, retrying (attempt ${retryCount + 1}/${maxRetries + 1})...`);
+          messages.push({
+            role: "user",
+            content: "Your response was not valid JSON. Please respond ONLY with the raw JSON object, no markdown code blocks (no ```), no explanations - just the JSON starting with { and ending with }."
+          });
+        }
 
-      // If safeParseJSON fails, try custom comma repair
-      if (!parsed) {
-        console.log('[GAME-TURN-V2] safeParseJSON failed, attempting comma repair...');
-        try {
-          // Extract from markdown code blocks if present
-          const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/```\n?([\s\S]*?)\n?```/);
-          const jsonStr = jsonMatch ? jsonMatch[1] : content;
+        let aiResponse;
+        if (useGemini) {
+          aiResponse = await callGeminiChat(messages, MODEL_DILEMMA_GEMINI);
+        } else if (useXAI) {
+          aiResponse = await callXAIChat(messages, MODEL_DILEMMA_XAI);
+        } else {
+          aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
+        }
 
-          // Fix missing commas: "value"\n"key" -> "value",\n"key"
-          const commaFixed = jsonStr.replace(/("\s*)\n(\s*"[^"]+"\s*:)/g, '$1,\n$2');
-          parsed = JSON.parse(commaFixed);
-          console.log('[GAME-TURN-V2] ✅ Comma repair successful');
-        } catch (commaError) {
-          console.error('[GAME-TURN-V2] All JSON parse attempts failed');
-          console.error('[GAME-TURN-V2] Comma repair error:', commaError);
+        content = aiResponse?.content;
+        if (!content) {
+          throw new Error("No content in AI response");
+        }
+
+        // Debug logging (Day 2+ AI response)
+        if (debugMode) {
+          console.log("\n" + "=".repeat(80));
+          console.log(`🐛 [DEBUG] Day ${day} Raw AI Response (attempt ${retryCount + 1}):`);
+          console.log("=".repeat(80));
+          console.log(content);
+          console.log("=".repeat(80) + "\n");
+        }
+
+        // Parse JSON response with robust error handling
+        // Try existing safeParseJSON utility first (includes markdown stripping)
+        parsed = safeParseJSON(content, { debugTag: `GAME-TURN-V2-DAY2+-ATTEMPT${retryCount + 1}` });
+
+        // If safeParseJSON fails, try custom comma repair
+        if (!parsed) {
+          console.log(`[GAME-TURN-V2] safeParseJSON failed (attempt ${retryCount + 1}), attempting comma repair...`);
+          try {
+            // First strip markdown using our robust function
+            const strippedContent = stripMarkdownCodeBlocks(content);
+
+            // Fix missing commas: "value"\n"key" -> "value",\n"key"
+            const commaFixed = strippedContent.replace(/("\s*)\n(\s*"[^"]+"\s*:)/g, '$1,\n$2');
+            parsed = JSON.parse(commaFixed);
+            console.log('[GAME-TURN-V2] ✅ Comma repair successful');
+          } catch (commaError) {
+            console.error(`[GAME-TURN-V2] Comma repair failed (attempt ${retryCount + 1}):`, commaError.message);
+          }
+        }
+
+        // If parsing succeeded, break out of retry loop
+        if (parsed) {
+          if (retryCount > 0) {
+            console.log(`[GAME-TURN-V2] ✅ JSON parsing succeeded on retry attempt ${retryCount + 1}`);
+          }
+          break;
+        }
+
+        // If this was the last attempt and still no parsed result, throw error
+        if (retryCount === maxRetries && !parsed) {
+          console.error('[GAME-TURN-V2] All JSON parse attempts failed after retries');
           console.error('[GAME-TURN-V2] Raw content:', content);
-          throw new Error(`Failed to parse AI response after all repair attempts: ${commaError.message}`);
+          throw new Error(`Failed to parse AI response after ${maxRetries + 1} attempts`);
         }
       }
 
@@ -5776,32 +5885,108 @@ async function callXAIChat(messages, model) {
  * Uses OpenAI-compatible endpoint format
  */
 async function callGeminiChat(messages, model) {
-  console.log(`[GEMINI] Calling Gemini API with key: ${GEMINI_KEY ? 'Yes (' + GEMINI_KEY.substring(0, 8) + '...)' : 'NO KEY!'}`);
-  const response = await fetch(GEMINI_CHAT_URL, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${GEMINI_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: model || MODEL_DILEMMA_GEMINI,
-      messages: messages,
-      temperature: 1,
-      max_tokens: 6144,
-      stream: false
-    })
-  });
+  const maxRetries = 5;
+  const retryDelayMs = 2000;
+  const retryableStatuses = [429, 500, 502, 503, 504];
 
-  if (!response.ok) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    console.log(`[GEMINI] Calling Gemini API (attempt ${attempt}/${maxRetries}) with key: ${GEMINI_KEY ? 'Yes (' + GEMINI_KEY.substring(0, 8) + '...)' : 'NO KEY!'}`);
+
+    const response = await fetch(GEMINI_CHAT_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${GEMINI_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: model || MODEL_DILEMMA_GEMINI,
+        messages: messages,
+        temperature: 1,
+        max_tokens: 6144,
+        stream: false
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        content: data?.choices?.[0]?.message?.content || "",
+        finishReason: data?.choices?.[0]?.finish_reason
+      };
+    }
+
+    // Check if we should retry
+    if (retryableStatuses.includes(response.status) && attempt < maxRetries) {
+      const errorText = await response.text();
+      console.log(`[GEMINI] ⚠️ Retryable error ${response.status}, waiting ${retryDelayMs}ms before retry ${attempt + 1}/${maxRetries}...`);
+      console.log(`[GEMINI] Error details: ${errorText.substring(0, 200)}`);
+      await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+      continue;
+    }
+
+    // Non-retryable error or max retries reached
     const errorText = await response.text();
     throw new Error(`Gemini API error ${response.status}: ${errorText}`);
   }
+}
 
-  const data = await response.json();
-  return {
-    content: data?.choices?.[0]?.message?.content || "",
-    finishReason: data?.choices?.[0]?.finish_reason
-  };
+/**
+ * Calls Google's Imagen API (via Google AI Studio) for image generation
+ * @param {string} prompt - The image generation prompt
+ * @param {string} model - The Imagen model (e.g., "imagen-4.0-fast-generate-001")
+ * @returns {Promise<string>} Base64-encoded image data
+ */
+async function callGeminiImageGeneration(prompt, model) {
+  const maxRetries = 3;
+  const retryDelayMs = 2000;
+  const retryableStatuses = [429, 500, 502, 503, 504];
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    console.log(`[GEMINI-IMAGE] Calling Imagen API (attempt ${attempt}/${maxRetries}) with model: ${model}`);
+
+    // Correct endpoint format: :predict with x-goog-api-key header
+    const url = `${GEMINI_IMAGE_URL}/${model}:predict`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "x-goog-api-key": GEMINI_KEY,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        instances: [
+          { prompt: prompt }
+        ],
+        parameters: {
+          sampleCount: 1
+        }
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      // Imagen API returns: { predictions: [{ bytesBase64Encoded: "...", mimeType: "image/png" }] }
+      const imageBytes = data?.predictions?.[0]?.bytesBase64Encoded;
+      if (!imageBytes) {
+        throw new Error("No image data in Imagen response");
+      }
+      console.log(`[GEMINI-IMAGE] ✅ Image generated successfully`);
+      return imageBytes;
+    }
+
+    // Check if we should retry
+    if (retryableStatuses.includes(response.status) && attempt < maxRetries) {
+      const errorText = await response.text();
+      console.log(`[GEMINI-IMAGE] ⚠️ Retryable error ${response.status}, waiting ${retryDelayMs}ms before retry ${attempt + 1}/${maxRetries}...`);
+      console.log(`[GEMINI-IMAGE] Error details: ${errorText.substring(0, 200)}`);
+      await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+      continue;
+    }
+
+    // Non-retryable error or max retries reached
+    const errorText = await response.text();
+    throw new Error(`Imagen API error ${response.status}: ${errorText}`);
+  }
 }
 
 // -------------------- Serve static files in production -------

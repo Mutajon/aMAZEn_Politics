@@ -494,10 +494,9 @@ CHAT_MODEL=gpt-5-mini
 MODEL_DILEMMA=gpt-5
 MODEL_MIRROR=gpt-5
 IMAGE_MODEL=gpt-image-1
-TTS_MODEL=gpt-4o-mini-tts
-TTS_VOICE=onyx
-TTS_INSTRUCTIONS=Speak in a mysterious and amused tone
-TTS_FORMAT=mp3
+TTS_MODEL=gemini-2.5-flash-preview-tts
+TTS_VOICE=enceladus
+VITE_TTS_VOICE=enceladus
 ENABLE_DATA_COLLECTION=true
 MONGODB_URI=mongodb://...
 ```

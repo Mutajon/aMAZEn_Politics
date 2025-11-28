@@ -7,13 +7,14 @@ import React, { useMemo, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { HelpCircle } from "lucide-react";
 import { mirrorBubbleTheme as T } from "../../theme/mirrorBubbleTheme";
+import { MirrorImage, MirrorReflection } from "../MirrorWithReflection";
 
 /* ====================== TUNABLES (EDIT HERE) ====================== */
 // Card visuals
 const CARD_BG         = T.bg;
 const CARD_TEXT_COLOR = T.textColor;
 const CARD_FONT_FF    = T.fontFamily;
-const CARD_FONT_PX    = 12; // Reduced for mobile (was 13, now 12)
+const CARD_FONT_PX    = 14; // Enlarged for readability (was 12)
 const CARD_PAD_X      = T.paddingX;
 const CARD_PAD_Y      = T.paddingY;
 const CARD_SHADOW     = T.shadow;
@@ -23,14 +24,12 @@ const RADIUS_BL       = T.cornerBL;
 const RADIUS_BR       = T.cornerBR;
 
 // Mirror art (served from /public) - Responsive sizing for mobile
-const MIRROR_IMG_SRC  = "/assets/images/mirror.png";
-const IMG_WIDTH_PX    = 55;   // Smaller for mobile (was 80, reduced to 55)
+const IMG_WIDTH_PX    = 110;  // Doubled from 55 for better visibility
 const IMG_OPACITY     = 0.95;
-const IMG_OFFSET_X    = -20;  // Less protrusion for mobile (was -40, now -20)
-const IMG_OFFSET_Y    = -10;  // Less protrusion above (was -20, now -10)
+const IMG_OFFSET_X    = -40;  // Increased protrusion for larger mirror
 
 // Card left padding to compensate for protruding mirror
-const CARD_PAD_LEFT   = 40;   // Reduced space for smaller mirror (was 60, now 40)
+const CARD_PAD_LEFT   = 80;   // Increased for larger mirror (was 40)
 
 // Keep text away from the image
 const TEXT_INSET_LEFT_PX  = 0;  // No longer needed, card padding handles spacing
@@ -63,9 +62,10 @@ export type MirrorCardProps = {
   italic?: boolean;
   className?: string;
   onExploreClick?: () => void; // NEW: Callback for explore button
+  avatarUrl?: string; // Avatar URL for reflection overlay in mirror
 };
 
-export default function MirrorCard({ text, italic = true, className, onExploreClick }: MirrorCardProps) {
+export default function MirrorCard({ text, italic = true, className, onExploreClick, avatarUrl }: MirrorCardProps) {
   // Use word-level splitting to prevent mid-word line breaks while maintaining shimmer effect
   const segments = useMemo(() => splitWords(text), [text]);
 
@@ -156,26 +156,27 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
           )}
         </div>
 
-        {/* Mirror image protruding from left side (matches speaker avatar pattern) */}
+        {/* Mirror image protruding from left side, vertically centered */}
         <div
           className="absolute"
           style={{
-            left: `${IMG_OFFSET_X}px`,  // Protrudes 40px to the left
-            top: `${IMG_OFFSET_Y}px`,   // Protrudes 20px above
+            left: `${IMG_OFFSET_X}px`,  // Protrudes to the left
+            top: "50%",                  // Center vertically
+            transform: "translateY(-50%)", // Adjust for center alignment
             zIndex: 10,                  // In front like speaker avatar
+            width: IMG_WIDTH_PX,
+            height: IMG_WIDTH_PX,
           }}
         >
-          <motion.img
+          {/* Shimmer wrapper - only contains the mirror image */}
+          <motion.div
             key={mirrorShimmerTrigger} // Key change triggers animation restart
-            src={MIRROR_IMG_SRC}
-            alt="Mirror"
             className="pointer-events-none select-none"
             style={{
               width: IMG_WIDTH_PX,
-              height: "auto",
+              height: IMG_WIDTH_PX,
               opacity: IMG_OPACITY,
             }}
-            loading="lazy"
             animate={
               MIRROR_SHIMMER_ENABLED
                 ? {
@@ -194,6 +195,14 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
               ease: "easeInOut",
               times: [0, 0.25, 0.5, 0.75, 1],
             }}
+          >
+            <MirrorImage mirrorSize={IMG_WIDTH_PX} mirrorAlt="Mirror" />
+          </motion.div>
+
+          {/* Reflection overlay - outside shimmer wrapper to avoid filter interference */}
+          <MirrorReflection
+            mirrorSize={IMG_WIDTH_PX}
+            avatarUrl={avatarUrl}
           />
         </div>
 
