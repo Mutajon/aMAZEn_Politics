@@ -4204,22 +4204,35 @@ NOT: "manage the situation," "respond to the challenge," "address the crisis"
 
 
 ─────────────────────────────────────────
-STEP 3: BRIDGE FROM PREVIOUS DAY (SHOW RESOLUTION)
+STEP 3: BRIDGE FROM PREVIOUS DAY (MANDATORY "bridge" FIELD)
 ─────────────────────────────────────────
 
-Days 2-7: In ONE SENTENCE, close yesterday's story by showing the OUTCOME of the player's choice - not just what they did, but what happened because of it. Then introduce the new problem.
+Days 2-7: The "bridge" field must contain EXACTLY ONE SENTENCE that:
+1. Shows the OUTCOME of the player's previous choice (what happened because of it)
+2. When relevant, CONNECTS that outcome to the new dilemma (cause → effect)
 
-Vary your phrasing naturally:
-- "Following your decision to X, Y happened..."
-- "Because you insisted on X, Y..."
-- "Your choice to X paid off - Y. But now..."
-- "The X you ordered worked - Y. However..."
+PRIORITY ORDER:
+- BEST: Previous choice directly caused or triggered today's problem
+- GOOD: Previous choice's outcome creates context for unrelated new problem
+- ACCEPTABLE: Outcome shown, then pivot to new problem
 
-BAD: "Yesterday you arrested the priest. Today, a plague arrives." (no outcome)
-GOOD: "Following your arrest of the priest, he confessed and named his conspirators - they rot in your dungeons now. But this morning, foreign ships appear on the horizon."
-GOOD: "Because you showed mercy to the thief, word spread - you're seen as just. The nobleman whose gold was stolen now demands an audience."
+GOOD EXAMPLES (causal connection - PREFERRED):
+- "Your arrest of the priest triggered riots in the temple district—now the high priestess demands an audience."
+- "The grain you distributed bought loyalty, but emptied the reserves; a merchant caravan offers supplies at a steep price."
+- "Your mercy to the rebels emboldened them—their leader now openly defies your decree in the market square."
 
-Show what HAPPENED because of the choice, then pivot to the new problem.
+ACCEPTABLE EXAMPLES (outcome + pivot):
+- "The bridge you ordered is half-built, workers grumbling about pay. Meanwhile, a foreign envoy arrives with urgent news."
+- "Your speech calmed the mob for now. But this morning, a different crisis: plague ships spotted in the harbor."
+
+BAD EXAMPLES (DO NOT DO THIS):
+- "Yesterday you arrested the priest. Today, a plague arrives." (no outcome shown)
+- "Following your decision, things changed." (too vague)
+- "The situation evolved." (no specific outcome)
+
+MANDATORY STRUCTURE:
+- "bridge": ONE sentence showing outcome → connection to new problem
+- "dilemma.description": NEW situation details + direct question (do NOT repeat the bridge here)
 
 
 3. CONSTRAINTS
@@ -4326,9 +4339,10 @@ DAY 2-7 SCHEMA:
     "holders": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Political reaction in first person 'we/us' (10-15 words)"},
     "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Personal reaction in FIRST PERSON 'I' (10-15 words)"}
   },
+  "bridge": "MANDATORY: ONE SENTENCE showing outcome of previous choice → connection to new problem (prefer causal link)",
   "dilemma": {
     "title": "Short title (max 120 chars)",
-    "description": "1-2 sentences bridging from previous action + new situation + direct question (no jargon)",
+    "description": "NEW situation details + direct question (no jargon, do NOT repeat the bridge)",
     "actions": [
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
@@ -4413,7 +4427,13 @@ ${mirrorMode === 'lastAction'
     if (day === 7) {
       prompt += `This is the final day. Make this dilemma especially tough and epic - a climactic choice worthy of the player's last act in this world. The stakes should feel monumental. Remind them their borrowed time is almost over.
 
-In ONE SENTENCE, close yesterday's story by showing the OUTCOME (not just the action). Vary phrasing naturally. Then introduce the final dilemma.
+MANDATORY "bridge" FIELD - Generate ONE SENTENCE showing:
+1. What HAPPENED because of "${playerChoice.title}"
+2. How that outcome CONNECTS to today's final crisis (prefer causal link)
+
+PRIORITY: Try to make today's final dilemma a CONSEQUENCE of yesterday's choice.
+
+Then generate dilemma.description with the NEW situation details + direct question (do NOT repeat the bridge).
 
 CRITICAL: Follow Golden Rules B & C - different tension from yesterday, actions exploring autonomy vs. heteronomy.
 
@@ -4421,9 +4441,13 @@ STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically af
     } else if (day === 8) {
       prompt += `This is Day 8 - the aftermath. Follow the system prompt instructions for Day 8.`;
     } else {
-      prompt += `In ONE SENTENCE, close yesterday's story by showing the OUTCOME of the choice (not just the action). Vary phrasing naturally - don't always start with "Yesterday you..."
+      prompt += `MANDATORY "bridge" FIELD - Generate ONE SENTENCE showing:
+1. What HAPPENED because of "${playerChoice.title}"
+2. How that outcome CONNECTS to today's new problem (prefer causal link)
 
-Then introduce a NEW dilemma from a DIFFERENT underlying issue.
+PRIORITY: Try to make today's dilemma a CONSEQUENCE of yesterday's choice.
+
+Then generate dilemma.description with the NEW situation details + direct question (do NOT repeat the bridge).
 
 CRITICAL: Follow Golden Rules B & C - different tension from yesterday, actions exploring autonomy vs. heteronomy.
 
@@ -4825,8 +4849,19 @@ app.post("/api/game-turn-v2", async (req, res) => {
           }
         }
 
-        // If parsing succeeded, break out of retry loop
+        // If parsing succeeded, validate bridge field and break out of retry loop
         if (parsed) {
+          // Validate bridge field exists for Day 2+ (mandatory)
+          if (day > 1 && !parsed.bridge && retryCount < maxRetries) {
+            console.warn(`[GAME-TURN-V2] Day ${day} - Missing "bridge" field, retrying with stronger instruction...`);
+            messages.push({
+              role: "user",
+              content: `Your response is missing the required "bridge" field. Please respond again with valid JSON that includes a "bridge" field containing ONE SENTENCE showing the OUTCOME of the player's previous action "${playerChoice.title}" and how it connects to today's new problem. This field is MANDATORY for Days 2-7.`
+            });
+            parsed = null; // Reset parsed to trigger retry
+            continue;
+          }
+
           if (retryCount > 0) {
             console.log(`[GAME-TURN-V2] ✅ JSON parsing succeeded on retry attempt ${retryCount + 1}`);
           }
@@ -5047,6 +5082,7 @@ Regenerate the ENTIRE JSON output with these changes.`;
       const response = {
         title: parsed.dilemma?.title || '',
         description: parsed.dilemma?.description || '',
+        bridge: parsed.bridge || '', // Bridge sentence connecting previous action to new dilemma
         actions: parsed.dilemma?.actions || [],
         topic: parsed.dilemma?.topic || '',
         scope: parsed.dilemma?.scope || '',
@@ -5060,6 +5096,11 @@ Regenerate the ENTIRE JSON output with these changes.`;
       if (USE_PROMPT_V3) {
         response.valueTargeted = parsed.valueTargeted || 'Unknown';
         response.axisExplored = parsed.axisExplored || 'Unknown';
+      }
+
+      // Log bridge field for debugging
+      if (day > 1) {
+        console.log(`[GAME-TURN-V2] Day ${day} bridge: "${response.bridge || '(none)'}"`);
       }
 
       return res.json(response);

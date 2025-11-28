@@ -377,10 +377,13 @@ async function fetchGameTurn(): Promise<{
     data.actions = [];
   }
 
-  // Extract dilemma
+  // Extract dilemma - combine bridge with description for Days 2+
+  // The bridge field contains the narrative connection from previous action to new dilemma
   const dilemma: Dilemma = {
     title: data.title,
-    description: data.description,
+    description: data.bridge
+      ? `${data.bridge} ${data.description}`
+      : data.description,
     actions: data.actions,
     isGameEnd: data.isGameEnd
   };
