@@ -5,17 +5,17 @@
 // - Appears before aftermath screen
 // - Mandatory self-assessment (no skip)
 // - 5 radio button options
-// - Plays timeIsUp voiceover on mount
+// - Shows mirror with player reflection
 // - Stores answer for session summary and past games
 //
 // Design inspired by ReasoningModal with MirrorCard styling
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLogger } from "../../hooks/useLogger";
-import { SpeakerAvatar } from "./SpeakerAvatar";
-import { audioManager } from "../../lib/audioManager";
+import MirrorWithReflection from "../MirrorWithReflection";
+import { useRoleStore } from "../../store/roleStore";
 
 // Speaker avatar constants
 const AVATAR_SIZE_PX = 120; // Sized to show full face and upper body
@@ -42,12 +42,11 @@ export default function SelfJudgmentModal({
 }: Props) {
   const [selectedJudgment, setSelectedJudgment] = useState<string | null>(null);
   const logger = useLogger();
+  const character = useRoleStore((s) => s.character);
 
-  // Play voiceover when modal opens
+  // Log when modal opens
   useEffect(() => {
     if (isOpen) {
-      audioManager.playVoiceover('time-is-up');
-
       logger.logSystem(
         "self_judgment_modal_opened",
         { day: 8 },
@@ -106,16 +105,12 @@ export default function SelfJudgmentModal({
           <div className="relative px-6 pt-6 pb-4 border-b border-white/10">
             {/* Icon and Title */}
             <div className="flex items-start gap-4">
-              {/* Speaker Avatar */}
+              {/* Mirror with Player Reflection */}
               <div className="flex-shrink-0">
-                <div style={{ width: `${AVATAR_SIZE_PX}px`, height: `${AVATAR_SIZE_PX}px` }}>
-                  <SpeakerAvatar
-                    speakerName="The Gatekeeper"
-                    imageId="gatekeeper"
-                    onClick={() => {}} // No-op since description modal isn't needed here
-                    size={AVATAR_SIZE_PX}
-                  />
-                </div>
+                <MirrorWithReflection
+                  mirrorSize={AVATAR_SIZE_PX}
+                  avatarUrl={character?.avatarUrl}
+                />
               </div>
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl font-bold text-white mb-2" style={{ fontFamily: "Georgia, serif" }}>

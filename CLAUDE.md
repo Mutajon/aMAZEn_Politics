@@ -1,3 +1,9 @@
+# ⛔⛔⛔ NEVER TOUCH .env.example - ONLY MODIFY .env ⛔⛔⛔
+# This project does NOT use .env.example. All environment configuration is in .env only.
+# DO NOT create, modify, or reference .env.example under any circumstances.
+
+---
+
 # CLAUDE.md
 
 Quick reference guide for AI agents working with this political simulation game codebase.

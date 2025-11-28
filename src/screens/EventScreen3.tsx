@@ -584,28 +584,36 @@ export default function EventScreen3({ push }: Props) {
         actionId: reasoningModalAction.id,
         pillsCount: pills.length,
         dimensions: pills.map((p: any) => `${p.prop}:${p.idx}`),
-        entryCount: useDilemmaStore.getState().reasoningHistory.length
+        entryCount: useDilemmaStore.getState().reasoningHistory.length,
+        hasMirrorMessage: !!data.mirrorMessage
       }, `Reasoning compass analysis completed with ${pills.length} pills`);
 
-      // Pick a random thank-you message
-      const thankYouMessages = [
-        "Ah, thank you—your thought now curls up nicely in my collection.",
-        "Gratitude, traveler. I've tucked your thought among the others.",
-        "Thank you. Your thought has found its shelf in my curious archive.",
-        "Much obliged—your thought now wanders my halls with the rest.",
-        "I appreciate the offering; your thought has joined my growing hoard.",
-        "Thank you. Another thought slips into my vault of oddities.",
-        "My thanks—your thought is now bottled and labeled accordingly.",
-        "Cheers, wanderer. Your thought now chatters with its new neighbors.",
-        "Thank you. I've added your thought to the maze—may it not get lost.",
-        "Grateful, I am. Your thought now hums quietly in my collection."
-      ];
-      const randomMessage = thankYouMessages[Math.floor(Math.random() * thankYouMessages.length)];
+      // Use AI-generated mirror message if available, otherwise fallback to random pre-made
+      let mirrorMessage = data.mirrorMessage;
+      if (!mirrorMessage) {
+        // Fallback pool of pre-made whimsical messages
+        const fallbackMessages = [
+          "Ah, thank you—your thought now curls up nicely in my collection.",
+          "Gratitude, traveler. I've tucked your thought among the others.",
+          "Thank you. Your thought has found its shelf in my curious archive.",
+          "Much obliged—your thought now wanders my halls with the rest.",
+          "I appreciate the offering; your thought has joined my growing hoard.",
+          "Thank you. Another thought slips into my vault of oddities.",
+          "My thanks—your thought is now bottled and labeled accordingly.",
+          "Cheers, wanderer. Your thought now chatters with its new neighbors.",
+          "Thank you. I've added your thought to the maze—may it not get lost.",
+          "Grateful, I am. Your thought now hums quietly in my collection."
+        ];
+        mirrorMessage = fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)];
+        console.log('[EventScreen3] 🪞 Using fallback mirror message (no AI message received)');
+      } else {
+        console.log('[EventScreen3] 🪞 Using AI-generated mirror message');
+      }
 
       setIsSubmittingReasoning(false);
 
       // Return pills and message for modal to display
-      return { pills, message: randomMessage };
+      return { pills, message: mirrorMessage };
 
     } catch (error) {
       console.error('[EventScreen3] Reasoning compass analysis failed:', error);
@@ -1119,8 +1127,7 @@ export default function EventScreen3({ push }: Props) {
             day={day}
             isOptional={reasoning.isOptional()}
             isSubmitting={isSubmittingReasoning}
-            speakerName={collectedData.dilemma.speaker}
-            speakerImageId="gatekeeper"
+            avatarUrl={character?.avatarUrl}
           />
         )}
 

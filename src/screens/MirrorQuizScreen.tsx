@@ -218,6 +218,9 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   // Track selected option for shimmer animation
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
 
+  // Track "Go to Sleep" button loading state
+  const [sleepPending, setSleepPending] = useState(false);
+
   function answer(opt: { a: string; mappings: string[] }, optionIndex: number) {
     if (done || selectedOption !== null) return; // Prevent multiple clicks during animation
 
@@ -532,6 +535,8 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
       <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
         <button
           onClick={async () => {
+            if (sleepPending) return;
+            setSleepPending(true);
             logger.log('button_click_go_to_sleep', 'Go to sleep', 'User clicked Go to sleep button');
 
             // Initial compass snapshot was already captured after quiz completion
@@ -541,9 +546,20 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
 
             push("/background-intro");
           }}
-          className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/90 text-[#0b1335] hover:bg-white"
+          disabled={sleepPending}
+          className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/90 text-[#0b1335] hover:bg-white disabled:opacity-70 disabled:cursor-wait"
         >
-          {lang(getGenderKey("BUTTON_GO_TO_SLEEP"))}
+          {sleepPending ? (
+            <span className="flex items-center justify-center gap-2">
+              <span
+                className="h-4 w-4 rounded-full border-2 border-[#0b1335]/40 border-t-[#0b1335] animate-spin"
+                aria-hidden
+              />
+              {lang(getGenderKey("BUTTON_GO_TO_SLEEP"))}
+            </span>
+          ) : (
+            lang(getGenderKey("BUTTON_GO_TO_SLEEP"))
+          )}
         </button>
         <button
           onClick={() => {

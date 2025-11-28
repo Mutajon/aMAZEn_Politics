@@ -798,6 +798,51 @@ async function aiJSONGemini({ system, user, model = MODEL_VALIDATE_GEMINI, tempe
   }
 }
 
+/**
+ * aiTextGemini - Call Gemini API and return raw text response
+ * Similar to aiJSONGemini but returns text instead of parsed JSON
+ */
+async function aiTextGemini({ system, user, model = "gemini-2.5-flash", temperature = 0.7, maxTokens = 2048 }) {
+  try {
+    console.log(`[GEMINI-TEXT] Calling Gemini API with model: ${model}`);
+
+    const messages = [
+      { role: "system", content: system },
+      { role: "user", content: user }
+    ];
+
+    const response = await fetch(GEMINI_CHAT_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${GEMINI_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        temperature: temperature,
+        max_tokens: maxTokens,
+        stream: false
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[GEMINI-TEXT] API error ${response.status}: ${errorText}`);
+      return "";
+    }
+
+    const data = await response.json();
+    const text = data?.choices?.[0]?.message?.content ?? "";
+
+    console.log(`[GEMINI-TEXT] Response received: ${text.substring(0, 100)}...`);
+    return text;
+  } catch (err) {
+    console.error("[GEMINI-TEXT] Error:", err?.message || err);
+    return "";
+  }
+}
+
 
 async function aiText({ system, user, model = CHAT_MODEL_DEFAULT, temperature, maxTokens }) {
   const FALLBACK_MODEL = "gpt-4o";
@@ -1071,7 +1116,7 @@ app.post("/api/intro-paragraph", async (req, res) => {
     // tiny retry wrapper (handles occasional upstream 503s)
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     async function getParagraphOnce() {
-      return (await aiText({ system, user, model: CHAT_MODEL_DEFAULT }))?.trim() || "";
+      return (await aiTextGemini({ system, user, model: "gemini-2.5-flash" }))?.trim() || "";
     }
 
     let paragraph = "";
@@ -1133,7 +1178,7 @@ app.post("/api/validate-role", async (req, res) => {
 
   const user = `Input: ${raw || ""}`;
 
-  const out = await aiJSON({ system, user, model: MODEL_VALIDATE, temperature: 0, fallback: null });
+  const out = await aiJSONGemini({ system, user, model: "gemini-2.5-flash", temperature: 0, fallback: null });
   if (!out || typeof out.valid !== "boolean") {
     return res.status(503).json({ error: "AI validator unavailable" });
   }
@@ -1163,10 +1208,10 @@ app.post("/api/bg-suggestion", async (req, res) => {
     const genderWord = gender === "female" ? "female" : gender === "male" ? "male" : "any gender";
     const user = `Role: ${role || ""}. Gender: ${genderWord}. JSON ONLY.`;
 
-    const ai = await aiJSON({
+    const ai = await aiJSONGemini({
       system,
       user,
-      model: MODEL_NAMES,
+      model: "gemini-2.5-flash",
       temperature: 0.2,
       fallback: { object: backgroundHeuristic(role) },
     });
@@ -1534,7 +1579,7 @@ IMPORTANT:
 ALLOWED_POLITIES: ${JSON.stringify(ALLOWED_POLITIES)}
 Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setting, rely on actual historical context; if fictional/unclear, infer plausibly.`;
 
-    const out = await aiJSON({ system, user, model: MODEL_ANALYZE, temperature: 0.2, fallback: FALLBACK });
+    const out = await aiJSONGemini({ system, user, model: "gemini-2.5-flash", temperature: 0.2, fallback: FALLBACK });
 
     // Normalize holders
     let holders = Array.isArray(out?.holders) ? out.holders.slice(0, 5) : FALLBACK.holders;
@@ -1704,11 +1749,9 @@ app.post("/api/mirror-light", async (req, res) => {
       `React to how ${valuePhrasing} this situation and give a playful nudge toward the most fitting choice.\n` +
       `Do not use numbers or quote the labels verbatim; paraphrase them into natural language.`;
 
-    console.log("[mirror-light] Calling AI with personality prompt...");
+    console.log("[mirror-light] Calling Gemini with personality prompt...");
 
-    const text = useAnthropic
-      ? await aiTextAnthropic({ system, user, model: MODEL_MIRROR_ANTHROPIC })
-      : await aiText({ system, user, model: MODEL_MIRROR });
+    const text = await aiTextGemini({ system, user, model: "gemini-2.5-flash" });
 
     // Sanitizer: enforce one sentence, remove digits, tame slashes/quotes, cap words
     const raw = (text || "The mirror squints… then grins mischievously.").trim();
@@ -1759,19 +1802,39 @@ const MIRROR_QUIZ_BASE_SYSTEM_PROMPT =
   "HARD RULES (ALWAYS APPLY):\n" +
   "- Output EXACTLY ONE sentence. 12–18 words total.\n" +
   "- NEVER reveal numbers, scores, scales, or ranges.\n" +
-  "- NEVER repeat the value labels verbatim; do not quote, uppercase, or mirror slashes.\n" +
-  "- Paraphrase technical labels into plain, everyday phrases.\n" +
+  "- NEVER use the exact value labels. Use simple, direct words that clearly reflect each value's meaning.\n" +
   "- Do NOT stage literal actions for values (no \"X is doing push-ups\", \"baking cookies\", etc.).\n" +
   "- No lists, no colons introducing items, no parenthetical asides.\n" +
   "- Keep the sentence clear first, witty second.";
 
-const MIRROR_QUIZ_BASE_USER_TEMPLATE = 
-  "PLAYER TOP VALUES (names only):\n" +
-  "GOALS: {what1}, {what2}\n" +
-  "JUSTIFICATIONS: {whence1}, {whence2}\n\n" +
+const MIRROR_QUIZ_BASE_USER_TEMPLATE =
+  "PLAYER'S TOP VALUES:\n" +
+  "GOALS (what they care about): {what1}, {what2}\n" +
+  "JUSTIFICATIONS (why they decide): {whence1}, {whence2}\n\n" +
+  "VALUE TRANSLATION GUIDE (use these, NOT the labels):\n" +
+  "- Truth/Trust → honesty, trusting others\n" +
+  "- Liberty/Agency → freedom, choosing your own path\n" +
+  "- Equality/Equity → fairness, equal chances\n" +
+  "- Care/Solidarity → caring for others, looking out for each other\n" +
+  "- Create/Courage → making things, being brave\n" +
+  "- Wellbeing → happiness, peace, feeling good\n" +
+  "- Security/Safety → safety, stability\n" +
+  "- Freedom/Responsibility → freedom with accountability\n" +
+  "- Honor/Sacrifice → doing what's right, even when hard\n" +
+  "- Sacred/Awe → wonder, reverence\n" +
+  "- Evidence → facts, proof\n" +
+  "- Public Reason → reasons others can accept\n" +
+  "- Personal → your gut, your own judgment\n" +
+  "- Tradition → what was handed down, the old ways\n" +
+  "- Revelation → divine guidance, higher calling\n" +
+  "- Nature → natural purpose, how things are meant to be\n" +
+  "- Pragmatism → what works, practical results\n" +
+  "- Aesthesis → beauty, the right feel\n" +
+  "- Fidelity → loyalty, keeping promises\n" +
+  "- Law (Office) → rules, authority\n\n" +
   "TASK:\n" +
-  "Write ONE sentence (12–18 words) in the mirror's voice that plainly captures how these goals blend with these justifications.\n" +
-  "Do not show numbers. Do not repeat labels verbatim; paraphrase them into natural language. Keep it dry with a faint smile—no metaphors.";
+  "Write ONE sentence (12–18 words) reflecting these values back to the player.\n" +
+  "Use the translation guide above—simple words that directly show what each value means. No metaphors, no numbers.";
 
 // Language names for instruction
 const LANGUAGE_NAMES = {
@@ -1827,9 +1890,7 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
     console.log("[mirror-quiz-light] Language:", language);
     console.log("[mirror-quiz-light] User prompt sent to AI:", user);
 
-    const text = useAnthropic
-      ? await aiTextAnthropic({ system, user, model: MODEL_MIRROR_ANTHROPIC })
-      : await aiText({ system, user, model: MODEL_MIRROR });
+    const text = await aiTextGemini({ system, user, model: "gemini-2.5-flash" });
 
     // Log raw AI response
     console.log("[mirror-quiz-light] Raw AI response:", text);
@@ -1992,10 +2053,10 @@ app.post("/api/compass-analyze", async (req, res) => {
       "- Assess strength: mild (slight/implied) or strong (explicit/emphasized)\n" +
       "- Return JSON ARRAY ONLY";
 
-    const items = await aiJSON({
+    const items = await aiJSONGemini({
       system,
       user,
-      model: MODEL_ANALYZE,   // cheapest analysis model from your .env
+      model: "gemini-2.5-flash",
       temperature: 0.2,
       fallback: [],
     });
@@ -2063,10 +2124,10 @@ app.post("/api/news-ticker", async (req, res) => {
 
     console.log("[news-ticker] Request params:", { day, role: role.slice(0, 50), systemName, mode, epoch });
 
-    const items = await aiJSON({
+    const items = await aiJSONGemini({
       system,
       user,
-      model: MODEL_ANALYZE, // reuse your lightweight JSON-capable model
+      model: "gemini-2.5-flash",
       fallback: null, // No fallbacks - always generate based on actual context
     });
 
@@ -2677,10 +2738,10 @@ Based on this political decision, generate 1-3 specific dynamic parameters that 
     let parameters = [];
 
     while (attempts < 2) {
-      const result = await aiJSON({
+      const result = await aiJSONGemini({
         system,
         user,
-        model: MODEL_DILEMMA, // Use same model as dilemmas
+        model: "gemini-2.5-flash",
         temperature: 0.8,
         fallback: { parameters: [] }
       });
@@ -2919,28 +2980,14 @@ ${historySummary || "No decisions recorded"}${conversationContext}
 
 Generate the aftermath epilogue following the structure above. Return STRICT JSON ONLY.`;
 
-    // Call AI with dilemma model (NO temperature override - use default)
+    // Call AI with Gemini model
     // No fallback - let errors propagate so frontend can show retry button
-    // Use provider-aware routing (same pattern as game-turn-v2)
-    const useGemini = process.env.AI_PROVIDER === 'gemini' || MODEL_DILEMMA_GEMINI;
-
-    let result;
-    if (useGemini && MODEL_DILEMMA_GEMINI) {
-      // Use Gemini API
-      const messages = [
-        { role: "system", content: system },
-        { role: "user", content: user }
-      ];
-      const aiResponse = await callGeminiChat(messages, MODEL_DILEMMA_GEMINI);
-      result = aiResponse?.content ? safeParseJSON(aiResponse.content, { debugTag: "aftermath-gemini" }) : null;
-    } else {
-      // Use OpenAI API (original behavior)
-      result = await aiJSON({
-        system,
-        user,
-        model: MODEL_DILEMMA
-      });
-    }
+    const messages = [
+      { role: "system", content: system },
+      { role: "user", content: user }
+    ];
+    const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
+    const result = aiResponse?.content ? safeParseJSON(aiResponse.content, { debugTag: "aftermath-gemini" }) : null;
 
     if (debug) {
       console.log("[/api/aftermath] AI response:", result);
@@ -3165,11 +3212,11 @@ REQUIREMENTS:
 
 Return STRICT JSON ONLY.`;
 
-    // Call AI with dilemma model
-    const result = await aiJSON({
+    // Call AI with Gemini model
+    const result = await aiJSONGemini({
       system: systemPrompt,
       user: userPrompt,
-      model: MODEL_DILEMMA,
+      model: "gemini-2.5-flash",
       temperature: 0.7, // Slightly more creative for narrative generation
       fallback
     });
@@ -3252,6 +3299,8 @@ app.post("/api/inquire", async (req, res) => {
     console.log("========================================\n");
 
     const { gameId, question, currentDilemma, day } = req.body;
+    const useXAI = !!req.body?.useXAI;
+    const useGemini = !!req.body?.useGemini;
 
     // Validation
     if (!gameId || typeof gameId !== 'string') {
@@ -3345,16 +3394,16 @@ Examples of BAD answers (too formal, breaks Game Master voice):
 
 Remember: Game Master voice (playful, knowing), 2 sentences max, natural language, role-appropriate.`;
 
-    // Get AI response
+    // Get AI response using Gemini
     let answer;
     try {
-      answer = await aiText({
-        system: systemPrompt,
-        user: question.trim(),
-        model: MODEL_DILEMMA,
-        temperature: 0.7,
-        maxTokens: 150 // Strict limit for conciseness (2 sentences)
-      });
+      const aiMessages = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: question.trim() }
+      ];
+      const response = await callGeminiChat(aiMessages, "gemini-2.5-flash");
+      answer = response.content;
+      console.log(`[INQUIRY] Using Gemini provider (gemini-2.5-flash)`);
 
       console.log(`[INQUIRY] AI answer: "${answer.substring(0, 100)}..."`);
     } catch (aiError) {
@@ -3974,7 +4023,6 @@ Tone: amused, observant, challenging, slightly teasing, but always clear.
 
 LANGUAGE RULES:
 - Simple English (CEFR B1-B2), short sentences (8-16 words)
-- Dilemma descriptions: MAX 70 WORDS total
 - NO metaphors, poetic phrasing, idioms, or fancy adjectives
 - NO technical jargon, academic language, or bureaucratic terms
   BAD: "preliminary audits", "unsanctioned bio-agent trials", "scientific standards demand transparency"
@@ -4255,7 +4303,7 @@ DAY 1 SCHEMA:
 {
   "dilemma": {
     "title": "Short title (max 120 chars)",
-    "description": "Game Master narration addressing 'you', ending with direct question (1-3 sentences, MAX 70 WORDS, no jargon)",
+    "description": "Game Master narration addressing 'you', ending with direct question (1-3 sentences, no jargon)",
     "actions": [
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "sword"},
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "scales"},
@@ -4279,7 +4327,7 @@ DAY 2-7 SCHEMA:
   },
   "dilemma": {
     "title": "Short title (max 120 chars)",
-    "description": "1-2 sentences bridging from previous action + new situation + direct question (MAX 70 WORDS, no jargon)",
+    "description": "1-2 sentences bridging from previous action + new situation + direct question (no jargon)",
     "actions": [
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
@@ -4306,7 +4354,7 @@ DAY 8 SCHEMA (Aftermath):
   },
   "dilemma": {
     "title": "The Aftermath",
-    "description": "EXACTLY 2 sentences describing immediate consequences of Day 7 decision (MAX 70 WORDS, no jargon)",
+    "description": "EXACTLY 2 sentences describing immediate consequences of Day 7 decision (no jargon)",
     "actions": [],
     "topic": "Conclusion",
     "scope": "N/A",
@@ -4543,14 +4591,7 @@ app.post("/api/game-turn-v2", async (req, res) => {
           });
         }
 
-        let aiResponse;
-        if (useGemini) {
-          aiResponse = await callGeminiChat(messages, MODEL_DILEMMA_GEMINI);
-        } else if (useXAI) {
-          aiResponse = await callXAIChat(messages, MODEL_DILEMMA_XAI);
-        } else {
-          aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
-        }
+        const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
 
         content = aiResponse?.content;
         if (!content) {
@@ -4747,14 +4788,7 @@ app.post("/api/game-turn-v2", async (req, res) => {
           });
         }
 
-        let aiResponse;
-        if (useGemini) {
-          aiResponse = await callGeminiChat(messages, MODEL_DILEMMA_GEMINI);
-        } else if (useXAI) {
-          aiResponse = await callXAIChat(messages, MODEL_DILEMMA_XAI);
-        } else {
-          aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
-        }
+        const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
 
         content = aiResponse?.content;
         if (!content) {
@@ -4838,9 +4872,9 @@ Consider them "different" (isSimilar: false) if they:
 - Address unrelated issues (e.g., baker prices vs military coup)
 - Shift to new tension type (e.g., economic → family crisis)`;
 
-        const similarityCheck = await callOpenAIChat([
+        const similarityCheck = await callGeminiChat([
           { role: "user", content: similarityPrompt }
-        ], "gpt-4o-mini"); // Use cheap model for validation
+        ], "gemini-2.5-flash"); // Use Gemini for validation
 
         const similarity = safeParseJSON(similarityCheck?.content, { debugTag: "SEMANTIC-CHECK" });
 
@@ -4866,14 +4900,7 @@ Regenerate the ENTIRE JSON output with these changes.`;
 
           const correctedMessages = [...messages, { role: "user", content: correctionPrompt }];
 
-          let retryResponse;
-          if (useGemini) {
-            retryResponse = await callGeminiChat(correctedMessages, MODEL_DILEMMA_GEMINI);
-          } else if (useXAI) {
-            retryResponse = await callXAIChat(correctedMessages, MODEL_DILEMMA_XAI);
-          } else {
-            retryResponse = await callOpenAIChat(correctedMessages, MODEL_DILEMMA);
-          }
+          const retryResponse = await callGeminiChat(correctedMessages, "gemini-2.5-flash");
 
           const retryContent = retryResponse?.content;
           if (retryContent) {
@@ -4927,14 +4954,7 @@ Regenerate the ENTIRE JSON output with these changes.`;
 
         const correctedMessages = [...messages, { role: "user", content: correctionPrompt }];
 
-        let retryResponse;
-        if (useGemini) {
-          retryResponse = await callGeminiChat(correctedMessages, MODEL_DILEMMA_GEMINI);
-        } else if (useXAI) {
-          retryResponse = await callXAIChat(correctedMessages, MODEL_DILEMMA_XAI);
-        } else {
-          retryResponse = await callOpenAIChat(correctedMessages, MODEL_DILEMMA);
-        }
+        const retryResponse = await callGeminiChat(correctedMessages, "gemini-2.5-flash");
 
         const retryContent = retryResponse?.content;
         if (retryContent) {
@@ -5291,8 +5311,10 @@ Wait for SCENARIO CONTEXT, PLAYER ROLE, POLITICAL SYSTEM, and ACTION.`;
  * Appends action to existing conversation and returns compass hints.
  * Requires prior initialization via /api/compass-conversation/init.
  *
- * Request: { gameId: string, action: { title: string, summary: string }, gameContext?: object, debugMode?: boolean }
- * Response: { compassHints: Array<{ prop: string, idx: number, polarity: number }> }
+ * Request: { gameId: string, action: { title: string, summary: string }, reasoning?: { text: string, selectedAction: string }, gameContext?: object, debugMode?: boolean }
+ * Response: { compassHints: Array<{ prop: string, idx: number, polarity: number }>, mirrorMessage?: string }
+ *
+ * When reasoning is provided, also generates a personalized mirror reflection message.
  */
 app.post("/api/compass-conversation/analyze", async (req, res) => {
   try {
@@ -5377,7 +5399,14 @@ PLAYER'S SELECTED ACTION: ${selectedAction}
 PLAYER'S REASONING FOR THIS CHOICE:
 "${reasoningText}"
 
-Analyze the player's reasoning text for political compass values. What values does their explanation reveal?`;
+Analyze the player's reasoning text for political compass values. What values does their explanation reveal?
+
+Additionally, generate a brief (1-2 sentence) mirror reflection message. The mirror is whimsical and archival:
+- Address player as "traveler" or "wanderer"
+- First-person ("I observe...", "I sense...")
+- Comment on their reasoning reflecting their values
+
+Return: {"compassHints": [...], "mirrorMessage": "..."}`;
       } else {
         fallbackUserPrompt = `${fallbackTrapContext}Analyze this action:
 TITLE: ${actionTitle}${actionSummary ? `\nSUMMARY: ${actionSummary}` : ''}`;
@@ -5391,7 +5420,13 @@ TITLE: ${actionTitle}${actionSummary ? `\nSUMMARY: ${actionSummary}` : ''}`;
       const aiResponse = await callGeminiChat(messages, MODEL_COMPASS_HINTS);
       const parsed = parseCompassHintsResponse(aiResponse.content);
 
-      return res.json({ compassHints: parsed.compassHints || [] });
+      // Extract mirrorMessage if present (for reasoning analysis)
+      const mirrorMessage = isReasoningAnalysis ? (parsed.mirrorMessage || null) : null;
+
+      return res.json({
+        compassHints: parsed.compassHints || [],
+        ...(mirrorMessage && { mirrorMessage })
+      });
     }
 
     // Extract context (prefer provided gameContext, fallback to stored)
@@ -5432,11 +5467,27 @@ PLAYER'S REASONING FOR THIS CHOICE:
 
 Analyze the player's reasoning text for political compass values. What values does their explanation reveal?
 
+Additionally, generate a SHORT mirror reflection message. The mirror is a cynical, dry-witted observer in FIRST PERSON.
+Job: surface tensions between their VALUES and their REASONING.
+
+Rules:
+- 1 sentence ONLY, 15-20 words maximum
+- Reference at least ONE value from their compass (what/how axes)
+- Create tension - show how their reasoning reveals or contradicts values
+- Never preach - just highlight the contradiction or irony
+- Do NOT use exact compass value names. Paraphrase: "your sense of truth", "your love of freedom"
+- Dry/mocking tone
+
+BAD: "I observe how your reasoning reflects your values, traveler." (too wordy, wrong voice)
+GOOD: "Your sense of fairness is charming when it justifies self-interest."
+GOOD: "Careful deliberation — protecting the powerful, naturally."
+
 Return JSON in this shape:
 {
   "compassHints": [
     {"prop": "what|whence|how|whither", "idx": 0-9, "polarity": -2|-1|1|2}
-  ]
+  ],
+  "mirrorMessage": "Your short mirror reflection here (15-20 words max)"
 }`;
     } else {
       userPrompt = `SCENARIO CONTEXT: ${scenarioContext}
@@ -5525,10 +5576,16 @@ Return JSON in this shape:
     // Validate hints
     const validatedHints = validateCompassHints(parsed.compassHints || []);
 
+    // Extract mirrorMessage if present (for reasoning analysis)
+    const mirrorMessage = isReasoningAnalysis ? (parsed.mirrorMessage || null) : null;
+
     console.log(`[CompassConversation] ✅ Returned ${validatedHints.length} validated hint(s)`);
     validatedHints.forEach(hint => {
       console.log(`  → ${hint.prop}:${hint.idx} (${hint.polarity >= 0 ? '+' : ''}${hint.polarity})`);
     });
+    if (mirrorMessage) {
+      console.log(`[CompassConversation] 🪞 Mirror message: "${mirrorMessage.substring(0, 80)}${mirrorMessage.length > 80 ? '...' : ''}"`);
+    }
 
     // Update conversation with assistant response
     messages.push({ role: "assistant", content });
@@ -5541,7 +5598,10 @@ Return JSON in this shape:
     // Touch conversation to reset TTL
     touchConversation(`compass-${gameId}`);
 
-    return res.json({ compassHints: validatedHints });
+    return res.json({
+      compassHints: validatedHints,
+      ...(mirrorMessage && { mirrorMessage })
+    });
 
   } catch (error) {
     console.error("[CompassConversation] ❌ Analysis error:", error);

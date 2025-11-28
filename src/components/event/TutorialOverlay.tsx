@@ -10,7 +10,7 @@ interface TutorialOverlayProps {
 
 interface ArrowConfig {
   message: string;
-  arrowDirection: 'up' | 'down' | 'left' | 'right';
+  arrowDirection: 'up' | 'down' | 'left' | 'right' | 'none';
   arrowPosition: { x: number; y: number };
   textPosition: { x: number; y: number };
 }
@@ -82,20 +82,16 @@ export function TutorialOverlay({ step, targetElement }: TutorialOverlayProps) {
           },
         });
       } else if (step === 'awaiting-compass-pills') {
-        // Use fixed position - pills button is at right edge, vertically centered in MirrorCard area
-        // This avoids race condition where ref isn't ready when AnimatePresence is still animating
+        // Show message only (no arrow) - the pulsing button highlight is sufficient
         const pillsX = window.innerWidth - 40; // Right edge with some padding
-        const pillsY = window.innerHeight * 0.58; // Approximate vertical center of MirrorCard area
+        const pillsY = window.innerHeight * 0.75; // Adjusted to match actual MirrorCard position
 
         setArrowConfig({
           message: 'Click here to see the most recent change to your values',
-          arrowDirection: 'right',
-          arrowPosition: {
-            x: pillsX - 60,
-            y: pillsY,
-          },
+          arrowDirection: 'none',
+          arrowPosition: { x: 0, y: 0 }, // Not used when direction is 'none'
           textPosition: {
-            x: Math.max(20, pillsX - 380),
+            x: Math.max(20, pillsX - 320),
             y: pillsY - 40,
           },
         });
@@ -142,33 +138,35 @@ export function TutorialOverlay({ step, targetElement }: TutorialOverlayProps) {
               <p className="text-sm leading-relaxed">{arrowConfig.message}</p>
             </motion.div>
 
-            {/* Animated arrow */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3, duration: 0.3 }}
-              className="absolute pointer-events-none"
-              style={{
-                left: arrowConfig.arrowPosition.x,
-                top: arrowConfig.arrowPosition.y,
-                zIndex: 50,
-              }}
-            >
+            {/* Animated arrow (hidden when direction is 'none') */}
+            {arrowConfig.arrowDirection !== 'none' && (
               <motion.div
-                animate={
-                  arrowConfig.arrowDirection === 'up'
-                    ? { y: [0, -8, 0] }
-                    : arrowConfig.arrowDirection === 'down'
-                    ? { y: [0, 8, 0] }
-                    : arrowConfig.arrowDirection === 'left'
-                    ? { x: [0, -8, 0] }
-                    : { x: [0, 8, 0] }
-                }
-                transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3, duration: 0.3 }}
+                className="absolute pointer-events-none"
+                style={{
+                  left: arrowConfig.arrowPosition.x,
+                  top: arrowConfig.arrowPosition.y,
+                  zIndex: 50,
+                }}
               >
-                <Arrow direction={arrowConfig.arrowDirection} />
+                <motion.div
+                  animate={
+                    arrowConfig.arrowDirection === 'up'
+                      ? { y: [0, -8, 0] }
+                      : arrowConfig.arrowDirection === 'down'
+                      ? { y: [0, 8, 0] }
+                      : arrowConfig.arrowDirection === 'left'
+                      ? { x: [0, -8, 0] }
+                      : { x: [0, 8, 0] }
+                  }
+                  transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
+                >
+                  <Arrow direction={arrowConfig.arrowDirection} />
+                </motion.div>
               </motion.div>
-            </motion.div>
+            )}
           </>
         )}
       </div>
