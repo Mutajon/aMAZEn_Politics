@@ -109,14 +109,24 @@ function genderizeRole(role: string, gender: "male" | "female" | "any"): string 
 
 function suggestBackgroundObject(role = ""): string {
   const r = role.toLowerCase();
+  // Existing mappings
   if (r.includes("tang") || r.includes("china")) return "red pagoda";
   if (r.includes("rome") || r.includes("roman")) return "colosseum";
   if (r.includes("german") || r.includes("germany") || r.includes("chancellor") || r.includes("kanzler"))
     return "brandenburg gate";
-  if (r.includes("egypt")) return "pyramids of giza";
+  if (r.includes("egypt") || r.includes("alexandria")) return "pyramids of giza";
   if (r.includes("japan") || r.includes("shogun")) return "torii gate";
   if (r.includes("viking")) return "drakkar longship";
   if (r.includes("mongol")) return "golden ger";
+  // New mappings for predefined roles
+  if (r.includes("athens") || r.includes("greek") || r.includes("greece")) return "parthenon";
+  if (r.includes("florence") || r.includes("italy") || r.includes("medici")) return "florentine duomo";
+  if (r.includes("america") || r.includes("colonial") || r.includes("jamestown")) return "wooden colonial fort";
+  if (r.includes("haiti") || r.includes("caribbean") || r.includes("saint-domingue")) return "tropical plantation";
+  if (r.includes("russia") || r.includes("russian") || r.includes("tsar") || r.includes("czar")) return "kremlin";
+  if (r.includes("india") || r.includes("indian") || r.includes("gandhi") || r.includes("nehru")) return "taj mahal";
+  if (r.includes("africa") || r.includes("apartheid") || r.includes("mandela")) return "table mountain";
+  if (r.includes("mars") || r.includes("colony") || r.includes("2179")) return "red martian domes";
   return "ornate palace backdrop";
 }
 
@@ -129,7 +139,7 @@ function buildFullPrompt(
   const genderedRole = genderizeRole(role, gender);
   const genderWord = gender === "male" ? "male " : gender === "female" ? "female " : "";
   const subject = `a ${genderWord}${genderedRole}`.trim();
-  const head = ["a fictional right-facing game avatar portrait of the face of", subject].join(" ");
+  const head = `a close-up portrait of the face of ${subject}`;
   const physicalClean = physical.trim().replace(/^[,.\s]+/, "");
   const withPhysical = physicalClean ? `${head}, ${physicalClean}` : head;
   const bg = bgObject ? `, with a ${bgObject} in the background` : "";
@@ -176,7 +186,12 @@ export default function NameScreen({ push }: { push: PushFn }) {
   const [phase, setPhase] = useState<"input" | "avatar">("input");
   const [avatarUrl, setAvatarUrl] = useState<string>(character?.avatarUrl || "");
   const [avatarLoading, setAvatarLoading] = useState(false);
+  const [avatarAttempt, setAvatarAttempt] = useState(0);
   const avatarReqRef = useRef(0);
+
+  // Retry configuration for avatar generation
+  const MAX_AVATAR_RETRIES = 3;
+  const RETRY_DELAY_MS = 2000;
 
   const fullPrompt = useMemo(
     () => buildFullPrompt(selectedRole || "", gender, physical, bgObject),
@@ -241,7 +256,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gender, trio]);
 
-  // Avatar generation logic (moved from CompassIntroStart)
+  // Avatar generation logic with retry (moved from CompassIntroStart)
   useEffect(() => {
     if (phase !== "avatar") return;
     if (!generateImages) return;
@@ -252,32 +267,66 @@ export default function NameScreen({ push }: { push: PushFn }) {
 
     const req = ++avatarReqRef.current;
     const ac = new AbortController();
+
     (async () => {
-      try {
-        setAvatarLoading(true);
-        const useXAI = useSettingsStore.getState().useXAI;
-        const res = await fetch("/api/generate-avatar", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, useXAI }),
-          signal: ac.signal,
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || !(data as any)?.dataUrl) {
-          throw new Error((data as any)?.error || `HTTP ${res.status}`);
+      setAvatarLoading(true);
+      setAvatarAttempt(0);
+
+      for (let attempt = 1; attempt <= MAX_AVATAR_RETRIES; attempt++) {
+        // Check if aborted or request is stale
+        if (ac.signal.aborted || req !== avatarReqRef.current) return;
+
+        setAvatarAttempt(attempt);
+        console.log(`[NameScreen] Avatar generation attempt ${attempt}/${MAX_AVATAR_RETRIES}`);
+
+        try {
+          const useXAI = useSettingsStore.getState().useXAI;
+          const useGemini = useSettingsStore.getState().useGemini;
+          const res = await fetch("/api/generate-avatar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt, useXAI, useGemini }),
+            signal: ac.signal,
+          });
+
+          if (res.ok) {
+            const data = await res.json().catch(() => ({}));
+            if ((data as any)?.dataUrl) {
+              if (req === avatarReqRef.current) {
+                console.log(`[NameScreen] Avatar generated successfully on attempt ${attempt}`);
+                setAvatarUrl((data as any).dataUrl);
+                updateCharacter({ avatarUrl: (data as any).dataUrl });
+                setAvatarLoading(false);
+              }
+              return; // Success!
+            }
+          }
+
+          // Server error - retry if attempts remaining
+          console.warn(`[NameScreen] Avatar generation failed on attempt ${attempt}/${MAX_AVATAR_RETRIES}`);
+          if (attempt < MAX_AVATAR_RETRIES) {
+            await new Promise(r => setTimeout(r, RETRY_DELAY_MS * attempt));
+          }
+        } catch (e: any) {
+          if (e.name === "AbortError") return;
+          console.warn(`[NameScreen] Avatar generation error on attempt ${attempt}/${MAX_AVATAR_RETRIES}:`, e?.message);
+          if (attempt < MAX_AVATAR_RETRIES) {
+            await new Promise(r => setTimeout(r, RETRY_DELAY_MS * attempt));
+          }
         }
-        if (req !== avatarReqRef.current) return;
-        setAvatarUrl((data as any).dataUrl);
-        updateCharacter({ avatarUrl: (data as any).dataUrl });
-      } catch (e: any) {
-        // Handle error if needed
-      } finally {
-        if (req === avatarReqRef.current) setAvatarLoading(false);
+      }
+
+      // All retries failed - use fallback
+      if (req === avatarReqRef.current) {
+        console.log("[NameScreen] All avatar generation attempts failed, using fallback");
+        setAvatarUrl(DEFAULT_AVATAR_DATA_URL);
+        updateCharacter({ avatarUrl: DEFAULT_AVATAR_DATA_URL });
+        setAvatarLoading(false);
       }
     })();
 
     return () => ac.abort();
-  }, [phase, generateImages, fullPrompt, avatarUrl, updateCharacter]);
+  }, [phase, generateImages, fullPrompt, avatarUrl, updateCharacter, MAX_AVATAR_RETRIES, RETRY_DELAY_MS]);
 
   // Calculate display avatar
   const displayAvatar = useMemo(() => {
@@ -317,7 +366,9 @@ export default function NameScreen({ push }: { push: PushFn }) {
     <div className="min-h-[100dvh] px-5 py-8" style={roleBgStyle}>
       <LoadingOverlay
         visible={loading || (phase === "avatar" && avatarLoading)}
-        title={phase === "avatar" ? lang("GENERATING_AVATAR") : overlayTitle}
+        title={phase === "avatar"
+          ? `${lang("GENERATING_AVATAR")}${avatarAttempt > 1 ? ` (${lang("ATTEMPT")} ${avatarAttempt}/${MAX_AVATAR_RETRIES})` : ""}`
+          : overlayTitle}
         quotes={loadingQuotes}
       />
 

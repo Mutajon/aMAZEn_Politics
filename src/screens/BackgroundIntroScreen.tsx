@@ -5,6 +5,7 @@ import { bgStyleWithRoleImage } from "../lib/ui";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNarrator } from "../hooks/useNarrator";
 import type { PreparedTTS } from "../hooks/useNarrator";
+import { TTS_VOICE } from "../lib/ttsConfig";
 import { useSettingsStore } from "../store/settingsStore";
 import { useRoleStore } from "../store/roleStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
@@ -12,20 +13,21 @@ import { useLogger } from "../hooks/useLogger";
 import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import { useLang, getCurrentLanguage } from "../i18n/lang";
 import { useReserveGameSlot } from "../hooks/useReserveGameSlot";
+import { audioManager } from "../lib/audioManager";
 
 /**
  * Phases:
- *  - "preparingDefault" : fetch & buffer TTS for the default line
- *  - "idle"             : default text visible; Wake up available
+ *  - "idle"             : default text visible; Wake up available (uses pre-recorded VO)
  *  - "waitingForSeed"   : waiting for narrative seeding to complete
  *  - "loading"          : calling OpenAI for paragraph
  *  - "preparingIntro"   : buffering TTS for generated paragraph
  *  - "ready" / "error"  : show paragraph + Begin
  *
  * We start audio exactly on the fade-in animation by using onAnimationStart.
+ * The default "drift to sleep" line uses a pre-recorded audio file for instant playback.
  */
 
-type Phase = "preparingDefault" | "idle" | "waitingForSeed" | "loading" | "preparingIntro" | "ready" | "error";
+type Phase = "idle" | "waitingForSeed" | "loading" | "preparingIntro" | "ready" | "error";
 
 export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
   const lang = useLang();
@@ -71,9 +73,8 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
 
   const DEFAULT_LINE = useMemo(() => lang(getGenderKey("BACKGROUND_INTRO_DEFAULT_LINE")), [lang, gender]);
 
-  const [phase, setPhase] = useState<Phase>("preparingDefault");
+  const [phase, setPhase] = useState<Phase>("idle");
   const [para, setPara] = useState<string>("");
-  const preparedDefaultRef = useRef<PreparedTTS | null>(null);
   const preparedIntroRef = useRef<PreparedTTS | null>(null);
   // prevent double-plays & track background readiness
   const defaultPlayedRef = useRef(false);
@@ -107,30 +108,15 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
     };
   }, []);
 
-  // 1) On mount, PREPARE default line audio; show nothing until ready
+  // 1) On unmount, cleanup TTS resources
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        if (narrationEnabled) {
-          const p = await narrator.prepare(DEFAULT_LINE, { voiceName: "onyx", format: "mp3" });
-          if (cancelled) { p.dispose(); return; }
-          preparedDefaultRef.current = p;
-        }
-        setPhase("idle"); // now we can reveal the default copy; we'll start TTS on fade-in start
-      } catch (e) {
-        console.warn("[BackgroundIntro] default prepare failed; showing text only", e);
-        setPhase("idle"); // soft-fail: still show text
-      }
-    })();
     return () => {
-      cancelled = true;
-      preparedDefaultRef.current?.dispose();
       preparedIntroRef.current?.dispose();
       narrator.stop();
+      audioManager.stopVoiceover();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [narrationEnabled]);
+  }, []);
   // Prefetch the generated paragraph + prepare its TTS AFTER the default narration completes
   useEffect(() => {
     if (phase !== "idle" || bgReadyRef.current || !defaultNarrationComplete || fetchingIntroRef.current) return;
@@ -177,7 +163,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
 
           // Prepare the TTS for the paragraph ahead of time (only if narration enabled)
           if (narrationEnabled) {
-            const p = await narrator.prepare(paragraph, { voiceName: "onyx", format: "mp3" });
+            const p = await narrator.prepare(paragraph, { voiceName: TTS_VOICE });
             if (cancelled) { p.dispose(); return; }
             preparedIntroRef.current = p;
           }
@@ -345,7 +331,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
       }
 
       try {
-        const p = await narrator.prepare(para, { voiceName: "onyx", format: "mp3" });
+        const p = await narrator.prepare(para, { voiceName: TTS_VOICE });
         if (cancelled) { p.dispose(); return; }
         preparedIntroRef.current = p;
         setPhase("ready"); // will start playback on fade-in animation
@@ -409,7 +395,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
     <div className="min-h-[100dvh] px-5 py-6" style={roleBgStyle}>
       <div className="max-w-2xl mx-auto">
 
-        {/* Stage A: default content (only after TTS is buffered) ------------------- */}
+        {/* Stage A: default content (uses pre-recorded VO for instant display) ------------------- */}
         <AnimatePresence mode="wait">
           {phase === "idle" && (
             <motion.div
@@ -418,26 +404,15 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.28 }}
-              // Start the default narration exactly with the fade-in
-              onAnimationStart={async () => {
-                const p = preparedDefaultRef.current;
-                if (p && narrationEnabled && !defaultPlayedRef.current) {
+              // Start the pre-recorded narration exactly with the fade-in
+              onAnimationStart={() => {
+                if (narrationEnabled && !defaultPlayedRef.current) {
                   defaultPlayedRef.current = true;
-                  try {
-                    await p.start();
-                    // Audio finished playing - safe to prefetch now
-                    setDefaultNarrationComplete(true);
-                  } catch (e) {
-                    console.warn("default play blocked:", e);
-                    // If blocked, allow prefetch anyway
-                    setDefaultNarrationComplete(true);
-                  }
-                } else if (!narrationEnabled) {
-                  // If narration disabled, allow prefetch immediately
-                  setDefaultNarrationComplete(true);
+                  audioManager.playVoiceover('drift-to-sleep');
                 }
+                // Allow prefetch immediately since pre-recorded audio doesn't need to wait
+                setDefaultNarrationComplete(true);
               }}
-              
             >
               <h1 className="text-3xl sm:text-4xl font-extrabold leading-tight tracking-tight bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]">
                 {lang("BACKGROUND_INTRO_NIGHT_FALLS")}

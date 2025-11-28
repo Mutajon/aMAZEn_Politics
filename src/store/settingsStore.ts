@@ -47,6 +47,10 @@ type SettingsState = {
   setUseXAI: (v: boolean) => void;
   toggleUseXAI: () => void;
 
+  // --- NEW: Use Gemini (Google) for game-turn API ---
+  useGemini: boolean;
+  setUseGemini: (v: boolean) => void;
+
   // --- NEW: In-game narration mute (separate from global toggle) ---
   narrationMutedInGame: boolean;
   setNarrationMutedInGame: (v: boolean) => void;
@@ -84,10 +88,9 @@ type SettingsState = {
   setExperimentMode: (v: boolean) => void;
   toggleExperimentMode: () => void;
 
-  // --- NEW: Corruption tracking (default OFF) ---
-  corruptionTrackingEnabled: boolean;
-  setCorruptionTrackingEnabled: (v: boolean) => void;
-  toggleCorruptionTrackingEnabled: () => void;
+  // --- NEW: Mobile device detection (session-only) ---
+  isMobileDevice: boolean;
+  setIsMobileDevice: (v: boolean) => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -138,6 +141,10 @@ export const useSettingsStore = create<SettingsState>()(
       setUseXAI: (v) => set({ useXAI: v }),
       toggleUseXAI: () => set({ useXAI: !get().useXAI }),
 
+      // NEW: Use Gemini (Google) for game-turn API (default ON)
+      useGemini: true,
+      setUseGemini: (v) => set({ useGemini: v }),
+
       // NEW: In-game narration mute (default OFF - respects global setting)
       narrationMutedInGame: false,
       setNarrationMutedInGame: (v) => set({ narrationMutedInGame: v }),
@@ -175,10 +182,9 @@ export const useSettingsStore = create<SettingsState>()(
       setExperimentMode: (v) => set({ experimentMode: v }),
       toggleExperimentMode: () => set({ experimentMode: !get().experimentMode }),
 
-      // NEW: Corruption tracking (default ON)
-      corruptionTrackingEnabled: true,
-      setCorruptionTrackingEnabled: (v) => set({ corruptionTrackingEnabled: v }),
-      toggleCorruptionTrackingEnabled: () => set({ corruptionTrackingEnabled: !get().corruptionTrackingEnabled }),
+      // NEW: Mobile device detection (default false, session-only - NOT persisted)
+      isMobileDevice: false,
+      setIsMobileDevice: (v) => set({ isMobileDevice: v }),
     }),
     {
       // Bump key so no stale objects hide the new fields
@@ -193,6 +199,7 @@ export const useSettingsStore = create<SettingsState>()(
         dilemmasSubject: s.dilemmasSubject,
         enableModifiers: s.enableModifiers,
         useLightDilemmaAnthropic: s.useLightDilemmaAnthropic,
+        useGemini: s.useGemini,
         narrationMutedInGame: s.narrationMutedInGame,
         musicEnabled: s.musicEnabled,
         musicVolume: s.musicVolume,
@@ -202,7 +209,6 @@ export const useSettingsStore = create<SettingsState>()(
         // NOTE: backstageMode is NOT persisted - session-only
         treatment: s.treatment,
         // NOTE: experimentMode is NOT persisted - session-only (always starts true)
-        corruptionTrackingEnabled: s.corruptionTrackingEnabled,
       }),
     }
   )

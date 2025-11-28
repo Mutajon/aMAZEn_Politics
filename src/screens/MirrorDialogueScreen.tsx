@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLogger } from "../hooks/useLogger";
 import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import { useLang } from "../i18n/lang";
+import MirrorWithReflection from "../components/MirrorWithReflection";
 
 /** Built-in placeholder (no file asset needed) */
 const DEFAULT_AVATAR_DATA_URL =
@@ -152,12 +153,9 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
             className="relative self-start"
             style={{ width: MIRROR, height: MIRROR }}
           >
-            <img
-              src="/assets/images/mirror.png"
-              alt="Mystic mirror"
-              width={MIRROR}
-              height={MIRROR}
-              className="rounded-full object-cover"
+            <MirrorWithReflection
+              mirrorSize={MIRROR}
+              avatarUrl={displayAvatar}
             />
           </motion.div>
 

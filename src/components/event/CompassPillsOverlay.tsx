@@ -1,6 +1,7 @@
 // src/components/event/CompassPillsOverlay.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react";
 import type { CompassEffectPing } from "../MiniCompass";
 import { COMPONENTS, PALETTE } from "../../data/compass-data";
 import { useAudioManager } from "../../hooks/useAudioManager";
@@ -9,14 +10,27 @@ type Props = {
   effectPills: CompassEffectPing[];
   loading: boolean;
   color?: string;
+  // Tutorial props
+  tutorialMode?: boolean;
+  tutorialPillsButtonRef?: (element: HTMLElement | null) => void;
+  onTutorialPillsClick?: () => void;
+  forceCollapse?: boolean; // Force pills to collapse (used by tutorial)
 };
 
 /** Spinner + stacked pills ABOVE the mirror card.
  *  - Shows pills for ~2s, then collapses to a small "+" button.
- *  - Clicking "+" expands; clicking any pill collapses again.
+ *  - Clicking "+" expands; clicking X button or any pill collapses again.
  *  - Container is pointer-events-none; only controls are clickable.
  *  - Pills animate from/to button position for smooth spatial transitions. */
-export default function CompassPillsOverlay({ effectPills, loading, color }: Props) {
+export default function CompassPillsOverlay({
+  effectPills,
+  loading,
+  color,
+  tutorialMode = false,
+  tutorialPillsButtonRef,
+  onTutorialPillsClick,
+  forceCollapse = false,
+}: Props) {
   const { playSfx } = useAudioManager();
 
   // Track expand/collapse
@@ -57,6 +71,18 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
     };
   }, [batchKey, loading, effectPills.length]);
 
+  // Force collapse when tutorial requires it
+  useEffect(() => {
+    if (forceCollapse) {
+      setExpanded(false);
+      // Clear auto-collapse timer since we're force-collapsing
+      if (timerRef.current) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  }, [forceCollapse]);
+
   // Nothing to render?
   const hasPills = effectPills.length > 0;
 
@@ -65,7 +91,9 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
   const buttonPosition = { x: 0, y: 0 }; // Relative to container center
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
+    <div
+      className={`pointer-events-none absolute inset-0 flex items-center justify-center ${tutorialMode ? 'z-[90]' : 'z-30'}`}
+    >
       {loading && (
         <div className="flex items-center justify-center" style={{ color }}>
           <span className="inline-block w-5 h-5 rounded-full border-2 border-current border-t-transparent animate-spin" />
@@ -85,6 +113,34 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
                 transform: "translate(-50%, -50%)",
               }}
             >
+              {/* Close button */}
+              <motion.button
+                type="button"
+                onClick={() => setExpanded(false)}
+                className="
+                  absolute -top-1 -left-20 z-10
+                  w-8 h-8 rounded-full
+                  bg-white/20 hover:bg-white/30
+                  backdrop-blur-sm border border-white/40
+                  flex items-center justify-center
+                  transition-colors cursor-pointer
+                  focus:outline-none
+                "
+                style={{
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+                }}
+                aria-label="Close compass effects"
+                title="Close"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                transition={{ duration: 0.2 }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <X className="w-5 h-5 text-white" />
+              </motion.button>
+
               {effectPills.map((p, index) => {
                 const label = COMPONENTS[p.prop][p.idx]?.short ?? "";
                 const bg = (PALETTE as any)[p.prop]?.base ?? "#fff";
@@ -146,8 +202,14 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
             <motion.button
               key="pills-collapsed"
               type="button"
-              onClick={() => setExpanded(true)}
-              className="
+              ref={tutorialMode && tutorialPillsButtonRef ? tutorialPillsButtonRef : undefined}
+              onClick={() => {
+                setExpanded(true);
+                if (tutorialMode && onTutorialPillsClick) {
+                  onTutorialPillsClick();
+                }
+              }}
+              className={`
                 pointer-events-auto
                 absolute top-1/2 -translate-y-1/2 translate-x-1/2
                 inline-flex items-center justify-center
@@ -155,7 +217,8 @@ export default function CompassPillsOverlay({ effectPills, loading, color }: Pro
                 text-white text-sm font-bold
                 focus:outline-none
                 border border-white/30
-              "
+                ${tutorialMode ? 'ring-2 ring-yellow-400 animate-pulse z-50' : ''}
+              `}
               aria-label="Show effects"
               title="Show effects"
               style={{

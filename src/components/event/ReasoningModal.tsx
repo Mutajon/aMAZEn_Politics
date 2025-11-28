@@ -18,15 +18,21 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Sparkles, Loader2 } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useTimingLogger } from "../../hooks/useTimingLogger";
 import { useLogger } from "../../hooks/useLogger";
 import { validateReasoningText } from "../../hooks/useReasoning";
 import { useDilemmaStore } from "../../store/dilemmaStore";
-import { SpeakerAvatar } from "./SpeakerAvatar";
+import { MirrorImage, MirrorReflection } from "../MirrorWithReflection";
 import CompassPillsOverlay from "./CompassPillsOverlay";
 import type { CompassPill } from "../../hooks/useEventDataCollector";
 import type { CompassEffectPing } from "../MiniCompass";
+
+// Mirror shimmer effect tunables (matching MirrorQuizScreen)
+const MIRROR_SHIMMER_MIN_INTERVAL = 5000;   // 5 seconds minimum
+const MIRROR_SHIMMER_MAX_INTERVAL = 10000;  // 10 seconds maximum
+const MIRROR_SHIMMER_DURATION = 1500;       // 1.5 second sweep duration
+const MIRROR_SHIMMER_COLOR = "rgba(94, 234, 212, 0.6)";  // Cyan/teal, semi-transparent
 
 // Speaker avatar constants
 const AVATAR_SIZE_PX = 120; // Sized to show full face and upper body
@@ -40,8 +46,7 @@ type Props = {
   actionSummary: string;
   day: number;
   isOptional: boolean;
-  speakerName?: string;        // Speaker name (e.g., "The Gatekeeper")
-  speakerImageId?: string;     // Speaker image ID (e.g., "gatekeeper")
+  avatarUrl?: string;          // Player avatar URL for mirror reflection
   isSubmitting: boolean;
 };
 
@@ -55,14 +60,16 @@ export default function ReasoningModal({
   day,
   isOptional,
   isSubmitting,
-  speakerName,
-  speakerImageId,
+  avatarUrl,
 }: Props) {
   const [reasoningText, setReasoningText] = useState("");
   const [showAcknowledgment, setShowAcknowledgment] = useState(false);
   const [validationError, setValidationError] = useState<string>("");
   const [compassPills, setCompassPills] = useState<CompassPill[]>([]);
   const [thankYouMessage, setThankYouMessage] = useState<string>("");
+
+  // Mirror shimmer state (triggers animation restart)
+  const [mirrorShimmerTrigger, setMirrorShimmerTrigger] = useState(0);
 
   // Logging hooks
   const timingLogger = useTimingLogger();
@@ -75,6 +82,13 @@ export default function ReasoningModal({
   // Validate reasoning text
   const validation = validateReasoningText(reasoningText);
   const canSubmit = validation.isValid && !isSubmitting;
+
+  // Stable pill IDs to prevent re-expansion on every render
+  // Only regenerate when compassPills actually changes (by reference)
+  const stablePillIds = useMemo(() => {
+    const timestamp = Date.now();
+    return compassPills.map((_, i) => `reasoning-${timestamp}-${i}`);
+  }, [compassPills]);
 
   // Start timing when modal opens
   useEffect(() => {
@@ -114,6 +128,25 @@ export default function ReasoningModal({
       modalOpenTimeRef.current = 0;
     }
   }, [isOpen, timingLogger]);
+
+  // Random interval shimmer effect for mirror image
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const scheduleNextShimmer = () => {
+      const randomInterval =
+        MIRROR_SHIMMER_MIN_INTERVAL +
+        Math.random() * (MIRROR_SHIMMER_MAX_INTERVAL - MIRROR_SHIMMER_MIN_INTERVAL);
+
+      return setTimeout(() => {
+        setMirrorShimmerTrigger(prev => prev + 1);
+        scheduleNextShimmer();
+      }, randomInterval);
+    };
+
+    const timerId = scheduleNextShimmer();
+    return () => clearTimeout(timerId);
+  }, [isOpen]);
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -308,16 +341,43 @@ export default function ReasoningModal({
 
             {/* Icon and Title */}
             <div className="flex items-start gap-4">
-              {/* Speaker Avatar (50% size) */}
-              <div className="flex-shrink-0">
-                <div style={{ width: `${AVATAR_SIZE_PX}px`, height: `${AVATAR_SIZE_PX}px` }}>
-                  <SpeakerAvatar
-                    speakerName={speakerName || "The Gatekeeper"}
-                    imageId={speakerImageId || "gatekeeper"}
-                    onClick={() => {}} // No-op since description modal isn't needed here
-                    size={AVATAR_SIZE_PX}
-                  />
-                </div>
+              {/* Mirror with Avatar Reflection */}
+              <div
+                className="relative flex-shrink-0"
+                style={{ width: AVATAR_SIZE_PX, height: AVATAR_SIZE_PX }}
+              >
+                {/* Shimmer wrapper - only contains the mirror image */}
+                <motion.div
+                  key={mirrorShimmerTrigger}
+                  className="pointer-events-none select-none"
+                  style={{
+                    width: AVATAR_SIZE_PX,
+                    height: AVATAR_SIZE_PX,
+                    opacity: 0.95,
+                  }}
+                  animate={{
+                    filter: [
+                      "drop-shadow(0px 0px 0px transparent)",
+                      `drop-shadow(-8px -8px 12px ${MIRROR_SHIMMER_COLOR})`,
+                      `drop-shadow(0px 0px 16px ${MIRROR_SHIMMER_COLOR})`,
+                      `drop-shadow(8px 8px 12px ${MIRROR_SHIMMER_COLOR})`,
+                      "drop-shadow(0px 0px 0px transparent)",
+                    ],
+                  }}
+                  transition={{
+                    duration: MIRROR_SHIMMER_DURATION / 1000,
+                    ease: "easeInOut",
+                    times: [0, 0.25, 0.5, 0.75, 1],
+                  }}
+                >
+                  <MirrorImage mirrorSize={AVATAR_SIZE_PX} mirrorAlt="Mystic mirror" />
+                </motion.div>
+
+                {/* Reflection overlay - outside shimmer wrapper to avoid filter interference */}
+                <MirrorReflection
+                  mirrorSize={AVATAR_SIZE_PX}
+                  avatarUrl={avatarUrl}
+                />
               </div>
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl font-bold text-white mb-2" style={{ fontFamily: "Georgia, serif" }}>
@@ -423,21 +483,12 @@ export default function ReasoningModal({
                   transition={{ type: "spring", stiffness: 200, damping: 20 }}
                   className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-6"
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
-                        <Sparkles className="w-6 h-6 text-purple-400" />
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <p
-                        className="text-white leading-relaxed italic"
-                        style={{ fontFamily: "Georgia, serif", fontSize: "15px" }}
-                      >
-                        {thankYouMessage || "Thank you for sharing your thoughts with me."}
-                      </p>
-                    </div>
-                  </div>
+                  <p
+                    className="text-white leading-relaxed italic"
+                    style={{ fontFamily: "Georgia, serif", fontSize: "15px" }}
+                  >
+                    {thankYouMessage || "Thank you for sharing your thoughts with me."}
+                  </p>
                 </motion.div>
 
                 {/* Compass Pills Display */}
@@ -450,7 +501,7 @@ export default function ReasoningModal({
                   >
                     <CompassPillsOverlay
                       effectPills={compassPills.map((pill, i) => ({
-                        id: `reasoning-${Date.now()}-${i}`,
+                        id: stablePillIds[i],
                         prop: pill.prop,
                         idx: pill.idx,
                         delta: pill.delta

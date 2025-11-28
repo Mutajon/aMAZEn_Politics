@@ -13,6 +13,7 @@ import { useDilemmaStore } from "./store/dilemmaStore";
 import { useCompassStore } from "./store/compassStore";
 import { useRoleStore } from "./store/roleStore";
 import { useHighscoreStore } from "./store/highscoreStore";
+import { resetDay2Tutorial } from "./hooks/useDay2Tutorial";
 
 // Disable StrictMode in development to avoid double-invoked effects (which fire duplicate API calls).
 const useStrict = import.meta.env.MODE !== "development";
@@ -21,6 +22,8 @@ const useStrict = import.meta.env.MODE !== "development";
 // Add global functions for switching between AI models
 (window as any).switchToClaude = () => {
   useSettingsStore.getState().setUseLightDilemmaAnthropic(true);
+  useSettingsStore.getState().setUseXAI(false);
+  useSettingsStore.getState().setUseGemini(false);
   console.log("✅ Switched to Claude (Anthropic)");
   console.log("📋 Affected: Dilemma generation + Mirror dialogue");
   console.log("🔧 Models configured in .env:");
@@ -32,6 +35,7 @@ const useStrict = import.meta.env.MODE !== "development";
 (window as any).switchToGPT = () => {
   useSettingsStore.getState().setUseLightDilemmaAnthropic(false);
   useSettingsStore.getState().setUseXAI(false);
+  useSettingsStore.getState().setUseGemini(false);
   console.log("✅ Switched to GPT (OpenAI)");
   console.log("📋 Affected: Dilemma generation + Mirror dialogue + Image generation");
   console.log("🔧 Models configured in .env:");
@@ -44,6 +48,7 @@ const useStrict = import.meta.env.MODE !== "development";
 (window as any).switchToXAI = () => {
   useSettingsStore.getState().setUseLightDilemmaAnthropic(false);
   useSettingsStore.getState().setUseXAI(true);
+  useSettingsStore.getState().setUseGemini(false);
   console.log("✅ Switched to XAI (X.AI/Grok)");
   console.log("📋 Affected: Dilemma generation + Compass pills + Image generation");
   console.log("🔧 Models configured in .env:");
@@ -51,6 +56,17 @@ const useStrict = import.meta.env.MODE !== "development";
   console.log("   - IMAGE_MODEL_XAI (optional - falls back to OpenAI)");
   console.log("💡 Next dilemma/compass will use XAI API");
   console.log("⚠️  Note: XAI doesn't support image generation yet - will fall back to OpenAI");
+};
+
+(window as any).switchToGemini = () => {
+  useSettingsStore.getState().setUseLightDilemmaAnthropic(false);
+  useSettingsStore.getState().setUseXAI(false);
+  useSettingsStore.getState().setUseGemini(true);
+  console.log("✅ Switched to Gemini (Google)");
+  console.log("📋 Affected: Dilemma generation");
+  console.log("🔧 Models configured in .env:");
+  console.log("   - MODEL_DILEMMA_GEMINI");
+  console.log("💡 Next dilemma will use Gemini API");
 };
 
 // Debug mode toggle commands
@@ -102,30 +118,6 @@ const useStrict = import.meta.env.MODE !== "development";
   }
 };
 
-// Corruption tracking toggle commands
-(window as any).enableCorruption = () => {
-  useSettingsStore.getState().setCorruptionTrackingEnabled(true);
-  console.log('✅ Corruption tracking enabled immediately (no refresh needed).');
-  console.log('🔸 Features: Corruption pills appear on Day 2+, AI judges power misuse');
-  console.log('💡 Corruption level tracked internally (0-100 scale)');
-};
-
-(window as any).disableCorruption = () => {
-  useSettingsStore.getState().setCorruptionTrackingEnabled(false);
-  console.log('❌ Corruption tracking disabled immediately (no refresh needed).');
-};
-
-(window as any).toggleCorruption = () => {
-  const current = useSettingsStore.getState().corruptionTrackingEnabled;
-  useSettingsStore.getState().setCorruptionTrackingEnabled(!current);
-  if (!current) {
-    console.log('✅ Corruption tracking enabled immediately (no refresh needed).');
-    console.log('🔸 Features: Corruption pills appear on Day 2+, AI judges power misuse');
-  } else {
-    console.log('❌ Corruption tracking disabled immediately (no refresh needed).');
-  }
-};
-
 // Democracy rating access (hidden axis for analysis)
 (window as any).showDemocracy = () => {
   const democracyRating = (window as any).__democracyRating;
@@ -170,7 +162,7 @@ const useStrict = import.meta.env.MODE !== "development";
     console.log(`[${index + 1}] ${game.playerName} — ${game.roleTitle}`);
     console.log(`    System: ${game.systemName} | Score: ${game.finalScore}`);
     console.log(`    Support: People=${game.supportPeople} Middle=${game.supportMiddle} MoM=${game.supportMom}`);
-    console.log(`    Corruption: ${game.corruptionLevel} | Date: ${date}`);
+    console.log(`    Date: ${date}`);
     console.log(`    Legacy: "${game.legacy}"`);
     console.log(`    Snapshot Events: ${game.snapshotHighlights.length} highlights`);
     console.log(`    Top Compass: ${game.topCompassValues.length} values`);
@@ -388,6 +380,9 @@ const useStrict = import.meta.env.MODE !== "development";
     useMirrorDialogueStore.getState().resetMirrorDialogue();
     useHighscoreStore.getState().reset();
 
+    // Tutorial systems
+    resetDay2Tutorial();
+
     // User identity & treatment
     resetLoggingStore(); // Generates new userId
     useSettingsStore.getState().setTreatment('semiAutonomy'); // Reset to default
@@ -402,6 +397,7 @@ const useStrict = import.meta.env.MODE !== "development";
     console.log('   → Past games cleared');
     console.log('   → Fragments cleared, intro reset');
     console.log('   → Mirror dialogue reset');
+    console.log('   → Day 2 tutorial reset');
     console.log('   → Highscores reset to defaults');
     console.log('   → New anonymous user ID generated');
     console.log('   → Treatment reset to semiAutonomy');
@@ -409,6 +405,71 @@ const useStrict = import.meta.env.MODE !== "development";
     console.log('💾 User preferences preserved (audio, language, display)');
     console.log('💡 Refresh the page to start fresh!');
   }
+};
+
+// Tutorial management
+(window as any).resetDay2Tutorial = () => {
+  resetDay2Tutorial();
+  console.log('✅ Day 2 tutorial reset');
+  console.log('💡 Tutorial will show again on next Day 2 playthrough');
+};
+
+// Compass values display
+(window as any).getCompass = () => {
+  const { values, initialCompassSnapshot } = useCompassStore.getState();
+
+  // Component names for each dimension (10 per dimension)
+  const labels: Record<string, string[]> = {
+    what: ['Truth/Trust', 'Liberty/Agency', 'Equality/Equity', 'Care/Solidarity', 'Create/Courage',
+           'Wellbeing', 'Security/Safety', 'Freedom/Responsibility', 'Honor/Sacrifice', 'Sacred/Awe'],
+    whence: ['Evidence', 'Public Reason', 'Personal', 'Tradition', 'Revelation',
+             'Nature', 'Pragmatism', 'Aesthesis', 'Fidelity', 'Law (Office)'],
+    how: ['Law/Std.', 'Deliberation', 'Mobilize', 'Markets', 'Mutual Aid',
+          'Ritual', 'Design', 'Enforce', 'Civic Culture', 'Philanthropy'],
+    whither: ['Self', 'Family', 'Friends', 'In-Group', 'Nation',
+              'Civiliz.', 'Humanity', 'Earth', 'Cosmos', 'God'],
+  };
+
+  const dimensionNames: Record<string, string> = {
+    what: 'WHAT (Values)',
+    whence: 'WHENCE (Sources)',
+    how: 'HOW (Methods)',
+    whither: 'WHITHER (Beneficiaries)',
+  };
+
+  console.log('🧭 COMPASS VALUES (0-10 scale):');
+  console.log('');
+
+  let totalSum = 0;
+  for (const dim of ['what', 'whence', 'how', 'whither'] as const) {
+    console.log(`📊 ${dimensionNames[dim]}:`);
+    const vals = values[dim];
+    const dimLabels = labels[dim];
+
+    for (let i = 0; i < 10; i++) {
+      const val = vals[i] ?? 0;
+      totalSum += val;
+      const bar = '█'.repeat(val) + '░'.repeat(10 - val);
+      const initial = initialCompassSnapshot ? initialCompassSnapshot[dim][i] : null;
+      const delta = initial !== null ? val - initial : null;
+      const deltaStr = delta !== null && delta !== 0
+        ? ` (${delta > 0 ? '+' : ''}${delta})`
+        : '';
+      console.log(`  ${dimLabels[i].padEnd(22)} ${bar} ${val}${deltaStr}`);
+    }
+    console.log('');
+  }
+
+  console.log(`📈 Total compass points: ${totalSum}/400`);
+  if (initialCompassSnapshot) {
+    const initialSum = Object.values(initialCompassSnapshot).flat().reduce((a, b) => a + b, 0);
+    const change = totalSum - initialSum;
+    console.log(`   Change since quiz: ${change > 0 ? '+' : ''}${change}`);
+  }
+  console.log('');
+  console.log('💡 Values change based on your choices during gameplay');
+
+  return values;
 };
 
 // HIDDEN FOR EXPERIMENTAL DISTRIBUTION
@@ -423,9 +484,6 @@ const useStrict = import.meta.env.MODE !== "development";
 // console.log("  skipPreviousContext()     - Skip Day 2+ context (diagnose AI failures)");
 // console.log("  includePreviousContext()  - Include Day 2+ context (normal behavior)");
 // console.log("  togglePreviousContext()   - Toggle previous context on/off");
-// console.log("  enableCorruption()        - Enable corruption tracking (AI judges power misuse)");
-// console.log("  disableCorruption()       - Disable corruption tracking");
-// console.log("  toggleCorruption()        - Toggle corruption tracking on/off");
 // ----------------------------------------------------------------
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

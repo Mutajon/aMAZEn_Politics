@@ -501,12 +501,11 @@ Applied to EventScreen3, PowerDistributionScreen, ActionDeck:
 - `click soft.mp3` - Button clicks
 
 **TTS (Text-to-Speech)**:
-- Provider: OpenAI TTS API
-- Model: `gpt-4o-mini-tts` (supports instructions)
-- Voices: alloy, echo, fable, onyx, nova, shimmer
-- Per-screen customization:
-  - Dilemmas: "Speak as dramatic political narrator with gravitas"
-  - Aftermath: "Speak in solemn, reflective tone"
+- Provider: Gemini TTS API
+- Model: `gemini-2.5-flash-preview-tts`
+- Voice: Configured via `VITE_TTS_VOICE` env var (default: `enceladus`)
+- Available voices: enceladus, puck, charon, kore, zephyr, fenrir, leda, aoede, etc.
+- Voice config centralized in `src/lib/ttsConfig.ts`
 - Controlled by: sfxEnabled toggle
 
 **Files**:

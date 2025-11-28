@@ -13,6 +13,7 @@ import { usePastGamesStore } from "../../store/pastGamesStore";
 import type { PastGameEntry } from "../../lib/types/pastGames";
 import { useEffect, useState, useRef } from "react";
 import { audioManager } from "../../lib/audioManager";
+import { lang } from "../../i18n/lang";
 
 interface FragmentSlotsProps {
   onFragmentClick?: (fragment: PastGameEntry, index: number) => void;
@@ -168,7 +169,7 @@ function FragmentSlot({
   onBobComplete,
   onClick,
 }: FragmentSlotProps) {
-  const label = isEmpty ? "Missing Fragment" : "Fragment Collected";
+  const label = isEmpty ? lang("MISSING_FRAGMENT") : lang("FRAGMENT_COLLECTED");
   const controls = useAnimation();
   const [showPulse, setShowPulse] = useState(false);
 

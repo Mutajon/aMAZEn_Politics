@@ -58,6 +58,8 @@ const AUDIO_FILES = {
     // Final fragment selection
     'gatekeeper-which-version': '/assets/sounds/VO/gatekeeperIntro/whichVersionOfSelf.wav',
     'gatekeeper-rest': '/assets/sounds/VO/gatekeeperIntro/youCanNowGoToRest.wav',
+    // Background intro transition
+    'drift-to-sleep': '/assets/sounds/VO/driftToSleep.wav',
   },
 } as const;
 

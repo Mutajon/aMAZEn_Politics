@@ -22,6 +22,7 @@ import { useTimingLogger } from "../hooks/useTimingLogger";
 import { useLang } from "../i18n/lang";
 import { translateQuizQuestion, translateQuizAnswer } from "../i18n/translateGameData";
 import { useLoggingStore } from "../store/loggingStore";
+import { MirrorImage, MirrorReflection } from "../components/MirrorWithReflection";
 
 
 /** placeholder avatar for images OFF */
@@ -40,8 +41,6 @@ const DEFAULT_AVATAR_DATA_URL =
       <rect x='26' y='78' width='76' height='30' rx='14' fill='rgba(0,0,0,0.25)'/>
     </svg>`
   );
-
-const MIRROR_SRC = "/assets/images/mirror.png";
 
 // Mirror shimmer effect configuration (matching MirrorCard.tsx)
 const MIRROR_SHIMMER_ENABLED = true;
@@ -219,6 +218,9 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   // Track selected option for shimmer animation
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
 
+  // Track "Go to Sleep" button loading state
+  const [sleepPending, setSleepPending] = useState(false);
+
   function answer(opt: { a: string; mappings: string[] }, optionIndex: number) {
     if (done || selectedOption !== null) return; // Prevent multiple clicks during animation
 
@@ -323,13 +325,9 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
             className="relative self-start"
             style={{ width: MIRROR_SIZE, height: MIRROR_SIZE }}
           >
-            <motion.img
+            {/* Shimmer wrapper - only contains the mirror image */}
+            <motion.div
               key={mirrorShimmerTrigger}
-              src={MIRROR_SRC}
-              alt="Mystic mirror"
-              width={MIRROR_SIZE}
-              height={MIRROR_SIZE}
-              className="rounded-full object-cover"
               animate={
                 MIRROR_SHIMMER_ENABLED
                   ? {
@@ -348,6 +346,14 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
                 ease: "easeInOut",
                 times: [0, 0.25, 0.5, 0.75, 1],
               }}
+            >
+              <MirrorImage mirrorSize={MIRROR_SIZE} />
+            </motion.div>
+
+            {/* Reflection overlay - outside shimmer wrapper to avoid filter interference */}
+            <MirrorReflection
+              mirrorSize={MIRROR_SIZE}
+              avatarUrl={displayAvatar}
             />
 
             {/* Compass Pills Overlay - displays pings above mirror image */}
@@ -482,7 +488,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
                               }
                             }}
                           >
-                            {translateQuizAnswer(quiz[idx].id, i, opt.a, lang)}
+                            {translateQuizAnswer(quiz[idx].id, i, opt.a, lang, character?.gender)}
                           </motion.button>
                         );
                       })}
@@ -529,6 +535,8 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
       <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
         <button
           onClick={async () => {
+            if (sleepPending) return;
+            setSleepPending(true);
             logger.log('button_click_go_to_sleep', 'Go to sleep', 'User clicked Go to sleep button');
 
             // Initial compass snapshot was already captured after quiz completion
@@ -538,9 +546,20 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
 
             push("/background-intro");
           }}
-          className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/90 text-[#0b1335] hover:bg-white"
+          disabled={sleepPending}
+          className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/90 text-[#0b1335] hover:bg-white disabled:opacity-70 disabled:cursor-wait"
         >
-          {lang(getGenderKey("BUTTON_GO_TO_SLEEP"))}
+          {sleepPending ? (
+            <span className="flex items-center justify-center gap-2">
+              <span
+                className="h-4 w-4 rounded-full border-2 border-[#0b1335]/40 border-t-[#0b1335] animate-spin"
+                aria-hidden
+              />
+              {lang(getGenderKey("BUTTON_GO_TO_SLEEP"))}
+            </span>
+          ) : (
+            lang(getGenderKey("BUTTON_GO_TO_SLEEP"))
+          )}
         </button>
         <button
           onClick={() => {

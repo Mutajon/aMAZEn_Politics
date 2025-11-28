@@ -46,19 +46,13 @@ export type DynamicParam = {
   text: string; // Narrative text (e.g., "12,000 soldiers mobilized")
 };
 
-export type CorruptionShift = {
-  score: number;       // Raw AI judgment (0-10 scale)
-  reason: string;      // AI's explanation
-  delta: number;       // Change from previous level
-  newLevel: number;    // New corruption level (0-100 scale)
-};
-
 // PHASE 1: Critical data - must load before showing anything
 export type Phase1Data = {
   dilemma: Dilemma;
   supportEffects: SupportEffect[] | null; // Included in dilemma response on Day 2+
   newsItems: TickerItem[]; // Empty array (disabled)
-  corruptionShift: CorruptionShift | null; // Included in dilemma response on Day 2+
+  valueTargeted?: string; // The compass value being tested by this dilemma (for trap context)
+  axisExplored?: string;  // The political axis being explored
 };
 
 // PHASE 2: Secondary data - loads in background while user reads
@@ -156,10 +150,11 @@ async function fetchGameTurn(): Promise<{
   dilemma: Dilemma;
   supportEffects: SupportEffect[] | null;
   newsItems: TickerItem[];
-  corruptionShift: CorruptionShift | null;
   compassPills: CompassPill[] | null;
   dynamicParams: DynamicParam[] | null;
   mirrorText: string;
+  valueTargeted?: string;  // The compass value being tested by this dilemma
+  axisExplored?: string;   // The political axis being explored
 }> {
   const {
     gameId,
@@ -249,7 +244,7 @@ async function fetchGameTurn(): Promise<{
     payload.dilemmasSubject = dilemmasSubject || null;
   }
 
-  // Day 2+: Send player choice
+  // Day 2+: Send player choice + current compass values
   if (day > 1 && lastChoice) {
     const { dilemmasSubjectEnabled, dilemmasSubject } = useSettingsStore.getState();
 
@@ -259,6 +254,14 @@ async function fetchGameTurn(): Promise<{
       cost: lastChoice.cost,
       iconHint: lastChoice.iconHint || "speech"
     };
+
+    // Include CURRENT top values (may have shifted due to compass pills)
+    payload.currentCompassTopValues = [
+      { dimension: "what", values: topKWithNames(compassValues?.what, 'what', 2).map(v => v.name) },
+      { dimension: "whence", values: topKWithNames(compassValues?.whence, 'whence', 2).map(v => v.name) },
+      { dimension: "how", values: topKWithNames(compassValues?.how, 'how', 2).map(v => v.name) },
+      { dimension: "whither", values: topKWithNames(compassValues?.whither, 'whither', 2).map(v => v.name) }
+    ];
 
     // Subject focus for Day 2+
     payload.dilemmasSubjectEnabled = dilemmasSubjectEnabled || false;
@@ -276,6 +279,10 @@ async function fetchGameTurn(): Promise<{
   // Pass XAI provider flag
   const useXAI = useSettingsStore.getState().useXAI;
   payload.useXAI = useXAI;
+
+  // Pass Gemini provider flag
+  const useGemini = useSettingsStore.getState().useGemini;
+  payload.useGemini = useGemini;
 
   // Day 1: Initialize compass conversation with game context
   if (day === 1 && payload.gameContext) {
@@ -306,7 +313,7 @@ async function fetchGameTurn(): Promise<{
     }
   }
 
-  console.log(`[fetchGameTurn] Calling /api/game-turn-v2 for Day ${day}, gameId=${currentGameId}, treatment=${treatment}, generateActions=${payload.generateActions}, useXAI=${useXAI}`);
+  console.log(`[fetchGameTurn] Calling /api/game-turn-v2 for Day ${day}, gameId=${currentGameId}, treatment=${treatment}, generateActions=${payload.generateActions}, useXAI=${useXAI}, useGemini=${useGemini}`);
 
   // Log compass values being sent for mirror advice debugging
   if (payload.gameContext?.playerCompassTopValues) {
@@ -449,72 +456,12 @@ async function fetchGameTurn(): Promise<{
     ];
   }
 
-  // Extract corruption shift (Day 2+ only) - Frontend calculates blended level
-  let corruptionShift: CorruptionShift | null = null;
-  if (data.corruptionShift && day > 1) {
-    const {
-      savePreviousCorruption,
-      setCorruptionLevel,
-      corruptionLevel: prevLevel,
-      corruptionHistory
-    } = useDilemmaStore.getState();
-
-    // STEP 0: Save previous value (for animation)
-    savePreviousCorruption();
-
-    // STEP 1: Calculate new corruption level using blending formula
-    const rawScore = Math.max(0, Math.min(10, data.corruptionShift.score));
-    const newScoreScaled = rawScore * 10; // 0-10 → 0-100 scale
-    const prevCorruption = typeof prevLevel === 'number' ? prevLevel : 0;
-
-    // Blending formula: 90% previous + 10% new (gradual accumulation)
-    const newLevel = Number((prevCorruption * 0.9 + newScoreScaled * 0.1).toFixed(2));
-    const delta = Number((newLevel - prevCorruption).toFixed(2));
-
-    // STEP 2: Apply new corruption level
-    setCorruptionLevel(newLevel);
-
-    // STEP 3: Store history entry (raw score + calculated level)
-    useDilemmaStore.setState({
-      corruptionHistory: [
-        ...corruptionHistory,
-        {
-          day,
-          score: rawScore,           // Raw 0-10 AI judgment
-          reason: data.corruptionShift.reason,
-          level: newLevel            // Calculated 0-100 level
-        }
-      ].slice(-3)  // Keep last 3
-    });
-
-    // STEP 4: Prepare for UI and logging
-    corruptionShift = {
-      score: rawScore,
-      reason: String(data.corruptionShift.reason || '').slice(0, 150),
-      delta: delta,
-      newLevel: newLevel
-    };
-
-    // COMPREHENSIVE DEBUG LOGGING
-    console.log('[fetchGameTurn] 🔸 Corruption calculated:');
-    console.log(`   AI judgment: ${rawScore}/10`);
-    console.log(`   Old level: ${prevCorruption.toFixed(2)}`);
-    console.log(`   New level: ${newLevel.toFixed(2)} (${delta >= 0 ? '+' : ''}${delta.toFixed(2)})`);
-    console.log(`   Reason: ${corruptionShift.reason}`);
-
-    if (debugMode) {
-      console.log(`   🐛 [DEBUG] Formula: (${prevCorruption.toFixed(2)} * 0.9) + (${newScoreScaled} * 0.1) = ${newLevel.toFixed(2)}`);
-      console.log(`   🐛 [DEBUG] History: ${JSON.stringify(useDilemmaStore.getState().corruptionHistory)}`);
-    }
-  }
-
   // Update live score once all resource values have been applied.
   {
     const {
       supportPeople: latestPeople,
       supportMiddle: latestMiddle,
       supportMom: latestMom,
-      corruptionLevel: latestCorruption,
       setScore,
     } = useDilemmaStore.getState();
 
@@ -522,7 +469,6 @@ async function fetchGameTurn(): Promise<{
       supportPeople: latestPeople,
       supportMiddle: latestMiddle,
       supportMom: latestMom,
-      corruptionLevel: latestCorruption,
     });
 
     setScore(breakdown.final);
@@ -549,16 +495,21 @@ async function fetchGameTurn(): Promise<{
   // Extract mirror advice
   const mirrorText = String(data.mirrorAdvice || "The mirror squints, light pooling in the glass...");
 
-  console.log(`[fetchGameTurn] ✅ Unified response received: ${data.actions.length} actions, 0 pills (pills fetched separately), ${dynamicParams.length} params`);
+  // Extract value trap context (for compass analysis)
+  const valueTargeted = data.valueTargeted || undefined;
+  const axisExplored = data.axisExplored || undefined;
+
+  console.log(`[fetchGameTurn] ✅ Unified response received: ${data.actions.length} actions, 0 pills (pills fetched separately), ${dynamicParams.length} params, valueTargeted=${valueTargeted || 'N/A'}`);
 
   return {
     dilemma,
     supportEffects,
     newsItems: [], // Empty array (disabled)
-    corruptionShift,
     compassPills,
     dynamicParams,
-    mirrorText
+    mirrorText,
+    valueTargeted,
+    axisExplored
   };
 }
 
@@ -600,9 +551,17 @@ function transformCompassHints(rawHints: any): CompassPill[] {
   return pills;
 }
 
+// Trap context for compass analysis - tells the analyzer which value is being tested
+export type TrapContext = {
+  valueTargeted: string;           // The compass value being tested (e.g., "Truth/Trust")
+  dilemmaTitle: string;            // The dilemma title for context
+  dilemmaDescription?: string;     // The dilemma description for context
+};
+
 export async function fetchCompassHintsForAction(
   gameId: string,
-  action: { title: string; summary: string }
+  action: { title: string; summary: string },
+  trapContext?: TrapContext        // NEW: Pass the value trap context for better analysis
 ): Promise<CompassPill[]> {
   try {
     // Get game context and debug mode from stores
@@ -620,7 +579,7 @@ export async function fetchCompassHintsForAction(
       systemName: roleState.analysis?.systemName || "Divine Right Monarchy"
     };
 
-    console.log(`[fetchCompassHintsForAction] Calling /api/compass-conversation/analyze for gameId=${gameId}`);
+    console.log(`[fetchCompassHintsForAction] Calling /api/compass-conversation/analyze for gameId=${gameId}, trapContext=${trapContext?.valueTargeted || 'none'}`);
 
     const response = await fetch("/api/compass-conversation/analyze", {
       method: "POST",
@@ -629,7 +588,8 @@ export async function fetchCompassHintsForAction(
         gameId,
         action,
         gameContext,
-        debugMode
+        debugMode,
+        trapContext  // NEW: Include trap context for value-aware analysis
       })
     });
 
@@ -866,7 +826,6 @@ export function useEventDataCollector() {
         supportEffects,
         dynamicParams,
         mirrorText,
-        corruptionShift,
       } = turnData;
 
       console.log(`[Collector] ✅ Unified data received for Day ${day}`);
@@ -892,7 +851,6 @@ export function useEventDataCollector() {
         dilemma,
         supportEffects,
         newsItems: [], // Disabled
-        corruptionShift: corruptionShift ?? null,
       };
 
       // Set Phase 1 data immediately - triggers UI render!
@@ -963,8 +921,7 @@ export function useEventDataCollector() {
     setPhase1Data({
       dilemma: data.dilemma,
       supportEffects: data.supportEffects,
-      newsItems: data.newsItems || [],
-      corruptionShift: data.corruptionShift || null
+      newsItems: data.newsItems || []
     });
 
     setPhase2Data({

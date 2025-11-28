@@ -15,6 +15,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSettingsStore } from "../store/settingsStore";
 import { useNarrator } from "./useNarrator";
+import { TTS_VOICE } from "../lib/ttsConfig";
 
 type PreparedTTSHandle = { start: () => Promise<void>; dispose: () => void } | null;
 
@@ -51,9 +52,7 @@ export function useAftermathNarration(remembranceText: string | undefined) {
 
         console.log('[AftermathNarration] Preparing narration...');
         const p = await narrator.prepare(remembranceText, {
-          voiceName: "onyx",
-          format: "mp3"
-          // No instructions - will use .env TTS_INSTRUCTIONS
+          voiceName: TTS_VOICE
         });
         if (cancelled) {
           p.dispose();

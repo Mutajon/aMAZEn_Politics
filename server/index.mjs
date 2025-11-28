@@ -15,6 +15,7 @@ import {
   startCleanupTask
 } from "./conversationStore.mjs";
 import { getCountersCollection, incrementCounter, getUsersCollection, getScenarioSuggestionsCollection } from "./db/mongodb.mjs";
+import { getTheoryPrompt } from "./theory-loader.mjs";
 
 // -------------------- Process Error Handlers ---------------------------
 /**
@@ -51,6 +52,22 @@ process.on('SIGTERM', () => {
   // Server will close existing connections and exit
   process.exit(0);
 });
+
+// ==================== FEATURE FLAGS ====================
+/**
+ * USE_PROMPT_V3: Toggle between original prompt and V3 (value-driven, private life focus)
+ *
+ * V3 Features:
+ * - Ultra-lean 3-step process (Value → Axis → Bridge)
+ * - Private life focus for low/mid authority
+ * - Setting-rooted details
+ * - Dynamic axis selection (max 3 per axis)
+ * - Value tracking (max 2 per value)
+ * - Includes tracking fields: valueTargeted, axisExplored
+ *
+ * Set to false for instant rollback to original prompt
+ */
+const USE_PROMPT_V3 = true;
 
 // -------------------- Topic/Scope/TensionCluster Debug Tracker ---------------------------
 /**
@@ -139,8 +156,6 @@ app.use(cors({
 app.use(bodyParser.json());
 
 
-const GAME_LIMIT = 250;
-
 /**
  * Adaptively assign treatment to ensure balanced distribution
  * Selects from treatments with the minimum count, ensuring even distribution
@@ -149,7 +164,7 @@ const GAME_LIMIT = 250;
 async function assignRandomTreatment() {
   const treatments = ['fullAutonomy', 'semiAutonomy', 'noAutonomy'];
   const countersCollection = await getCountersCollection();
-  
+
   // Get current counts for all treatments
   const counts = {};
   for (const treatment of treatments) {
@@ -157,16 +172,16 @@ async function assignRandomTreatment() {
     const counter = await countersCollection.findOne({ name: counterName });
     counts[treatment] = counter?.value || 0;
   }
-  
+
   // Find the minimum count
   const minCount = Math.min(...Object.values(counts));
   const underrepresented = treatments.filter(t => counts[t] === minCount);
   const selected = underrepresented[
     Math.floor(Math.random() * underrepresented.length)
   ];
-  
+
   await incrementCounter(`treatment_${selected}`);
-  
+
   return selected;
 }
 
@@ -174,11 +189,11 @@ async function assignRandomTreatment() {
 /**
  * POST /api/users/register
  * Register a new user or get existing user with treatment assignment
- * 
+ *
  * Body: {
  *   userId: string (email address)
  * }
- * 
+ *
  * Returns: {
  *   success: boolean,
  *   userId: string,
@@ -199,7 +214,7 @@ app.post("/api/users/register", async (req, res) => {
     }
 
     const usersCollection = await getUsersCollection();
-    
+
     // Check if user already exists
     const existingUser = await usersCollection.findOne({ userId });
 
@@ -238,7 +253,7 @@ app.post("/api/users/register", async (req, res) => {
 
   } catch (error) {
     console.error('[User Register] ❌ Error:', error?.message || error);
-    
+
     // Handle duplicate key error (race condition)
     if (error.code === 11000) {
       // User was created between check and insert - fetch existing
@@ -272,8 +287,9 @@ app.post("/api/reserve-game-slot", async (req, res) => {
     const countersCollection = await getCountersCollection();
 
     // Atomically find and increment the counter, but only if its value is less than the limit.
+    const gameLimit = parseInt(process.env.GAME_LIMIT || '250', 10);
     const result = await countersCollection.findOneAndUpdate(
-      { name: 'total_games', value: { $lt: GAME_LIMIT } },
+      { name: 'total_games', value: { $lt: gameLimit } },
       { $inc: { value: 1 } },
       { returnDocument: 'after' }
     );
@@ -283,7 +299,7 @@ app.post("/api/reserve-game-slot", async (req, res) => {
       console.log(`[Reserve Slot] Slot reserved. New count: ${result.value}`);
       res.json({ success: true, gameCount: result.value });
     } else {
-      // The findOneAndUpdate came back empty, which means the condition value < GAME_LIMIT failed.
+      // The findOneAndUpdate came back empty, which means the condition value < gameLimit failed.
       const currentCounter = await countersCollection.findOne({ name: 'total_games' });
       const currentCount = currentCounter ? currentCounter.value : 'unknown';
       console.log(`[Reserve Slot] Game limit reached. Current count: ${currentCount}`);
@@ -308,10 +324,12 @@ app.use("/api/log", loggingRouter);
 const OPENAI_KEY = process.env.OPENAI_API_KEY || "";
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || "";
 const XAI_KEY = process.env.XAI_API_KEY || "";
+const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
 const CHAT_URL = "https://api.openai.com/v1/chat/completions";
 const IMAGE_URL = "https://api.openai.com/v1/images/generations";
 const XAI_CHAT_URL = "https://api.x.ai/v1/chat/completions";
 const XAI_IMAGE_URL = "https://api.x.ai/v1/images/generations";
+const GEMINI_CHAT_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 
 // Initialize Anthropic client
 const anthropic = ANTHROPIC_KEY ? new Anthropic({ apiKey: ANTHROPIC_KEY }) : null;
@@ -329,24 +347,23 @@ const MODEL_DILEMMA = process.env.MODEL_DILEMMA || CHAT_MODEL_DEFAULT;
 const MODEL_DILEMMA_PREMIUM = process.env.MODEL_DILEMMA_PREMIUM || "gpt-5";
 const MODEL_DILEMMA_ANTHROPIC = process.env.MODEL_DILEMMA_ANTHROPIC || ""; // No fallback - must be set in .env
 const MODEL_DILEMMA_XAI = process.env.MODEL_DILEMMA_XAI || ""; // No fallback - must be set in .env
-const MODEL_COMPASS_HINTS = process.env.MODEL_COMPASS_HINTS || "gpt-5-mini";
+const MODEL_DILEMMA_GEMINI = process.env.MODEL_DILEMMA_GEMINI || ""; // No fallback - must be set in .env
+const MODEL_VALIDATE_GEMINI = process.env.MODEL_VALIDATE_GEMINI || "gemini-2.5-flash"; // Gemini model for suggestion validation
+const MODEL_COMPASS_HINTS = process.env.MODEL_COMPASS_HINTS || "gemini-2.5-flash"; // Changed to Gemini for consistency with dilemma/aftermath
 
 
 // Image model
-const IMAGE_MODEL = process.env.IMAGE_MODEL || "gpt-image-1";
+const IMAGE_MODEL_OPENAI = process.env.IMAGE_MODEL_OPENAI || "gpt-image-1"; // OpenAI model (also used as fallback)
 const IMAGE_MODEL_XAI = process.env.IMAGE_MODEL_XAI || ""; // No fallback - must be set in .env
+const IMAGE_MODEL_GEMINI = process.env.IMAGE_MODEL_GEMINI || ""; // e.g., imagen-3.0-generate-001
+const GEMINI_IMAGE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 const IMAGE_SIZE = process.env.IMAGE_SIZE || "1024x1024";
 const IMAGE_QUALITY = process.env.IMAGE_QUALITY || "low"; // low|medium|high
 
-// --- NEW: TTS model/voice (OpenAI Text-to-Speech) --------------------------
-// Note: "Cove" is not currently available in the public TTS API. If OpenAI
-// exposes it in the future, change TTS_VOICE to "cove".
-const TTS_URL = "https://api.openai.com/v1/audio/speech";
-const TTS_MODEL = process.env.TTS_MODEL || "gpt-4o-mini-tts ";       // tts-1, tts-1-hd, or gpt-4o-mini-tts
-const TTS_VOICE = process.env.TTS_VOICE || "onyx";       // alloy|echo|fable|onyx|nova|shimmer
-const TTS_INSTRUCTIONS = process.env.TTS_INSTRUCTIONS || undefined; // Optional: style/tone instructions (only for gpt-4o-mini-tts)
-const TTS_FORMAT = process.env.TTS_FORMAT || "mp3";       // mp3|opus|aac|flac
-// ---------------------------------------------------------------------------
+// --- Gemini TTS Configuration --------------------------
+const TTS_MODEL = process.env.TTS_MODEL || "gemini-2.5-flash-preview-tts";
+const TTS_VOICE = process.env.TTS_VOICE || "Enceladus";
+// -------------------------------------------------------
 
 // -------------------- Shared AI Prompt Rules --------------------
 // Anti-jargon rules to ensure accessibility across all content generation
@@ -728,6 +745,104 @@ async function aiJSON({ system, user, model = CHAT_MODEL_DEFAULT, temperature = 
 }
 
 
+/**
+ * aiJSONGemini: Call Gemini API and parse JSON from the response
+ * Similar to aiJSON but uses Google's Gemini API via OpenAI-compatible endpoint
+ */
+async function aiJSONGemini({ system, user, model = MODEL_VALIDATE_GEMINI, temperature = 0, fallback = null }) {
+  try {
+    console.log(`[GEMINI-JSON] Calling Gemini API with model: ${model}`);
+
+    const messages = [
+      { role: "system", content: system },
+      { role: "user", content: user }
+    ];
+
+    const response = await fetch(GEMINI_CHAT_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${GEMINI_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        temperature: temperature,
+        max_tokens: 1024, // Validation responses are small
+        stream: false
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[GEMINI-JSON] API error ${response.status}: ${errorText}`);
+      return fallback;
+    }
+
+    const data = await response.json();
+    const text = data?.choices?.[0]?.message?.content ?? "";
+
+    console.log(`[GEMINI-JSON] Raw response: ${text.substring(0, 200)}...`);
+
+    const parsed = safeParseJSON(text, { debugTag: "aiJSONGemini" });
+    if (parsed) {
+      return parsed;
+    }
+
+    console.warn("[GEMINI-JSON] Failed to parse JSON from response, using fallback");
+    return fallback;
+  } catch (err) {
+    console.error("[GEMINI-JSON] Error:", err?.message || err);
+    return fallback;
+  }
+}
+
+/**
+ * aiTextGemini - Call Gemini API and return raw text response
+ * Similar to aiJSONGemini but returns text instead of parsed JSON
+ */
+async function aiTextGemini({ system, user, model = "gemini-2.5-flash", temperature = 0.7, maxTokens = 2048 }) {
+  try {
+    console.log(`[GEMINI-TEXT] Calling Gemini API with model: ${model}`);
+
+    const messages = [
+      { role: "system", content: system },
+      { role: "user", content: user }
+    ];
+
+    const response = await fetch(GEMINI_CHAT_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${GEMINI_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        temperature: temperature,
+        max_tokens: maxTokens,
+        stream: false
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[GEMINI-TEXT] API error ${response.status}: ${errorText}`);
+      return "";
+    }
+
+    const data = await response.json();
+    const text = data?.choices?.[0]?.message?.content ?? "";
+
+    console.log(`[GEMINI-TEXT] Response received: ${text.substring(0, 100)}...`);
+    return text;
+  } catch (err) {
+    console.error("[GEMINI-TEXT] Error:", err?.message || err);
+    return "";
+  }
+}
+
+
 async function aiText({ system, user, model = CHAT_MODEL_DEFAULT, temperature, maxTokens }) {
   const FALLBACK_MODEL = "gpt-4o";
 
@@ -910,7 +1025,8 @@ app.get("/api/_ping", (_req, res) => {
       analyze: MODEL_ANALYZE,
       mirror: MODEL_MIRROR,
       mirrorAnthropic: MODEL_MIRROR_ANTHROPIC,
-      image: IMAGE_MODEL,
+      image: IMAGE_MODEL_OPENAI,
+      imageGemini: IMAGE_MODEL_GEMINI,
       imageXAI: IMAGE_MODEL_XAI,
       tts: TTS_MODEL,
       ttsVoice: TTS_VOICE,
@@ -970,7 +1086,7 @@ app.post("/api/intro-paragraph", async (req, res) => {
       "- Vivid but not florid; no lists, no headings, no bullet points\n" +
       "- Avoid anachronisms; respect the historical setting and political system\n" +
       "- Keep names generic unless iconic to the role or setting\n" +
-      "- If gender is male or female, you may subtly reflect it in titles or forms of address; otherwise use gender-neutral language.";
+      "- If gender is male or female, you must use gender-appropriate grammar and verb forms. For Hebrew: use 'אתה' (you, male) with masculine verbs for male characters, and 'את' (you, female) with feminine verbs for female characters. All verbs must match the character's gender grammatically.";
 
     // Add language instruction if not English
     if (languageCode !== "en") {
@@ -994,12 +1110,20 @@ app.post("/api/intro-paragraph", async (req, res) => {
     // Add language instruction to user prompt if not English
     if (languageCode !== "en") {
       user += `\n\nWrite your response in ${languageName}.`;
+      // Add specific Hebrew gender grammar instructions
+      if (languageCode === "he" && (genderText === "male" || genderText === "female")) {
+        if (genderText === "male") {
+          user += `\n\nIMPORTANT: Use masculine forms throughout: "אתה" (you), masculine verbs (נכנס, מרגיש, עומד, etc.). All verbs must be in masculine form.`;
+        } else if (genderText === "female") {
+          user += `\n\nIMPORTANT: Use feminine forms throughout: "את" (you), feminine verbs (נכנסת, מרגישה, עומדת, etc.). All verbs must be in feminine form.`;
+        }
+      }
     }
 
     // tiny retry wrapper (handles occasional upstream 503s)
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     async function getParagraphOnce() {
-      return (await aiText({ system, user, model: CHAT_MODEL_DEFAULT }))?.trim() || "";
+      return (await aiTextGemini({ system, user, model: "gemini-2.5-flash" }))?.trim() || "";
     }
 
     let paragraph = "";
@@ -1061,7 +1185,7 @@ app.post("/api/validate-role", async (req, res) => {
 
   const user = `Input: ${raw || ""}`;
 
-  const out = await aiJSON({ system, user, model: MODEL_VALIDATE, temperature: 0, fallback: null });
+  const out = await aiJSONGemini({ system, user, model: "gemini-2.5-flash", temperature: 0, fallback: null });
   if (!out || typeof out.valid !== "boolean") {
     return res.status(503).json({ error: "AI validator unavailable" });
   }
@@ -1091,10 +1215,10 @@ app.post("/api/bg-suggestion", async (req, res) => {
     const genderWord = gender === "female" ? "female" : gender === "male" ? "male" : "any gender";
     const user = `Role: ${role || ""}. Gender: ${genderWord}. JSON ONLY.`;
 
-    const ai = await aiJSON({
+    const ai = await aiJSONGemini({
       system,
       user,
-      model: MODEL_NAMES,
+      model: "gemini-2.5-flash",
       temperature: 0.2,
       fallback: { object: backgroundHeuristic(role) },
     });
@@ -1112,7 +1236,7 @@ app.post("/api/bg-suggestion", async (req, res) => {
 /**
  * POST /api/suggest-scenario
  * Save a user-submitted scenario suggestion to the database
- * 
+ *
  * Body: {
  *   title: string (required),
  *   role: string (required),
@@ -1120,7 +1244,7 @@ app.post("/api/bg-suggestion", async (req, res) => {
  *   introParagraph?: string (optional),
  *   topicsToEmphasis?: string (optional)
  * }
- * 
+ *
  * Returns: {
  *   success: boolean,
  *   message: string
@@ -1132,23 +1256,23 @@ app.post("/api/suggest-scenario", async (req, res) => {
 
     // Validate required fields
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Title is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Title is required'
       });
     }
 
     if (!role || typeof role !== 'string' || role.trim().length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Role is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Role is required'
       });
     }
 
     if (!settings || typeof settings !== 'string' || settings.trim().length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Settings (place + time) is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Settings (place + time) is required'
       });
     }
 
@@ -1462,7 +1586,7 @@ IMPORTANT:
 ALLOWED_POLITIES: ${JSON.stringify(ALLOWED_POLITIES)}
 Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setting, rely on actual historical context; if fictional/unclear, infer plausibly.`;
 
-    const out = await aiJSON({ system, user, model: MODEL_ANALYZE, temperature: 0.2, fallback: FALLBACK });
+    const out = await aiJSONGemini({ system, user, model: "gemini-2.5-flash", temperature: 0.2, fallback: FALLBACK });
 
     // Normalize holders
     let holders = Array.isArray(out?.holders) ? out.holders.slice(0, 5) : FALLBACK.holders;
@@ -1544,54 +1668,30 @@ app.post("/api/generate-avatar", async (req, res) => {
   try {
     const prompt = String(req.body?.prompt || "").trim();
     const useXAI = !!req.body?.useXAI;
+    const useGemini = !!req.body?.useGemini;
 
     if (!prompt) return res.status(400).json({ error: "Missing prompt" });
 
-    // XAI fallback: XAI/Grok doesn't currently support image generation
-    // Fall back to OpenAI if XAI is requested but not configured
-    const shouldUseXAI = useXAI && XAI_KEY && IMAGE_MODEL_XAI;
-    const imageUrl = shouldUseXAI ? XAI_IMAGE_URL : IMAGE_URL;
-    const imageModel = shouldUseXAI ? IMAGE_MODEL_XAI : IMAGE_MODEL;
-    const apiKey = shouldUseXAI ? XAI_KEY : OPENAI_KEY;
-    const provider = shouldUseXAI ? "XAI" : "OpenAI";
-
-    if (useXAI && !shouldUseXAI) {
-      console.warn("[generate-avatar] XAI requested but not configured - falling back to OpenAI");
+    // --- Gemini/Imagen provider (no fallback to OpenAI) ---
+    const shouldUseGemini = useGemini && GEMINI_KEY && IMAGE_MODEL_GEMINI;
+    if (shouldUseGemini) {
+      console.log(`[generate-avatar] Using Gemini/Imagen with model ${IMAGE_MODEL_GEMINI}`);
+      try {
+        const b64 = await callGeminiImageGeneration(prompt, IMAGE_MODEL_GEMINI);
+        const dataUrl = `data:image/png;base64,${b64}`;
+        return res.json({ dataUrl });
+      } catch (geminiErr) {
+        console.error(`[generate-avatar] Gemini/Imagen failed: ${geminiErr.message}`);
+        return res.status(503).json({ error: "Image generation unavailable", retryable: true });
+      }
+    } else if (useGemini && !shouldUseGemini) {
+      console.warn("[generate-avatar] Gemini requested but not configured");
+      return res.status(503).json({ error: "Image provider not configured", retryable: false });
     }
 
-    console.log(`[generate-avatar] Using ${provider} with model ${imageModel}`);
-
-    // Build request body - XAI doesn't support quality or size parameters
-    const body = {
-      model: imageModel,
-      prompt,
-    };
-
-    // Only add size and quality for OpenAI (XAI doesn't support them)
-    if (!shouldUseXAI) {
-      body.size = IMAGE_SIZE;
-      body.quality = IMAGE_QUALITY;
-    }
-
-    const r = await fetch(imageUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!r.ok) {
-      const t = await r.text().catch(() => "");
-      throw new Error(`${provider} image error ${r.status}: ${t}`);
-    }
-
-    const data = await r.json();
-    const b64 = data?.data?.[0]?.b64_json;
-    if (!b64) throw new Error("No image returned");
-    const dataUrl = `data:image/png;base64,${b64}`;
-    res.json({ dataUrl });
+    // No provider configured
+    console.error("[generate-avatar] No image provider configured");
+    return res.status(503).json({ error: "No image provider configured", retryable: false });
   } catch (e) {
     console.error("Error in /api/generate-avatar:", e?.message || e);
     res.status(502).json({ error: "avatar generation failed" });
@@ -1656,11 +1756,9 @@ app.post("/api/mirror-light", async (req, res) => {
       `React to how ${valuePhrasing} this situation and give a playful nudge toward the most fitting choice.\n` +
       `Do not use numbers or quote the labels verbatim; paraphrase them into natural language.`;
 
-    console.log("[mirror-light] Calling AI with personality prompt...");
+    console.log("[mirror-light] Calling Gemini with personality prompt...");
 
-    const text = useAnthropic
-      ? await aiTextAnthropic({ system, user, model: MODEL_MIRROR_ANTHROPIC })
-      : await aiText({ system, user, model: MODEL_MIRROR });
+    const text = await aiTextGemini({ system, user, model: "gemini-2.5-flash" });
 
     // Sanitizer: enforce one sentence, remove digits, tame slashes/quotes, cap words
     const raw = (text || "The mirror squints… then grins mischievously.").trim();
@@ -1702,7 +1800,7 @@ app.post("/api/mirror-light", async (req, res) => {
 
 // System prompts stored server-side for security (prevents client manipulation)
 // Base prompt in English - language instruction appended dynamically
-const MIRROR_QUIZ_BASE_SYSTEM_PROMPT = 
+const MIRROR_QUIZ_BASE_SYSTEM_PROMPT =
   "You are a magical mirror sidekick bound to the player's soul. You reflect their inner values with warmth, speed, and theatrical charm.\n\n" +
   "VOICE:\n" +
   "- Succinct, deadpan, and a little wry; think quick backstage whisper, not stage show.\n" +
@@ -1711,19 +1809,39 @@ const MIRROR_QUIZ_BASE_SYSTEM_PROMPT =
   "HARD RULES (ALWAYS APPLY):\n" +
   "- Output EXACTLY ONE sentence. 12–18 words total.\n" +
   "- NEVER reveal numbers, scores, scales, or ranges.\n" +
-  "- NEVER repeat the value labels verbatim; do not quote, uppercase, or mirror slashes.\n" +
-  "- Paraphrase technical labels into plain, everyday phrases.\n" +
+  "- NEVER use the exact value labels. Use simple, direct words that clearly reflect each value's meaning.\n" +
   "- Do NOT stage literal actions for values (no \"X is doing push-ups\", \"baking cookies\", etc.).\n" +
   "- No lists, no colons introducing items, no parenthetical asides.\n" +
   "- Keep the sentence clear first, witty second.";
 
-const MIRROR_QUIZ_BASE_USER_TEMPLATE = 
-  "PLAYER TOP VALUES (names only):\n" +
-  "GOALS: {what1}, {what2}\n" +
-  "JUSTIFICATIONS: {whence1}, {whence2}\n\n" +
+const MIRROR_QUIZ_BASE_USER_TEMPLATE =
+  "PLAYER'S TOP VALUES:\n" +
+  "GOALS (what they care about): {what1}, {what2}\n" +
+  "JUSTIFICATIONS (why they decide): {whence1}, {whence2}\n\n" +
+  "VALUE TRANSLATION GUIDE (use these, NOT the labels):\n" +
+  "- Truth/Trust → honesty, trusting others\n" +
+  "- Liberty/Agency → freedom, choosing your own path\n" +
+  "- Equality/Equity → fairness, equal chances\n" +
+  "- Care/Solidarity → caring for others, looking out for each other\n" +
+  "- Create/Courage → making things, being brave\n" +
+  "- Wellbeing → happiness, peace, feeling good\n" +
+  "- Security/Safety → safety, stability\n" +
+  "- Freedom/Responsibility → freedom with accountability\n" +
+  "- Honor/Sacrifice → doing what's right, even when hard\n" +
+  "- Sacred/Awe → wonder, reverence\n" +
+  "- Evidence → facts, proof\n" +
+  "- Public Reason → reasons others can accept\n" +
+  "- Personal → your gut, your own judgment\n" +
+  "- Tradition → what was handed down, the old ways\n" +
+  "- Revelation → divine guidance, higher calling\n" +
+  "- Nature → natural purpose, how things are meant to be\n" +
+  "- Pragmatism → what works, practical results\n" +
+  "- Aesthesis → beauty, the right feel\n" +
+  "- Fidelity → loyalty, keeping promises\n" +
+  "- Law (Office) → rules, authority\n\n" +
   "TASK:\n" +
-  "Write ONE sentence (12–18 words) in the mirror's voice that plainly captures how these goals blend with these justifications.\n" +
-  "Do not show numbers. Do not repeat labels verbatim; paraphrase them into natural language. Keep it dry with a faint smile—no metaphors.";
+  "Write ONE sentence (12–18 words) reflecting these values back to the player.\n" +
+  "Use the translation guide above—simple words that directly show what each value means. No metaphors, no numbers.";
 
 // Language names for instruction
 const LANGUAGE_NAMES = {
@@ -1757,7 +1875,7 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
 
     // Build system prompt with language instruction
     const languageName = LANGUAGE_NAMES[language] || LANGUAGE_NAMES.en;
-    const system = language === 'en' 
+    const system = language === 'en'
       ? MIRROR_QUIZ_BASE_SYSTEM_PROMPT
       : MIRROR_QUIZ_BASE_SYSTEM_PROMPT + `\n\nWrite your answer to this prompt in ${languageName}.`;
 
@@ -1770,7 +1888,7 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
       .replace("{what2}", what2.name)
       .replace("{whence1}", whence1.name)
       .replace("{whence2}", whence2.name);
-    
+
     if (language !== 'en') {
       user += `\n\nWrite your response in ${languageName}.`;
     }
@@ -1779,9 +1897,7 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
     console.log("[mirror-quiz-light] Language:", language);
     console.log("[mirror-quiz-light] User prompt sent to AI:", user);
 
-    const text = useAnthropic
-      ? await aiTextAnthropic({ system, user, model: MODEL_MIRROR_ANTHROPIC })
-      : await aiText({ system, user, model: MODEL_MIRROR });
+    const text = await aiTextGemini({ system, user, model: "gemini-2.5-flash" });
 
     // Log raw AI response
     console.log("[mirror-quiz-light] Raw AI response:", text);
@@ -1813,64 +1929,102 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
 });
 
 
-// -------------------- NEW: Text-to-Speech endpoint -----------
-// POST /api/tts { text: string, voice?: string, format?: "mp3"|"opus"|"aac"|"flac", instructions?: string }
-// Returns raw audio bytes with appropriate Content-Type.
+// -------------------- PCM to WAV conversion helper -----------
+/**
+ * Convert raw PCM data to WAV format for browser compatibility
+ * @param {Buffer} pcmData - Raw PCM samples (signed 16-bit little-endian)
+ * @param {number} sampleRate - Sample rate in Hz (24000 for Gemini)
+ * @param {number} numChannels - Number of channels (1 for mono)
+ * @param {number} bitsPerSample - Bits per sample (16)
+ * @returns {Buffer} - WAV file buffer
+ */
+function pcmToWav(pcmData, sampleRate, numChannels, bitsPerSample) {
+  const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+  const blockAlign = numChannels * (bitsPerSample / 8);
+  const dataSize = pcmData.length;
+  const headerSize = 44;
+  const fileSize = headerSize + dataSize;
+
+  const buffer = Buffer.alloc(fileSize);
+  let offset = 0;
+
+  // RIFF header
+  buffer.write("RIFF", offset); offset += 4;
+  buffer.writeUInt32LE(fileSize - 8, offset); offset += 4;
+  buffer.write("WAVE", offset); offset += 4;
+
+  // fmt subchunk
+  buffer.write("fmt ", offset); offset += 4;
+  buffer.writeUInt32LE(16, offset); offset += 4;           // Subchunk1Size (16 for PCM)
+  buffer.writeUInt16LE(1, offset); offset += 2;            // AudioFormat (1 = PCM)
+  buffer.writeUInt16LE(numChannels, offset); offset += 2;  // NumChannels
+  buffer.writeUInt32LE(sampleRate, offset); offset += 4;   // SampleRate
+  buffer.writeUInt32LE(byteRate, offset); offset += 4;     // ByteRate
+  buffer.writeUInt16LE(blockAlign, offset); offset += 2;   // BlockAlign
+  buffer.writeUInt16LE(bitsPerSample, offset); offset += 2; // BitsPerSample
+
+  // data subchunk
+  buffer.write("data", offset); offset += 4;
+  buffer.writeUInt32LE(dataSize, offset); offset += 4;
+
+  // Copy PCM data
+  pcmData.copy(buffer, offset);
+
+  return buffer;
+}
+
+// -------------------- Text-to-Speech endpoint (Gemini TTS) -----------
+// POST /api/tts { text: string, voice?: string }
+// Returns WAV audio bytes
 app.post("/api/tts", async (req, res) => {
   try {
     const text = String(req.body?.text || "").trim();
     if (!text) return res.status(400).json({ error: "Missing 'text'." });
 
-    // If someone passes "cove", we transparently fall back to shimmer (not in API today).
-    let voiceRequested = String(req.body?.voice || TTS_VOICE || "shimmer").trim().toLowerCase();
-    if (voiceRequested === "cove") {
-      console.warn("[server] 'cove' requested but not available in TTS API. Falling back to 'shimmer'.");
-      voiceRequested = "shimmer";
-    }
-    const format = String(req.body?.format || TTS_FORMAT || "mp3").trim().toLowerCase();
+    const voice = String(req.body?.voice || TTS_VOICE || "Enceladus");
+    const model = TTS_MODEL;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
-    // Instructions for tone/style (only supported by gpt-4o-mini-tts and newer models)
-    // Can be overridden per-request, falls back to env var, or undefined if not set
-    const instructions = req.body?.instructions || TTS_INSTRUCTIONS;
+    console.log(`[TTS] Gemini request: voice=${voice}, text length=${text.length}`);
 
-    // Build request body - only include instructions if defined
-    const requestBody = {
-      model: TTS_MODEL,
-      voice: voiceRequested,
-      input: text,
-      response_format: format, // mp3|opus|aac|flac
-    };
-
-    // Only add instructions field if it's defined (optional parameter)
-    if (instructions) {
-      requestBody.instructions = instructions;
-    }
-
-    const r = await fetch(TTS_URL, {
+    const response = await fetch(url, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${OPENAI_KEY}`,
         "Content-Type": "application/json",
+        "x-goog-api-key": GEMINI_KEY,
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({
+        contents: [{ parts: [{ text }] }],
+        generationConfig: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: voice }
+            }
+          }
+        }
+      }),
     });
 
-    if (!r.ok) {
-      const t = await r.text().catch(() => "");
-      throw new Error(`OpenAI TTS error ${r.status}: ${t}`);
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      throw new Error(`Gemini TTS error ${response.status}: ${errText}`);
     }
 
-    const buf = Buffer.from(await r.arrayBuffer());
-    const type =
-      format === "wav"  ? "audio/wav"  :
-      format === "aac"  ? "audio/aac"  :
-      format === "flac" ? "audio/flac" :
-      format === "opus" ? "audio/ogg"  :
-                          "audio/mpeg";
+    const json = await response.json();
+    const audioData = json.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!audioData) {
+      throw new Error("No audio data in Gemini TTS response");
+    }
 
-    res.setHeader("Content-Type", type);
+    // Decode base64 PCM and convert to WAV
+    const pcmBuffer = Buffer.from(audioData, "base64");
+    const wavBuffer = pcmToWav(pcmBuffer, 24000, 1, 16);
+
+    res.setHeader("Content-Type", "audio/wav");
     res.setHeader("Cache-Control", "no-store");
-    res.send(buf);
+    res.send(wavBuffer);
+
   } catch (e) {
     console.error("Error in /api/tts:", e?.message || e);
     res.status(502).json({ error: "tts failed" });
@@ -1906,10 +2060,10 @@ app.post("/api/compass-analyze", async (req, res) => {
       "- Assess strength: mild (slight/implied) or strong (explicit/emphasized)\n" +
       "- Return JSON ARRAY ONLY";
 
-    const items = await aiJSON({
+    const items = await aiJSONGemini({
       system,
       user,
-      model: MODEL_ANALYZE,   // cheapest analysis model from your .env
+      model: "gemini-2.5-flash",
       temperature: 0.2,
       fallback: [],
     });
@@ -1977,10 +2131,10 @@ app.post("/api/news-ticker", async (req, res) => {
 
     console.log("[news-ticker] Request params:", { day, role: role.slice(0, 50), systemName, mode, epoch });
 
-    const items = await aiJSON({
+    const items = await aiJSONGemini({
       system,
       user,
-      model: MODEL_ANALYZE, // reuse your lightweight JSON-capable model
+      model: "gemini-2.5-flash",
       fallback: null, // No fallbacks - always generate based on actual context
     });
 
@@ -2138,6 +2292,37 @@ function analyzeSystemType(systemName) {
 
 
 /**
+ * Strip markdown code block markers from text
+ * Handles: ```json, ```, and variations with trailing whitespace/newlines
+ *
+ * This is critical for Gemini responses which often wrap JSON in markdown blocks
+ * with trailing newlines AFTER the closing ``` that break simple regex patterns
+ */
+function stripMarkdownCodeBlocks(text) {
+  if (typeof text !== "string") return text;
+
+  // Method 1: Extract content BETWEEN markdown blocks using capture group
+  // This is the most reliable approach - handles any trailing content after ```
+  const betweenMatch = text.match(/```(?:json|javascript|js)?\s*\n?([\s\S]*?)\n?```[\s\S]*$/i);
+  if (betweenMatch && betweenMatch[1]) {
+    return betweenMatch[1].trim();
+  }
+
+  // Method 2: Fallback - strip leading/trailing markers more aggressively
+  let result = text.trim();
+
+  // Remove opening: ``` with optional language identifier
+  result = result.replace(/^```(?:json|javascript|js)?\s*\n?/i, '');
+
+  // Remove closing: ``` with any trailing content (newlines, whitespace, etc)
+  // Using [\s\S]*$ instead of \s*$ to consume ANY content after ```
+  result = result.replace(/\n?```[\s\S]*$/i, '');
+
+  return result.trim();
+}
+
+
+/**
  * Strip line (//) and block (/* ... *\/) style comments from a JSON-like string without touching quoted content
  */
 function stripJsonComments(text) {
@@ -2266,6 +2451,13 @@ function safeParseJSON(text, { debugTag = "safeParseJSON", maxLogLength = 400 } 
     return null;
   }
 
+  // Strip markdown code blocks first (Gemini often wraps JSON in ```json ... ```)
+  const stripped = stripMarkdownCodeBlocks(text);
+  if (stripped !== text) {
+    console.log(`[${debugTag}] Stripped markdown code blocks from response`);
+    text = stripped;
+  }
+
   const logFailure = (stage, error, sample) => {
     const snippet = sample && sample.length > maxLogLength ? `${sample.slice(0, maxLogLength)}…` : sample;
     console.warn(`[${debugTag}] JSON parse failed at stage=${stage}: ${error?.message || error}`);
@@ -2386,28 +2578,28 @@ app.post("/api/validate-suggestion", async (req, res) => {
       roleScope
     });
 
-    const model =
-      process.env.MODEL_VALIDATE ||
-      process.env.CHAT_MODEL ||
-      "gpt-5-mini";
-
-    const raw = await aiJSON({
+    // Use Gemini for validation (gemini-2.5-flash)
+    console.log(`[validate-suggestion] Using Gemini model: ${MODEL_VALIDATE_GEMINI}`);
+    const raw = await aiJSONGemini({
       system,
       user,
-      model,
+      model: MODEL_VALIDATE_GEMINI,
       temperature: 0,
       fallback: { valid: true, reason: "Accepted (fallback)" }
     });
 
     const valid = typeof raw?.valid === "boolean" ? raw.valid : true;
-    const reason =
-      typeof raw?.reason === "string" && raw.reason.trim().length > 0
-        ? raw.reason.trim().slice(0, 240)
-        : valid
-          ? "Sounds workable."
-          : "I don’t think that fits this setting.";
 
-    return res.json({ valid, reason });
+    // Only include reason when validation fails (saves tokens)
+    if (valid) {
+      return res.json({ valid });
+    } else {
+      const reason =
+        typeof raw?.reason === "string" && raw.reason.trim().length > 0
+          ? raw.reason.trim().slice(0, 240)
+          : "I don't think that fits this setting.";
+      return res.json({ valid, reason });
+    }
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("validate-suggestion error:", err?.message || err);
@@ -2553,10 +2745,10 @@ Based on this political decision, generate 1-3 specific dynamic parameters that 
     let parameters = [];
 
     while (attempts < 2) {
-      const result = await aiJSON({
+      const result = await aiJSONGemini({
         system,
         user,
-        model: MODEL_DILEMMA, // Use same model as dilemmas
+        model: "gemini-2.5-flash",
         temperature: 0.8,
         fallback: { parameters: [] }
       });
@@ -2683,7 +2875,7 @@ Decisions: for each decision, provide:
 - liberalism: rate THIS SPECIFIC DECISION on liberalism (very-low|low|medium|high|very-high)
 - democracy: rate THIS SPECIFIC DECISION on democracy (very-low|low|medium|high|very-high)
 
-RATING FRAMEWORK:
+${getTheoryPrompt()}RATING FRAMEWORK (use the theoretical frameworks above for detailed guidance):
 
 1. Autonomy ↔ Heteronomy (Who decides?)
    - High Autonomy: Self-direction, owned reasons ("I choose because…"), empowering individual/group choice, decentralized decision-making, willingness to accept responsibility for consequences.
@@ -2795,13 +2987,14 @@ ${historySummary || "No decisions recorded"}${conversationContext}
 
 Generate the aftermath epilogue following the structure above. Return STRICT JSON ONLY.`;
 
-    // Call AI with dilemma model (NO temperature override - use default)
+    // Call AI with Gemini model
     // No fallback - let errors propagate so frontend can show retry button
-    const result = await aiJSON({
-      system,
-      user,
-      model: MODEL_DILEMMA
-    });
+    const messages = [
+      { role: "system", content: system },
+      { role: "user", content: user }
+    ];
+    const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
+    const result = aiResponse?.content ? safeParseJSON(aiResponse.content, { debugTag: "aftermath-gemini" }) : null;
 
     if (debug) {
       console.log("[/api/aftermath] AI response:", result);
@@ -2810,6 +3003,19 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
     // Normalize and validate response
     const validRatings = ["very-low", "low", "medium", "high", "very-high"];
     const validTypes = ["positive", "negative"];
+
+    // Fallback values when AI returns null or incomplete data
+    const fallback = {
+      intro: "After many years of rule, the leader passed into history.",
+      snapshot: [
+        { type: "positive", icon: "🏛️", text: "Governed their people", context: "Overall reign" },
+        { type: "negative", icon: "⚠️", text: "Faced challenges", context: "Overall reign" }
+      ],
+      decisions: [],
+      valuesSummary: "A leader who navigated complex political terrain.",
+      haiku: "Power came and went\nDecisions echo through time\nHistory records"
+    };
+
     const response = {
       intro: String(result?.intro || fallback.intro).slice(0, 500),
       snapshot: Array.isArray(result?.snapshot)
@@ -3013,11 +3219,11 @@ REQUIREMENTS:
 
 Return STRICT JSON ONLY.`;
 
-    // Call AI with dilemma model
-    const result = await aiJSON({
+    // Call AI with Gemini model
+    const result = await aiJSONGemini({
       system: systemPrompt,
       user: userPrompt,
-      model: MODEL_DILEMMA,
+      model: "gemini-2.5-flash",
       temperature: 0.7, // Slightly more creative for narrative generation
       fallback
     });
@@ -3100,6 +3306,8 @@ app.post("/api/inquire", async (req, res) => {
     console.log("========================================\n");
 
     const { gameId, question, currentDilemma, day } = req.body;
+    const useXAI = !!req.body?.useXAI;
+    const useGemini = !!req.body?.useGemini;
 
     // Validation
     if (!gameId || typeof gameId !== 'string') {
@@ -3193,16 +3401,16 @@ Examples of BAD answers (too formal, breaks Game Master voice):
 
 Remember: Game Master voice (playful, knowing), 2 sentences max, natural language, role-appropriate.`;
 
-    // Get AI response
+    // Get AI response using Gemini
     let answer;
     try {
-      answer = await aiText({
-        system: systemPrompt,
-        user: question.trim(),
-        model: MODEL_DILEMMA,
-        temperature: 0.7,
-        maxTokens: 150 // Strict limit for conciseness (2 sentences)
-      });
+      const aiMessages = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: question.trim() }
+      ];
+      const response = await callGeminiChat(aiMessages, "gemini-2.5-flash");
+      answer = response.content;
+      console.log(`[INQUIRY] Using Gemini provider (gemini-2.5-flash)`);
 
       console.log(`[INQUIRY] AI answer: "${answer.substring(0, 100)}..."`);
     } catch (aiError) {
@@ -3316,12 +3524,12 @@ function calculateAuthorityLevel(e12, powerHolders, playerIndex, roleScope = nul
 function convertSupportShiftToDeltas(supportShift, currentSupport) {
   // Randomized delta ranges for each reaction level
   const REACTION_RANGES = {
-    slightly_supportive: { min: 5, max: 10 },
-    moderately_supportive: { min: 11, max: 15 },
-    strongly_supportive: { min: 16, max: 20 },
-    slightly_opposed: { min: -10, max: -5 },
-    moderately_opposed: { min: -15, max: -11 },
-    strongly_opposed: { min: -20, max: -16 }
+    slightly_supportive: { min: 1, max: 5 },
+    moderately_supportive: { min: 6, max: 10 },
+    strongly_supportive: { min: 11, max: 15 },
+    slightly_opposed: { min: -5, max: -1 },
+    moderately_opposed: { min: -10, max: -6 },
+    strongly_opposed: { min: -15, max: -11 }
   };
 
   const deltas = {
@@ -3332,6 +3540,12 @@ function convertSupportShiftToDeltas(supportShift, currentSupport) {
 
   // Convert each entity's reaction to a random delta within range
   for (const [entity, shift] of Object.entries(supportShift)) {
+    // Skip unexpected entity keys from AI response
+    if (!deltas[entity]) {
+      console.warn(`[SUPPORT-SHIFT] Skipping unexpected entity: ${entity}`);
+      continue;
+    }
+
     const range = REACTION_RANGES[shift.attitudeLevel];
 
     if (!range) {
@@ -3430,11 +3644,11 @@ function buildGameMasterSystemPromptUnified(gameContext) {
 
 You are the Game Master of a historical-political simulation.
 You speak directly to the player as "you".
-Tone: amused, observant, slightly teasing, but always clear.
+Tone: amused, observant, challenging, slightly teasing, but always clear.
 Use simple English (CEFR B1-B2).
 Short sentences (8-16 words).
 No metaphors, no poetic phrasing, no idioms, no fancy adjectives.
-Your job is to make the player feel what it is like to be this exact person in this exact historical moment.
+Your job is to TEST the player's values by creating specific moral traps based on their compass, while making them feel what it is like to be this exact person in this exact historical moment.
 
 1. CORE IDENTITY OF THE PLAYER
 
@@ -3452,33 +3666,63 @@ Main Challenger: ${challengerName}
 Top Power Holders:
 ${top5PowerHolders.map(ph => `  - ${ph.name} (${ph.type}, power: ${ph.power}%)`).join('\n')}
 
-Player Values (for optional tension-building, do NOT mention explicitly):
+Player Values (Target these for dilemmas):
 ${compassText}
 
 You must respect all of them strictly.
-When you judge actions or reactions, you must think from inside this setting’s values, not from 21st-century Western morality.
+When you judge actions or reactions, you must think from inside this setting's values, not from 21st-century Western morality.
 
-2. GOLDEN RULE A — ROLE-TRUE, CONCRETE DILEMMAS
+1.1 AXIS DEFINITIONS (Use these to categorize the dilemma and actions)
 
-Every dilemma and every action option must match the actual life of the player's role.
+1. Autonomy ↔ Heteronomy (Who decides?)
+   - High Autonomy: Self-direction, owned reasons ("I choose because…"), empowering individual choice, accepting personal blame.
+   - Low Autonomy (Heteronomy): External control, borrowed reasons ("The law says so"), obedience, delegation to superiors.
+
+2. Liberalism ↔ Totalism (What's valued?)
+   - High Liberalism: Individual rights, tolerance, protecting the exception.
+   - Low Liberalism (Totalism): Uniformity, order, suppressing dissent, enforcing one strict code.
+
+3. Democracy ↔ Oligarchy
+   - High Democracy: Shared authorship, inclusivity.
+   - Low Democracy: Elite control, exclusion.
+
+2. GOLDEN RULE A — THE VALUE TRAP + ROLE-TRUE DILEMMAS
+
+Every dilemma must:
+a) Force a conflict between the player's VALUES and their INTERESTS/SAFETY
+b) Match the actual life of the player's role
+c) Be engaging, meaningful and thought provoking
+
+THE VALUE TRAP LOGIC:
+1. Pick a value from the player's list (e.g., Truth, Freedom, Loyalty).
+2. Create a situation where upholding that value forces a terrible personal cost.
+   - Example (Value: Truth): Your sister stole the tax money. If you tell the Truth, she is hanged. If you Lie, you save her but betray your value.
+   - Example (Value: Freedom): A plague carrier demands to leave the city. If you respect Freedom, the city dies. If you detain him, you become a tyrant.
+
 Dilemmas must be engaging, meaningful and thought provoking.
 
-CONCRETENESS RULE (HIGH PRIORITY):
+THE CAMERA TEST (STRICT):
 
-Every dilemma description MUST include at least ONE clear, concrete event caused by the previous choice:
-- a specific place (street, hall, border, temple, farm, camp…)
-- specific actors (named group or character, not just "people" or "they")
-- a specific action (what exactly happened?)
+You MUST NEVER describe "tensions," "debates," "atmosphere," or "unease."
+If a movie camera cannot record it, DO NOT WRITE IT.
+
+BAD (Abstract): "Tensions are high and people are debating the new laws."
+GOOD (Concrete): "A rock crashes through your window. A mob of hungry weavers is chanting your name outside."
+
+Every dilemma MUST be a specific "Inciting Incident" happening RIGHT NOW:
+
+A) A specific person/group (Name them: "Your brother," "The Baker's Guild," "General Kael")
+B) Doing a specific physical action (Blocking a road, stealing a cow, arresting a priest)
+C) Forcing an immediate choice (Not "how will you balance this," but "Do you arrest them or join them?")
 
 GOOD: "At dawn, twenty soldiers block the city gate and refuse to let traders enter."
 BAD: "Tensions rise in the city and people are uneasy."
 
-Do NOT just say "tensions are high", "they want to challenge you", or "pressure grows".
-Always describe what is actually happening in the world in simple, concrete terms.
-
 Each set of 3 actions must also be concrete:
 - not "manage the crisis" or "respond to the challenge"
 - but "close the city gates", "lower the grain tax", "summon the council", "publicly punish the captain", etc.
+
+AUTHORITY LEVEL CONSTRAINTS (CRITICAL):
 
 If the player is LOW authority (citizen, commoner):
 MUST give dilemmas about:
@@ -3526,8 +3770,18 @@ But MUST still include personal risks, family tensions, court intrigue.
     c. War, diplomacy, famine, plague, succession, rebellion, unrest, and resource crises are ALL separate tension types.
       Never stay on the same type two days in a row.
 
-    d. You may mention yesterday’s situation in ONE short bridging sentence, but today’s problem must be NEW and DIFFERENT.
+    d. You may mention yesterday's situation in ONE short bridging sentence, but today's problem must be NEW and DIFFERENT.
 
+
+3.1 GOLDEN RULE C — THE AXIS OF ACTION
+
+The 3 action options must implicitly explore the AUTONOMY vs. HETERONOMY axis:
+
+- Action 1 (High Autonomy/Risk): The player acts on their own authority. They say "I decide." They break protocol or take a personal risk to do what feels right.
+- Action 2 (Heteronomy/Safety): The player follows the rules, obeys a superior, delegates the decision, or hides behind "the law." They say "I had no choice."
+- Action 3 (Transactional/Pragmatic): A compromise or corruption. Solving the problem by paying a cost or making a dirty deal.
+
+Ensure all actions are specific physical deeds (arrest, pay, scream, sign), not abstract concepts ("manage the situation").
 
 4. HISTORICAL REALISM (OVERRIDES MODERN MORALITY)
 
@@ -3569,7 +3823,7 @@ They may worry about retaliation, honor, spirits, or lost trade — not abstract
 
 Day 1:
 - One urgent situation
-- NO supportShift / dynamicParams / corruptionShift
+- NO supportShift / dynamicParams
 - Provide mirrorAdvice
 
 Day 2-6:
@@ -3587,14 +3841,10 @@ Day 2-6:
   * {"icon": "⚔️", "text": "12,000 soldiers mobilized"}
   * {"icon": "🤒", "text": "2,345 civilians infected"}
   * {"icon": "🚧", "text": "Trade routes blocked"}
-- corruptionShift — score 0-10 evaluating:
-  - Corruption = misuse of entrusted power for personal/factional benefit that betrays the trust or norms of this polity
-  - Judge relative to ${systemName} norms and ${setting} context — what counts as abuse differs by era/regime
-  - Score 0-1 for normal actions, 3-5 for grey-area acts, 6-10 only for blatantly self-serving/abusive acts
 - mirrorAdvice — 20-25 words, one value name, dry tone
 
 Day 7:
-- Peak of the story
+- Generate a climatic dramatic dilemma that ties in the story so far
 - Remind the player their time is ending
 - Same schema as Day 2-6
 
@@ -3651,11 +3901,13 @@ Rules:
 - ALWAYS reference at least ONE specific value from player's "what" or "how" values
 - Create tension - show how dilemma challenges or contradicts their stated values
 - Never preach - just highlight the contradiction or irony
-- Use the actual value name: "your precious Honor", "that Truth you claim to value"
+- IMPORTANT: Do NOT use the exact compass value names (e.g., "Truth/Trust", "Liberty/Agency", "Deliberation"). Instead, paraphrase into natural, conversational language: "your sense of truth", "your love of freedom", "your careful deliberation"
 - 1 sentence, 20-25 words, dry/mocking tone
 
 BAD: "I wonder how you'll handle this crisis."
-GOOD: "Your beloved Deliberation might be a luxury when soldiers are dying by the minute."
+BAD: "Your Truth/Trust is being tested." (uses exact system nomenclature)
+GOOD: "Your sense of truth might be a luxury when the crowd demands blood."
+GOOD: "I see your careful deliberation — charming, while soldiers bleed."
 
 
 8. OUTPUT FORMAT
@@ -3710,7 +3962,6 @@ CRITICAL JSON RULES:
     {"icon": "🔥", "text": "Dramatic consequence (2-4 words)"}
   ],
   "mirrorAdvice": "FIRST PERSON (20-25 words)",
-  "corruptionShift": {"score": 0-10},
 }
 
 ## DAY 8 SCHEMA (Aftermath):
@@ -3730,8 +3981,398 @@ CRITICAL JSON RULES:
   "dynamicParams": [
     {"icon": "emoji", "text": "Dramatic consequence (2-4 words)"}
   ],
+  "mirrorAdvice": "FIRST PERSON reflective sentence (20-25 words)"
+}`;
+
+  return prompt;
+}
+
+/**
+ * V3: Ultra-lean value-driven prompt with private life focus and setting-rooted details
+ *
+ * Key differences from original:
+ * - 3-step process: Value → Axis → Bridge
+ * - Private life focus (especially low/mid authority)
+ * - Setting-rooted atmosphere and details
+ * - Dynamic axis selection (Autonomy, Liberalism, Democracy)
+ * - Includes tracking fields: valueTargeted, axisExplored
+ *
+ * Rollback: Set USE_PROMPT_V3 = false to use original prompt
+ */
+function buildGameMasterSystemPromptUnifiedV3(gameContext) {
+  const {
+    role,
+    systemName,
+    setting,
+    challengerName,
+    powerHolders,
+    authorityLevel,
+    playerCompassTopValues
+  } = gameContext;
+
+  // Get top 5 power holders only
+  const top5PowerHolders = powerHolders.slice(0, 5);
+
+  // Format compass values for prompt (top 8 values: 2 from each category)
+  const compassText = playerCompassTopValues.map(dim =>
+    `  - ${dim.dimension}: ${dim.values.join(', ')}`
+  ).join('\n');
+
+  // Log compass values for debugging
+  console.log("[game-turn-v2] [V3] Player compass values received:", playerCompassTopValues);
+  console.log("[game-turn-v2] [V3] Formatted compassText for prompt:\n" + compassText);
+
+  const prompt = `0. YOUR MISSION
+
+You are the Game Master of a historical-political simulation.
+You speak directly to the player as "you".
+Tone: amused, observant, challenging, slightly teasing, but always clear.
+
+LANGUAGE RULES:
+- Simple English (CEFR B1-B2), short sentences (8-16 words)
+- NO metaphors, poetic phrasing, idioms, or fancy adjectives
+- NO technical jargon, academic language, or bureaucratic terms
+  BAD: "preliminary audits", "unsanctioned bio-agent trials", "scientific standards demand transparency"
+  GOOD: "the inspectors found out", "illegal experiments", "people want answers"
+- Use concrete language: "Citizens protest" NOT "tensions rise"
+- If a movie camera cannot record it, DO NOT WRITE IT
+
+YOUR MISSION:
+Create VALUE TRAPS in the player's PRIVATE LIFE that force them to choose between their stated values and their survival, rooted in the specific details and atmosphere of the setting.
+
+
+1. PLAYER CONTEXT
+
+Role: ${role}
+Authority Level: ${authorityLevel}
+  - high = ruler, general, chief, monarch (can command, decree, execute)
+  - medium = council member, minister, influential elite (can persuade, negotiate, influence)
+  - low = citizen, commoner, minor official (can petition, vote, resist at personal risk)
+
+Setting: ${setting}
+System: ${systemName}
+Main Challenger: ${challengerName}
+
+Top Power Holders:
+${top5PowerHolders.map(ph => `  - ${ph.name} (${ph.type}, power: ${ph.power}%)`).join('\n')}
+
+PLAYER'S INITIAL TOP 8 VALUES (Day 1):
+${compassText}
+
+IMPORTANT: For Days 2+, you will receive UPDATED "CURRENT TOP VALUES" in each daily prompt.
+These values may shift due to the player's actions and their consequences (compass pills).
+ALWAYS use the most recent values provided to ensure maximum personal relevance.
+
+
+2. THE THREE-STEP PROCESS
+
+Every day, follow this exact process:
+
+─────────────────────────────────────────
+STEP 1: SELECT A VALUE TO TRAP
+─────────────────────────────────────────
+
+1. Pick ONE value from:
+   - Day 1: Use the initial top 8 values listed above
+   - Days 2+: Use the CURRENT TOP VALUES provided in today's daily prompt
+2. Create a PRIVATE LIFE incident where honoring that value forces a terrible personal cost (safety, family, social acceptance, livelihood).
+3. For LOW and MEDIUM authority: MUST focus on personal/family/social dilemmas, NOT grand political decisions.
+
+THE VALUE TRAP FORMULA:
+"If you honor [VALUE], you lose [something vital]. If you protect [something vital], you betray [VALUE]."
+
+PRIVATE LIFE FOCUS BY AUTHORITY:
+
+LOW AUTHORITY (Citizen, Commoner):
+Focus on: Family decisions, social pressure, personal choices, neighborhood conflicts, religious obligations
+Examples:
+- Autonomy: "Your mother insists you marry the baker's son. Your heart belongs to another. Obey her or defy tradition?"
+- Truth: "Your brother stole grain. The magistrate demands names. Tell the truth and he's punished. Lie and save him."
+- Freedom: "The priest demands you fast for seven days. Your children are hungry. Follow his command or feed your family?"
+- Loyalty: "Your friend asks you to hide him from the authorities. Help him or protect your family from punishment?"
+
+MEDIUM AUTHORITY (Council Member, Minister):
+Focus on: Personal influence, family vs duty, patron demands, guild/council pressures
+Examples:
+- Autonomy: "Your patron demands you vote for his corrupt nephew. Your conscience says no. Obey or vote freely?"
+- Loyalty: "Your wife begs you to use your influence to save her imprisoned brother. Bend rules for family or stay neutral?"
+- Equality: "The guild pressures you to exclude foreign traders. Allow diversity or enforce conformity?"
+
+HIGH AUTHORITY (Ruler, General):
+MUST STILL include personal stakes: family, assassination, succession, close advisors
+Examples:
+- Loyalty: "Your general is your childhood friend. He lost the battle. Execute him or spare him and lose the army's respect?"
+- Truth: "Your daughter must marry the foreign king for peace. She loves another. Force her or risk war?"
+- Honor: "Your brother plots against you. Family loyalty or throne security?"
+
+SETTING-ROOTED DETAILS (CRITICAL):
+
+The value trap logic is universal, but the CONTENT must come from the setting.
+
+Use setting-specific:
+- Cultural norms (What's shameful? Sacred? Normal?)
+- Social structures (Who has power? Who enforces rules?)
+- Material details (What do people eat, wear, trade, fear?)
+- Spiritual frameworks (Gods, spirits, ancestors, protocols?)
+- Economic systems (Currency, debt, property, resources?)
+- Power dynamics (Who can punish? Who decides?)
+
+Setting: ${setting}
+System: ${systemName}
+
+EXAMPLES: Same value trap (Truth vs Family) in different settings:
+
+Ancient Athens:
+"Your brother stole sacred olive oil from the temple stores. The archons demand the thief's name at tomorrow's Assembly. Speak the truth and he'll be stoned. Stay silent and the gods' curse falls on all Athens."
+
+North American Tribe:
+"Your sister took corn from the winter stores to feed her starving children. The council of elders gathers tonight. Speak the truth and she faces exile into the frozen forest. Stay silent and the spirits will punish the whole village."
+
+Medieval Europe:
+"Your son poached the lord's deer to feed his newborn. The bailiff drags villagers to the manor hall. Name him and he hangs. Lie and the lord burns the whole village."
+
+Martian Colony:
+"Your wife bypassed the oxygen rationing system. The Administrator's audit starts in one hour. Report her and she's exiled to the surface (death). Cover for her and the entire hab module loses oxygen privileges."
+
+Ask yourself:
+- What would THIS person in THIS world actually face?
+- What objects, places, rituals, dangers exist HERE?
+- What would shock vs. be normal in THIS culture?
+- How do THESE people enforce rules and punish transgressions?
+
+THE CAMERA TEST:
+Every dilemma MUST be a concrete incident happening RIGHT NOW:
+- A specific named person/group ("Your mother," "The Baker's Guild," "General Kael")
+- Doing a specific physical action (blocking road, demanding answer, threatening family)
+- Forcing an immediate choice (NOT "how will you balance" but "Do X or Y?")
+
+GOOD: "Your neighbor drags your son into the square and accuses him of theft in front of the whole village."
+BAD: "There are tensions in the village about property disputes."
+
+
+─────────────────────────────────────────
+STEP 2: CHOOSE THE BEST-FIT AXIS
+─────────────────────────────────────────
+
+After creating your value trap, ask: "Which axis best explores this value conflict?"
+
+THE THREE AXES:
+
+1. AUTONOMY ↔ HETERONOMY (Who decides?)
+   - High Autonomy: Self-direction, owned reasons ("I choose because..."), personal risk, accepting blame
+   - Low Autonomy (Heteronomy): External control, borrowed reasons ("The law says..."), obedience, deference
+   - Middle Ground: Consultation, shared decision, strategic delegation
+
+2. LIBERALISM ↔ TOTALISM (What's valued?)
+   - High Liberalism: Protect the exception, tolerate difference, individual rights, risk disorder
+   - Low Liberalism (Totalism): Enforce uniformity, suppress dissent, one strict code, ensure order
+   - Middle Ground: Bounded pluralism, rules with exceptions, pragmatic tolerance
+
+3. DEMOCRACY ↔ OLIGARCHY (Who authors the system?)
+   - High Democracy: Inclusive voice, shared authorship, participatory governance, expand power
+   - Low Democracy (Oligarchy): Elite control, exclusion, concentrated power, restrict voice
+   - Middle Ground: Mixed constitution, limited franchise, strategic representation
+
+MATCHING AXIS TO VALUE TRAP:
+
+If the value trap is about PERSONAL AGENCY, DECISION-MAKING, RESPONSIBILITY:
+→ Likely best explored via AUTONOMY ↔ HETERONOMY axis
+Examples: Truth (speak my truth vs follow authority), Courage (act on my conviction vs obey), Autonomy itself
+
+If the value trap is about TOLERANCE, CONFORMITY, ORDER vs FREEDOM:
+→ Likely best explored via LIBERALISM ↔ TOTALISM axis
+Examples: Freedom, Tradition, Unity, Diversity, Tolerance
+
+If the value trap is about POWER-SHARING, INCLUSION, VOICE:
+→ Likely best explored via DEMOCRACY ↔ OLIGARCHY axis
+Examples: Equality, Justice, Voice, Participation, Representation
+
+DESIGN 3 ACTIONS EXPLORING THE CHOSEN AXIS:
+
+AUTONOMY Axis Actions:
+- Action A (High Autonomy): Take personal responsibility, break protocol, "I decide," accept blame
+- Action B (Heteronomy): Follow orders, defer to authority, "The rules say...," avoid responsibility
+- Action C (Middle Ground): Consult others, share burden, strategic delegation
+
+LIBERALISM Axis Actions:
+- Action A (High Liberalism): Protect the dissenter, allow difference, tolerate deviation, risk disorder
+- Action B (Totalism): Enforce conformity, suppress exception, ensure order, punish deviation
+- Action C (Middle Ground): Tolerate within limits, calibrated enforcement, bounded pluralism
+
+DEMOCRACY Axis Actions:
+- Action A (High Democracy): Expand voice, include outsiders, share power, participatory decision
+- Action B (Oligarchy): Restrict voice, exclude, concentrate control, elite decision
+- Action C (Middle Ground): Limited inclusion, strategic representation, mixed approach
+
+All actions must be CONCRETE PHYSICAL DEEDS:
+"arrest," "pay," "scream," "sign," "burn," "kneel," "speak at assembly," "hide"
+NOT: "manage the situation," "respond to the challenge," "address the crisis"
+
+
+─────────────────────────────────────────
+STEP 3: BRIDGE FROM PREVIOUS DAY (SHOW RESOLUTION)
+─────────────────────────────────────────
+
+Days 2-7: In ONE SENTENCE, close yesterday's story by showing the OUTCOME of the player's choice - not just what they did, but what happened because of it. Then introduce the new problem.
+
+Vary your phrasing naturally:
+- "Following your decision to X, Y happened..."
+- "Because you insisted on X, Y..."
+- "Your choice to X paid off - Y. But now..."
+- "The X you ordered worked - Y. However..."
+
+BAD: "Yesterday you arrested the priest. Today, a plague arrives." (no outcome)
+GOOD: "Following your arrest of the priest, he confessed and named his conspirators - they rot in your dungeons now. But this morning, foreign ships appear on the horizon."
+GOOD: "Because you showed mercy to the thief, word spread - you're seen as just. The nobleman whose gold was stolen now demands an audience."
+
+Show what HAPPENED because of the choice, then pivot to the new problem.
+
+
+3. CONSTRAINTS
+
+AUTHORITY LEVEL CONSTRAINTS:
+- Low authority CANNOT: command armies, issue decrees, conduct diplomacy
+- Low authority CAN: petition, argue, vote, protest, organize, resist at risk
+- Medium authority CAN: persuade councils, negotiate, build alliances, influence
+- Medium authority CANNOT: unilateral military command (unless setting allows)
+- High authority CAN: all of the above, but MUST still face personal stakes
+
+HISTORICAL REALISM:
+All reactions must match the culture of ${setting} and ${systemName}, NOT modern Western values.
+Ask: "Would people HERE see this as normal, risky, sacred, shameful?"
+
+If an action is COMMON for this era (beatings, harsh punishments, captives):
+- Treat it as normal or risky, NOT morally shocking
+- Only show outrage when the action breaks THEIR taboos (betraying guests, harming kin, violating oaths)
+
+"Mom," "people," and "holders" must sound like members of this culture.
+They worry about honor, spirits, retaliation, trade—not modern human-rights language.
+
+TOPIC & SCOPE DIVERSITY:
+In every 3-day window: at least 2 different topics, at least 2 different scopes
+Topics: Military, Economy, Religion, Diplomacy, Justice, Infrastructure, Politics, Social, Health, Education
+Scopes: Personal, Local, Regional, National, International
+
+
+DAY-BY-DAY REQUIREMENTS:
+
+DYNAMIC PARAMETERS (Days 2-7):
+- MANDATORY: Generate 2-3 concrete consequences of the previous player action
+- Format: {"icon": "emoji", "text": "2-4 words"}
+- Use emoji that matches the consequence type (⚔️ 🏥 💀 🏛️ 🔥 📚 ⚖️ 💰 🌾 🗡️ etc.)
+- Include numbers when dramatically impactful
+- Examples:
+  * {"icon": "⚔️", "text": "12,000 troops assembled"}
+  * {"icon": "💰", "text": "Treasury depleted by 40%"}
+  * {"icon": "🔥", "text": "3 villages burned"}
+  * {"icon": "🏥", "text": "200 plague deaths averted"}
+
+THE MIRROR'S ROLE (All Days):
+- The Mirror is a light-hearted companion who surfaces value tensions with dry humor
+- MUST reference the player's specific value from their top 8 values, but NEVER use the exact compass nomenclature (e.g., "Truth/Trust", "Care/Solidarity", "Law/Std."). Instead, paraphrase naturally: "your sense of truth", "your care for others", "your faith in the law"
+- Tone: amused, teasing, observant - NOT preachy or judgmental
+- First person perspective: "I see..." "I wonder..." "I notice..."
+- Length: 20-25 words exactly
+
+MIRROR MODE (specified in user prompt for Days 2+):
+- Mode "lastAction": Reflect on the player's PREVIOUS choice and what it reveals about their values. Comment on the tension between what they chose and what they claim to value.
+- Mode "dilemma": Comment on the CURRENT dilemma they're about to face and how it challenges their values.
+
+GOOD "lastAction" Examples (reflecting on previous choice):
+- "I see you chose the treasury over the temple. Your practicality shows, but I wonder what your ancestors think of such pragmatism."
+- "You sided with the nobles again. Your loyalty is touching—though I notice the common folk don't share your enthusiasm."
+- "Mercy for the rebels, hm? Your compassion is admirable. I wonder if the families of the slain guards agree."
+
+GOOD "dilemma" Examples (commenting on current situation):
+- "Ah, another test of your famous sense of justice. I wonder if mercy will win today, or if the law will have its way."
+- "The refugees wait at your gates. Your compassion is admirable—let's see if it survives the grain shortage."
+- "Freedom for all, you say. I'm curious how long that lasts when the grain runs out."
+
+BAD Mirror Examples (DO NOT DO THIS):
+- "That was an interesting choice." (too vague, no value reference)
+- "I wonder how this will play out." (no value reference)
+- "Your commitment to your ideals is admirable." (too generic, preachy)
+- "Your Truth/Trust is in conflict here." (uses exact compass nomenclature - sounds robotic)
+- "Your Liberty/Agency matters to you." (uses slash notation from system - unnatural)
+
+
+4. OUTPUT FORMAT
+
+Return ONLY valid JSON. No \`\`\`json fences.
+
+CRITICAL JSON RULES:
+- ALWAYS include commas between properties
+- NO trailing commas after last property
+- Double quotes for all keys and strings
+- Properly closed braces and brackets
+
+DAY 1 SCHEMA:
+{
+  "dilemma": {
+    "title": "Short title (max 120 chars)",
+    "description": "Game Master narration addressing 'you', ending with direct question (1-3 sentences, no jargon)",
+    "actions": [
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "sword"},
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "scales"},
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "coin"}
+    ],
+    "topic": "Military|Economy|Religion|Diplomacy|Justice|Infrastructure|Politics|Social|Health|Education",
+    "scope": "Personal|Local|Regional|National|International",
+    "tensionCluster": "ExternalConflict|InternalPower|EconomyResources|HealthDisaster|ReligionCulture|LawJustice|SocialOrder|FamilyPersonal|DiplomacyTreaty"
+  },
+  "mirrorAdvice": "One sentence in FIRST PERSON (20-25 words, reference ONE specific value from player's compass, dry/mocking tone)",
+  "valueTargeted": "Truth|Freedom|Loyalty|Honor|...",
+  "axisExplored": "Autonomy|Liberalism|Democracy"
+}
+
+DAY 2-7 SCHEMA:
+{
+  "supportShift": {
+    "people": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Civic reaction in first person 'we/us' (10-15 words)"},
+    "holders": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Political reaction in first person 'we/us' (10-15 words)"},
+    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Personal reaction in FIRST PERSON 'I' (10-15 words)"}
+  },
+  "dilemma": {
+    "title": "Short title (max 120 chars)",
+    "description": "1-2 sentences bridging from previous action + new situation + direct question (no jargon)",
+    "actions": [
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
+      {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."}
+    ],
+    "topic": "Military|Economy|Religion|Diplomacy|Justice|Infrastructure|Politics|Social|Health|Education",
+    "scope": "Personal|Local|Regional|National|International",
+    "tensionCluster": "ExternalConflict|InternalPower|EconomyResources|HealthDisaster|ReligionCulture|LawJustice|SocialOrder|FamilyPersonal|DiplomacyTreaty"
+  },
+  "dynamicParams": [
+    {"icon": "🔥", "text": "Dramatic consequence (2-4 words)"}
+  ],
+  "mirrorAdvice": "FIRST PERSON (20-25 words)",
+  "valueTargeted": "Truth|Freedom|Loyalty|Honor|...",
+  "axisExplored": "Autonomy|Liberalism|Democracy"
+}
+
+DAY 8 SCHEMA (Aftermath):
+{
+  "supportShift": {
+    "people": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Civic reaction in first person 'we/us' (10-15 words)"},
+    "holders": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Political reaction in first person 'we/us' (10-15 words)"},
+    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Personal reaction in FIRST PERSON 'I' (10-15 words)"}
+  },
+  "dilemma": {
+    "title": "The Aftermath",
+    "description": "EXACTLY 2 sentences describing immediate consequences of Day 7 decision (no jargon)",
+    "actions": [],
+    "topic": "Conclusion",
+    "scope": "N/A",
+    "tensionCluster": "N/A"
+  },
+  "dynamicParams": [
+    {"icon": "emoji", "text": "Dramatic consequence (2-4 words)"}
+  ],
   "mirrorAdvice": "FIRST PERSON reflective sentence (20-25 words)",
-  "corruptionShift": {"score": 0-10}
+  "valueTargeted": "N/A",
+  "axisExplored": "N/A"
 }`;
 
   return prompt;
@@ -3739,26 +4380,63 @@ CRITICAL JSON RULES:
 
 /**
  * Build conditional user prompt (Day 1 vs Day 2+)
+ * @param {number} day - Current day (1-8)
+ * @param {object|null} playerChoice - Previous action {title, description}
+ * @param {array|null} currentCompassTopValues - Current top compass values
+ * @param {string} mirrorMode - 'lastAction' or 'dilemma' (default: 'dilemma')
  */
-function buildGameMasterUserPrompt(day, playerChoice = null) {
+function buildGameMasterUserPrompt(day, playerChoice = null, currentCompassTopValues = null, mirrorMode = 'dilemma') {
   // General instruction for all days
   let prompt = `First, carefully review the entire system prompt to understand all context and rules.\n\n`;
 
   if (day === 1) {
     prompt += `This is DAY 1 of 7.
-  
-  Follow the system prompt instructions for Day 1.
-  Write the dilemma description in the Game Master voice described in the system prompt (playful, slightly teasing, speaking to "you").`;
+
+Create the first concrete incident that forces an immediate choice.
+STRICTLY OBEY THE CAMERA TEST: describe a specific event happening RIGHT NOW, not abstract tensions.
+Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
   }
    else {
-    prompt += `DAY ${day} of 7\n\nPrevious action: "${playerChoice.title}" - ${playerChoice.description}\n\n`;
+    // Format current compass values (if provided)
+    let compassUpdateText = '';
+    if (currentCompassTopValues && Array.isArray(currentCompassTopValues)) {
+      compassUpdateText = '\n\nCURRENT TOP VALUES (SELECT FROM THESE FOR TODAY\'S VALUE TRAP):\n' +
+        currentCompassTopValues.map(dim =>
+          `  - ${dim.dimension}: ${dim.values.join(', ')}`
+        ).join('\n') + '\n';
+    }
+
+    prompt += `DAY ${day} of 7\n\nPrevious action: "${playerChoice.title}" - ${playerChoice.description}${compassUpdateText}\n\n`;
+
+    // Add mirror mode instruction for Days 2+
+    prompt += `MIRROR MODE FOR THIS TURN: "${mirrorMode}"
+${mirrorMode === 'lastAction'
+  ? `The mirror should reflect on the player's PREVIOUS choice ("${playerChoice.title}") and what it reveals about their values.`
+  : `The mirror should comment on the CURRENT dilemma they're about to face and how it challenges their values.`}
+
+`;
 
     if (day === 7) {
-      prompt += `This is the final day: clearly remind the player that their borrowed time in this world is almost over and this is their last decisive act.`;
+      prompt += `This is the final day. Make this dilemma especially tough and epic - a climactic choice worthy of the player's last act in this world. The stakes should feel monumental. Remind them their borrowed time is almost over.
+
+In ONE SENTENCE, close yesterday's story by showing the OUTCOME (not just the action). Vary phrasing naturally. Then introduce the final dilemma.
+
+CRITICAL: Follow Golden Rules B & C - different tension from yesterday, actions exploring autonomy vs. heteronomy.
+
+STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player RIGHT NOW.`;
     } else if (day === 8) {
       prompt += `This is Day 8 - the aftermath. Follow the system prompt instructions for Day 8.`;
     } else {
-      prompt += `Follow the system prompt instructions for Day 2+. Write the dilemma description in the Game Master voice described in the system prompt (playful, slightly teasing, speaking to "you").`;
+      prompt += `In ONE SENTENCE, close yesterday's story by showing the OUTCOME of the choice (not just the action). Vary phrasing naturally - don't always start with "Yesterday you..."
+
+Then introduce a NEW dilemma from a DIFFERENT underlying issue.
+
+CRITICAL: Follow Golden Rules B & C - different tension from yesterday, actions exploring autonomy vs. heteronomy.
+
+DO NOT summarize the general situation or write about "debates" or "rising tensions."
+STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player RIGHT NOW.
+
+Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
     }
   }
 
@@ -3796,6 +4474,7 @@ app.post("/api/game-turn-v2", async (req, res) => {
       dilemmasSubject = null,
       generateActions = true,
       useXAI = false,
+      useGemini = false,
       debugMode = false
     } = req.body;
 
@@ -3859,7 +4538,10 @@ app.post("/api/game-turn-v2", async (req, res) => {
       };
 
       // Build unified system prompt (sent ONCE)
-      const systemPrompt = buildGameMasterSystemPromptUnified(enrichedContext);
+      // Use V3 if feature flag enabled, otherwise use original
+      const systemPrompt = USE_PROMPT_V3
+        ? buildGameMasterSystemPromptUnifiedV3(enrichedContext)
+        : buildGameMasterSystemPromptUnified(enrichedContext);
 
       // Build minimal Day 1 user prompt
       const userPrompt = buildGameMasterUserPrompt(day);
@@ -3896,56 +4578,75 @@ app.post("/api/game-turn-v2", async (req, res) => {
         console.log("=".repeat(80) + "\n");
       }
 
-      // Call AI
+      // Call AI with retry logic for JSON parsing failures
       const messages = [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
       ];
 
-      let aiResponse;
-      if (useXAI) {
-        aiResponse = await callXAIChat(messages, MODEL_DILEMMA_XAI);
-      } else {
-        aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
-      }
-
-      const content = aiResponse?.content;
-      if (!content) {
-        throw new Error("No content in AI response");
-      }
-
-      // Debug logging (Day 1 AI response)
-      if (debugMode) {
-        console.log("\n" + "=".repeat(80));
-        console.log("🐛 [DEBUG] Day 1 Raw AI Response:");
-        console.log("=".repeat(80));
-        console.log(content);
-        console.log("=".repeat(80) + "\n");
-      }
-
-      // Parse JSON response with robust error handling
       let parsed;
+      let content;
+      const maxRetries = 1;
 
-      // Try existing safeParseJSON utility first
-      parsed = safeParseJSON(content, { debugTag: "GAME-TURN-V2-DAY1" });
+      for (let retryCount = 0; retryCount <= maxRetries; retryCount++) {
+        // Add correction message on retry
+        if (retryCount > 0) {
+          console.log(`[GAME-TURN-V2] JSON parse failed, retrying Day 1 (attempt ${retryCount + 1}/${maxRetries + 1})...`);
+          messages.push({
+            role: "user",
+            content: "Your response was not valid JSON. Please respond ONLY with the raw JSON object, no markdown code blocks (no ```), no explanations - just the JSON starting with { and ending with }."
+          });
+        }
 
-      // If safeParseJSON fails, try custom comma repair
-      if (!parsed) {
-        console.log('[GAME-TURN-V2] safeParseJSON failed, attempting comma repair...');
-        try {
-          // Extract from markdown code blocks if present
-          const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/```\n?([\s\S]*?)\n?```/);
-          const jsonStr = jsonMatch ? jsonMatch[1] : content;
+        const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
 
-          // Fix missing commas: "value"\n"key" -> "value",\n"key"
-          const commaFixed = jsonStr.replace(/("\s*)\n(\s*"[^"]+"\s*:)/g, '$1,\n$2');
-          parsed = JSON.parse(commaFixed);
-          console.log('[GAME-TURN-V2] ✅ Comma repair successful');
-        } catch (commaError) {
-          console.error('[GAME-TURN-V2] All JSON parse attempts failed');
-          console.error('[GAME-TURN-V2] Comma repair error:', commaError);
+        content = aiResponse?.content;
+        if (!content) {
+          throw new Error("No content in AI response");
+        }
+
+        // Debug logging (Day 1 AI response)
+        if (debugMode) {
+          console.log("\n" + "=".repeat(80));
+          console.log(`🐛 [DEBUG] Day 1 Raw AI Response (attempt ${retryCount + 1}):`);
+          console.log("=".repeat(80));
+          console.log(content);
+          console.log("=".repeat(80) + "\n");
+        }
+
+        // Parse JSON response with robust error handling
+        // Try existing safeParseJSON utility first (includes markdown stripping)
+        parsed = safeParseJSON(content, { debugTag: `GAME-TURN-V2-DAY1-ATTEMPT${retryCount + 1}` });
+
+        // If safeParseJSON fails, try custom comma repair
+        if (!parsed) {
+          console.log(`[GAME-TURN-V2] safeParseJSON failed (attempt ${retryCount + 1}), attempting comma repair...`);
+          try {
+            // First strip markdown using our robust function
+            const strippedContent = stripMarkdownCodeBlocks(content);
+
+            // Fix missing commas: "value"\n"key" -> "value",\n"key"
+            const commaFixed = strippedContent.replace(/("\s*)\n(\s*"[^"]+"\s*:)/g, '$1,\n$2');
+            parsed = JSON.parse(commaFixed);
+            console.log('[GAME-TURN-V2] ✅ Comma repair successful');
+          } catch (commaError) {
+            console.error(`[GAME-TURN-V2] Comma repair failed (attempt ${retryCount + 1}):`, commaError.message);
+          }
+        }
+
+        // If parsing succeeded, break out of retry loop
+        if (parsed) {
+          if (retryCount > 0) {
+            console.log(`[GAME-TURN-V2] ✅ JSON parsing succeeded on retry attempt ${retryCount + 1}`);
+          }
+          break;
+        }
+
+        // If this was the last attempt and still no parsed result, throw error
+        if (retryCount === maxRetries && !parsed) {
+          console.error('[GAME-TURN-V2] All JSON parse attempts failed after retries (Day 1)');
           console.error('[GAME-TURN-V2] Raw content:', content);
-          throw new Error(`Failed to parse AI response after all repair attempts: ${commaError.message}`);
+          throw new Error(`Failed to parse AI response after ${maxRetries + 1} attempts`);
         }
       }
 
@@ -3996,7 +4697,7 @@ app.post("/api/game-turn-v2", async (req, res) => {
       }
 
       // Return response (flattened for frontend compatibility)
-      return res.json({
+      const response = {
         title: parsed.dilemma?.title || '',
         description: parsed.dilemma?.description || '',
         actions: parsed.dilemma?.actions || [],
@@ -4004,7 +4705,15 @@ app.post("/api/game-turn-v2", async (req, res) => {
         scope: parsed.dilemma?.scope || '',
         mirrorAdvice: parsed.mirrorAdvice,
         isGameEnd: false
-      });
+      };
+
+      // Add tracking fields if using V3 (for frontend validation)
+      if (USE_PROMPT_V3) {
+        response.valueTargeted = parsed.valueTargeted || 'Unknown';
+        response.axisExplored = parsed.axisExplored || 'Unknown';
+      }
+
+      return res.json(response);
     }
 
     // ========================================================================
@@ -4021,8 +4730,19 @@ app.post("/api/game-turn-v2", async (req, res) => {
 
       console.log(`[GAME-TURN-V2] Day ${day} - Appending to conversation history`);
 
-      // Build minimal Day 2+ user prompt
-      const userPrompt = buildGameMasterUserPrompt(day, playerChoice);
+      // Extract current compass values from payload (Day 2+)
+      const currentCompassTopValues = req.body.currentCompassTopValues || null;
+
+      if (currentCompassTopValues) {
+        console.log(`[GAME-TURN-V2] Day ${day} - Current top values received:`, currentCompassTopValues);
+      }
+
+      // Determine mirror mode for Days 2-7 (50/50 random between reflecting on last action vs current dilemma)
+      const mirrorMode = Math.random() < 0.5 ? 'lastAction' : 'dilemma';
+      console.log(`[GAME-TURN-V2] Day ${day} - Mirror mode: ${mirrorMode}`);
+
+      // Build Day 2+ user prompt with current compass values and mirror mode
+      const userPrompt = buildGameMasterUserPrompt(day, playerChoice, currentCompassTopValues, mirrorMode);
 
       // Prepare messages array (history + new user message)
       const messages = [
@@ -4060,57 +4780,157 @@ app.post("/api/game-turn-v2", async (req, res) => {
         console.log("=".repeat(80) + "\n");
       }
 
-      // Call AI
-      let aiResponse;
-      if (useXAI) {
-        aiResponse = await callXAIChat(messages, MODEL_DILEMMA_XAI);
-      } else {
-        aiResponse = await callOpenAIChat(messages, MODEL_DILEMMA);
-      }
-
-      const content = aiResponse?.content;
-      if (!content) {
-        throw new Error("No content in AI response");
-      }
-
-      // Debug logging (Day 2+ AI response)
-      if (debugMode) {
-        console.log("\n" + "=".repeat(80));
-        console.log(`🐛 [DEBUG] Day ${day} Raw AI Response:`);
-        console.log("=".repeat(80));
-        console.log(content);
-        console.log("=".repeat(80) + "\n");
-      }
-
-      // Parse JSON response with robust error handling
+      // Call AI with retry logic for JSON parsing failures
       let parsed;
+      let content;
+      const maxRetries = 1;
 
-      // Try existing safeParseJSON utility first
-      parsed = safeParseJSON(content, { debugTag: "GAME-TURN-V2-DAY2+" });
+      for (let retryCount = 0; retryCount <= maxRetries; retryCount++) {
+        // Add correction message on retry
+        if (retryCount > 0) {
+          console.log(`[GAME-TURN-V2] JSON parse failed, retrying (attempt ${retryCount + 1}/${maxRetries + 1})...`);
+          messages.push({
+            role: "user",
+            content: "Your response was not valid JSON. Please respond ONLY with the raw JSON object, no markdown code blocks (no ```), no explanations - just the JSON starting with { and ending with }."
+          });
+        }
 
-      // If safeParseJSON fails, try custom comma repair
-      if (!parsed) {
-        console.log('[GAME-TURN-V2] safeParseJSON failed, attempting comma repair...');
-        try {
-          // Extract from markdown code blocks if present
-          const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/```\n?([\s\S]*?)\n?```/);
-          const jsonStr = jsonMatch ? jsonMatch[1] : content;
+        const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
 
-          // Fix missing commas: "value"\n"key" -> "value",\n"key"
-          const commaFixed = jsonStr.replace(/("\s*)\n(\s*"[^"]+"\s*:)/g, '$1,\n$2');
-          parsed = JSON.parse(commaFixed);
-          console.log('[GAME-TURN-V2] ✅ Comma repair successful');
-        } catch (commaError) {
-          console.error('[GAME-TURN-V2] All JSON parse attempts failed');
-          console.error('[GAME-TURN-V2] Comma repair error:', commaError);
+        content = aiResponse?.content;
+        if (!content) {
+          throw new Error("No content in AI response");
+        }
+
+        // Debug logging (Day 2+ AI response)
+        if (debugMode) {
+          console.log("\n" + "=".repeat(80));
+          console.log(`🐛 [DEBUG] Day ${day} Raw AI Response (attempt ${retryCount + 1}):`);
+          console.log("=".repeat(80));
+          console.log(content);
+          console.log("=".repeat(80) + "\n");
+        }
+
+        // Parse JSON response with robust error handling
+        // Try existing safeParseJSON utility first (includes markdown stripping)
+        parsed = safeParseJSON(content, { debugTag: `GAME-TURN-V2-DAY2+-ATTEMPT${retryCount + 1}` });
+
+        // If safeParseJSON fails, try custom comma repair
+        if (!parsed) {
+          console.log(`[GAME-TURN-V2] safeParseJSON failed (attempt ${retryCount + 1}), attempting comma repair...`);
+          try {
+            // First strip markdown using our robust function
+            const strippedContent = stripMarkdownCodeBlocks(content);
+
+            // Fix missing commas: "value"\n"key" -> "value",\n"key"
+            const commaFixed = strippedContent.replace(/("\s*)\n(\s*"[^"]+"\s*:)/g, '$1,\n$2');
+            parsed = JSON.parse(commaFixed);
+            console.log('[GAME-TURN-V2] ✅ Comma repair successful');
+          } catch (commaError) {
+            console.error(`[GAME-TURN-V2] Comma repair failed (attempt ${retryCount + 1}):`, commaError.message);
+          }
+        }
+
+        // If parsing succeeded, break out of retry loop
+        if (parsed) {
+          if (retryCount > 0) {
+            console.log(`[GAME-TURN-V2] ✅ JSON parsing succeeded on retry attempt ${retryCount + 1}`);
+          }
+          break;
+        }
+
+        // If this was the last attempt and still no parsed result, throw error
+        if (retryCount === maxRetries && !parsed) {
+          console.error('[GAME-TURN-V2] All JSON parse attempts failed after retries');
           console.error('[GAME-TURN-V2] Raw content:', content);
-          throw new Error(`Failed to parse AI response after all repair attempts: ${commaError.message}`);
+          throw new Error(`Failed to parse AI response after ${maxRetries + 1} attempts`);
         }
       }
 
-      // TENSION CLUSTER VALIDATION + RE-PROMPT
-      const ALL_CLUSTERS = ['ExternalConflict', 'InternalPower', 'EconomyResources', 'HealthDisaster', 'ReligionCulture', 'LawJustice', 'SocialOrder', 'FamilyPersonal', 'DiplomacyTreaty'];
+      // Get existing topic history (used by both topic/scope and tension cluster validation)
       const existingTopicHistory = conversation.meta.topicHistory || [];
+
+      // SEMANTIC SIMILARITY VALIDATION (prevent narrative repetition)
+      // DISABLED: Testing if Gemini model follows instructions without validation
+      if (false && existingTopicHistory.length > 0) {
+        const prevDilemma = existingTopicHistory[existingTopicHistory.length - 1];
+        const currentTitle = parsed.dilemma?.title || '';
+        const currentDescription = parsed.dilemma?.description || '';
+
+        // Quick AI check for semantic similarity using cheap model
+        const similarityPrompt = `Analyze if these two political dilemmas are about the same underlying issue:
+
+Dilemma 1 (Day ${prevDilemma.day}): "${prevDilemma.title}" - ${prevDilemma.description}
+Dilemma 2 (Day ${day}): "${currentTitle}" - ${currentDescription}
+
+Answer ONLY with this JSON format:
+{
+  "isSimilar": true,
+  "reason": "Brief explanation (1 sentence)"
+}
+
+Consider them "similar" (isSimilar: true) if they involve:
+- Same people/groups (e.g., bakers, merchants, priests)
+- Same core tension (e.g., food prices, succession, war)
+- Continuation of same conflict (e.g., baker strike after baker demands)
+
+Consider them "different" (isSimilar: false) if they:
+- Involve completely different stakeholders
+- Address unrelated issues (e.g., baker prices vs military coup)
+- Shift to new tension type (e.g., economic → family crisis)`;
+
+        const similarityCheck = await callGeminiChat([
+          { role: "user", content: similarityPrompt }
+        ], "gemini-2.5-flash"); // Use Gemini for validation
+
+        const similarity = safeParseJSON(similarityCheck?.content, { debugTag: "SEMANTIC-CHECK" });
+
+        if (similarity?.isSimilar) {
+          console.log(`[SEMANTIC] ⚠️ VIOLATION: Day ${day} similar to Day ${prevDilemma.day}`);
+          console.log(`[SEMANTIC] Reason: ${similarity.reason}`);
+          console.log(`[SEMANTIC] 🔄 Re-prompting for different scenario...`);
+
+          const correctionPrompt = `Your dilemma is too similar to yesterday's dilemma.
+
+Yesterday (Day ${prevDilemma.day}): "${prevDilemma.title}" - ${prevDilemma.description}
+Today (Day ${day}): "${currentTitle}" - ${currentDescription}
+Similarity reason: ${similarity.reason}
+
+INSTRUCTIONS:
+1. Keep ONE short sentence acknowledging yesterday's action
+2. Then pivot to a COMPLETELY DIFFERENT underlying issue
+3. Follow Golden Rule B: different human angle (personal, family, religious, social, political, health, environmental, power struggle)
+4. Must be about a different topic entirely, not a continuation of the same tension
+5. Different people/groups should be involved
+
+Regenerate the ENTIRE JSON output with these changes.`;
+
+          const correctedMessages = [...messages, { role: "user", content: correctionPrompt }];
+
+          const retryResponse = await callGeminiChat(correctedMessages, "gemini-2.5-flash");
+
+          const retryContent = retryResponse?.content;
+          if (retryContent) {
+            const retryParsed = safeParseJSON(retryContent, { debugTag: "GAME-TURN-V2-SEMANTIC-RETRY" });
+            if (retryParsed && retryParsed.dilemma) {
+              console.log(`[SEMANTIC] ✅ Re-prompt successful: "${retryParsed.dilemma.title}"`);
+              parsed = retryParsed;
+            } else {
+              console.log(`[SEMANTIC] ⚠️ Re-prompt failed to parse. Using original response.`);
+            }
+          } else {
+            console.log(`[SEMANTIC] ⚠️ Re-prompt returned no content. Using original response.`);
+          }
+        } else {
+          console.log(`[SEMANTIC] ✅ Day ${day}: Different from Day ${prevDilemma.day} - "${currentTitle}"`);
+        }
+      } else {
+        console.log(`[SEMANTIC] ✅ Day ${day}: First dilemma - "${parsed.dilemma?.title || 'Unknown'}"`);
+      }
+
+      // TENSION CLUSTER VALIDATION + RE-PROMPT
+      // DISABLED: Testing if Gemini model follows instructions without validation
+      const ALL_CLUSTERS = ['ExternalConflict', 'InternalPower', 'EconomyResources', 'HealthDisaster', 'ReligionCulture', 'LawJustice', 'SocialOrder', 'FamilyPersonal', 'DiplomacyTreaty'];
       const clusterCounts = { ...(conversation.meta.clusterCounts || {}) };
 
       const prevCluster = existingTopicHistory.length > 0
@@ -4121,7 +4941,7 @@ app.post("/api/game-turn-v2", async (req, res) => {
       // Check violation: max 2 per game (consecutive repeats are allowed)
       const isOverMax = currentCluster !== 'Unknown' && (clusterCounts[currentCluster] || 0) >= 2;
 
-      if (isOverMax) {
+      if (false && isOverMax) {
         console.log(`[TENSION] ⚠️ CLUSTER VIOLATION: Day ${day} "${currentCluster}" - already used 2 times`);
         console.log(`[TENSION] 🔄 Attempting re-prompt...`);
 
@@ -4141,12 +4961,7 @@ Regenerate the ENTIRE JSON output with these changes.`;
 
         const correctedMessages = [...messages, { role: "user", content: correctionPrompt }];
 
-        let retryResponse;
-        if (useXAI) {
-          retryResponse = await callXAIChat(correctedMessages, MODEL_DILEMMA_XAI);
-        } else {
-          retryResponse = await callOpenAIChat(correctedMessages, MODEL_DILEMMA);
-        }
+        const retryResponse = await callGeminiChat(correctedMessages, "gemini-2.5-flash");
 
         const retryContent = retryResponse?.content;
         if (retryContent) {
@@ -4200,7 +5015,9 @@ Regenerate the ENTIRE JSON output with these changes.`;
         day,
         topic: parsed.dilemma?.topic || 'Unknown',
         scope: parsed.dilemma?.scope || 'Unknown',
-        tensionCluster: currentCluster
+        tensionCluster: currentCluster,
+        title: parsed.dilemma?.title || '',        // For semantic similarity validation
+        description: parsed.dilemma?.description || ''  // For semantic similarity validation
       });
 
       // Update meta with new messages array, topic history, and cluster counts
@@ -4233,7 +5050,7 @@ Regenerate the ENTIRE JSON output with these changes.`;
       }
 
       // Return response (flattened for frontend compatibility)
-      return res.json({
+      const response = {
         title: parsed.dilemma?.title || '',
         description: parsed.dilemma?.description || '',
         actions: parsed.dilemma?.actions || [],
@@ -4242,9 +5059,16 @@ Regenerate the ENTIRE JSON output with these changes.`;
         supportShift,
         dynamicParams,
         mirrorAdvice: parsed.mirrorAdvice,
-        corruptionShift: parsed.corruptionShift,
         isGameEnd: isAftermathTurn
-      });
+      };
+
+      // Add tracking fields if using V3 (for frontend validation)
+      if (USE_PROMPT_V3) {
+        response.valueTargeted = parsed.valueTargeted || 'Unknown';
+        response.axisExplored = parsed.axisExplored || 'Unknown';
+      }
+
+      return res.json(response);
     }
 
     // If we get here, invalid request
@@ -4494,8 +5318,10 @@ Wait for SCENARIO CONTEXT, PLAYER ROLE, POLITICAL SYSTEM, and ACTION.`;
  * Appends action to existing conversation and returns compass hints.
  * Requires prior initialization via /api/compass-conversation/init.
  *
- * Request: { gameId: string, action: { title: string, summary: string }, gameContext?: object, debugMode?: boolean }
- * Response: { compassHints: Array<{ prop: string, idx: number, polarity: number }> }
+ * Request: { gameId: string, action: { title: string, summary: string }, reasoning?: { text: string, selectedAction: string }, gameContext?: object, debugMode?: boolean }
+ * Response: { compassHints: Array<{ prop: string, idx: number, polarity: number }>, mirrorMessage?: string }
+ *
+ * When reasoning is provided, also generates a personalized mirror reflection message.
  */
 app.post("/api/compass-conversation/analyze", async (req, res) => {
   try {
@@ -4503,9 +5329,14 @@ app.post("/api/compass-conversation/analyze", async (req, res) => {
       return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
     }
 
-    const { gameId, action, reasoning, gameContext, debugMode = false } = req.body || {};
+    const { gameId, action, reasoning, gameContext, trapContext, debugMode = false } = req.body || {};
     const actionTitle = typeof action?.title === "string" ? action.title.trim().slice(0, 160) : "";
     const actionSummary = typeof action?.summary === "string" ? action.summary.trim().slice(0, 400) : "";
+
+    // Extract trap context for value-aware analysis
+    const valueTargeted = typeof trapContext?.valueTargeted === "string" ? trapContext.valueTargeted.trim() : "";
+    const trapDilemmaTitle = typeof trapContext?.dilemmaTitle === "string" ? trapContext.dilemmaTitle.trim().slice(0, 200) : "";
+    const trapDilemmaDescription = typeof trapContext?.dilemmaDescription === "string" ? trapContext.dilemmaDescription.trim().slice(0, 500) : "";
 
     // Check if this is reasoning analysis
     const isReasoningAnalysis = reasoning?.text;
@@ -4530,15 +5361,33 @@ app.post("/api/compass-conversation/analyze", async (req, res) => {
       console.log(`[CompassConversation] Dilemma: "${actionTitle}"`);
       console.log(`[CompassConversation] Selected Action: "${selectedAction}"`);
       console.log(`[CompassConversation] Reasoning: "${reasoningText.substring(0, 100)}${reasoningText.length > 100 ? '...' : ''}"`);
+      if (valueTargeted) {
+        console.log(`[CompassConversation] 🎯 Value Trap: "${valueTargeted}"`);
+      }
     } else {
       console.log(`\n[CompassConversation] 🔍 Analyzing action for gameId=${gameId}`);
       console.log(`[CompassConversation] Action: "${actionTitle}"`);
+      if (valueTargeted) {
+        console.log(`[CompassConversation] 🎯 Value Trap: "${valueTargeted}"`);
+      }
     }
 
     // Get conversation
     const conversation = getConversation(`compass-${gameId}`);
     if (!conversation || !conversation.meta.messages) {
       console.warn(`[CompassConversation] ⚠️ No conversation found, falling back to non-stateful analysis`);
+
+      // Build trap context section for fallback mode
+      const fallbackTrapContext = valueTargeted ? `
+VALUE TRAP CONTEXT:
+This dilemma was designed to test the player's "${valueTargeted}" value.
+${trapDilemmaTitle ? `The trap setup: "${trapDilemmaTitle}"${trapDilemmaDescription ? ` - ${trapDilemmaDescription}` : ''}` : ''}
+
+MANDATORY: Your analysis MUST include a compass hint for the trapped value (${valueTargeted}).
+- If the action SUPPORTS the trapped value → positive polarity (+1 or +2)
+- If the action CONTRADICTS/BETRAYS the trapped value → negative polarity (-1 or -2)
+
+` : '';
 
       // Fallback: Create one-off analysis without stored state
       const fallbackSystemPrompt = `You translate player decisions into political compass hints.
@@ -4549,7 +5398,7 @@ Return 2-6 compass hints as JSON: {"compassHints": [{"prop": "what|whence|how|wh
 
       let fallbackUserPrompt;
       if (isReasoningAnalysis) {
-        fallbackUserPrompt = `CURRENT DILEMMA:
+        fallbackUserPrompt = `${fallbackTrapContext}CURRENT DILEMMA:
 TITLE: ${actionTitle}${actionSummary ? `\nDESCRIPTION: ${actionSummary}` : ''}
 
 PLAYER'S SELECTED ACTION: ${selectedAction}
@@ -4557,9 +5406,16 @@ PLAYER'S SELECTED ACTION: ${selectedAction}
 PLAYER'S REASONING FOR THIS CHOICE:
 "${reasoningText}"
 
-Analyze the player's reasoning text for political compass values. What values does their explanation reveal?`;
+Analyze the player's reasoning text for political compass values. What values does their explanation reveal?
+
+Additionally, generate a brief (1-2 sentence) mirror reflection message. The mirror is whimsical and archival:
+- Address player as "traveler" or "wanderer"
+- First-person ("I observe...", "I sense...")
+- Comment on their reasoning reflecting their values
+
+Return: {"compassHints": [...], "mirrorMessage": "..."}`;
       } else {
-        fallbackUserPrompt = `Analyze this action:
+        fallbackUserPrompt = `${fallbackTrapContext}Analyze this action:
 TITLE: ${actionTitle}${actionSummary ? `\nSUMMARY: ${actionSummary}` : ''}`;
       }
 
@@ -4568,10 +5424,16 @@ TITLE: ${actionTitle}${actionSummary ? `\nSUMMARY: ${actionSummary}` : ''}`;
         { role: "user", content: fallbackUserPrompt }
       ];
 
-      const aiResponse = await callOpenAIChat(messages, MODEL_COMPASS_HINTS);
+      const aiResponse = await callGeminiChat(messages, MODEL_COMPASS_HINTS);
       const parsed = parseCompassHintsResponse(aiResponse.content);
 
-      return res.json({ compassHints: parsed.compassHints || [] });
+      // Extract mirrorMessage if present (for reasoning analysis)
+      const mirrorMessage = isReasoningAnalysis ? (parsed.mirrorMessage || null) : null;
+
+      return res.json({
+        compassHints: parsed.compassHints || [],
+        ...(mirrorMessage && { mirrorMessage })
+      });
     }
 
     // Extract context (prefer provided gameContext, fallback to stored)
@@ -4580,13 +5442,27 @@ TITLE: ${actionTitle}${actionSummary ? `\nSUMMARY: ${actionSummary}` : ''}`;
     const playerRole = gameContext?.role || storedContext.role || "Unknown role";
     const politicalSystem = gameContext?.systemName || storedContext.systemName || "Unknown system";
 
+    // Build trap context section if provided (for value-aware analysis)
+    const trapContextSection = valueTargeted ? `
+VALUE TRAP CONTEXT:
+This dilemma was designed to test the player's "${valueTargeted}" value.
+The trap setup: "${trapDilemmaTitle}"${trapDilemmaDescription ? ` - ${trapDilemmaDescription}` : ''}
+
+MANDATORY: Your analysis MUST include a compass hint for the trapped value (${valueTargeted}).
+- If the action SUPPORTS the trapped value → positive polarity (+1 or +2)
+- If the action CONTRADICTS/BETRAYS the trapped value → negative polarity (-1 or -2)
+- This hint is REQUIRED in addition to any other relevant values you identify
+
+Continue to analyze other relevant values as well - the trapped value is mandatory but not exclusive.
+` : '';
+
     // Build enhanced user prompt with full context
     let userPrompt;
     if (isReasoningAnalysis) {
       userPrompt = `SCENARIO CONTEXT: ${scenarioContext}
 PLAYER ROLE: ${playerRole}
 POLITICAL SYSTEM: ${politicalSystem}
-
+${trapContextSection}
 CURRENT DILEMMA:
 TITLE: ${actionTitle}${actionSummary ? `
 DESCRIPTION: ${actionSummary}` : ''}
@@ -4598,17 +5474,33 @@ PLAYER'S REASONING FOR THIS CHOICE:
 
 Analyze the player's reasoning text for political compass values. What values does their explanation reveal?
 
+Additionally, generate a SHORT mirror reflection message. The mirror is a cynical, dry-witted observer in FIRST PERSON.
+Job: surface tensions between their VALUES and their REASONING.
+
+Rules:
+- 1 sentence ONLY, 15-20 words maximum
+- Reference at least ONE value from their compass (what/how axes)
+- Create tension - show how their reasoning reveals or contradicts values
+- Never preach - just highlight the contradiction or irony
+- Do NOT use exact compass value names. Paraphrase: "your sense of truth", "your love of freedom"
+- Dry/mocking tone
+
+BAD: "I observe how your reasoning reflects your values, traveler." (too wordy, wrong voice)
+GOOD: "Your sense of fairness is charming when it justifies self-interest."
+GOOD: "Careful deliberation — protecting the powerful, naturally."
+
 Return JSON in this shape:
 {
   "compassHints": [
     {"prop": "what|whence|how|whither", "idx": 0-9, "polarity": -2|-1|1|2}
-  ]
+  ],
+  "mirrorMessage": "Your short mirror reflection here (15-20 words max)"
 }`;
     } else {
       userPrompt = `SCENARIO CONTEXT: ${scenarioContext}
 PLAYER ROLE: ${playerRole}
 POLITICAL SYSTEM: ${politicalSystem}
-
+${trapContextSection}
 ACTION:
 TITLE: ${actionTitle}${actionSummary ? `
 SUMMARY: ${actionSummary}` : ''}
@@ -4662,8 +5554,8 @@ Return JSON in this shape:
       { role: "user", content: userPrompt }
     ];
 
-    // Call AI
-    const aiResponse = await callOpenAIChat(messages, MODEL_COMPASS_HINTS);
+    // Call AI (using Gemini for consistency with dilemma/aftermath)
+    const aiResponse = await callGeminiChat(messages, MODEL_COMPASS_HINTS);
     const content = aiResponse?.content;
 
     if (!content) {
@@ -4691,10 +5583,16 @@ Return JSON in this shape:
     // Validate hints
     const validatedHints = validateCompassHints(parsed.compassHints || []);
 
+    // Extract mirrorMessage if present (for reasoning analysis)
+    const mirrorMessage = isReasoningAnalysis ? (parsed.mirrorMessage || null) : null;
+
     console.log(`[CompassConversation] ✅ Returned ${validatedHints.length} validated hint(s)`);
     validatedHints.forEach(hint => {
       console.log(`  → ${hint.prop}:${hint.idx} (${hint.polarity >= 0 ? '+' : ''}${hint.polarity})`);
     });
+    if (mirrorMessage) {
+      console.log(`[CompassConversation] 🪞 Mirror message: "${mirrorMessage.substring(0, 80)}${mirrorMessage.length > 80 ? '...' : ''}"`);
+    }
 
     // Update conversation with assistant response
     messages.push({ role: "assistant", content });
@@ -4707,7 +5605,10 @@ Return JSON in this shape:
     // Touch conversation to reset TTL
     touchConversation(`compass-${gameId}`);
 
-    return res.json({ compassHints: validatedHints });
+    return res.json({
+      compassHints: validatedHints,
+      ...(mirrorMessage && { mirrorMessage })
+    });
 
   } catch (error) {
     console.error("[CompassConversation] ❌ Analysis error:", error);
@@ -4766,16 +5667,28 @@ function buildSuggestionValidatorSystemPrompt({
     "- Leaders (chiefs, kings, presidents, etc.) CAN propose systemic changes like new governance models – ACCEPT.",
     "- You ONLY judge whether the action can be ATTEMPTED, not whether it will succeed or is politically feasible.",
     "",
-    "REJECT ONLY IF ONE OF THESE TWO CONDITIONS (VERY RARE):",
+    "REJECT ONLY IF ONE OF THESE CONDITIONS (VERY RARE):",
     "",
     "1) ANACHRONISTIC TECHNOLOGY:",
     "   - The suggestion requires technology that literally does not exist in this time period.",
     "   - Example: using smartphones, drones, internet, or firearms before they were invented.",
     "   - NOTE: Social/political innovations are NOT technology - they CAN be proposed in any era.",
     "",
-    "2) GIBBERISH OR NON-ACTION:",
-    "   - Incoherent or meaningless text (e.g., \"I space dog\").",
-    "   - Or a statement that does not describe any actionable behavior.",
+    "2) PASSIVE NON-ACTION:",
+    "   - The player explicitly chooses to do nothing, wait, or delay without taking any active steps.",
+    "   - Example: \"wait\", \"do nothing\", \"just wait and see\", \"delay the decision\".",
+    "   - NOTE: Gathering information IS an active action (e.g., \"consult advisors\", \"research\") → ACCEPT.",
+    "",
+    "3) COMPLETELY UNRELATED TO POLITICAL CONTEXT:",
+    "   - The action has absolutely no connection to the political dilemma or governance.",
+    "   - Example: \"make pasta\", \"mow the lawn\", \"clean my room\", \"take a nap\".",
+    "   - NOTE: Consulting others (mom, advisors, experts) IS related to decision-making → ACCEPT.",
+    "   - NOTE: Personal actions taken TO AVOID the dilemma are still related → ACCEPT.",
+    "",
+    "4) UTTERLY INCOMPREHENSIBLE GIBBERISH:",
+    "   - Random characters, keyboard mashing, or word salad with zero discernible intent.",
+    "   - Example: \"asdfghjkl\", \"вфывфыв\", \"purple fence eat Wednesday\".",
+    "   - NOTE: Terse/shorthand suggestions with clear intent ARE comprehensible → ACCEPT.",
     "",
     "IMPORTANT - THESE ARE NOT GROUNDS FOR REJECTION:",
     "- 'This would face opposition' → ACCEPT (game handles consequences)",
@@ -4790,16 +5703,22 @@ function buildSuggestionValidatorSystemPrompt({
     "- Citizen organizing a revolution → ACCEPT (can attempt)",
     "- Leader changing governance structure → ACCEPT (leaders can propose systemic changes)",
     "- Any political/social innovation regardless of era → ACCEPT (ideas don't require technology)",
+    "- \"consult mom\" → ACCEPT (gathering advice is active and relevant to decision-making)",
+    "- \"research in library\" → ACCEPT (gathering information is active and relevant)",
+    "- \"ask advisors\" → ACCEPT (consultation is active and relevant)",
+    "- \"gather intelligence\" → ACCEPT (information gathering is active and relevant)",
     "",
     "WHEN YOU REJECT (RARE):",
     "- Give one short, friendly sentence naming the exact reason:",
-    "  * Example (authority): \"As a citizen, you cannot directly command the army.\"",
-    "  * Example (setting): \"This society has no such technology in this time period.\"",
-    "  * Example (gibberish): \"This text does not describe a coherent action.\"",
+    "  * Example (technology): \"This society has no such technology in this time period.\"",
+    "  * Example (passive): \"Waiting or doing nothing is not an active choice.\"",
+    "  * Example (unrelated): \"This action has no connection to the political situation.\"",
+    "  * Example (gibberish): \"This text is incomprehensible.\"",
     "- When possible, offer a role-appropriate alternative the player could try.",
     "",
     "OUTPUT FORMAT (JSON ONLY, no extra text):",
-    "{ \"valid\": boolean, \"reason\": string }"
+    "When ACCEPTING: { \"valid\": true }",
+    "When REJECTING: { \"valid\": false, \"reason\": \"short explanation here\" }"
   ].join("\n");
 }
 
@@ -5026,6 +5945,115 @@ async function callXAIChat(messages, model) {
     content: data?.choices?.[0]?.message?.content || "",
     finishReason: data?.choices?.[0]?.finish_reason
   };
+}
+
+/**
+ * Call Gemini (Google) Chat API for game-turn endpoint
+ * Uses OpenAI-compatible endpoint format
+ */
+async function callGeminiChat(messages, model) {
+  const maxRetries = 5;
+  const retryDelayMs = 2000;
+  const retryableStatuses = [429, 500, 502, 503, 504];
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    console.log(`[GEMINI] Calling Gemini API (attempt ${attempt}/${maxRetries}) with key: ${GEMINI_KEY ? 'Yes (' + GEMINI_KEY.substring(0, 8) + '...)' : 'NO KEY!'}`);
+
+    const response = await fetch(GEMINI_CHAT_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${GEMINI_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: model || MODEL_DILEMMA_GEMINI,
+        messages: messages,
+        temperature: 1,
+        max_tokens: 6144,
+        stream: false
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        content: data?.choices?.[0]?.message?.content || "",
+        finishReason: data?.choices?.[0]?.finish_reason
+      };
+    }
+
+    // Check if we should retry
+    if (retryableStatuses.includes(response.status) && attempt < maxRetries) {
+      const errorText = await response.text();
+      console.log(`[GEMINI] ⚠️ Retryable error ${response.status}, waiting ${retryDelayMs}ms before retry ${attempt + 1}/${maxRetries}...`);
+      console.log(`[GEMINI] Error details: ${errorText.substring(0, 200)}`);
+      await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+      continue;
+    }
+
+    // Non-retryable error or max retries reached
+    const errorText = await response.text();
+    throw new Error(`Gemini API error ${response.status}: ${errorText}`);
+  }
+}
+
+/**
+ * Calls Google's Imagen API (via Google AI Studio) for image generation
+ * @param {string} prompt - The image generation prompt
+ * @param {string} model - The Imagen model (e.g., "imagen-4.0-fast-generate-001")
+ * @returns {Promise<string>} Base64-encoded image data
+ */
+async function callGeminiImageGeneration(prompt, model) {
+  const maxRetries = 3;
+  const retryDelayMs = 2000;
+  const retryableStatuses = [429, 500, 502, 503, 504];
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    console.log(`[GEMINI-IMAGE] Calling Imagen API (attempt ${attempt}/${maxRetries}) with model: ${model}`);
+
+    // Correct endpoint format: :predict with x-goog-api-key header
+    const url = `${GEMINI_IMAGE_URL}/${model}:predict`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "x-goog-api-key": GEMINI_KEY,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        instances: [
+          { prompt: prompt }
+        ],
+        parameters: {
+          sampleCount: 1
+        }
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      // Imagen API returns: { predictions: [{ bytesBase64Encoded: "...", mimeType: "image/png" }] }
+      const imageBytes = data?.predictions?.[0]?.bytesBase64Encoded;
+      if (!imageBytes) {
+        throw new Error("No image data in Imagen response");
+      }
+      console.log(`[GEMINI-IMAGE] ✅ Image generated successfully`);
+      return imageBytes;
+    }
+
+    // Check if we should retry
+    if (retryableStatuses.includes(response.status) && attempt < maxRetries) {
+      const errorText = await response.text();
+      console.log(`[GEMINI-IMAGE] ⚠️ Retryable error ${response.status}, waiting ${retryDelayMs}ms before retry ${attempt + 1}/${maxRetries}...`);
+      console.log(`[GEMINI-IMAGE] Error details: ${errorText.substring(0, 200)}`);
+      await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+      continue;
+    }
+
+    // Non-retryable error or max retries reached
+    const errorText = await response.text();
+    throw new Error(`Imagen API error ${response.status}: ${errorText}`);
+  }
 }
 
 // -------------------- Serve static files in production -------

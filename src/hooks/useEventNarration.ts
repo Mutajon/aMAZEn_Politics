@@ -4,13 +4,14 @@ import { useDilemmaStore } from "../store/dilemmaStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useNarrator } from "./useNarrator";
 import { narrationTextForDilemma } from "../lib/narration";
+import { TTS_VOICE } from "../lib/ttsConfig";
 
 type PreparedTTSHandle = { start: () => Promise<void>; dispose: () => void } | null;
 
 export function useEventNarration() {
   const { current } = useDilemmaStore();
   const narrationEnabled = useSettingsStore((s) => s.narrationEnabled !== false);
-  const { prepare: prepareNarration, stop: stopNarration } = useNarrator();
+  const { prepare: prepareNarration, stop: stopNarration, speaking } = useNarrator();
 
   const preparedDilemmaRef = useRef<PreparedTTSHandle>(null);
   const dilemmaPlayedRef = useRef(false);
@@ -50,9 +51,7 @@ export function useEventNarration() {
         skipNarrationLogRef.current = false;
 
         const p = await prepareNarration(speech, {
-          voiceName: "onyx",
-          format: "mp3"
-          // No instructions - will use .env TTS_INSTRUCTIONS
+          voiceName: TTS_VOICE
         });
         if (cancelled) {
           p.dispose();
@@ -108,5 +107,6 @@ export function useEventNarration() {
     overlayPreparing,
     narrationEnabled,
     startNarrationIfReady,
+    speaking, // Expose speaking state for tutorial timing
   };
 }

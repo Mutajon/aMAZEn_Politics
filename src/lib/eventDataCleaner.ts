@@ -17,7 +17,7 @@ import { useDilemmaStore } from "../store/dilemmaStore";
 import { useCompassStore } from "../store/compassStore";
 import { useSettingsStore } from "../store/settingsStore";
 import type { ActionCard } from "../components/event/ActionDeck";
-import { fetchCompassHintsForAction } from "../hooks/useEventDataCollector";
+import { fetchCompassHintsForAction, type TrapContext } from "../hooks/useEventDataCollector";
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -49,11 +49,13 @@ function delay(ms: number): Promise<void> {
  *
  * @param selectedAction - The ActionCard the player confirmed
  * @param clearFlights - Function to clear all coin flight animations
+ * @param trapContext - Optional trap context for value-aware compass analysis
  * @returns Promise that resolves when cleanup is complete
  */
 export async function cleanAndAdvanceDay(
   selectedAction: ActionCard,
-  clearFlights: () => void
+  clearFlights: () => void,
+  trapContext?: TrapContext  // NEW: Pass trap context for value-aware compass analysis
 ): Promise<void> {
   console.log('[Cleaner] Starting cleanup for action:', selectedAction.id, selectedAction.title);
 
@@ -108,8 +110,13 @@ export async function cleanAndAdvanceDay(
   // ========================================================================
   // Note: ActionDeck's confirmation flow already triggers coin flight
   // We just need to wait for it to complete (1200ms standard duration)
-  console.log('[Cleaner] Waiting for coin animation to complete (1200ms)...');
-  await delay(1200);
+  // Only wait if budget system is enabled (otherwise no animation plays)
+  if (showBudget) {
+    console.log('[Cleaner] Waiting for coin animation to complete (1200ms)...');
+    await delay(1200);
+  } else {
+    console.log('[Cleaner] Budget disabled - skipping coin animation wait');
+  }
 
   // ========================================================================
   // STEP 3.5: Fetch and apply compass deltas IMMEDIATELY (Day 1+ with gameId)
@@ -121,11 +128,12 @@ export async function cleanAndAdvanceDay(
     console.log('[Cleaner] Fetching compass deltas for current action...');
 
     try {
-      // Fetch compass pills for the action just taken
+      // Fetch compass pills for the action just taken (with trap context for value-aware analysis)
+      console.log(`[Cleaner] Fetching compass hints with trapContext: ${trapContext?.valueTargeted || 'none'}`);
       const pills = await fetchCompassHintsForAction(gameId, {
         title: selectedAction.title,
         summary: selectedAction.summary || selectedAction.title
-      });
+      }, trapContext);
 
       if (pills.length > 0) {
         console.log(`[Cleaner] Applying ${pills.length} compass deltas immediately`);

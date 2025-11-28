@@ -9,7 +9,6 @@ export type ApiGameSettings = {
   debugMode?: boolean;
   enableModifiers?: boolean;
   experimentMode?: boolean;
-  corruptionTrackingEnabled?: boolean;
   dilemmasSubjectEnabled?: boolean;
   dilemmasSubject?: string;
   treatment?: 'fullAutonomy' | 'semiAutonomy' | 'noAutonomy';
@@ -63,12 +62,6 @@ export const applyGameSettingsToStore = (apiSettings: ApiGameSettings | Record<s
   const experimentModeValue = getApiValue('experimentMode', 'ExperimentMode');
   if (typeof experimentModeValue === 'boolean') {
     store.setExperimentMode(experimentModeValue);
-    settingsApplied = true;
-  }
-
-  const corruptionTrackingValue = getApiValue('corruptionTrackingEnabled', 'CorruptionTrackingEnabled');
-  if (typeof corruptionTrackingValue === 'boolean') {
-    store.setCorruptionTrackingEnabled(corruptionTrackingValue);
     settingsApplied = true;
   }
 
@@ -160,7 +153,6 @@ export const applyGameSettingsToStore = (apiSettings: ApiGameSettings | Record<s
           skipPreviousContext: currentState.skipPreviousContext,
           treatment: currentState.treatment,
           experimentMode: currentState.experimentMode,
-          corruptionTrackingEnabled: currentState.corruptionTrackingEnabled,
         },
         version: 0, // Zustand persist version
       };
@@ -254,9 +246,6 @@ export const loadGameSettingsFromLocalStorage = () => {
       
       const experimentModeValue = getApiValue('experimentMode', 'ExperimentMode');
       if (typeof experimentModeValue === 'boolean') persistData.state.experimentMode = experimentModeValue;
-      
-      const corruptionTrackingValue = getApiValue('corruptionTrackingEnabled', 'CorruptionTrackingEnabled');
-      if (typeof corruptionTrackingValue === 'boolean') persistData.state.corruptionTrackingEnabled = corruptionTrackingValue;
       
       const dilemmasSubjectEnabledValue = getApiValue('dilemmasSubjectEnabled', 'DilemmasSubjectEnabled');
       if (typeof dilemmasSubjectEnabledValue === 'boolean') persistData.state.dilemmasSubjectEnabled = dilemmasSubjectEnabledValue;

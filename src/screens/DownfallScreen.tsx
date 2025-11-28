@@ -4,7 +4,7 @@
 // Shows:
 // - Dramatic downfall narrative from API
 // - Final support levels (all < 20%)
-// - Two options: View Full Report (Aftermath) or Start New Game
+// - One action: View Full Report (forces player through Aftermath screen for logging)
 
 import { useMemo } from "react";
 import { useDilemmaStore } from "../store/dilemmaStore";
@@ -91,12 +91,6 @@ export default function DownfallScreen({ push }: Props) {
               className="w-full px-6 py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-amber-500/50 text-lg"
             >
               View Full Report
-            </button>
-            <button
-              onClick={() => push("/")}
-              className="w-full px-6 py-3 bg-slate-700/50 hover:bg-slate-600/50 border border-slate-500/50 text-slate-200 font-semibold rounded-xl transition-colors"
-            >
-              Start New Game
             </button>
           </div>
 

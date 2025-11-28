@@ -13,7 +13,15 @@ export function updateGlobalTranslations(translations: Record<string, string>, l
 
 // Direct lang function that can be imported
 export function lang(key: string): string {
-  return globalTranslations[key] || key;
+  if (globalTranslations[key]) {
+    return globalTranslations[key];
+  }
+  // Try base key if gender variant not found
+  const baseKey = key.replace(/_(MALE|FEMALE|ANY)$/, '');
+  if (baseKey !== key && globalTranslations[baseKey]) {
+    return globalTranslations[baseKey];
+  }
+  return key;
 }
 
 // Hook version for components that need reactivity

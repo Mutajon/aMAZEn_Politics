@@ -107,7 +107,7 @@ export default function ActionDeck({
       // Skip coin animation if budget is disabled
       if (!showBudget) {
         debugLog("onConfirmSuggestion: budget disabled, skipping coin animation");
-        onSuggest(suggestText);
+        await onSuggest(suggestText);
         closeModalAfterSuccess(); // Close modal after parent handler succeeds
         debugLog("onConfirmSuggestion: COMPLETED (no budget)");
         return;
@@ -116,7 +116,7 @@ export default function ActionDeck({
       // Validate ref exists before animation
       if (!suggestRef.current) {
         debugLog("onConfirmSuggestion: WARNING - suggestRef.current is null, skipping animation");
-        onSuggest(suggestText);
+        await onSuggest(suggestText);
         closeModalAfterSuccess(); // Close modal after parent handler succeeds
         debugLog("onConfirmSuggestion: COMPLETED (no ref)");
         return;

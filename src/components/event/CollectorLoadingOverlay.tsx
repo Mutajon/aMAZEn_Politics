@@ -13,6 +13,7 @@
 import { useMemo, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { useRoleStore } from "../../store/roleStore";
+import { useSettingsStore } from "../../store/settingsStore";
 import { useRotatingTips } from "../../hooks/useRotatingTips";
 import { VideoBackground } from "./VideoBackground";
 import { getRoleVideoPath } from "../../data/predefinedRoles";
@@ -29,6 +30,7 @@ export default function CollectorLoadingOverlay({
 }: Props) {
   const { currentTip, fadeState } = useRotatingTips();
   const soundPlayedRef = useRef(false);
+  const isMobileDevice = useSettingsStore((s) => s.isMobileDevice);
 
   // Play zoom woosh sound when overlay appears
   useEffect(() => {
@@ -64,8 +66,20 @@ export default function CollectorLoadingOverlay({
       transition={{ duration: 0.5 }}
       className="min-h-screen flex items-end justify-center relative pb-20"
     >
-      {/* Video background (with fallback to static image) */}
-      <VideoBackground videoPath={videoPath} imagePath={roleBackgroundImage} />
+      {/* Background: Video on mobile, static image on desktop/tablet */}
+      {isMobileDevice ? (
+        <VideoBackground videoPath={videoPath} imagePath={roleBackgroundImage} />
+      ) : (
+        <div
+          className="fixed inset-0 z-0"
+          style={{
+            backgroundImage: roleBackgroundImage ? `url(${roleBackgroundImage})` : undefined,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+          }}
+        />
+      )}
 
       {/* Minimal loading indicator - positioned at lower part */}
       <div className="relative z-10 flex flex-col items-center gap-4">

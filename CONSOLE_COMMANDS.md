@@ -10,6 +10,7 @@ Switch between AI providers without restarting the application.
 switchToClaude()     // Switch to Anthropic Claude (requires MODEL_DILEMMA_ANTHROPIC in .env)
 switchToGPT()        // Switch to OpenAI GPT (DEFAULT)
 switchToXAI()        // Switch to X.AI/Grok (requires MODEL_DILEMMA_XAI in .env)
+switchToGemini()     // Switch to Google Gemini (requires MODEL_DILEMMA_GEMINI in .env)
 ```
 
 **Note**: Provider switching persists in localStorage. Requires corresponding API keys in `.env`.
@@ -74,6 +75,24 @@ getDemocracy()       // Alias for showDemocracy()
 
 ---
 
+## Compass Values
+
+View current 4D political compass values with visual bars.
+
+```javascript
+getCompass()         // Display all 40 compass values with visual bars
+```
+
+**Output Includes**:
+- All 4 dimensions: What (Values), Whence (Sources), How (Methods), Whither (Beneficiaries)
+- 10 components per dimension with 0-10 scale bars
+- Change indicators from initial quiz values (e.g., `+2`, `-1`)
+- Total compass points out of 400
+
+**Use Case**: Debug compass changes during gameplay, verify quiz initialization.
+
+---
+
 ## Past Games Storage
 
 Manage saved game history (max 10 games, localStorage).
@@ -123,6 +142,36 @@ resetMirrorDialogue()  // Reset first mirror dialogue flag (show full conversati
 - Automatically integrated with `resetAll()` command
 
 **Use Case**: Test mirror dialogue variations, debug first-time experience.
+
+---
+
+## Tutorial System
+
+Manage the Day 2 tutorial system that teaches players about avatar pop-ups and compass values.
+
+```javascript
+resetDay2Tutorial()  // Reset Day 2 tutorial completion flag
+```
+
+**Tutorial System**:
+- Triggers once per player on Day 2 after dilemma narration completes
+- Shows interactive tutorial for:
+  1. Clicking avatar to view compass values
+  2. Clicking compass values to see explanations
+- Completion flag persists in localStorage (`tutorial_day2_completed`)
+- Automatically integrated with `resetAll()` command
+
+**Use Case**:
+- Test tutorial flow during development
+- Re-experience tutorial after completing it once
+- Debug tutorial timing and interactions
+
+**Tutorial Flow**:
+1. Day 2 loads → Narration plays
+2. Narration ends → Tutorial overlay appears
+3. Player clicks avatar → Modal opens
+4. Arrow points to random value → Player clicks value
+5. Explanation modal appears → Player closes → Tutorial complete
 
 ---
 
