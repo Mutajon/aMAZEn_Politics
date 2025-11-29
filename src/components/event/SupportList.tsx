@@ -5,7 +5,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Landmark, Heart, ArrowUp, ArrowDown } from "lucide-react";
+import { Users, Landmark, Heart, ArrowUp, ArrowDown, Skull } from "lucide-react";
+import { lang } from "../../i18n/lang";
 import { useSupportEntityPopover } from "../../hooks/useSupportEntityPopover";
 import { useLogger } from "../../hooks/useLogger";
 import SupportEntityPopover from "./SupportEntityPopover";
@@ -46,6 +47,7 @@ export type SupportItem = {
   trend?: "up" | "down" | null;    // persists until caller changes it
   note?: string | null;            // optional secondary line
   moodVariant?: "civic" | "empathetic"; // civic => angry low; empathetic => sad low (Mom)
+  isDeceased?: boolean;            // NEW: True if entity is dead (shows grayed out with skull)
 };
 
 type Props = {
@@ -136,7 +138,46 @@ function SupportCard({
     trend = null,
     note = null,
     moodVariant = "civic",
+    isDeceased = false,
   } = item;
+
+  // Early return for deceased entities (Mom only currently)
+  if (isDeceased) {
+    return (
+      <motion.div
+        className="rounded-xl px-2 py-2 md:px-3 md:py-2.5 text-white relative bg-gray-800/50 border border-gray-600/30 opacity-60"
+        initial={{ opacity: 0, x: -30 }}
+        animate={{ opacity: 0.6, x: 0 }}
+        transition={{ duration: 0.5, delay: index * 0.2 }}
+      >
+        <div className="flex items-start">
+          {/* Grayed out icon badge with skull */}
+          <div className={`mr-2 md:mr-3 inline-flex items-center justify-center shrink-0 ${ICON_BADGE_SHAPE} ${ICON_BADGE_PADDING} bg-gray-600/50 ${ICON_BADGE_RING}`}>
+            <span className="text-gray-400">
+              <Skull className="w-4 h-4" strokeWidth={2.6} />
+            </span>
+          </div>
+
+          {/* Main info - grayed out */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 md:gap-2">
+              <div className="font-semibold text-sm md:text-base text-gray-400 line-through">{name}</div>
+
+              {/* Deceased label */}
+              <span className="text-[11px] md:text-[13px] leading-none px-2 py-1 rounded-full border bg-gray-700/50 border-gray-500/40 text-gray-400 font-medium">
+                {lang("SUPPORT_DECEASED")}
+              </span>
+
+              {/* Frozen at 0% */}
+              <span className="text-[13px] md:text-[15px] leading-none px-2 py-1 rounded-full border font-semibold bg-gray-700/50 border-gray-500/40 text-gray-500">
+                0%
+              </span>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
 
   // Smoothly animate displayed percent from initialPercent → percent
   // If initialPercent is provided, use it as the animation baseline (value before delta applied)

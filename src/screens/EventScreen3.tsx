@@ -48,7 +48,7 @@ import ReasoningModal from "../components/event/ReasoningModal";
 import SelfJudgmentModal from "../components/event/SelfJudgmentModal";
 import { useDay2Tutorial } from "../hooks/useDay2Tutorial";
 import { TutorialOverlay } from "../components/event/TutorialOverlay";
-import { ValueExplanationModal } from "../components/event/ValueExplanationModal";
+import MomDeathToast from "../components/event/MomDeathToast";
 
 type Props = {
   push: (path: string) => void;
@@ -973,6 +973,9 @@ export default function EventScreen3({ push }: Props) {
 
     return (
       <div className="min-h-screen p-4 pb-20 md:p-6 md:pb-24" style={roleBgStyle}>
+        {/* Toast notification for mom death */}
+        <MomDeathToast />
+
         {/* Debug: Jump to Final Day button */}
         {debugMode && day < 7 && phase === 'interacting' && (
           <button
@@ -997,13 +1000,10 @@ export default function EventScreen3({ push }: Props) {
               scoreDetails={scoreDetails}
               avatarSrc={character?.avatarUrl || null}
               tutorialMode={tutorial.tutorialActive}
-              tutorialDisableClose={tutorial.shouldDisableModalClose}
               onTutorialAvatarClick={tutorial.onAvatarOpened}
               onTutorialValueClick={tutorial.onValueClicked}
               onTutorialModalClose={() => {
-                // Clear value ref to prevent stale state
                 setTutorialValueRef(null);
-                // Call with ref checker function
                 tutorial.onModalClosed(() => tutorialPillsRef !== null);
               }}
               tutorialValueRef={(el) => setTutorialValueRef(el)}
@@ -1168,13 +1168,6 @@ export default function EventScreen3({ push }: Props) {
           />
         )}
 
-        {/* Value Explanation Modal - Tutorial only */}
-        {tutorial.shouldShowExplanation && tutorial.selectedValue && (
-          <ValueExplanationModal
-            value={tutorial.selectedValue}
-            onClose={tutorial.onExplanationClosed}
-          />
-        )}
       </div>
     );
   }

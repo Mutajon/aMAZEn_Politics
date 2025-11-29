@@ -28,7 +28,6 @@ type Props = {
   avatarSrc?: string | null;
   // Tutorial props
   tutorialMode?: boolean;
-  tutorialDisableClose?: boolean; // Separate flag to control whether modal can be closed during tutorial
   onTutorialValueClick?: (value: { short: string; full: string; dimension: PropKey; index: number }) => void;
   tutorialValueRef?: (element: HTMLElement | null) => void;
 };
@@ -123,7 +122,6 @@ export default function PlayerCardModal({
   onClose,
   avatarSrc,
   tutorialMode = false,
-  tutorialDisableClose = false,
   onTutorialValueClick,
   tutorialValueRef,
 }: Props) {
@@ -208,7 +206,7 @@ export default function PlayerCardModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={tutorialDisableClose ? undefined : onClose}
+          onClick={onClose}
           className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         />
 
@@ -223,14 +221,11 @@ export default function PlayerCardModal({
         >
           {/* Header */}
           <div className="sticky top-0 z-10 bg-gradient-to-b from-slate-900/95 to-transparent backdrop-blur-sm px-6 pt-6 pb-4 border-b border-white/10">
-            {/* Close Button - disabled during tutorial until explanation is viewed */}
+            {/* Close Button */}
             <button
-              onClick={tutorialDisableClose ? undefined : onClose}
-              className={`absolute top-4 right-4 p-2 rounded-lg transition-colors z-20 ${
-                tutorialDisableClose ? 'opacity-30 cursor-not-allowed' : 'hover:bg-white/10'
-              }`}
+              onClick={onClose}
+              className="absolute top-4 right-4 p-2 rounded-lg transition-colors z-20 hover:bg-white/10"
               aria-label="Close"
-              disabled={tutorialDisableClose}
             >
               <X className="w-5 h-5 text-white/70" />
             </button>

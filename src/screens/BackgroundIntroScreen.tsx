@@ -132,6 +132,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
       try {
         try {
           const analysis = useRoleStore.getState().analysis;
+          const character = useRoleStore.getState().character;
           const payload = {
             role: roleText || "Unknown role",
             gender,
@@ -139,7 +140,8 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
             systemName: analysis?.systemName || "",
             setting: analysis?.setting || "",
             authorityLevel: analysis?.authorityLevel || "medium",
-            challengerName: analysis?.challengerName || ""
+            challengerName: analysis?.challengerName || "",
+            playerName: character?.name || ""
           };
           const r = await fetch("/api/intro-paragraph", {
             method: "POST",
@@ -271,6 +273,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
       try {
         try {
           const analysis = useRoleStore.getState().analysis;
+          const character = useRoleStore.getState().character;
           const payload = {
             role: roleText || "Unknown role",
             gender,
@@ -278,7 +281,8 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
             systemName: analysis?.systemName || "",
             setting: analysis?.setting || "",
             authorityLevel: analysis?.authorityLevel || "medium",
-            challengerName: analysis?.challengerName || ""
+            challengerName: analysis?.challengerName || "",
+            playerName: character?.name || ""
           };
           const r = await fetch("/api/intro-paragraph", {
             method: "POST",
