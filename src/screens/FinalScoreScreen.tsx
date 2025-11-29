@@ -32,6 +32,7 @@ import { useCompassStore } from "../store/compassStore";
 import { useMirrorQuizStore } from "../store/mirrorQuizStore";
 import { useHighscoreStore } from "../store/highscoreStore";
 import { useRoleProgressStore } from "../store/roleProgressStore";
+import { useLoggingStore } from "../store/loggingStore";
 import { useMirrorTop3 } from "../hooks/useMirrorTop3";
 import { useAudioManager } from "../hooks/useAudioManager";
 import { useLogger } from "../hooks/useLogger";
@@ -292,8 +293,61 @@ export default function FinalScoreScreen({ push }: Props) {
         top3ByDimension
       );
 
+      // Add to local store first (for immediate UI feedback)
       addHighscoreEntry(entry);
       markScoreSubmitted();
+
+      // Submit to global leaderboard (non-blocking)
+      // Note: We don't send avatarUrl to avoid large payloads (base64 images can be 100KB+)
+      // Avatars are stored locally and can be regenerated if needed
+      const userId = useLoggingStore.getState().userId;
+      const gameId = useDilemmaStore.getState().gameId;
+      const sessionId = useLoggingStore.getState().sessionId;
+
+      fetch("/api/highscores/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,           // ADDED: User ID for tracking
+          gameId,           // ADDED: Game session ID (for linking to logs)
+          sessionId,        // ADDED: Session ID (for linking to logs)
+          name: entry.name,
+          about: entry.about,
+          democracy: entry.democracy,
+          autonomy: entry.autonomy,
+          values: entry.values,
+          score: entry.score,
+          politicalSystem: entry.politicalSystem,
+          period: entry.period
+          // avatarUrl intentionally omitted - too large for server storage
+        })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            console.log(`[FinalScore] ✅ Submitted to global leaderboard`);
+            console.log(`  - Global Rank: ${data.globalRank}`);
+            console.log(`  - User Rank: ${data.userRank}`);
+            console.log(`  - Personal Best: ${data.isPersonalBest ? "YES" : "NO"}`);
+            
+            logger.log(
+              "highscore_submitted",
+              { 
+                globalRank: data.globalRank, 
+                userRank: data.userRank,
+                isPersonalBest: data.isPersonalBest,
+                score: entry.score 
+              },
+              `Highscore submitted: Global #${data.globalRank}, Personal #${data.userRank}`
+            );
+          } else {
+            console.warn("[FinalScore] ⚠️ Failed to submit to global leaderboard:", data.error);
+          }
+        })
+        .catch(error => {
+          console.error("[FinalScore] ❌ Error submitting to global leaderboard:", error);
+          // Don't block user experience - local storage still works
+        });
 
       const freshEntries = useHighscoreStore.getState().entries;
       const rank = findPlayerRank(entry.name, breakdown.final, freshEntries);

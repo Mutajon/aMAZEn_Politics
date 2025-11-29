@@ -12,6 +12,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import type { CarouselItem } from "../../hooks/useRoleCarousel";
 import { useLang } from "../../i18n/lang";
+import { useRoleStore } from "../../store/roleStore";
 
 interface RoleInfoBoxProps {
   item: CarouselItem;
@@ -27,6 +28,8 @@ export default function RoleInfoBox({
   onOpenScenario,
 }: RoleInfoBoxProps) {
   const lang = useLang();
+  const character = useRoleStore((s) => s.character);
+  const playerName = character?.name;
   
   // Determine goal color based on score goal
   const goalColorClass = (() => {
@@ -124,6 +127,24 @@ export default function RoleInfoBox({
           </p>
         )}
 
+        {/* Player name and highscore */}
+        {(playerName || (item.highScore && item.highScore > 0)) && (
+          <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-700/40">
+            {playerName && (
+              <div className="flex items-center gap-2">
+                <span className="text-white/70">{lang("PLAYER_NAME")}:</span>
+                <span className="font-semibold text-amber-200">{playerName}</span>
+              </div>
+            )}
+            {item.highScore && item.highScore > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-white/70">{lang("FINAL_SCORE_HIGH_SCORE")}:</span>
+                <span className="font-semibold text-amber-300">{highScoreDisplay}</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Score goal badge */}
         {item.scoreGoal && (
           <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-700/40">
@@ -132,10 +153,6 @@ export default function RoleInfoBox({
               <span className={`font-bold ${goalColorClass}`}>
                 {item.scoreGoal.toLocaleString()}
               </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-white/70">{lang("FINAL_SCORE_HIGH_SCORE")}:</span>
-              <span className="font-semibold text-amber-300">{highScoreDisplay}</span>
             </div>
           </div>
         )}

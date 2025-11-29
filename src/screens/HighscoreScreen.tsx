@@ -61,9 +61,13 @@ function rankColor(i: number): string | undefined {
 
 export default function HighscoreScreen() {
   const lang = useLang();
-  const entries = useHighscoreStore((s) => s.entries);
+  const localEntries = useHighscoreStore((s) => s.entries);
+  const setEntries = useHighscoreStore((s) => s.setEntries);
   const [selected, setSelected] = useState<HighscoreEntry | null>(null);
   const highlightedRef = useRef<HTMLButtonElement | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [entries, setEntriesState] = useState<HighscoreEntry[]>(localEntries);
 
   // Extract highlight parameter from URL
   const highlightName = useMemo(() => {
@@ -74,6 +78,77 @@ export default function HighscoreScreen() {
     const params = new URLSearchParams(hash.slice(queryStart + 1));
     return params.get("highlight");
   }, []);
+
+  // Fetch global highscores on mount only
+  useEffect(() => {
+    let isMounted = true;
+    
+    const fetchGlobalHighscores = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const response = await fetch("/api/highscores?limit=50");
+        const data = await response.json();
+        
+        if (!isMounted) return;
+        
+        if (data.success && data.entries) {
+          // Get current local entries at fetch time (not from dependency)
+          const currentLocalEntries = useHighscoreStore.getState().entries;
+          
+          // Merge with local entries (local takes precedence for same name+score)
+          const localMap = new Map(
+            currentLocalEntries.map(e => [`${e.name}-${e.score}`, e])
+          );
+          
+          const merged = data.entries.map((entry: HighscoreEntry) => {
+            const key = `${entry.name}-${entry.score}`;
+            return localMap.get(key) || entry;
+          });
+          
+          // Add any local entries not in global list
+          data.entries.forEach((entry: HighscoreEntry) => {
+            const key = `${entry.name}-${entry.score}`;
+            localMap.delete(key);
+          });
+          
+          const additionalLocal = Array.from(localMap.values());
+          const allEntries = [...merged, ...additionalLocal]
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 50);
+          
+          setEntriesState(allEntries);
+          // Don't update store to avoid triggering re-renders
+        } else {
+          // Fallback to local entries if API fails
+          console.warn("[HighscoreScreen] ⚠️ Failed to fetch global highscores, using local");
+          if (isMounted) {
+            const currentLocalEntries = useHighscoreStore.getState().entries;
+            setEntriesState(currentLocalEntries);
+          }
+        }
+      } catch (err) {
+        console.error("[HighscoreScreen] ❌ Error fetching global highscores:", err);
+        if (isMounted) {
+          setError("Failed to load global leaderboard");
+          // Fallback to local entries
+          const currentLocalEntries = useHighscoreStore.getState().entries;
+          setEntriesState(currentLocalEntries);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+    
+    fetchGlobalHighscores();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Only fetch once on mount
 
   const list = useMemo(
     () => [...entries].sort((a, b) => b.score - a.score).slice(0, 50),
@@ -104,7 +179,7 @@ export default function HighscoreScreen() {
               {lang("HIGHSCORE_TITLE")}
             </h1>
             <p className="text-white/60 text-xs md:text-sm mt-1">
-              {lang("HIGHSCORE_CLICK_LEADERS")}
+              {loading ? "Loading global leaderboard..." : error || lang("HIGHSCORE_CLICK_LEADERS")}
             </p>
           </div>
           <button
@@ -135,13 +210,17 @@ export default function HighscoreScreen() {
 
           {/* Scrollable body */}
           <div className="max-h-[60vh] md:max-h-[70vh] overflow-y-auto divide-y divide-white/5">
-  <motion.div
-    initial="hidden"
-    animate="show"
-    variants={listVariants}
-  >
-
-            {list.map((e, i) => {
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-white/60">Loading leaderboard...</div>
+              </div>
+            ) : (
+              <motion.div
+                initial="hidden"
+                animate="show"
+                variants={listVariants}
+              >
+                {list.map((e, i) => {
               const color = rankColor(i);
               const isHighlighted = highlightName && e.name === highlightName;
               const isMobile = window.innerWidth < 640;
@@ -189,8 +268,15 @@ export default function HighscoreScreen() {
                       height={isMobile ? 40 : 50}
                       className="w-10 h-10 md:w-[50px] md:h-[50px] rounded-lg object-cover border border-white/10 flex-shrink-0"
                       onError={(ev) => {
-                        (ev.currentTarget as HTMLImageElement).src =
-                          "/assets/images/leaders/placeholder.jpg";
+                        const img = ev.currentTarget as HTMLImageElement;
+                        // Prevent infinite loop: only set placeholder if not already set
+                        if (img.src && !img.src.includes('placeholder.jpg')) {
+                          img.src = "/assets/images/leaders/placeholder.jpg";
+                        } else {
+                          // If placeholder also fails, use a transparent pixel to stop the loop
+                          img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50'%3E%3Crect fill='%23333' width='50' height='50'/%3E%3C/svg%3E";
+                          img.onerror = null; // Remove error handler to stop loop
+                        }
                       }}
                     />
                     <span className="truncate px-2 py-1 rounded-md bg-white/10 text-white/90 text-xs md:text-sm font-medium">
@@ -214,9 +300,10 @@ export default function HighscoreScreen() {
                     {e.score.toLocaleString()}
                   </div>
                   </motion.button>
-              );
-            })}
-            </motion.div>
+                );
+              })}
+              </motion.div>
+            )}
           </div>
         </div>
       </div>

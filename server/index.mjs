@@ -14,7 +14,7 @@ import {
   deleteConversation,
   startCleanupTask
 } from "./conversationStore.mjs";
-import { getCountersCollection, incrementCounter, getUsersCollection, getScenarioSuggestionsCollection } from "./db/mongodb.mjs";
+import { getCountersCollection, incrementCounter, getUsersCollection, getScenarioSuggestionsCollection, getHighscoresCollection } from "./db/mongodb.mjs";
 import { getTheoryPrompt } from "./theory-loader.mjs";
 
 // -------------------- Process Error Handlers ---------------------------
@@ -6128,6 +6128,318 @@ if (process.env.NODE_ENV === "production") {
 
   console.log(`[server] serving static files from ${distPath}`);
 }
+
+// -------------------- Highscores API Endpoints ---------------------------
+/**
+ * POST /api/highscores/submit
+ * Submit a highscore entry to the global leaderboard (V2)
+ * Note: Avatars are NOT stored on server - only stored locally in browser
+ * 
+ * Request Body:
+ * {
+ *   userId: string,         // REQUIRED: Anonymous UUID or researcher ID
+ *   gameId?: string,        // OPTIONAL: Game session ID (for linking to logs)
+ *   sessionId?: string,     // OPTIONAL: Session ID (for linking to logs)
+ *   name: string,
+ *   about: string,
+ *   democracy: string,
+ *   autonomy: string,
+ *   values: string,
+ *   score: number,
+ *   politicalSystem: string,
+ *   period?: string
+ * }
+ */
+app.post("/api/highscores/submit", async (req, res) => {
+  try {
+    const {
+      userId,           // NEW: Required
+      gameId,           // NEW: Optional (for linking to logs)
+      sessionId,        // NEW: Optional (for linking to logs)
+      name,
+      about,
+      democracy,
+      autonomy,
+      values,
+      score,
+      politicalSystem,
+      period
+    } = req.body;
+
+    // Validation
+    if (!userId || typeof userId !== 'string' || userId.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "userId is required"
+      });
+    }
+
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Name is required"
+      });
+    }
+
+    if (typeof score !== 'number' || score < 0 || score > 1500) {
+      return res.status(400).json({
+        success: false,
+        error: "Score must be between 0 and 1500"
+      });
+    }
+
+    const collection = await getHighscoresCollection();
+    
+    // Insert entry
+    const entry = {
+      userId: userId.trim(),
+      gameId: gameId || null,
+      sessionId: sessionId || null,
+      name: name.trim(),
+      about: about?.trim() || "",
+      democracy: democracy || "Medium",
+      autonomy: autonomy || "Medium",
+      values: values || "",
+      score: Math.round(score),
+      politicalSystem: politicalSystem?.trim() || "Unknown",
+      period: period || undefined,
+      createdAt: new Date()
+    };
+
+    await collection.insertOne(entry);
+
+    // Get global rank (across all users)
+    const globalRank = await collection.countDocuments({ score: { $gt: score } }) + 1;
+
+    // Get user's personal rank (among their own scores)
+    const userRank = await collection.countDocuments({ 
+      userId: userId,
+      score: { $gt: score } 
+    }) + 1;
+
+    // Check if this is user's best score
+    const userBestScore = await collection.findOne(
+      { userId: userId },
+      { sort: { score: -1 }, projection: { score: 1 } }
+    );
+    const isPersonalBest = !userBestScore || score >= userBestScore.score;
+
+    console.log(`[Highscores] ✅ Submitted: ${name} (userId: ${userId}, Score: ${score}, Global Rank: ${globalRank}, User Rank: ${userRank})`);
+
+    res.json({
+      success: true,
+      globalRank,
+      userRank,
+      isPersonalBest,
+      totalUserScores: await collection.countDocuments({ userId }),
+      message: "Highscore submitted successfully"
+    });
+
+  } catch (error) {
+    console.error("[Highscores] ❌ Error submitting:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to submit highscore"
+    });
+  }
+});
+
+/**
+ * GET /api/highscores/global
+ * Get global leaderboard - highest score per user (top 50 users)
+ * 
+ * Query Parameters:
+ * - limit: number (default: 50, max: 100)
+ * - offset: number (default: 0)
+ */
+app.get("/api/highscores/global", async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
+    const collection = await getHighscoresCollection();
+    
+    // MongoDB aggregation to get best score per user
+    const pipeline = [
+      // Sort by score descending to get best scores first
+      { $sort: { score: -1 } },
+      
+      // Group by userId, take first (highest) score for each user
+      {
+        $group: {
+          _id: { $ifNull: ["$userId", { $concat: ["anonymous-", { $toString: "$_id" }] }] },
+          bestEntry: { $first: "$$ROOT" }
+        }
+      },
+      
+      // Replace root with the best entry document
+      { $replaceRoot: { newRoot: "$bestEntry" } },
+      
+      // Sort by score again (after grouping)
+      { $sort: { score: -1 } },
+      
+      // Pagination
+      { $skip: offset },
+      { $limit: limit }
+    ];
+
+    const entries = await collection.aggregate(pipeline).toArray();
+
+    // Format response (remove _id, sensitive data)
+    const formattedEntries = entries.map(({ _id, userId, gameId, sessionId, ...entry }) => ({
+      ...entry,
+      createdAt: entry.createdAt?.toISOString?.() || entry.createdAt,
+      // Note: userId intentionally excluded for privacy in global view
+      // Note: avatarUrl not stored in DB (only local)
+    }));
+
+    // Get total unique users count (for pagination)
+    const totalUsers = await collection.distinct("userId").then(arr => arr.length);
+
+    console.log(`[Highscores] ✅ Fetched global leaderboard: ${formattedEntries.length} entries (offset: ${offset}, totalUsers: ${totalUsers})`);
+
+    res.json({
+      success: true,
+      entries: formattedEntries,
+      totalUsers,
+      limit,
+      offset
+    });
+
+  } catch (error) {
+    console.error("[Highscores] ❌ Error fetching global leaderboard:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch global leaderboard"
+    });
+  }
+});
+
+/**
+ * GET /api/highscores/user/:userId
+ * Get all scores for a specific user (personal history)
+ * 
+ * Query Parameters:
+ * - limit: number (default: 50, max: 100)
+ * - offset: number (default: 0)
+ * - sortBy: "score" | "date" (default: "score")
+ */
+app.get("/api/highscores/user/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+    const sortBy = req.query.sortBy === "date" ? "createdAt" : "score";
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: "userId is required"
+      });
+    }
+
+    const collection = await getHighscoresCollection();
+    
+    // Get all scores for this user
+    const sortOrder = sortBy === "score" ? { score: -1 } : { createdAt: -1 };
+    
+    const entries = await collection
+      .find({ userId })
+      .sort(sortOrder)
+      .skip(offset)
+      .limit(limit)
+      .toArray();
+
+    // Format response
+    const formattedEntries = entries.map(({ _id, userId, gameId, sessionId, ...entry }) => ({
+      ...entry,
+      createdAt: entry.createdAt?.toISOString?.() || entry.createdAt,
+      gameId, // Include gameId for user's own scores (helps with debugging)
+    }));
+
+    // Get total count for this user
+    const total = await collection.countDocuments({ userId });
+
+    // Get user's best score
+    const bestScore = entries.length > 0 
+      ? Math.max(...entries.map(e => e.score))
+      : 0;
+
+    console.log(`[Highscores] ✅ Fetched user scores: ${userId} (${formattedEntries.length} entries, best: ${bestScore})`);
+
+    res.json({
+      success: true,
+      entries: formattedEntries,
+      total,
+      bestScore,
+      limit,
+      offset
+    });
+
+  } catch (error) {
+    console.error("[Highscores] ❌ Error fetching user scores:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch user scores"
+    });
+  }
+});
+
+/**
+ * GET /api/highscores (DEPRECATED)
+ * Get global highscores leaderboard
+ * 
+ * @deprecated Use /api/highscores/global or /api/highscores/user/:userId instead
+ * 
+ * Query Parameters:
+ * - limit: number (default: 50, max: 100)
+ * - offset: number (default: 0)
+ */
+app.get("/api/highscores", async (req, res) => {
+  console.warn('[Highscores] ⚠️ DEPRECATED: /api/highscores endpoint called. Use /api/highscores/global or /api/highscores/user/:userId instead.');
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
+    const collection = await getHighscoresCollection();
+    
+    // Get top scores, sorted by score descending
+    const entries = await collection
+      .find({})
+      .sort({ score: -1 })
+      .skip(offset)
+      .limit(limit)
+      .toArray();
+
+    // Remove MongoDB _id field and format response
+    // Note: Avatars are NOT included - they're only stored locally in browser
+    const formattedEntries = entries.map(({ _id, ...entry }) => ({
+      ...entry,
+      // Convert MongoDB date to ISO string if needed
+      createdAt: entry.createdAt?.toISOString?.() || entry.createdAt
+    }));
+
+    // Get total count for pagination
+    const total = await collection.countDocuments({});
+
+    console.log(`[Highscores] ✅ Fetched ${formattedEntries.length} entries (offset: ${offset}, total: ${total})`);
+
+    res.json({
+      success: true,
+      entries: formattedEntries,
+      total,
+      limit,
+      offset
+    });
+
+  } catch (error) {
+    console.error("[Highscores] ❌ Error fetching highscores:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch highscores"
+    });
+  }
+});
 
 // -------------------- Health Check Endpoint ---------------------------
 /**

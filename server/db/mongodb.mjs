@@ -210,6 +210,15 @@ async function createIndexes() {
     const scenarioSuggestionsCollection = db.collection('scenarioSuggestions');
     await scenarioSuggestionsCollection.createIndex({ createdAt: -1 }, { name: 'createdAt', background: true });
 
+    // highscores collection - for global leaderboard
+    const highscoresCollection = db.collection('highscores');
+    await highscoresCollection.createIndex({ score: -1 }, { name: 'score_desc', background: true });
+    await highscoresCollection.createIndex({ name: 1, score: -1 }, { name: 'name_score', background: true });
+    await highscoresCollection.createIndex({ createdAt: -1 }, { name: 'createdAt', background: true });
+    // V2: User-based tracking indexes
+    await highscoresCollection.createIndex({ userId: 1, score: -1 }, { name: 'userId_score', background: true });
+    await highscoresCollection.createIndex({ userId: 1, createdAt: -1 }, { name: 'userId_timestamp', background: true });
+
     console.log('[MongoDB] ✅ Indexes created/verified');
   } catch (error) {
     console.warn('[MongoDB] ⚠️ Index creation failed (non-critical):', error.message);
@@ -262,6 +271,18 @@ export async function getUsersCollection() {
 export async function getScenarioSuggestionsCollection() {
   const database = await ensureConnection();
   return database.collection('scenarioSuggestions');
+}
+
+/**
+ * Get highscores collection
+ * Automatically connects to database if not connected
+ * Ensures connection is healthy before returning collection
+ *
+ * @returns {Promise<Collection>} MongoDB collection instance
+ */
+export async function getHighscoresCollection() {
+  const database = await ensureConnection();
+  return database.collection('highscores');
 }
 
 /**

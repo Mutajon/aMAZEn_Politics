@@ -31,7 +31,8 @@ import DifficultyScreen from "./screens/DifficultyScreen";
 import GoalsSelectionScreen from "./screens/GoalsSelectionScreen";
 import { useEnsureMirroredAvatarOnce } from "./hooks/useEnsureMirroredAvatarOnce";
 import EventScreen3 from "./screens/EventScreen3";
-import HighscoreScreen from "./screens/HighscoreScreen";
+import HighscoreScreen from "./screens/HighscoreScreen"; // Legacy (V1)
+import HighscoreScreenV2 from "./screens/HighscoreScreenV2"; // V2: Global/Local tabs with userId tracking
 import AchievementsScreen from "./screens/AchievementsScreen";
 import MirrorScreen from "./screens/MirrorScreen";
 import AftermathScreen from "./screens/AftermathScreen";
@@ -242,7 +243,8 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
           })()}
           {route === "/event" && <EventScreen3 push={push} />}
           {route === "/downfall" && <DownfallScreen push={push} />}
-          {route.startsWith("/highscores") && <HighscoreScreen />}
+          {route === "/highscores-v1" && <HighscoreScreen />} {/* Legacy V1 */}
+          {route.startsWith("/highscores") && <HighscoreScreenV2 />} {/* V2: Global/Local tabs */}
           {route === "/achievements" && <AchievementsScreen />}
           {route === "/aftermath" && <AftermathScreen push={push} />}
           {route === "/final-score" && <FinalScoreScreen key={gameId} push={push} />}
