@@ -81,32 +81,6 @@ function extractPhysical(input: string): string {
   return trimmed.trim().replace(/^with\s+/i, "");
 }
 
-function genderizeRole(role: string, gender: "male" | "female" | "any"): string {
-  const r = (role || "").trim().toLowerCase();
-  const map: Record<string, { male: string; female: string }> = {
-    emperor: { male: "Emperor of", female: "Empress of" },
-    king: { male: "King of", female: "Queen of" },
-    prince: { male: "Prince of", female: "Princess of" },
-    hero: { male: "Hero of", female: "Heroine of" },
-    monk: { male: "Monk of", female: "Nun of" },
-    lord: { male: "Lord of", female: "Lady of" },
-    duke: { male: "Duke of", female: "Duchess of" },
-    tsar: { male: "Tsar of", female: "Tsarina of" },
-    pharaoh: { male: "Pharaoh of", female: "Pharaoh of" },
-    chancellor: { male: "Chancellor of", female: "Chancellor of" },
-    kanzler: { male: "Kanzler von", female: "Kanzlerin von" },
-  };
-  for (const key of Object.keys(map)) {
-    if (r.startsWith(key)) {
-      const rest = role.slice(key.length).trim();
-      const pair = map[key];
-      if (gender === "female") return `${pair.female} ${rest}`.trim();
-      return `${pair.male} ${rest}`.trim();
-    }
-  }
-  return role;
-}
-
 function suggestBackgroundObject(role = ""): string {
   const r = role.toLowerCase();
   // Existing mappings
@@ -130,68 +104,24 @@ function suggestBackgroundObject(role = ""): string {
   return "ornate palace backdrop";
 }
 
-/**
- * Derives era/setting context for image generation prompt.
- * Uses grounding.era if available (from AI analysis), otherwise falls back to role name + year.
- */
-function deriveEraSetting(role: string, year: string | null, era: string | undefined): string {
-  // Use grounding.era if available (most descriptive)
-  if (era) {
-    // Extract just the period part, e.g., "431 BCE Athens" from "431 BCE Athens (outbreak...)"
-    const cleaned = era.replace(/\s*\([^)]*\)/g, '').trim();
-    return cleaned || "historical period";
-  }
-
-  // Fallback: construct from role name + year
-  const r = role.toLowerCase();
-  if (r.includes("athens") || r.includes("greece")) return `ancient Greece${year ? `, ${year.replace('-', '')} BCE` : ''}`;
-  if (r.includes("alexandria") || r.includes("egypt")) return `ancient Alexandria${year ? `, ${year.replace('-', '')} BCE` : ''}`;
-  if (r.includes("florence") || r.includes("italy")) return `Renaissance Florence${year ? `, ${year} CE` : ''}`;
-  if (r.includes("japan") || r.includes("shogun")) return `feudal Japan${year ? `, ${year} CE` : ''}`;
-  if (r.includes("america") || r.includes("colonial") || r.includes("jamestown")) return `colonial North America${year ? `, ${year} CE` : ''}`;
-  if (r.includes("haiti") || r.includes("saint-domingue")) return `colonial Haiti${year ? `, ${year} CE` : ''}`;
-  if (r.includes("russia") || r.includes("tsar")) return `imperial Russia${year ? `, ${year} CE` : ''}`;
-  if (r.includes("india") || r.includes("gandhi")) return `British India${year ? `, ${year} CE` : ''}`;
-  if (r.includes("africa") || r.includes("mandela")) return `South Africa${year ? `, ${year} CE` : ''}`;
-  if (r.includes("mars") || r.includes("2179")) return `Mars colony${year ? `, ${year} CE` : ''}`;
-
-  // Generic fallback
-  return year ? `year ${year}` : "historical setting";
-}
-
 function buildFullPrompt(
-  role: string,
   gender: "male" | "female" | "any",
   physical: string,
   bgObject: string,
-  eraSetting: string,
-  roleDescription: string | null
+  avatarPrompt: string | null
 ): string {
-  // Clean the role name - strip "— Subtitle (-year)" patterns
-  const cleanRole = role
-    .replace(/\s*—.*$/, '')           // Remove "— Shadows of War"
-    .replace(/\s*\([^)]*\)/g, '')     // Remove "(-431)"
-    .trim() || "leader";
+  const genderWord = gender === "male" ? "male " : gender === "female" ? "female " : "";
 
-  const genderedRole = genderizeRole(cleanRole, gender);
-
-  // Extract era without dates for cleaner prompt
-  const eraClean = eraSetting
-    .replace(/\d+\s*(BCE|CE|BC|AD)/gi, '')
-    .replace(/,\s*$/, '')
-    .trim() || "historical setting";
-
-  // Use role description if available, otherwise use role name
-  const roleContext = roleDescription
-    ? roleDescription.split('.')[0].trim()  // First sentence only
-    : `a ${genderedRole}`;
+  // Use avatarPrompt if available, otherwise generic "leader"
+  const subject = avatarPrompt
+    ? `a ${genderWord}${avatarPrompt}`.replace("a a ", "a ")
+    : `a ${genderWord}leader`;
 
   const physicalClean = physical.trim().replace(/^[,.\s]+/, '');
-  const physicalDesc = physicalClean || "with distinctive features";
+  const physicalDesc = physicalClean ? `, ${physicalClean}` : "";
+  const bg = bgObject ? `. Background: ${bgObject}` : "";
 
-  const bg = bgObject ? `, with ${bgObject} in the background` : "";
-
-  return `A drawing of a close up of the face only of ${roleContext} from ${eraClean}, ${physicalDesc}${bg}.`;
+  return `A close-up portrait drawing of ONLY the face of ${subject}${physicalDesc}${bg}. Style: colored cartoon with strong lines.`;
 }
 
 
@@ -212,9 +142,6 @@ export default function NameScreen({ push }: { push: PushFn }) {
   });
 
   const selectedRole = useRoleStore((s) => s.selectedRole);
-  const roleYear = useRoleStore((s) => s.roleYear);
-  const roleDescription = useRoleStore((s) => s.roleDescription);
-  const analysis = useRoleStore((s) => s.analysis);
   const character = useRoleStore((s) => s.character);
   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
   const setCharacter = useRoleStore((s) => s.setCharacter);
@@ -243,15 +170,16 @@ export default function NameScreen({ push }: { push: PushFn }) {
   const MAX_AVATAR_RETRIES = 3;
   const RETRY_DELAY_MS = 2000;
 
-  // Derive era/setting for image generation prompt
-  const eraSetting = useMemo(
-    () => deriveEraSetting(selectedRole || "", roleYear, analysis?.grounding?.era),
-    [selectedRole, roleYear, analysis?.grounding?.era]
-  );
+  // Get avatarPrompt from predefined role (null for custom roles)
+  const avatarPrompt = useMemo(() => {
+    if (!selectedRole) return null;
+    const roleData = getPredefinedRole(selectedRole);
+    return roleData?.avatarPrompt || null;
+  }, [selectedRole]);
 
   const fullPrompt = useMemo(
-    () => buildFullPrompt(selectedRole || "", gender, physical, bgObject, eraSetting, roleDescription),
-    [selectedRole, gender, physical, bgObject, eraSetting, roleDescription]
+    () => buildFullPrompt(gender, physical, bgObject, avatarPrompt),
+    [gender, physical, bgObject, avatarPrompt]
   );
 
   async function loadSuggestions() {
@@ -334,7 +262,6 @@ export default function NameScreen({ push }: { push: PushFn }) {
 
         setAvatarAttempt(attempt);
         console.log(`[NameScreen] Avatar generation attempt ${attempt}/${MAX_AVATAR_RETRIES}`);
-        console.log(`[NameScreen] Era setting: "${eraSetting}"`);
         console.log(`[NameScreen] Full prompt: "${prompt}"`);
 
         try {
@@ -568,8 +495,8 @@ export default function NameScreen({ push }: { push: PushFn }) {
                         return `${lang(roleData.titleKey)} (${roleData.year})`;
                       }
                     }
-                    // For custom roles, use genderizeRole
-                    return genderizeRole(selectedRole || "", gender);
+                    // For custom roles, just use the role name
+                    return selectedRole || "Leader";
                   })()}
                 </p>
               </motion.div>

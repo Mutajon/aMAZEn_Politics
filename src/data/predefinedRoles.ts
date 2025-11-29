@@ -37,6 +37,7 @@ export interface PredefinedRoleData {
   youAreKey: string;                   // i18n key for role description
   year: string;                        // Year badge display
   imageId: string;                     // Image identifier for banner/full images
+  avatarPrompt: string;                // Short description for avatar image generation
   roleScope: string;                   // In-world authority / what this role can actually do
   storyThemes: string[];               // Core thematic axes or domains to explore
   powerDistribution: AnalysisResult;   // Complete E-12 political system analysis
@@ -60,6 +61,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "ATHENS_YOU_ARE",
     year: "-431",
     imageId: "greece",
+    avatarPrompt: "citizen of ancient Athens",
     roleScope: "You are a citizen of Athens. You may propose measures, and the Assembly will vote on them. You cannot enact major changes by yourself.",
     storyThemes: ["democracy_vs_empire", "glory_vs_pragmatism", "citizen_vs_expert"],
     scoreGoal: 1000,
@@ -158,6 +160,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "ALEXANDRIA_YOU_ARE",
     year: "-48",
     imageId: "alexandria",
+    avatarPrompt: "scholar-advisor in ancient Alexandria",
     roleScope: "Serves as a city scholar-advisor mediating between palace factions and Roman commanders; can sway civic policy, archives, and urban defenses but not direct legions.",
     storyThemes: ["cultural_survival", "foreign_domination", "knowledge_vs_power"],
     scoreGoal: 1000,
@@ -256,6 +259,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "FLORENCE_YOU_ARE",
     year: "1494",
     imageId: "florence",
+    avatarPrompt: "council member in Renaissance Florence",
     roleScope: "Sits on Florence's Great Council, balancing guild and patrician interests; can propose civic edicts, policing orders, and cultural protections but cannot command Papal or French armies.",
     storyThemes: ["faith_vs_freedom", "economic_stability", "civic_identity"],
     scoreGoal: 1100,
@@ -354,6 +358,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "NORTH_AMERICA_YOU_ARE",
     year: "1607",
     imageId: "northAmerica",
+    avatarPrompt: "Native American tribal chief when European settlers arrived",
     roleScope: "You are a tribal indian chief. You lead a council overseeing diplomacy, land stewardship, and trade terms; can mobilize scouts and negotiate boundaries but does not unilaterally declare war without consensus.",
     storyThemes: ["territorial_autonomy", "cultural_preservation", "exchange_vs_exploitation"],
     scoreGoal: 1100,
@@ -452,6 +457,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "JAPAN_YOU_ARE",
     year: "1600",
     imageId: "japan",
+    avatarPrompt: "samurai clan leader in feudal Japan",
     roleScope: "Heads a mid-level samurai clan caught between warring coalitions; can commit retainers, negotiate allegiances, and manage village protections but cannot dictate national strategy.",
     storyThemes: ["loyalty_vs_survival", "clan_honor", "centralization"],
     scoreGoal: 1200,
@@ -550,6 +556,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "HAITI_YOU_ARE",
     year: "1791",
     imageId: "haiti",
+    avatarPrompt: "plantation overseer in colonial Haiti during the slave revolt",
     roleScope: "Acts as a plantation overseer-turned-liaison among rebel factions; can influence local militia deployments, justice for captives, and resource distribution but cannot dictate colony-wide treaties.",
     storyThemes: ["emancipation", "justice_vs_vengeance", "unity_vs_fragmentation"],
     scoreGoal: 1200,
@@ -648,6 +655,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "RUSSIA_YOU_ARE",
     year: "1917",
     imageId: "russia",
+    avatarPrompt: "Tsar of Imperial Russia",
     roleScope: "Embattled Tsar managing imperial decrees, military appointments, and court negotiations; can reshuffle ministers, issue manifestos, or seek truces but cannot personally command every garrison simultaneously.",
     storyThemes: ["autocracy_vs_revolution", "bread_land_peace", "loyalty_crisis"],
     scoreGoal: 1300,
@@ -746,6 +754,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "INDIA_YOU_ARE",
     year: "1947",
     imageId: "india",
+    avatarPrompt: "district officer during India's partition",
     roleScope: "District officer coordinating police, relief, and political liaisons along the partition line; manages curfews, convoys, and investigations but cannot redraw national borders.",
     storyThemes: ["communal_trust", "order_vs_liberty", "refugee_protection"],
     scoreGoal: 1300,
@@ -844,6 +853,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "SOUTH_AFRICA_YOU_ARE",
     year: "1990",
     imageId: "southAfrica",
+    avatarPrompt: "police commander in apartheid-era South Africa",
     roleScope: "Senior police commander overseeing citywide operations during the transition; can set deployment protocols, liaise with reform negotiators, and manage crowd-control policy but cannot pass national laws.",
     storyThemes: ["justice_vs_amnesty", "public_safety", "institutional_trust"],
     scoreGoal: 1400,
@@ -942,6 +952,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     youAreKey: "MARS_YOU_ARE",
     year: "2179",
     imageId: "mars",
+    avatarPrompt: "governor of a Mars colony in the future",
     roleScope: "Elected Mars colony governor balancing survival systems and autonomy petitions; can adjust habitat policy, rationing, and negotiations with Earth but cannot conjure unlimited supplies.",
     storyThemes: ["autonomy_vs_dependency", "survival_ethics", "science_vs_populism"],
     scoreGoal: 1400,
