@@ -266,6 +266,8 @@
   "HIGHSCORE_NO_GLOBAL_SCORES": "No global scores available yet.",
   "HIGHSCORE_LOADING": "Loading leaderboard...",
   "HIGHSCORE_ERROR_LOAD": "Failed to load scores. Please try again.",
+  "ROLE_YOUR_BEST": "Your Best:",
+  "ROLE_GLOBAL_BEST": "World Best:",
   "DEMOCRACY_LEVEL_VERY_LOW": "Very Low",
   "DEMOCRACY_LEVEL_LOW": "Low",
   "DEMOCRACY_LEVEL_MEDIUM": "Medium",

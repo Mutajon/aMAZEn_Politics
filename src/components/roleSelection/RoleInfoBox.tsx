@@ -13,12 +13,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { CarouselItem } from "../../hooks/useRoleCarousel";
 import { useLang } from "../../i18n/lang";
 import { useRoleStore } from "../../store/roleStore";
+import { Trophy, Crown } from "lucide-react";
 
 interface RoleInfoBoxProps {
   item: CarouselItem;
   onConfirm: () => void;
   onOpenCustomRole?: () => void;
   onOpenScenario?: () => void;
+  userBestScore?: number | null;
+  globalBestScore?: number | null;
 }
 
 export default function RoleInfoBox({
@@ -26,6 +29,8 @@ export default function RoleInfoBox({
   onConfirm,
   onOpenCustomRole,
   onOpenScenario,
+  userBestScore,
+  globalBestScore,
 }: RoleInfoBoxProps) {
   const lang = useLang();
   const character = useRoleStore((s) => s.character);
@@ -145,15 +150,34 @@ export default function RoleInfoBox({
           </div>
         )}
 
-        {/* Score goal badge */}
+        {/* Score goal badge with User Best & Global Best on same row */}
         {item.scoreGoal && (
-          <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-700/40">
+          <div className="flex flex-wrap items-center gap-2 text-xs pt-2 border-t border-slate-700/40">
+            {/* Score Goal */}
             <div className="flex items-center gap-2">
               <span className="text-white/70">{lang("ROLE_GOAL_TARGET_LABEL")}:</span>
               <span className={`font-bold ${goalColorClass}`}>
                 {item.scoreGoal.toLocaleString()}
               </span>
             </div>
+
+            {/* User's Personal Best */}
+            {userBestScore && userBestScore > 0 && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gradient-to-r from-amber-500/20 via-yellow-400/20 to-amber-500/20 border border-amber-400/30">
+                <Trophy className="w-3 h-3 flex-shrink-0 text-amber-300" />
+                <span className="text-white/70">{lang("ROLE_YOUR_BEST")}</span>
+                <span className="font-bold text-amber-300">{userBestScore.toLocaleString()}</span>
+              </div>
+            )}
+            
+            {/* Global Best */}
+            {globalBestScore && globalBestScore > 0 && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gradient-to-r from-purple-500/20 via-violet-400/20 to-purple-500/20 border border-purple-400/30">
+                <Crown className="w-3 h-3 flex-shrink-0 text-purple-300" />
+                <span className="text-white/70">{lang("ROLE_GLOBAL_BEST")}</span>
+                <span className="font-bold text-purple-300">{globalBestScore.toLocaleString()}</span>
+              </div>
+            )}
           </div>
         )}
 

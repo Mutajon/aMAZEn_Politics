@@ -19,6 +19,8 @@ import NavigationArrows from "../components/roleSelection/NavigationArrows";
 import PositionIndicator from "../components/roleSelection/PositionIndicator";
 import RoleInfoBox from "../components/roleSelection/RoleInfoBox";
 import { audioManager } from "../lib/audioManager";
+import { useUserBestScore } from "../hooks/useUserBestScore";
+import { useGlobalBestScore } from "../hooks/useGlobalBestScore";
 
 export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const lang = useLang();
@@ -42,6 +44,11 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const debugMode = useSettingsStore(s => s.debugMode);
   const experimentMode = useSettingsStore(s => s.experimentMode);
   const setExperimentActiveRole = useLoggingStore((s) => s.setExperimentActiveRole);
+  
+  // Fetch user's best score and global best for greeting
+  const userId = useLoggingStore((s) => s.userId);
+  const { bestScore } = useUserBestScore(userId);
+  const { globalBest } = useGlobalBestScore();
 
   // Carousel hook
   const {
@@ -352,6 +359,8 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
         onConfirm={handleRoleConfirm}
         onOpenCustomRole={openSuggest}
         onOpenScenario={openScenarioModal}
+        userBestScore={bestScore}
+        globalBestScore={globalBest}
       />
 
       {/* Suggest-your-own Modal */}

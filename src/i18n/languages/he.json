@@ -280,6 +280,8 @@
   "HIGHSCORE_NO_GLOBAL_SCORES": "אין עדיין ציונים עולמיים זמינים.",
   "HIGHSCORE_LOADING": "טוען לוח תוצאות...",
   "HIGHSCORE_ERROR_LOAD": "נכשל בטעינת הציונים. אנא נסה שוב.",
+  "ROLE_YOUR_BEST": "הטוב שלך:",
+  "ROLE_GLOBAL_BEST": "הטוב בעולם:",
   "DEMOCRACY_LEVEL_VERY_LOW": "נמוך מאוד",
   "DEMOCRACY_LEVEL_LOW": "נמוך",
   "DEMOCRACY_LEVEL_MEDIUM": "בינוני",
