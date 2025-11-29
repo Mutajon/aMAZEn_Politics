@@ -1975,9 +1975,12 @@ app.post("/api/tts", async (req, res) => {
     const text = String(req.body?.text || "").trim();
     if (!text) return res.status(400).json({ error: "Missing 'text'." });
 
-    // OpenAI voices: alloy, echo, fable, onyx, nova, shimmer
-    // Default to onyx (deep, authoritative male voice - similar to Gemini's Enceladus)
-    const voice = String(req.body?.voice || TTS_VOICE || "onyx");
+    // Valid OpenAI TTS voices
+    const OPENAI_TTS_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
+
+    // Validate voice - default to onyx if invalid (handles old "enceladus" from cached frontend)
+    const requestedVoice = String(req.body?.voice || TTS_VOICE || "onyx").toLowerCase();
+    const voice = OPENAI_TTS_VOICES.includes(requestedVoice) ? requestedVoice : "onyx";
     const model = TTS_MODEL || "tts-1"; // tts-1 = fast, tts-1-hd = higher quality
 
     console.log(`[TTS] OpenAI request: model=${model}, voice=${voice}, text length=${text.length}`);
