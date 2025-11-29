@@ -1,10 +1,7 @@
 // src/components/LeaderPopup.tsx
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  DEFAULT_HIGHSCORES,
-  type HighscoreEntry,
-} from "../data/highscores-default";
+import { type HighscoreEntry } from "../data/highscores-default";
 import { POLITICAL_SYSTEMS } from "../data/politicalSystems";
 import { HelpCircle } from "lucide-react";
 import { useLang } from "../i18n/lang";
@@ -24,8 +21,15 @@ function parseValues(s: string) {
   };
 }
 
-function imgForLeader(name: string) {
-  const first = name.split(" ")[0];
+/** Get image URL for leader (V2: supports avatarUrl from MongoDB) */
+function imgForLeader(entry: HighscoreEntry) {
+  // Priority 1: Use avatarUrl from API (compressed 64x64 WebP thumbnail from MongoDB)
+  if (entry.avatarUrl) {
+    return entry.avatarUrl;
+  }
+  
+  // Priority 2: Try historical leader image (for predefined roles)
+  const first = entry.name.split(" ")[0];
   return `/assets/images/leaders/${first}.jpg`;
 }
 
@@ -85,14 +89,8 @@ export default function LeaderPopup({
     return POLITICAL_SYSTEMS.find((ps) => ps.name === entry.politicalSystem) || null;
   }, [entry]);
 
-  // --- safe period with dataset fallback ---
-  const period = useMemo(() => {
-    if (!entry) return undefined;
-    return (
-      entry.period ??
-      DEFAULT_HIGHSCORES.find((x) => x.name === entry.name)?.period
-    );
-  }, [entry]);
+  // Period directly from entry (V2: stored in MongoDB, no fallback needed)
+  const period = entry?.period;
 
   // ESC to close
   useEffect(() => {
@@ -128,7 +126,7 @@ export default function LeaderPopup({
             <div className="relative px-3 py-3 md:px-5 md:py-4 bg-gradient-to-r from-[#0f1f7a] via-[#142aa8] to-[#0f1f7a]">
               <div className="flex items-center gap-3 md:gap-4 flex-wrap">
                 <img
-                  src={imgForLeader(entry.name)}
+                  src={imgForLeader(entry)}
                   alt={entry.name}
                   width={64}
                   height={64}
