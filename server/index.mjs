@@ -1967,57 +1967,45 @@ function pcmToWav(pcmData, sampleRate, numChannels, bitsPerSample) {
   return buffer;
 }
 
-// -------------------- Text-to-Speech endpoint (Gemini TTS) -----------
+// -------------------- Text-to-Speech endpoint (OpenAI TTS) -----------
 // POST /api/tts { text: string, voice?: string }
-// Returns WAV audio bytes
+// Returns MP3 audio bytes (~200-250ms latency vs 10+ seconds with Gemini)
 app.post("/api/tts", async (req, res) => {
   try {
     const text = String(req.body?.text || "").trim();
     if (!text) return res.status(400).json({ error: "Missing 'text'." });
 
-    const voice = String(req.body?.voice || TTS_VOICE || "Enceladus");
-    const model = TTS_MODEL;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    // OpenAI voices: alloy, echo, fable, onyx, nova, shimmer
+    // Default to onyx (deep, authoritative male voice - similar to Gemini's Enceladus)
+    const voice = String(req.body?.voice || TTS_VOICE || "onyx");
+    const model = TTS_MODEL || "tts-1"; // tts-1 = fast, tts-1-hd = higher quality
 
-    console.log(`[TTS] Gemini request: voice=${voice}, text length=${text.length}`);
+    console.log(`[TTS] OpenAI request: model=${model}, voice=${voice}, text length=${text.length}`);
 
-    const response = await fetch(url, {
+    const response = await fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",
       headers: {
+        "Authorization": `Bearer ${OPENAI_KEY}`,
         "Content-Type": "application/json",
-        "x-goog-api-key": GEMINI_KEY,
       },
       body: JSON.stringify({
-        contents: [{ parts: [{ text }] }],
-        generationConfig: {
-          responseModalities: ["AUDIO"],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: voice }
-            }
-          }
-        }
+        model: model,
+        input: text,
+        voice: voice,
+        response_format: "mp3",
       }),
     });
 
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
-      throw new Error(`Gemini TTS error ${response.status}: ${errText}`);
+      throw new Error(`OpenAI TTS error ${response.status}: ${errText}`);
     }
 
-    const json = await response.json();
-    const audioData = json.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!audioData) {
-      throw new Error("No audio data in Gemini TTS response");
-    }
+    const audioBuffer = await response.arrayBuffer();
 
-    // Decode base64 PCM and convert to WAV
-    const pcmBuffer = Buffer.from(audioData, "base64");
-    const wavBuffer = pcmToWav(pcmBuffer, 24000, 1, 16);
-
-    res.setHeader("Content-Type", "audio/wav");
+    res.setHeader("Content-Type", "audio/mpeg");
     res.setHeader("Cache-Control", "no-store");
-    res.send(wavBuffer);
+    res.send(Buffer.from(audioBuffer));
 
   } catch (e) {
     console.error("Error in /api/tts:", e?.message || e);
@@ -3523,13 +3511,15 @@ function convertSupportShiftToDeltas(supportShift, currentSupport) {
     strongly_supportive: { min: 11, max: 15 },
     slightly_opposed: { min: -5, max: -1 },
     moderately_opposed: { min: -10, max: -6 },
-    strongly_opposed: { min: -15, max: -11 }
+    strongly_opposed: { min: -15, max: -11 },
+    dead: { min: -100, max: -100 }
   };
 
   const deltas = {
     people: { delta: 0, why: "" },
     holders: { delta: 0, why: "" },
-    mom: { delta: 0, why: "" }
+    mom: { delta: 0, why: "" },
+    momDied: false
   };
 
   // Convert each entity's reaction to a random delta within range
@@ -3538,6 +3528,18 @@ function convertSupportShiftToDeltas(supportShift, currentSupport) {
     if (!deltas[entity]) {
       console.warn(`[SUPPORT-SHIFT] Skipping unexpected entity: ${entity}`);
       continue;
+    }
+
+    // Check if mom died
+    if (entity === 'mom') {
+      const isDead = shift.attitudeLevel === 'dead' || shift.momDied === true;
+      if (isDead) {
+        deltas.momDied = true;
+        deltas.mom.delta = -(currentSupport.mom || 50);
+        deltas.mom.why = shift.shortLine || "Mom has passed away";
+        console.log(`[SUPPORT-SHIFT] 💀 MOM DIED: ${shift.shortLine}`);
+        continue;
+      }
     }
 
     const range = REACTION_RANGES[shift.attitudeLevel];
@@ -3813,7 +3815,15 @@ Examples of period-appropriate norms (non-exhaustive):
 They may worry about retaliation, honor, spirits, or lost trade — not abstract modern human-rights language.
 
 
-5. DAY STRUCTURE
+5. MOM DEATH RULES
+- Mom CAN die from extreme player actions (war, plague, assassination, executing family, etc.)
+- When mom dies: set attitudeLevel="dead", momDied=true, shortLine="brief death description"
+- If player action explicitly targets/kills mom (e.g., "Murder my mother", "Execute my family"), she MUST die
+- Death is rare but dramatically appropriate to severe actions
+- Once dead in this turn, the UI will handle hiding her in future turns
+
+
+6. DAY STRUCTURE
 
 Day 1:
 - One urgent situation
@@ -3938,7 +3948,7 @@ CRITICAL JSON RULES:
   "supportShift": {
     "people": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Short civic reaction in first person 'we/us' (10-15 words)"},
     "holders": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Short political reaction in first person 'we/us' (10-15 words)"},
-    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Warm personal reaction in FIRST PERSON 'I' (e.g., 'I worry about...', 'I'm proud of...', 'I fear that...') (10-15 words)"}
+    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed|dead", "shortLine": "Warm personal reaction in FIRST PERSON 'I' (e.g., 'I worry about...', 'I'm proud of...', 'I fear that...') (10-15 words)", "momDied": false}
   },
   "dilemma": {
     "title": "Short title (max 120 chars)",
@@ -3963,7 +3973,7 @@ CRITICAL JSON RULES:
   "supportShift": {
     "people": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Short civic reaction in first person 'we/us' (10-15 words)"},
     "holders": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Short political reaction in first person 'we/us' (10-15 words)"},
-    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Warm personal reaction in FIRST PERSON 'I' (e.g., 'I worry about...', 'I'm proud of...', 'I fear that...') (10-15 words)"}
+    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed|dead", "shortLine": "Warm personal reaction in FIRST PERSON 'I' (e.g., 'I worry about...', 'I'm proud of...', 'I fear that...') (10-15 words)", "momDied": false}
   },
   "dilemma": {
     "title": "The Aftermath",
@@ -4255,6 +4265,12 @@ If an action is COMMON for this era (beatings, harsh punishments, captives):
 "Mom," "people," and "holders" must sound like members of this culture.
 They worry about honor, spirits, retaliation, trade—not modern human-rights language.
 
+MOM DEATH RULES:
+- Mom CAN die from extreme player actions (war, plague, assassination, executing family, etc.)
+- When mom dies: set attitudeLevel="dead", momDied=true, shortLine="brief death description"
+- If player action explicitly targets/kills mom (e.g., "Murder my mother", "Execute my family"), she MUST die
+- Death is rare but dramatically appropriate to severe actions
+
 TOPIC & SCOPE DIVERSITY:
 In every 3-day window: at least 2 different topics, at least 2 different scopes
 Topics: Military, Economy, Religion, Diplomacy, Justice, Infrastructure, Politics, Social, Health, Education
@@ -4337,7 +4353,7 @@ DAY 2-7 SCHEMA:
   "supportShift": {
     "people": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Civic reaction in first person 'we/us' (10-15 words)"},
     "holders": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Political reaction in first person 'we/us' (10-15 words)"},
-    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Personal reaction in FIRST PERSON 'I' (10-15 words)"}
+    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed|dead", "shortLine": "Personal reaction in FIRST PERSON 'I' (10-15 words)", "momDied": false}
   },
   "bridge": "MANDATORY: ONE SENTENCE showing outcome of previous choice → connection to new problem (prefer causal link)",
   "dilemma": {
@@ -4365,7 +4381,7 @@ DAY 8 SCHEMA (Aftermath):
   "supportShift": {
     "people": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Civic reaction in first person 'we/us' (10-15 words)"},
     "holders": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Political reaction in first person 'we/us' (10-15 words)"},
-    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Personal reaction in FIRST PERSON 'I' (10-15 words)"}
+    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed|dead", "shortLine": "Personal reaction in FIRST PERSON 'I' (10-15 words)", "momDied": false}
   },
   "dilemma": {
     "title": "The Aftermath",

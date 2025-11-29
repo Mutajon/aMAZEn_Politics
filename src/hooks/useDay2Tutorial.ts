@@ -15,6 +15,7 @@ export function useDay2Tutorial() {
   const [tutorialCompleted, setTutorialCompleted] = useState<boolean>(() => {
     return localStorage.getItem(TUTORIAL_STORAGE_KEY) === 'true';
   });
+  const [valueClicked, setValueClicked] = useState(false);
 
   // Start the tutorial
   const startTutorial = useCallback(() => {
@@ -31,16 +32,18 @@ export function useDay2Tutorial() {
     }
   }, [tutorialStep]);
 
-  // Handle a value being clicked - user has seen the value details
+  // Handle a value being clicked - hide overlay while viewing details
   const onValueClicked = useCallback(() => {
-    // Just record that they clicked, don't advance yet
-    // They need to close the modal to advance
-  }, []);
+    if (tutorialStep === 'awaiting-value') {
+      setValueClicked(true);
+    }
+  }, [tutorialStep]);
 
   // Handle main modal being closed - advance to compass pills step
   const onModalClosed = useCallback((checkPillsRefReady?: () => boolean) => {
     if (tutorialStep === 'awaiting-value') {
       console.log('[Tutorial] PlayerCardModal closed, polling for pills ref');
+      setValueClicked(false); // Reset for next time
 
       // Poll for pills ref to be ready (max 1000ms)
       let attempts = 0;
@@ -87,6 +90,7 @@ export function useDay2Tutorial() {
     localStorage.removeItem(TUTORIAL_STORAGE_KEY);
     setTutorialCompleted(false);
     setTutorialStep('inactive');
+    setValueClicked(false);
   }, []);
 
   return {
@@ -96,9 +100,9 @@ export function useDay2Tutorial() {
     tutorialCompleted,
     shouldShowOverlay:
       tutorialStep === 'awaiting-avatar' ||
-      tutorialStep === 'awaiting-value' ||
+      (tutorialStep === 'awaiting-value' && !valueClicked) ||
       tutorialStep === 'awaiting-compass-pills',
-    shouldShowValueHighlight: tutorialStep === 'awaiting-value',
+    shouldShowValueHighlight: tutorialStep === 'awaiting-value' && !valueClicked,
 
     // Actions
     startTutorial,

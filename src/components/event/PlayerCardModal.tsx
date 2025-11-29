@@ -101,13 +101,18 @@ function CompassBox({
                 <span className="text-sm text-white/90 font-medium">
                   {component.short}
                 </span>
-                <div
-                  className="h-2 rounded-full min-w-[40px] max-w-[80px] flex-shrink-0"
-                  style={{
-                    backgroundColor: `${color}40`,
-                    width: `${Math.max(40, component.value * 8)}px`,
-                  }}
-                />
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <div
+                    className="h-2 rounded-full min-w-[40px] max-w-[80px]"
+                    style={{
+                      backgroundColor: `${color}40`,
+                      width: `${Math.max(40, component.value * 8)}px`,
+                    }}
+                  />
+                  <span className="text-xs text-white/60 w-4 text-right">
+                    {component.value}
+                  </span>
+                </div>
               </button>
             );
           })

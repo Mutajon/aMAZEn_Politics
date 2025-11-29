@@ -13,7 +13,7 @@ const STEP_MESSAGES: Partial<Record<TutorialStep, string>> = {
   'awaiting-avatar':
     'Click on your avatar to see the current top values exhibited by your actions',
   'awaiting-value': 'Click on a value for further details',
-  'awaiting-compass-pills': 'Click here to see the most recent change to your values',
+  'awaiting-compass-pills': 'Click the compass to see the most recent change to your values',
 };
 
 export function TutorialOverlay({ step, targetElement }: TutorialOverlayProps) {
@@ -26,15 +26,6 @@ export function TutorialOverlay({ step, targetElement }: TutorialOverlayProps) {
   return createPortal(
     <AnimatePresence>
       <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 80 }}>
-        {/* Semi-transparent overlay */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
-          className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"
-        />
-
         {/* Highlight ring around target element */}
         {targetElement && <HighlightRing targetElement={targetElement} />}
 
@@ -43,7 +34,7 @@ export function TutorialOverlay({ step, targetElement }: TutorialOverlayProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
-          transition={{ delay: 0.2, duration: 0.3 }}
+          transition={{ duration: 0.3 }}
           className="fixed left-1/2 -translate-x-1/2 bottom-24 bg-gray-900/95 text-white rounded-xl p-4 ring-2 ring-amber-400/60 shadow-2xl max-w-[300px]"
           style={{ zIndex: 90 }}
         >
