@@ -10,10 +10,14 @@
 // - src/components/aftermath/AftermathContent.tsx: section orchestration
 // - src/lib/aftermath.ts: SnapshotEvent type
 
+import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import type { SnapshotEvent } from "../../lib/aftermath";
 import SnapshotPill from "./SnapshotPill";
 import { useLang } from "../../i18n/lang";
+import { useNarrator } from "../../hooks/useNarrator";
+import { TTS_VOICE } from "../../lib/ttsConfig";
+import { useSettingsStore } from "../../store/settingsStore";
 
 type Props = {
   intro: string; // Death text ("After X years, [leader] died of Z.")
@@ -24,6 +28,31 @@ type Props = {
 
 export default function SnapshotSection({ intro, snapshot, avatarUrl, legacy }: Props) {
   const lang = useLang();
+  const narrationEnabled = useSettingsStore((s) => s.narrationEnabled !== false);
+  const narrator = useNarrator();
+  const narrationPlayedRef = useRef(false);
+
+  // TTS narration for intro (death text)
+  useEffect(() => {
+    if (!narrationEnabled || !intro || narrationPlayedRef.current) return;
+    narrationPlayedRef.current = true;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const p = await narrator.prepare(intro, { voiceName: TTS_VOICE });
+        if (cancelled) { p.dispose(); return; }
+        await p.start();
+      } catch (e) {
+        console.warn("[SnapshotSection] TTS failed:", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      narrator.stop();
+    };
+  }, [intro, narrationEnabled, narrator]);
 
   return (
     <motion.div
