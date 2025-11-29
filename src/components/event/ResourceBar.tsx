@@ -33,7 +33,6 @@ type Props = {
   avatarSrc?: string | null; // Player avatar image
   // Tutorial props
   tutorialMode?: boolean;
-  tutorialDisableClose?: boolean; // Controls whether modal can be closed during tutorial
   onTutorialAvatarClick?: () => void;
   onTutorialValueClick?: (value: any) => void;
   onTutorialModalClose?: () => void;
@@ -51,7 +50,6 @@ export default function ResourceBar({
   scoreDetails,
   avatarSrc = null,
   tutorialMode = false,
-  tutorialDisableClose = false,
   onTutorialAvatarClick,
   onTutorialValueClick,
   onTutorialModalClose,
@@ -234,7 +232,6 @@ export default function ResourceBar({
         onClose={handleModalClose}
         avatarSrc={avatarSrc}
         tutorialMode={tutorialMode}
-        tutorialDisableClose={tutorialDisableClose}
         onTutorialValueClick={onTutorialValueClick}
         tutorialValueRef={tutorialValueRef}
       />

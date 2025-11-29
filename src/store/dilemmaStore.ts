@@ -120,6 +120,7 @@ type DilemmaState = {
   supportPeople: number;
   supportMiddle: number;
   supportMom: number;
+  momAlive: boolean;  // Session-only: tracks if mom is alive (resets on page refresh)
   score: number;
 
   // Difficulty level
@@ -157,6 +158,7 @@ type DilemmaState = {
   setSupportPeople: (n: number) => void;
   setSupportMiddle: (n: number) => void;
   setSupportMom: (n: number) => void;
+  setMomDead: () => void;  // Mark mom as deceased (sets momAlive=false, supportMom=0)
   setScore: (n: number) => void;
 
   // Day progression methods
@@ -316,6 +318,7 @@ export const useDilemmaStore = create<DilemmaState>()(
   supportPeople: 50,
   supportMiddle: 50,
   supportMom: 50,
+  momAlive: true,  // Session-only: not persisted in localStorage
   score: 0,
 
   // Difficulty level
@@ -414,6 +417,7 @@ export const useDilemmaStore = create<DilemmaState>()(
       supportPeople: 50,
       supportMiddle: 50,
       supportMom: 50,
+      momAlive: true,
       score: 0,
       difficulty: null,
       selectedGoals: [],
@@ -457,9 +461,24 @@ export const useDilemmaStore = create<DilemmaState>()(
   },
 
   setSupportMom(n) {
+    const { momAlive } = get();
+    if (!momAlive) {
+      dlog("setSupportMom -> BLOCKED: Mom is dead");
+      return;
+    }
     const v = Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
     dlog("setSupportMom ->", v);
     set({ supportMom: v });
+  },
+
+  setMomDead() {
+    const { momAlive } = get();
+    if (!momAlive) {
+      dlog("setMomDead -> Already dead");
+      return;
+    }
+    dlog("setMomDead -> Mom has died");
+    set({ momAlive: false, supportMom: 0 });
   },
 
   setScore(n) {

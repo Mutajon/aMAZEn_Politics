@@ -6,12 +6,15 @@
 // - Final support levels (all < 20%)
 // - One action: View Full Report (forces player through Aftermath screen for logging)
 
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
+import { useSettingsStore } from "../store/settingsStore";
 import { bgStyleWithRoleImage } from "../lib/ui";
 import { AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion";
+import { useNarrator } from "../hooks/useNarrator";
+import { TTS_VOICE } from "../lib/ttsConfig";
 
 type Props = {
   push: (path: string) => void;
@@ -20,6 +23,8 @@ type Props = {
 export default function DownfallScreen({ push }: Props) {
   const { current, supportPeople, supportMiddle, supportMom } = useDilemmaStore();
   const { character, roleBackgroundImage, analysis } = useRoleStore();
+  const narrationEnabled = useSettingsStore((s) => s.narrationEnabled !== false);
+  const narrator = useNarrator();
 
   const roleBgStyle = useMemo(
     () => bgStyleWithRoleImage(roleBackgroundImage),
@@ -28,6 +33,27 @@ export default function DownfallScreen({ push }: Props) {
 
   // Get downfall narrative from current dilemma (set by API when isGameEnd=true)
   const downfallNarrative = current?.description || "Your rule has collapsed under the weight of total opposition. All three pillars of support have crumbled.";
+
+  // TTS narration for downfall narrative
+  useEffect(() => {
+    if (!narrationEnabled || !downfallNarrative) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const p = await narrator.prepare(downfallNarrative, { voiceName: TTS_VOICE });
+        if (cancelled) { p.dispose(); return; }
+        await p.start();
+      } catch (e) {
+        console.warn("[DownfallScreen] TTS failed:", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      narrator.stop();
+    };
+  }, [downfallNarrative, narrationEnabled, narrator]);
 
   // Get entity names
   const challengerName = analysis?.challengerSeat?.name || "Power Holders";

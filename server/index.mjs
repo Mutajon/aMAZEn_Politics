@@ -1967,57 +1967,45 @@ function pcmToWav(pcmData, sampleRate, numChannels, bitsPerSample) {
   return buffer;
 }
 
-// -------------------- Text-to-Speech endpoint (Gemini TTS) -----------
+// -------------------- Text-to-Speech endpoint (OpenAI TTS) -----------
 // POST /api/tts { text: string, voice?: string }
-// Returns WAV audio bytes
+// Returns MP3 audio bytes (~200-250ms latency vs 10+ seconds with Gemini)
 app.post("/api/tts", async (req, res) => {
   try {
     const text = String(req.body?.text || "").trim();
     if (!text) return res.status(400).json({ error: "Missing 'text'." });
 
-    const voice = String(req.body?.voice || TTS_VOICE || "Enceladus");
-    const model = TTS_MODEL;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    // OpenAI voices: alloy, echo, fable, onyx, nova, shimmer
+    // Default to onyx (deep, authoritative male voice - similar to Gemini's Enceladus)
+    const voice = String(req.body?.voice || TTS_VOICE || "onyx");
+    const model = TTS_MODEL || "tts-1"; // tts-1 = fast, tts-1-hd = higher quality
 
-    console.log(`[TTS] Gemini request: voice=${voice}, text length=${text.length}`);
+    console.log(`[TTS] OpenAI request: model=${model}, voice=${voice}, text length=${text.length}`);
 
-    const response = await fetch(url, {
+    const response = await fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",
       headers: {
+        "Authorization": `Bearer ${OPENAI_KEY}`,
         "Content-Type": "application/json",
-        "x-goog-api-key": GEMINI_KEY,
       },
       body: JSON.stringify({
-        contents: [{ parts: [{ text }] }],
-        generationConfig: {
-          responseModalities: ["AUDIO"],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: voice }
-            }
-          }
-        }
+        model: model,
+        input: text,
+        voice: voice,
+        response_format: "mp3",
       }),
     });
 
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
-      throw new Error(`Gemini TTS error ${response.status}: ${errText}`);
+      throw new Error(`OpenAI TTS error ${response.status}: ${errText}`);
     }
 
-    const json = await response.json();
-    const audioData = json.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!audioData) {
-      throw new Error("No audio data in Gemini TTS response");
-    }
+    const audioBuffer = await response.arrayBuffer();
 
-    // Decode base64 PCM and convert to WAV
-    const pcmBuffer = Buffer.from(audioData, "base64");
-    const wavBuffer = pcmToWav(pcmBuffer, 24000, 1, 16);
-
-    res.setHeader("Content-Type", "audio/wav");
+    res.setHeader("Content-Type", "audio/mpeg");
     res.setHeader("Cache-Control", "no-store");
-    res.send(wavBuffer);
+    res.send(Buffer.from(audioBuffer));
 
   } catch (e) {
     console.error("Error in /api/tts:", e?.message || e);
@@ -3523,13 +3511,15 @@ function convertSupportShiftToDeltas(supportShift, currentSupport) {
     strongly_supportive: { min: 11, max: 15 },
     slightly_opposed: { min: -5, max: -1 },
     moderately_opposed: { min: -10, max: -6 },
-    strongly_opposed: { min: -15, max: -11 }
+    strongly_opposed: { min: -15, max: -11 },
+    dead: { min: -100, max: -100 }
   };
 
   const deltas = {
     people: { delta: 0, why: "" },
     holders: { delta: 0, why: "" },
-    mom: { delta: 0, why: "" }
+    mom: { delta: 0, why: "" },
+    momDied: false
   };
 
   // Convert each entity's reaction to a random delta within range
@@ -3538,6 +3528,18 @@ function convertSupportShiftToDeltas(supportShift, currentSupport) {
     if (!deltas[entity]) {
       console.warn(`[SUPPORT-SHIFT] Skipping unexpected entity: ${entity}`);
       continue;
+    }
+
+    // Check if mom died
+    if (entity === 'mom') {
+      const isDead = shift.attitudeLevel === 'dead' || shift.momDied === true;
+      if (isDead) {
+        deltas.momDied = true;
+        deltas.mom.delta = -(currentSupport.mom || 50);
+        deltas.mom.why = shift.shortLine || "Mom has passed away";
+        console.log(`[SUPPORT-SHIFT] 💀 MOM DIED: ${shift.shortLine}`);
+        continue;
+      }
     }
 
     const range = REACTION_RANGES[shift.attitudeLevel];
@@ -3813,7 +3815,15 @@ Examples of period-appropriate norms (non-exhaustive):
 They may worry about retaliation, honor, spirits, or lost trade — not abstract modern human-rights language.
 
 
-5. DAY STRUCTURE
+5. MOM DEATH RULES
+- Mom CAN die from extreme player actions (war, plague, assassination, executing family, etc.)
+- When mom dies: set attitudeLevel="dead", momDied=true, shortLine="brief death description"
+- If player action explicitly targets/kills mom (e.g., "Murder my mother", "Execute my family"), she MUST die
+- Death is rare but dramatically appropriate to severe actions
+- Once dead in this turn, the UI will handle hiding her in future turns
+
+
+6. DAY STRUCTURE
 
 Day 1:
 - One urgent situation
@@ -3938,7 +3948,7 @@ CRITICAL JSON RULES:
   "supportShift": {
     "people": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Short civic reaction in first person 'we/us' (10-15 words)"},
     "holders": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Short political reaction in first person 'we/us' (10-15 words)"},
-    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Warm personal reaction in FIRST PERSON 'I' (e.g., 'I worry about...', 'I'm proud of...', 'I fear that...') (10-15 words)"}
+    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed|dead", "shortLine": "Warm personal reaction in FIRST PERSON 'I' (e.g., 'I worry about...', 'I'm proud of...', 'I fear that...') (10-15 words)", "momDied": false}
   },
   "dilemma": {
     "title": "Short title (max 120 chars)",
@@ -3963,7 +3973,7 @@ CRITICAL JSON RULES:
   "supportShift": {
     "people": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Short civic reaction in first person 'we/us' (10-15 words)"},
     "holders": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Short political reaction in first person 'we/us' (10-15 words)"},
-    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Warm personal reaction in FIRST PERSON 'I' (e.g., 'I worry about...', 'I'm proud of...', 'I fear that...') (10-15 words)"}
+    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed|dead", "shortLine": "Warm personal reaction in FIRST PERSON 'I' (e.g., 'I worry about...', 'I'm proud of...', 'I fear that...') (10-15 words)", "momDied": false}
   },
   "dilemma": {
     "title": "The Aftermath",
@@ -4204,22 +4214,35 @@ NOT: "manage the situation," "respond to the challenge," "address the crisis"
 
 
 ─────────────────────────────────────────
-STEP 3: BRIDGE FROM PREVIOUS DAY (SHOW RESOLUTION)
+STEP 3: BRIDGE FROM PREVIOUS DAY (MANDATORY "bridge" FIELD)
 ─────────────────────────────────────────
 
-Days 2-7: In ONE SENTENCE, close yesterday's story by showing the OUTCOME of the player's choice - not just what they did, but what happened because of it. Then introduce the new problem.
+Days 2-7: The "bridge" field must contain EXACTLY ONE SENTENCE that:
+1. Shows the OUTCOME of the player's previous choice (what happened because of it)
+2. When relevant, CONNECTS that outcome to the new dilemma (cause → effect)
 
-Vary your phrasing naturally:
-- "Following your decision to X, Y happened..."
-- "Because you insisted on X, Y..."
-- "Your choice to X paid off - Y. But now..."
-- "The X you ordered worked - Y. However..."
+PRIORITY ORDER:
+- BEST: Previous choice directly caused or triggered today's problem
+- GOOD: Previous choice's outcome creates context for unrelated new problem
+- ACCEPTABLE: Outcome shown, then pivot to new problem
 
-BAD: "Yesterday you arrested the priest. Today, a plague arrives." (no outcome)
-GOOD: "Following your arrest of the priest, he confessed and named his conspirators - they rot in your dungeons now. But this morning, foreign ships appear on the horizon."
-GOOD: "Because you showed mercy to the thief, word spread - you're seen as just. The nobleman whose gold was stolen now demands an audience."
+GOOD EXAMPLES (causal connection - PREFERRED):
+- "Your arrest of the priest triggered riots in the temple district—now the high priestess demands an audience."
+- "The grain you distributed bought loyalty, but emptied the reserves; a merchant caravan offers supplies at a steep price."
+- "Your mercy to the rebels emboldened them—their leader now openly defies your decree in the market square."
 
-Show what HAPPENED because of the choice, then pivot to the new problem.
+ACCEPTABLE EXAMPLES (outcome + pivot):
+- "The bridge you ordered is half-built, workers grumbling about pay. Meanwhile, a foreign envoy arrives with urgent news."
+- "Your speech calmed the mob for now. But this morning, a different crisis: plague ships spotted in the harbor."
+
+BAD EXAMPLES (DO NOT DO THIS):
+- "Yesterday you arrested the priest. Today, a plague arrives." (no outcome shown)
+- "Following your decision, things changed." (too vague)
+- "The situation evolved." (no specific outcome)
+
+MANDATORY STRUCTURE:
+- "bridge": ONE sentence showing outcome → connection to new problem
+- "dilemma.description": NEW situation details + direct question (do NOT repeat the bridge here)
 
 
 3. CONSTRAINTS
@@ -4241,6 +4264,12 @@ If an action is COMMON for this era (beatings, harsh punishments, captives):
 
 "Mom," "people," and "holders" must sound like members of this culture.
 They worry about honor, spirits, retaliation, trade—not modern human-rights language.
+
+MOM DEATH RULES:
+- Mom CAN die from extreme player actions (war, plague, assassination, executing family, etc.)
+- When mom dies: set attitudeLevel="dead", momDied=true, shortLine="brief death description"
+- If player action explicitly targets/kills mom (e.g., "Murder my mother", "Execute my family"), she MUST die
+- Death is rare but dramatically appropriate to severe actions
 
 TOPIC & SCOPE DIVERSITY:
 In every 3-day window: at least 2 different topics, at least 2 different scopes
@@ -4324,11 +4353,12 @@ DAY 2-7 SCHEMA:
   "supportShift": {
     "people": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Civic reaction in first person 'we/us' (10-15 words)"},
     "holders": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Political reaction in first person 'we/us' (10-15 words)"},
-    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Personal reaction in FIRST PERSON 'I' (10-15 words)"}
+    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed|dead", "shortLine": "Personal reaction in FIRST PERSON 'I' (10-15 words)", "momDied": false}
   },
+  "bridge": "MANDATORY: ONE SENTENCE showing outcome of previous choice → connection to new problem (prefer causal link)",
   "dilemma": {
     "title": "Short title (max 120 chars)",
-    "description": "1-2 sentences bridging from previous action + new situation + direct question (no jargon)",
+    "description": "NEW situation details + direct question (no jargon, do NOT repeat the bridge)",
     "actions": [
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
@@ -4351,7 +4381,7 @@ DAY 8 SCHEMA (Aftermath):
   "supportShift": {
     "people": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Civic reaction in first person 'we/us' (10-15 words)"},
     "holders": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Political reaction in first person 'we/us' (10-15 words)"},
-    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Personal reaction in FIRST PERSON 'I' (10-15 words)"}
+    "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed|dead", "shortLine": "Personal reaction in FIRST PERSON 'I' (10-15 words)", "momDied": false}
   },
   "dilemma": {
     "title": "The Aftermath",
@@ -4413,7 +4443,13 @@ ${mirrorMode === 'lastAction'
     if (day === 7) {
       prompt += `This is the final day. Make this dilemma especially tough and epic - a climactic choice worthy of the player's last act in this world. The stakes should feel monumental. Remind them their borrowed time is almost over.
 
-In ONE SENTENCE, close yesterday's story by showing the OUTCOME (not just the action). Vary phrasing naturally. Then introduce the final dilemma.
+MANDATORY "bridge" FIELD - Generate ONE SENTENCE showing:
+1. What HAPPENED because of "${playerChoice.title}"
+2. How that outcome CONNECTS to today's final crisis (prefer causal link)
+
+PRIORITY: Try to make today's final dilemma a CONSEQUENCE of yesterday's choice.
+
+Then generate dilemma.description with the NEW situation details + direct question (do NOT repeat the bridge).
 
 CRITICAL: Follow Golden Rules B & C - different tension from yesterday, actions exploring autonomy vs. heteronomy.
 
@@ -4421,9 +4457,13 @@ STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically af
     } else if (day === 8) {
       prompt += `This is Day 8 - the aftermath. Follow the system prompt instructions for Day 8.`;
     } else {
-      prompt += `In ONE SENTENCE, close yesterday's story by showing the OUTCOME of the choice (not just the action). Vary phrasing naturally - don't always start with "Yesterday you..."
+      prompt += `MANDATORY "bridge" FIELD - Generate ONE SENTENCE showing:
+1. What HAPPENED because of "${playerChoice.title}"
+2. How that outcome CONNECTS to today's new problem (prefer causal link)
 
-Then introduce a NEW dilemma from a DIFFERENT underlying issue.
+PRIORITY: Try to make today's dilemma a CONSEQUENCE of yesterday's choice.
+
+Then generate dilemma.description with the NEW situation details + direct question (do NOT repeat the bridge).
 
 CRITICAL: Follow Golden Rules B & C - different tension from yesterday, actions exploring autonomy vs. heteronomy.
 
@@ -4825,8 +4865,19 @@ app.post("/api/game-turn-v2", async (req, res) => {
           }
         }
 
-        // If parsing succeeded, break out of retry loop
+        // If parsing succeeded, validate bridge field and break out of retry loop
         if (parsed) {
+          // Validate bridge field exists for Day 2+ (mandatory)
+          if (day > 1 && !parsed.bridge && retryCount < maxRetries) {
+            console.warn(`[GAME-TURN-V2] Day ${day} - Missing "bridge" field, retrying with stronger instruction...`);
+            messages.push({
+              role: "user",
+              content: `Your response is missing the required "bridge" field. Please respond again with valid JSON that includes a "bridge" field containing ONE SENTENCE showing the OUTCOME of the player's previous action "${playerChoice.title}" and how it connects to today's new problem. This field is MANDATORY for Days 2-7.`
+            });
+            parsed = null; // Reset parsed to trigger retry
+            continue;
+          }
+
           if (retryCount > 0) {
             console.log(`[GAME-TURN-V2] ✅ JSON parsing succeeded on retry attempt ${retryCount + 1}`);
           }
@@ -5047,6 +5098,7 @@ Regenerate the ENTIRE JSON output with these changes.`;
       const response = {
         title: parsed.dilemma?.title || '',
         description: parsed.dilemma?.description || '',
+        bridge: parsed.bridge || '', // Bridge sentence connecting previous action to new dilemma
         actions: parsed.dilemma?.actions || [],
         topic: parsed.dilemma?.topic || '',
         scope: parsed.dilemma?.scope || '',
@@ -5060,6 +5112,11 @@ Regenerate the ENTIRE JSON output with these changes.`;
       if (USE_PROMPT_V3) {
         response.valueTargeted = parsed.valueTargeted || 'Unknown';
         response.axisExplored = parsed.axisExplored || 'Unknown';
+      }
+
+      // Log bridge field for debugging
+      if (day > 1) {
+        console.log(`[GAME-TURN-V2] Day ${day} bridge: "${response.bridge || '(none)'}"`);
       }
 
       return res.json(response);

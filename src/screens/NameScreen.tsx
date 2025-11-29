@@ -130,21 +130,55 @@ function suggestBackgroundObject(role = ""): string {
   return "ornate palace backdrop";
 }
 
+/**
+ * Derives era/setting context for image generation prompt.
+ * Uses grounding.era if available (from AI analysis), otherwise falls back to role name + year.
+ */
+function deriveEraSetting(role: string, year: string | null, era: string | undefined): string {
+  // Use grounding.era if available (most descriptive)
+  if (era) {
+    // Extract just the period part, e.g., "431 BCE Athens" from "431 BCE Athens (outbreak...)"
+    const cleaned = era.replace(/\s*\([^)]*\)/g, '').trim();
+    return cleaned || "historical period";
+  }
+
+  // Fallback: construct from role name + year
+  const r = role.toLowerCase();
+  if (r.includes("athens") || r.includes("greece")) return `ancient Greece${year ? `, ${year.replace('-', '')} BCE` : ''}`;
+  if (r.includes("alexandria") || r.includes("egypt")) return `ancient Alexandria${year ? `, ${year.replace('-', '')} BCE` : ''}`;
+  if (r.includes("florence") || r.includes("italy")) return `Renaissance Florence${year ? `, ${year} CE` : ''}`;
+  if (r.includes("japan") || r.includes("shogun")) return `feudal Japan${year ? `, ${year} CE` : ''}`;
+  if (r.includes("america") || r.includes("colonial") || r.includes("jamestown")) return `colonial North America${year ? `, ${year} CE` : ''}`;
+  if (r.includes("haiti") || r.includes("saint-domingue")) return `colonial Haiti${year ? `, ${year} CE` : ''}`;
+  if (r.includes("russia") || r.includes("tsar")) return `imperial Russia${year ? `, ${year} CE` : ''}`;
+  if (r.includes("india") || r.includes("gandhi")) return `British India${year ? `, ${year} CE` : ''}`;
+  if (r.includes("africa") || r.includes("mandela")) return `South Africa${year ? `, ${year} CE` : ''}`;
+  if (r.includes("mars") || r.includes("2179")) return `Mars colony${year ? `, ${year} CE` : ''}`;
+
+  // Generic fallback
+  return year ? `year ${year}` : "historical setting";
+}
+
 function buildFullPrompt(
   role: string,
   gender: "male" | "female" | "any",
   physical: string,
-  bgObject: string
+  bgObject: string,
+  eraSetting: string
 ): string {
   const genderedRole = genderizeRole(role, gender);
   const genderWord = gender === "male" ? "male " : gender === "female" ? "female " : "";
   const subject = `a ${genderWord}${genderedRole}`.trim();
-  const head = `a close-up portrait of the face of ${subject}`;
+
   const physicalClean = physical.trim().replace(/^[,.\s]+/, "");
-  const withPhysical = physicalClean ? `${head}, ${physicalClean}` : head;
-  const bg = bgObject ? `, with a ${bgObject} in the background` : "";
-  const tail = ", colored cartoon with strong lines";
-  return `${withPhysical}${bg}${tail}`;
+  const withPhysical = physicalClean ? `, ${physicalClean}` : "";
+  const bg = bgObject ? `, with ${bgObject} visible in the background` : "";
+
+  // Era context at the START and END of prompt
+  const eraPart = eraSetting ? `set in ${eraSetting}: ` : "";
+  const eraReinforce = eraSetting ? `, appropriate to the ${eraSetting.split(',')[0]} period` : "";
+
+  return `A fictional game avatar, close-up portrait ${eraPart}${subject}${withPhysical}${bg}. Colored cartoon with strong lines${eraReinforce}.`;
 }
 
 
@@ -165,6 +199,8 @@ export default function NameScreen({ push }: { push: PushFn }) {
   });
 
   const selectedRole = useRoleStore((s) => s.selectedRole);
+  const roleYear = useRoleStore((s) => s.roleYear);
+  const analysis = useRoleStore((s) => s.analysis);
   const character = useRoleStore((s) => s.character);
   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
   const setCharacter = useRoleStore((s) => s.setCharacter);
@@ -193,9 +229,15 @@ export default function NameScreen({ push }: { push: PushFn }) {
   const MAX_AVATAR_RETRIES = 3;
   const RETRY_DELAY_MS = 2000;
 
+  // Derive era/setting for image generation prompt
+  const eraSetting = useMemo(
+    () => deriveEraSetting(selectedRole || "", roleYear, analysis?.grounding?.era),
+    [selectedRole, roleYear, analysis?.grounding?.era]
+  );
+
   const fullPrompt = useMemo(
-    () => buildFullPrompt(selectedRole || "", gender, physical, bgObject),
-    [selectedRole, gender, physical, bgObject]
+    () => buildFullPrompt(selectedRole || "", gender, physical, bgObject, eraSetting),
+    [selectedRole, gender, physical, bgObject, eraSetting]
   );
 
   async function loadSuggestions() {
@@ -278,6 +320,8 @@ export default function NameScreen({ push }: { push: PushFn }) {
 
         setAvatarAttempt(attempt);
         console.log(`[NameScreen] Avatar generation attempt ${attempt}/${MAX_AVATAR_RETRIES}`);
+        console.log(`[NameScreen] Era setting: "${eraSetting}"`);
+        console.log(`[NameScreen] Full prompt: "${prompt}"`);
 
         try {
           const useXAI = useSettingsStore.getState().useXAI;

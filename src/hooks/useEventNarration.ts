@@ -11,7 +11,7 @@ type PreparedTTSHandle = { start: () => Promise<void>; dispose: () => void } | n
 export function useEventNarration() {
   const { current } = useDilemmaStore();
   const narrationEnabled = useSettingsStore((s) => s.narrationEnabled !== false);
-  const { prepare: prepareNarration, stop: stopNarration, speaking } = useNarrator();
+  const { prepare: prepareNarration, speaking } = useNarrator();
 
   const preparedDilemmaRef = useRef<PreparedTTSHandle>(null);
   const dilemmaPlayedRef = useRef(false);
@@ -19,51 +19,54 @@ export function useEventNarration() {
   const [canShowDilemma, setCanShowDilemma] = useState(false);
 
   // Prepare narration whenever the dilemma changes
+  // IMPORTANT: Don't block dilemma display on TTS - show text immediately, let audio catch up
   useEffect(() => {
     const d = current;
-    setCanShowDilemma(false);
     dilemmaPlayedRef.current = false;
 
     // cleanup previous audio
     preparedDilemmaRef.current?.dispose?.();
     preparedDilemmaRef.current = null;
 
-    if (!d) return;
+    if (!d) {
+      setCanShowDilemma(false);
+      return;
+    }
 
+    // Show dilemma immediately - don't wait for TTS
+    setCanShowDilemma(true);
+
+    const speech = narrationTextForDilemma(d);
+    if (!speech) {
+      return;
+    }
+
+    // Skip TTS preparation if narration disabled
+    if (!narrationEnabled) {
+      if (!skipNarrationLogRef.current) {
+        console.log("[EventNarration] Skipping TTS preparation (narration disabled)");
+        skipNarrationLogRef.current = true;
+      }
+      return;
+    }
+    skipNarrationLogRef.current = false;
+
+    // Prepare TTS in background (non-blocking)
     let cancelled = false;
-    (async () => {
-      try {
-        const speech = narrationTextForDilemma(d);
-        if (!speech) {
-          setCanShowDilemma(true);
-          return;
-        }
-
-        // Skip TTS preparation if narration disabled
-        if (!narrationEnabled) {
-          if (!skipNarrationLogRef.current) {
-            console.log("[EventNarration] Skipping TTS preparation (narration disabled)");
-            skipNarrationLogRef.current = true;
-          }
-          setCanShowDilemma(true);
-          return;
-        }
-        skipNarrationLogRef.current = false;
-
-        const p = await prepareNarration(speech, {
-          voiceName: TTS_VOICE
-        });
+    prepareNarration(speech, { voiceName: TTS_VOICE })
+      .then(p => {
         if (cancelled) {
           p.dispose();
           return;
         }
         preparedDilemmaRef.current = p;
-        setCanShowDilemma(true);
-      } catch (e) {
-        console.warn("[Event] TTS prepare failed; showing without audio:", e);
-        setCanShowDilemma(true);
-      }
-    })();
+        // Auto-start if dilemma is already showing and hasn't been played yet
+        if (!dilemmaPlayedRef.current) {
+          dilemmaPlayedRef.current = true;
+          p.start().catch((e) => console.warn("[Event] TTS start blocked:", e));
+        }
+      })
+      .catch(e => console.warn("[Event] TTS prepare failed:", e));
 
     return () => {
       cancelled = true;
@@ -74,6 +77,8 @@ export function useEventNarration() {
   }, [current?.title, current?.description, narrationEnabled, prepareNarration]);
 
   // Start narration when we reveal the dilemma (once) - controlled by reveal sequence
+  // Note: TTS may still be preparing when this is called, so we mark it as "should play"
+  // and the TTS preparation will auto-start when ready
   const startNarrationIfReady = useCallback((shouldShowDilemma: boolean = true) => {
     if (!canShowDilemma || !shouldShowDilemma) return;
     const p = preparedDilemmaRef.current;
@@ -81,22 +86,7 @@ export function useEventNarration() {
       dilemmaPlayedRef.current = true;
       p.start().catch((e) => console.warn("[Event] TTS start blocked:", e));
     }
-  }, [canShowDilemma, narrationEnabled]);
-
-  // Auto-start narration for first day (when no reveal sequence is controlling it)
-  useEffect(() => {
-    if (!canShowDilemma) return;
-    const p = preparedDilemmaRef.current;
-    if (narrationEnabled && p && !dilemmaPlayedRef.current) {
-      // Add a small delay to ensure this runs after the manual trigger would have run
-      const timer = setTimeout(() => {
-        if (!dilemmaPlayedRef.current) {
-          dilemmaPlayedRef.current = true;
-          p.start().catch((e) => console.warn("[Event] TTS start blocked:", e));
-        }
-      }, 100);
-      return () => clearTimeout(timer);
-    }
+    // If TTS not ready yet, the preparation effect will auto-start when done
   }, [canShowDilemma, narrationEnabled]);
 
   // Check if we should show overlay while preparing TTS

@@ -377,19 +377,36 @@ async function fetchGameTurn(): Promise<{
     data.actions = [];
   }
 
-  // Extract dilemma
+  // Extract dilemma - combine bridge with description for Days 2+
+  // The bridge field contains the narrative connection from previous action to new dilemma
   const dilemma: Dilemma = {
     title: data.title,
-    description: data.description,
+    description: data.bridge
+      ? `${data.bridge} ${data.description}`
+      : data.description,
     actions: data.actions,
     isGameEnd: data.isGameEnd
   };
 
   // Extract support effects (Day 2+ only)
   let supportEffects: SupportEffect[] | null = null;
+  let momDiedThisTurn = false;
 
   if (data.supportShift && day > 1) {
-    const { people, mom, holders } = data.supportShift;
+    const { people, mom, holders, momDied } = data.supportShift;
+
+    // Check if mom died this turn
+    if (momDied === true) {
+      console.log('[fetchGameTurn] 💀 MOM DIED THIS TURN');
+      momDiedThisTurn = true;
+      const { setMomDead } = useDilemmaStore.getState();
+      setMomDead();
+
+      // Dispatch event for toast notification
+      window.dispatchEvent(new CustomEvent('mom-died', {
+        detail: { shortLine: mom?.why || "Mom has passed away" }
+      }));
+    }
 
     // STEP 0: Save previous support values BEFORE updating (for crisis context)
     const { savePreviousSupport } = useDilemmaStore.getState();

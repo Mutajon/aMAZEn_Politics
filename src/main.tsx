@@ -92,6 +92,24 @@ const useStrict = import.meta.env.MODE !== "development";
   }
 };
 
+// Debug command: Kill mom (for testing deceased state)
+(window as any).killMom = () => {
+  const { momAlive, setMomDead } = useDilemmaStore.getState();
+  if (!momAlive) {
+    console.log('💀 Mom is already dead.');
+    return;
+  }
+  setMomDead();
+  console.log('💀 Mom has been killed (debug command).');
+  console.log('🔧 Support bar should now show deceased state.');
+  console.log('💡 Page refresh will restore mom to alive.');
+
+  // Dispatch the mom-died event to show toast
+  window.dispatchEvent(new CustomEvent('mom-died', {
+    detail: { shortLine: "Debug command executed" }
+  }));
+};
+
 // Previous context debug commands (for diagnosing Day 2+ failures)
 (window as any).skipPreviousContext = () => {
   useSettingsStore.getState().setSkipPreviousContext(true);

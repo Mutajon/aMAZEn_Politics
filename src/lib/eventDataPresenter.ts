@@ -47,6 +47,12 @@ function applySupportDeltas(supportEffects: CollectedData['supportEffects']): vo
   supportEffects.forEach(effect => {
     const { id, delta } = effect;
 
+    // Skip mom updates if she's dead
+    if (id === 'mom' && !store.momAlive) {
+      console.log(`[Presenter] Skipping mom delta - Mom is deceased`);
+      return;
+    }
+
     // Get current value and setter
     const currentValue = store[`support${capitalize(id)}` as keyof typeof store] as number;
     const setter = store[`setSupport${capitalize(id)}` as keyof typeof store] as (v: number) => void;
@@ -178,8 +184,9 @@ export function buildSupportItems(
   icon: React.ReactNode;
   accentClass: string;
   moodVariant: "civic" | "empathetic";
+  isDeceased?: boolean; // NEW: True if entity is dead (mom only currently)
 }> {
-  const { supportPeople, supportMiddle, supportMom } = useDilemmaStore.getState();
+  const { supportPeople, supportMiddle, supportMom, momAlive } = useDilemmaStore.getState();
   const { analysis } = useRoleStore.getState();
 
   // Get middle entity info from challenger seat (primary institutional opponent)
@@ -236,14 +243,15 @@ export function buildSupportItems(
     {
       id: "mom",
       name: "Mom",
-      percent: supportMom,
+      percent: momAlive ? supportMom : 0, // Force 0 if dead
       initialPercent: initialValues?.mom, // Animation starts from this value
-      delta: momEffect.delta,
-      trend: momEffect.trend,
-      note: momEffect.note,
+      delta: momAlive ? momEffect.delta : null, // No delta if dead
+      trend: momAlive ? momEffect.trend : null, // No trend if dead
+      note: momAlive ? momEffect.note : null, // No note if dead
       icon: null as any, // Filled in by EventScreen3
       accentClass: "bg-rose-600",
       moodVariant: "empathetic" as const,
+      isDeceased: !momAlive, // NEW: Pass deceased flag to UI
     }
   ];
 }
