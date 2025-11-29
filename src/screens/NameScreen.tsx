@@ -164,21 +164,34 @@ function buildFullPrompt(
   gender: "male" | "female" | "any",
   physical: string,
   bgObject: string,
-  eraSetting: string
+  eraSetting: string,
+  roleDescription: string | null
 ): string {
-  const genderedRole = genderizeRole(role, gender);
-  const genderWord = gender === "male" ? "male " : gender === "female" ? "female " : "";
-  const subject = `a ${genderWord}${genderedRole}`.trim();
+  // Clean the role name - strip "— Subtitle (-year)" patterns
+  const cleanRole = role
+    .replace(/\s*—.*$/, '')           // Remove "— Shadows of War"
+    .replace(/\s*\([^)]*\)/g, '')     // Remove "(-431)"
+    .trim() || "leader";
 
-  const physicalClean = physical.trim().replace(/^[,.\s]+/, "");
-  const withPhysical = physicalClean ? `, ${physicalClean}` : "";
-  const bg = bgObject ? `, with ${bgObject} visible in the background` : "";
+  const genderedRole = genderizeRole(cleanRole, gender);
 
-  // Era context at the START and END of prompt
-  const eraPart = eraSetting ? `set in ${eraSetting}: ` : "";
-  const eraReinforce = eraSetting ? `, appropriate to the ${eraSetting.split(',')[0]} period` : "";
+  // Extract era without dates for cleaner prompt
+  const eraClean = eraSetting
+    .replace(/\d+\s*(BCE|CE|BC|AD)/gi, '')
+    .replace(/,\s*$/, '')
+    .trim() || "historical setting";
 
-  return `A fictional game avatar, close-up portrait ${eraPart}${subject}${withPhysical}${bg}. Colored cartoon with strong lines${eraReinforce}.`;
+  // Use role description if available, otherwise use role name
+  const roleContext = roleDescription
+    ? roleDescription.split('.')[0].trim()  // First sentence only
+    : `a ${genderedRole}`;
+
+  const physicalClean = physical.trim().replace(/^[,.\s]+/, '');
+  const physicalDesc = physicalClean || "with distinctive features";
+
+  const bg = bgObject ? `, with ${bgObject} in the background` : "";
+
+  return `A drawing of a close up of the face only of ${roleContext} from ${eraClean}, ${physicalDesc}${bg}.`;
 }
 
 
@@ -200,6 +213,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
 
   const selectedRole = useRoleStore((s) => s.selectedRole);
   const roleYear = useRoleStore((s) => s.roleYear);
+  const roleDescription = useRoleStore((s) => s.roleDescription);
   const analysis = useRoleStore((s) => s.analysis);
   const character = useRoleStore((s) => s.character);
   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
@@ -236,8 +250,8 @@ export default function NameScreen({ push }: { push: PushFn }) {
   );
 
   const fullPrompt = useMemo(
-    () => buildFullPrompt(selectedRole || "", gender, physical, bgObject, eraSetting),
-    [selectedRole, gender, physical, bgObject, eraSetting]
+    () => buildFullPrompt(selectedRole || "", gender, physical, bgObject, eraSetting, roleDescription),
+    [selectedRole, gender, physical, bgObject, eraSetting, roleDescription]
   );
 
   async function loadSuggestions() {
