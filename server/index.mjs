@@ -6147,7 +6147,8 @@ if (process.env.NODE_ENV === "production") {
  *   values: string,
  *   score: number,
  *   politicalSystem: string,
- *   period?: string
+ *   period?: string,
+ *   avatarUrl?: string      // OPTIONAL: Compressed 64x64 WebP thumbnail (~5-10KB)
  * }
  */
 app.post("/api/highscores/submit", async (req, res) => {
@@ -6163,7 +6164,8 @@ app.post("/api/highscores/submit", async (req, res) => {
       values,
       score,
       politicalSystem,
-      period
+      period,
+      avatarUrl         // NEW: Optional compressed thumbnail (~5-10KB)
     } = req.body;
 
     // Validation
@@ -6203,6 +6205,7 @@ app.post("/api/highscores/submit", async (req, res) => {
       score: Math.round(score),
       politicalSystem: politicalSystem?.trim() || "Unknown",
       period: period || undefined,
+      avatarUrl: avatarUrl || undefined,  // Compressed 64x64 WebP thumbnail
       createdAt: new Date()
     };
 
@@ -6290,7 +6293,7 @@ app.get("/api/highscores/global", async (req, res) => {
       ...entry,
       createdAt: entry.createdAt?.toISOString?.() || entry.createdAt,
       // Note: userId intentionally excluded for privacy in global view
-      // Note: avatarUrl not stored in DB (only local)
+      // avatarUrl included (compressed 64x64 WebP thumbnail, ~5-10KB)
     }));
 
     // Get total unique users count (for pagination)
@@ -6355,6 +6358,7 @@ app.get("/api/highscores/user/:userId", async (req, res) => {
       ...entry,
       createdAt: entry.createdAt?.toISOString?.() || entry.createdAt,
       gameId, // Include gameId for user's own scores (helps with debugging)
+      // avatarUrl included (compressed 64x64 WebP thumbnail, ~5-10KB)
     }));
 
     // Get total count for this user

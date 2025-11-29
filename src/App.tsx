@@ -243,7 +243,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
           })()}
           {route === "/event" && <EventScreen3 push={push} />}
           {route === "/downfall" && <DownfallScreen push={push} />}
-          {route === "/highscores-v1" && <HighscoreScreen />} {/* Legacy V1 */}
+          {/*{route === "/highscores-v1" && <HighscoreScreen />} /!* Legacy V1 *!/*/}
           {route.startsWith("/highscores") && <HighscoreScreenV2 />} {/* V2: Global/Local tabs */}
           {route === "/achievements" && <AchievementsScreen />}
           {route === "/aftermath" && <AftermathScreen push={push} />}

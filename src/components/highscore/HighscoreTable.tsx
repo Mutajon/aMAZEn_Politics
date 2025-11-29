@@ -30,18 +30,23 @@ function rankColor(i: number): string | undefined {
 }
 
 function imgForLeader(entry: HighscoreEntry, rank: number): string {
-  // Top 20: Use avatarUrl if available (won't be in DB, but might be in local cache)
-  if (rank < 20 && entry.avatarUrl) {
+  // Priority 1: Use avatarUrl from API (compressed 64x64 WebP thumbnail from MongoDB)
+  if (entry.avatarUrl) {
     return entry.avatarUrl;
   }
   
-  // Fallback: Try historical image or placeholder
+  // Priority 2: Try historical leader image (for predefined roles)
+  const first = entry.name.split(" ")[0];
+  const historicalImage = `/assets/images/leaders/${first}.jpg`;
+  
+  // Priority 3: Placeholder fallback
+  // Note: We could return historicalImage here and let onError handle fallback,
+  // but for ranks 21+ we go straight to placeholder to avoid image load attempts
   if (rank >= 20) {
     return "/assets/images/leaders/placeholder.jpg";
   }
   
-  const first = entry.name.split(" ")[0];
-  return `/assets/images/leaders/${first}.jpg`;
+  return historicalImage;
 }
 
 type Props = {

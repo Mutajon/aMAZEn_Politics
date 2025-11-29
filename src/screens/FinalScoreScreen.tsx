@@ -41,6 +41,7 @@ import { loggingService } from "../lib/loggingService";
 import type { PushFn } from "../lib/router";
 import { useLang } from "../i18n/lang";
 import { audioManager } from "../lib/audioManager";
+import { generateAvatarThumbnail } from "../lib/avatarThumbnail";
 
 type Props = {
   push: PushFn;
@@ -298,32 +299,45 @@ export default function FinalScoreScreen({ push }: Props) {
       markScoreSubmitted();
 
       // Submit to global leaderboard (non-blocking)
-      // Note: We don't send avatarUrl to avoid large payloads (base64 images can be 100KB+)
-      // Avatars are stored locally and can be regenerated if needed
-      const userId = useLoggingStore.getState().userId;
-      const gameId = useDilemmaStore.getState().gameId;
-      const sessionId = useLoggingStore.getState().sessionId;
+      // Generate compressed thumbnail from avatar before sending
+      const submitToLeaderboard = async () => {
+        try {
+          const userId = useLoggingStore.getState().userId;
+          const gameId = useDilemmaStore.getState().gameId;
+          const sessionId = useLoggingStore.getState().sessionId;
 
-      fetch("/api/highscores/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,           // ADDED: User ID for tracking
-          gameId,           // ADDED: Game session ID (for linking to logs)
-          sessionId,        // ADDED: Session ID (for linking to logs)
-          name: entry.name,
-          about: entry.about,
-          democracy: entry.democracy,
-          autonomy: entry.autonomy,
-          values: entry.values,
-          score: entry.score,
-          politicalSystem: entry.politicalSystem,
-          period: entry.period
-          // avatarUrl intentionally omitted - too large for server storage
-        })
-      })
-        .then(res => res.json())
-        .then(data => {
+          // Generate 64x64 WebP thumbnail if avatar exists (~5-10KB vs 50-100KB full size)
+          let avatarThumbnail: string | undefined;
+          if (entry.avatarUrl) {
+            try {
+              avatarThumbnail = await generateAvatarThumbnail(entry.avatarUrl, 64, 0.7);
+              console.log(`[FinalScore] 📸 Generated avatar thumbnail: ${(avatarThumbnail.length / 1024).toFixed(1)}KB`);
+            } catch (err) {
+              console.warn("[FinalScore] ⚠️ Failed to generate thumbnail, submitting without avatar:", err);
+            }
+          }
+
+          const response = await fetch("/api/highscores/submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId,           // User ID for tracking
+              gameId,           // Game session ID (for linking to logs)
+              sessionId,        // Session ID (for linking to logs)
+              name: entry.name,
+              about: entry.about,
+              democracy: entry.democracy,
+              autonomy: entry.autonomy,
+              values: entry.values,
+              score: entry.score,
+              politicalSystem: entry.politicalSystem,
+              period: entry.period,
+              avatarUrl: avatarThumbnail  // Compressed 64x64 WebP thumbnail (~5-10KB)
+            })
+          });
+
+          const data = await response.json();
+          
           if (data.success) {
             console.log(`[FinalScore] ✅ Submitted to global leaderboard`);
             console.log(`  - Global Rank: ${data.globalRank}`);
@@ -343,11 +357,14 @@ export default function FinalScoreScreen({ push }: Props) {
           } else {
             console.warn("[FinalScore] ⚠️ Failed to submit to global leaderboard:", data.error);
           }
-        })
-        .catch(error => {
+        } catch (error) {
           console.error("[FinalScore] ❌ Error submitting to global leaderboard:", error);
           // Don't block user experience - local storage still works
-        });
+        }
+      };
+
+      // Submit in background (non-blocking)
+      submitToLeaderboard();
 
       const freshEntries = useHighscoreStore.getState().entries;
       const rank = findPlayerRank(entry.name, breakdown.final, freshEntries);
