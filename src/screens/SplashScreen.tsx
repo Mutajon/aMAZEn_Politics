@@ -181,10 +181,52 @@ export default function SplashScreen({
     }
   };
 
+  // Helper function to request fullscreen
+  const requestFullscreen = async () => {
+    try {
+      // TypeScript interfaces for browser-specific fullscreen APIs
+      interface DocumentElementWithFullscreen extends HTMLElement {
+        webkitRequestFullscreen?: () => Promise<void>;
+        msRequestFullscreen?: () => Promise<void>;
+      }
+      
+      const elem = document.documentElement as DocumentElementWithFullscreen;
+      
+      if (elem.requestFullscreen) {
+        await elem.requestFullscreen();
+      } else if (elem.webkitRequestFullscreen) {
+        // Safari
+        await elem.webkitRequestFullscreen();
+      } else if (elem.msRequestFullscreen) {
+        // IE11
+        await elem.msRequestFullscreen();
+      }
+      
+      logger.log(
+        'fullscreen_entered',
+        'requested',
+        'User entered fullscreen mode on game start'
+      );
+      console.log('[SplashScreen] Fullscreen mode activated');
+    } catch (error) {
+      // Fullscreen request can fail (user denied, browser policy, etc.)
+      // This is non-critical, so we just log it and continue
+      console.warn('[SplashScreen] Fullscreen request failed:', error);
+      logger.log(
+        'fullscreen_failed',
+        { error: (error as Error).message },
+        'Fullscreen request was denied or failed'
+      );
+    }
+  };
+
   // Handle start button click (when not in experiment mode, skip ID modal)
   const handleStartClick = async () => {
     // Play click sound
     audioManager.playSfx('click-soft');
+
+    // Request fullscreen mode
+    await requestFullscreen();
 
     if (experimentMode) {
       // In experiment mode, show ID modal
