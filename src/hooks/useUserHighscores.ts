@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import type { HighscoreEntry } from "../data/highscores-default";
+import { lang } from "../i18n/lang";
 
 export function useUserHighscores(userId: string, limit = 50) {
   const [entries, setEntries] = useState<HighscoreEntry[]>([]);
@@ -25,11 +26,11 @@ export function useUserHighscores(userId: string, limit = 50) {
         setEntries(data.entries);
         setBestScore(data.bestScore || 0);
       } else {
-        setError(data.error || "Failed to load your scores");
+        setError(data.error || lang("HIGHSCORE_ERROR_LOAD_USER"));
       }
     } catch (err) {
       console.error("[useUserHighscores] Error:", err);
-      setError("Failed to load your scores");
+      setError(lang("HIGHSCORE_ERROR_LOAD_USER"));
     } finally {
       setLoading(false);
     }

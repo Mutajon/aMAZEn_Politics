@@ -24,6 +24,7 @@ import ReflectionSection from "./ReflectionSection";
 import TombstoneSection from "./TombstoneSection";
 import { useLogger } from "../../hooks/useLogger";
 import { audioManager } from "../../lib/audioManager";
+import { useLang } from "../../i18n/lang";
 
 type TopValue = {
   short: string;
@@ -42,6 +43,7 @@ export default function AftermathContent({
   top3ByDimension,
   onRevealScoreClick,
 }: Props) {
+  const lang = useLang();
   const logger = useLogger();
 
   // Log when snapshot pills are displayed
@@ -107,7 +109,7 @@ export default function AftermathContent({
           }}
           className="w-full px-6 py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white text-lg font-bold rounded-xl transition-all duration-200 shadow-lg hover:shadow-amber-500/50"
         >
-          Reveal final score
+          {lang("REVEAL_FINAL_SCORE")}
         </button>
       </div>
     </div>

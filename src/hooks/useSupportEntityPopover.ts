@@ -5,6 +5,7 @@
 import { useState, useCallback } from "react";
 import { useRoleStore } from "../store/roleStore";
 import type { SupportProfile } from "../data/supportProfiles";
+import { useLang } from "../i18n/lang";
 
 export type OpenEntityType = "people" | "challenger" | null;
 
@@ -16,6 +17,7 @@ export type EntityData = {
 
 export function useSupportEntityPopover() {
   const [openEntity, setOpenEntity] = useState<OpenEntityType>(null);
+  const lang = useLang();
 
   // Get support profiles from roleStore
   const supportProfiles = useRoleStore((s) => s.supportProfiles);
@@ -45,7 +47,7 @@ export function useSupportEntityPopover() {
         const profile = supportProfiles.people;
         if (!profile) return null;
         return {
-          name: "The People",
+          name: lang("SUPPORT_THE_PEOPLE"),
           profile,
           currentSupport,
         };
@@ -53,7 +55,7 @@ export function useSupportEntityPopover() {
 
       if (entityType === "challenger") {
         const profile = supportProfiles.challenger;
-        const name = challengerSeat?.name || "Opposition";
+        const name = challengerSeat?.name || lang("OPPOSITION");
         if (!profile) return null;
         return {
           name,
@@ -64,7 +66,7 @@ export function useSupportEntityPopover() {
 
       return null;
     },
-    [supportProfiles, challengerSeat]
+    [supportProfiles, challengerSeat, lang]
   );
 
   return {

@@ -16,6 +16,7 @@ import { Component, type ReactNode } from 'react';
 import { loggingService } from '../lib/loggingService';
 import { useSettingsStore } from '../store/settingsStore';
 import { captureError } from '../lib/sentry';
+import { lang } from '../i18n/lang';
 
 type Props = {
   children: ReactNode;
@@ -146,29 +147,29 @@ export class ErrorBoundary extends Component<Props, State> {
 
             {/* Error Title */}
             <h1 className="text-3xl font-bold text-red-400 mb-3 text-center">
-              Something Went Wrong
+              {lang("ERROR_BOUNDARY_TITLE")}
             </h1>
 
             {/* Error Message */}
             <p className="text-white/80 mb-6 text-center">
-              We've encountered an unexpected error. The error has been logged and we'll investigate it.
+              {lang("ERROR_BOUNDARY_MESSAGE")}
             </p>
 
             {/* Error Details (Collapsible) */}
             <details className="mb-6 bg-black/30 rounded-lg p-4">
               <summary className="cursor-pointer text-red-300 font-semibold mb-2">
-                Technical Details {errorCount > 1 && `(${errorCount} errors)`}
+                {lang("ERROR_BOUNDARY_TECHNICAL_DETAILS")} {errorCount > 1 && `(${errorCount} ${lang("ERROR_BOUNDARY_ERRORS_COUNT")})`}
               </summary>
               <div className="mt-3 space-y-3">
                 <div>
-                  <p className="text-red-400 font-mono text-sm mb-1">Error:</p>
+                  <p className="text-red-400 font-mono text-sm mb-1">{lang("ERROR_BOUNDARY_ERROR_LABEL")}</p>
                   <p className="text-white/70 text-sm font-mono bg-black/50 p-2 rounded overflow-x-auto">
                     {error?.name}: {error?.message}
                   </p>
                 </div>
                 {error?.stack && (
                   <div>
-                    <p className="text-red-400 font-mono text-sm mb-1">Stack Trace:</p>
+                    <p className="text-red-400 font-mono text-sm mb-1">{lang("ERROR_BOUNDARY_STACK_TRACE")}</p>
                     <pre className="text-white/60 text-xs font-mono bg-black/50 p-2 rounded overflow-x-auto max-h-40">
                       {error.stack}
                     </pre>
@@ -176,7 +177,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 )}
                 {errorInfo?.componentStack && (
                   <div>
-                    <p className="text-red-400 font-mono text-sm mb-1">Component Stack:</p>
+                    <p className="text-red-400 font-mono text-sm mb-1">{lang("ERROR_BOUNDARY_COMPONENT_STACK")}</p>
                     <pre className="text-white/60 text-xs font-mono bg-black/50 p-2 rounded overflow-x-auto max-h-40">
                       {errorInfo.componentStack}
                     </pre>
@@ -191,19 +192,19 @@ export class ErrorBoundary extends Component<Props, State> {
                 onClick={this.handleReset}
                 className="flex-1 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors"
               >
-                Try Again
+                {lang("TRY_AGAIN")}
               </button>
               <button
                 onClick={this.handleReload}
                 className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg transition-colors"
               >
-                Reload Page
+                {lang("ERROR_BOUNDARY_RELOAD_PAGE")}
               </button>
             </div>
 
             {/* Help Text */}
             <p className="text-white/50 text-xs text-center mt-6">
-              If this problem persists, try clearing your browser cache or contact support.
+              {lang("ERROR_BOUNDARY_HELP_TEXT")}
             </p>
           </div>
         </div>

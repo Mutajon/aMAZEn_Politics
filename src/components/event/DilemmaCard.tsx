@@ -24,6 +24,7 @@ import { getTreatmentConfig } from "../../data/experimentConfig";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useDilemmaStore } from "../../store/dilemmaStore";
 import type { TreatmentType } from "../../data/experimentConfig";
+import { useLang } from "../../i18n/lang";
 
 export type DilemmaProps = {
   title: string;
@@ -33,6 +34,7 @@ export type DilemmaProps = {
 };
 
 export default function DilemmaCard({ title, description }: DilemmaProps) {
+  const lang = useLang();
   const treatment = useSettingsStore(state => state.treatment) as TreatmentType;
   const config = getTreatmentConfig(treatment);
   const inquiryCreditsRemaining = useDilemmaStore(state => state.inquiryCreditsRemaining);
@@ -84,7 +86,7 @@ export default function DilemmaCard({ title, description }: DilemmaProps) {
           >
             <MessageCircle className="w-4 h-4" />
             <span>
-              Inquire more {hasCredits && `(${inquiryCreditsRemaining})`}
+              {lang("INQUIRE_MORE")} {hasCredits && `(${inquiryCreditsRemaining})`}
             </span>
           </motion.button>
         )}

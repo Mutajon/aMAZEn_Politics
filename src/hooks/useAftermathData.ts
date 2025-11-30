@@ -15,6 +15,7 @@ import { useSettingsStore } from "../store/settingsStore";
 import { COMPONENTS, type PropKey } from "../data/compass-data";
 import type { AftermathRequest, AftermathResponse, TopCompassValue } from "../lib/aftermath";
 import { calculateOverallRatings } from "../lib/aftermath";
+import { useLanguage } from "../i18n/LanguageContext";
 
 /**
  * Extract top 2 compass values per dimension
@@ -60,6 +61,7 @@ function extractTopCompassValues(): TopCompassValue[] {
  * Collects all game state and calls /api/aftermath
  */
 export function useAftermathData() {
+  const { language } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<AftermathResponse | null>(null);
@@ -105,7 +107,8 @@ export function useAftermathData() {
           mom: supportMom
         },
         topCompassValues,
-        debug: debugMode
+        debug: debugMode,
+        language
       };
 
       if (debugMode) {
@@ -158,7 +161,7 @@ export function useAftermathData() {
       setError(message);
       setLoading(false);
     }
-  }, []);
+  }, [language]);
 
   // Method to restore data from snapshot (bypasses API call)
   const restoreData = useCallback((restoredData: AftermathResponse) => {

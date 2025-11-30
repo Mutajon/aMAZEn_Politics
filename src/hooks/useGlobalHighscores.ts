@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import type { HighscoreEntry } from "../data/highscores-default";
+import { lang } from "../i18n/lang";
 
 export function useGlobalHighscores(limit = 50) {
   const [entries, setEntries] = useState<HighscoreEntry[]>([]);
@@ -17,11 +18,11 @@ export function useGlobalHighscores(limit = 50) {
       if (data.success && data.entries) {
         setEntries(data.entries);
       } else {
-        setError(data.error || "Failed to load global leaderboard");
+        setError(data.error || lang("HIGHSCORE_ERROR_LOAD_GLOBAL"));
       }
     } catch (err) {
       console.error("[useGlobalHighscores] Error:", err);
-      setError("Failed to load global leaderboard");
+      setError(lang("HIGHSCORE_ERROR_LOAD_GLOBAL"));
     } finally {
       setLoading(false);
     }

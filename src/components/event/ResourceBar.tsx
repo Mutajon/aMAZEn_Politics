@@ -157,12 +157,12 @@ export default function ResourceBar({
         {/* Resources Section */}
         <div className="flex flex-col gap-1">
           <div className="text-[10px] text-white/50 uppercase tracking-wide px-1">
-            Resources
+            {lang("RESOURCES")}
           </div>
           <div className="flex items-stretch gap-2">
             <ResourcePill
               icon={<Hourglass className="w-4 h-4" />}
-              label="Days Left"
+              label={lang("DAYS_LEFT")}
               value={String(daysLeft)}
               iconBgClass="bg-sky-600"
               iconTextClass="text-cyan-200"
@@ -176,7 +176,7 @@ export default function ResourceBar({
                     <Coins className="w-4 h-4" />
                   </span>
                 }
-                label="Budget"
+                label={lang("BUDGET")}
                 value={formatMoney(displayBudget)}
                 iconBgClass="bg-amber-500/25"
                 iconTextClass="text-amber-200"
@@ -339,6 +339,7 @@ function ScorePill({
   goalLabel: string;
   details: ResourceBarScoreDetails;
 }) {
+  const lang = useLang();
   const [tooltipPinned, setTooltipPinned] = useState(false);
   const [tooltipHovered, setTooltipHovered] = useState(false);
 
@@ -379,7 +380,7 @@ function ScorePill({
             <Trophy className="w-3.5 h-3.5" />
           </span>
           <span className="text-[9px] md:text-[10px] text-white/80 leading-none uppercase tracking-wider">
-            Score
+            {lang("SCORE_LABEL")}
           </span>
         </div>
 
@@ -427,7 +428,7 @@ function ScorePill({
             </button>
           )}
           <div className="text-xs uppercase tracking-wide text-white/50 mb-2">
-            Score Breakdown
+            {lang("SCORE_BREAKDOWN")}
           </div>
           <ul className="space-y-1 text-sm">
             {details.components.map((comp) => (
@@ -437,7 +438,7 @@ function ScorePill({
               >
                 <span className="truncate">{comp.label}</span>
                 <span className="tabular-nums font-semibold text-white/90">
-                  {formatPoints(comp.points)} pts
+                  {formatPoints(comp.points)} {lang("PTS")}
                 </span>
               </li>
             ))}

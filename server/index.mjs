@@ -2788,7 +2788,8 @@ app.post("/api/aftermath", async (req, res) => {
       dilemmaHistory,
       finalSupport,
       topCompassValues,
-      debug
+      debug,
+      language = 'en' // Get language from client (default: English)
     } = req.body || {};
 
     if (debug) {
@@ -2800,7 +2801,8 @@ app.post("/api/aftermath", async (req, res) => {
         systemName,
         historyLength: dilemmaHistory?.length,
         finalSupport,
-        topCompassValues
+        topCompassValues,
+        language: languageCode
       });
     }
 
@@ -2820,6 +2822,8 @@ app.post("/api/aftermath", async (req, res) => {
     };
 
     // Build system prompt using EXACT text from user's preliminary plan
+    const languageCode = String(language || "en").toLowerCase();
+    const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
     const system = `PLAYER ROLE & CONTEXT:
 - Setting: ${setting || role || "Unknown Setting"}
 - Player Role: ${role || "Unknown Role"}
@@ -2830,6 +2834,7 @@ Write in clear, vivid, reflective language; no jargon or game terms.
 Tone: ironic-cinematic, like a historical epilogue (Reigns, Frostpunk, Democracy 3).
 Accessible for teens; mix wit with weight.
 Use roles/descriptions, not obscure names.
+${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.` : ''}
 
 CONTENT
 Generate an in-world epilogue for the leader based on their decisions, outcomes, supports, and values.
@@ -2970,7 +2975,7 @@ ${compassSummary || "None"}
 DECISION HISTORY:
 ${historySummary || "No decisions recorded"}${conversationContext}
 
-Generate the aftermath epilogue following the structure above. Return STRICT JSON ONLY.`;
+Generate the aftermath epilogue following the structure above. Return STRICT JSON ONLY.${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}.` : ''}`;
 
     // Call AI with Gemini model
     // No fallback - let errors propagate so frontend can show retry button
@@ -3616,7 +3621,7 @@ function sanitizeDilemmaResponse(rawResponse) {
  * Build unified Game Master system prompt (sent ONCE on Day 1)
  * Focused, short prompt with essential rules only
  */
-function buildGameMasterSystemPromptUnified(gameContext) {
+function buildGameMasterSystemPromptUnified(gameContext, languageCode = 'en', languageName = 'English') {
   const {
     role,
     systemName,
@@ -3644,10 +3649,11 @@ function buildGameMasterSystemPromptUnified(gameContext) {
 You are the Game Master of a historical-political simulation.
 You speak directly to the player as "you".
 Tone: amused, observant, challenging, slightly teasing, but always clear.
-Use simple English (CEFR B1-B2).
+Use simple ${languageCode === 'en' ? 'English' : languageName} (CEFR B1-B2).
 Short sentences (8-16 words).
 No metaphors, no poetic phrasing, no idioms, no fancy adjectives.
 Your job is to TEST the player's values by creating specific moral traps based on their compass, while making them feel what it is like to be this exact person in this exact historical moment.
+${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.` : ''}
 
 1. CORE IDENTITY OF THE PLAYER
 
@@ -4006,7 +4012,7 @@ CRITICAL JSON RULES:
  *
  * Rollback: Set USE_PROMPT_V3 = false to use original prompt
  */
-function buildGameMasterSystemPromptUnifiedV3(gameContext) {
+function buildGameMasterSystemPromptUnifiedV3(gameContext, languageCode = 'en', languageName = 'English') {
   const {
     role,
     systemName,
@@ -4036,13 +4042,14 @@ You speak directly to the player as "you".
 Tone: amused, observant, challenging, slightly teasing, but always clear.
 
 LANGUAGE RULES:
-- Simple English (CEFR B1-B2), short sentences (8-16 words)
+- Simple ${languageCode === 'en' ? 'English' : languageName} (CEFR B1-B2), short sentences (8-16 words)
 - NO metaphors, poetic phrasing, idioms, or fancy adjectives
 - NO technical jargon, academic language, or bureaucratic terms
   BAD: "preliminary audits", "unsanctioned bio-agent trials", "scientific standards demand transparency"
   GOOD: "the inspectors found out", "illegal experiments", "people want answers"
 - Use concrete language: "Citizens protest" NOT "tensions rise"
 - If a movie camera cannot record it, DO NOT WRITE IT
+${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.` : ''}
 
 YOUR MISSION:
 Create VALUE TRAPS in the player's PRIVATE LIFE that force them to choose between their stated values and their survival, rooted in the specific details and atmosphere of the setting.
@@ -4412,7 +4419,7 @@ DAY 8 SCHEMA (Aftermath):
  * @param {array|null} currentCompassTopValues - Current top compass values
  * @param {string} mirrorMode - 'lastAction' or 'dilemma' (default: 'dilemma')
  */
-function buildGameMasterUserPrompt(day, playerChoice = null, currentCompassTopValues = null, mirrorMode = 'dilemma') {
+function buildGameMasterUserPrompt(day, playerChoice = null, currentCompassTopValues = null, mirrorMode = 'dilemma', languageCode = 'en', languageName = 'English') {
   // General instruction for all days
   let prompt = `First, carefully review the entire system prompt to understand all context and rules.\n\n`;
 
@@ -4477,6 +4484,11 @@ Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
     }
   }
 
+  // Add language instruction if not English
+  if (languageCode !== 'en') {
+    prompt += `\n\nWrite your response in ${languageName}.`;
+  }
+
   return prompt;
 }
 
@@ -4512,7 +4524,8 @@ app.post("/api/game-turn-v2", async (req, res) => {
       generateActions = true,
       useXAI = false,
       useGemini = false,
-      debugMode = false
+      debugMode = false,
+      language = 'en' // Get language from client (default: English)
     } = req.body;
 
     // Validation
@@ -4524,7 +4537,7 @@ app.post("/api/game-turn-v2", async (req, res) => {
       return res.status(400).json({ error: "Missing or invalid day (must be 1-8)" });
     }
 
-    console.log(`[GAME-TURN-V2] gameId=${gameId}, day=${day}, isFirstDilemma=${isFirstDilemma}`);
+    console.log(`[GAME-TURN-V2] gameId=${gameId}, day=${day}, isFirstDilemma=${isFirstDilemma}, language=${language}`);
 
     // Get or create conversation
     let conversation = getConversation(gameId);
@@ -4576,12 +4589,14 @@ app.post("/api/game-turn-v2", async (req, res) => {
 
       // Build unified system prompt (sent ONCE)
       // Use V3 if feature flag enabled, otherwise use original
+      const languageCode = String(language || "en").toLowerCase();
+      const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
       const systemPrompt = USE_PROMPT_V3
-        ? buildGameMasterSystemPromptUnifiedV3(enrichedContext)
-        : buildGameMasterSystemPromptUnified(enrichedContext);
+        ? buildGameMasterSystemPromptUnifiedV3(enrichedContext, languageCode, languageName)
+        : buildGameMasterSystemPromptUnified(enrichedContext, languageCode, languageName);
 
       // Build minimal Day 1 user prompt
-      const userPrompt = buildGameMasterUserPrompt(day);
+      const userPrompt = buildGameMasterUserPrompt(day, null, null, 'dilemma', languageCode, languageName);
 
       // Debug logging (Day 1 request payload)
       if (debugMode) {
@@ -4595,6 +4610,7 @@ app.post("/api/game-turn-v2", async (req, res) => {
           isFirstDilemma: true,
           generateActions,
           useXAI,
+          language: languageCode,
           gameContext: {
             role: enrichedContext.role,
             systemName: enrichedContext.systemName,
@@ -4779,7 +4795,9 @@ app.post("/api/game-turn-v2", async (req, res) => {
       console.log(`[GAME-TURN-V2] Day ${day} - Mirror mode: ${mirrorMode}`);
 
       // Build Day 2+ user prompt with current compass values and mirror mode
-      const userPrompt = buildGameMasterUserPrompt(day, playerChoice, currentCompassTopValues, mirrorMode);
+      const languageCode = String(language || "en").toLowerCase();
+      const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
+      const userPrompt = buildGameMasterUserPrompt(day, playerChoice, currentCompassTopValues, mirrorMode, languageCode, languageName);
 
       // Prepare messages array (history + new user message)
       const messages = [
@@ -4801,6 +4819,7 @@ app.post("/api/game-turn-v2", async (req, res) => {
           isFollowUp: true,
           generateActions,
           useXAI,
+          language: languageCode,
           playerChoice: {
             title: playerChoice?.title,
             description: playerChoice?.description,

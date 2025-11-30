@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { useDilemmaStore } from '../store/dilemmaStore';
 import { useSettingsStore } from '../store/settingsStore';
 import type { TreatmentType } from '../data/experimentConfig';
+import { lang } from '../i18n/lang';
 
 /**
  * Hook for managing reasoning prompts during gameplay.
@@ -91,7 +92,7 @@ export function validateReasoningText(text: string): ValidationResult {
     return {
       isValid: false,
       reason: 'too_short',
-      message: 'Please write at least 10 characters.',
+      message: lang('REASONING_VALIDATION_TOO_SHORT'),
     };
   }
 
@@ -100,7 +101,7 @@ export function validateReasoningText(text: string): ValidationResult {
     return {
       isValid: false,
       reason: 'too_long',
-      message: 'Please keep your reasoning under 500 characters.',
+      message: lang('REASONING_VALIDATION_TOO_LONG'),
     };
   }
 
@@ -110,7 +111,7 @@ export function validateReasoningText(text: string): ValidationResult {
     return {
       isValid: false,
       reason: 'all_same_char',
-      message: 'Please provide meaningful text.',
+      message: lang('REASONING_VALIDATION_MEANINGFUL'),
     };
   }
 
@@ -120,7 +121,7 @@ export function validateReasoningText(text: string): ValidationResult {
     return {
       isValid: false,
       reason: 'repeated_pattern',
-      message: 'Please provide meaningful text without repeated patterns.',
+      message: lang('REASONING_VALIDATION_REPEATED_PATTERN'),
     };
   }
 
@@ -130,7 +131,7 @@ export function validateReasoningText(text: string): ValidationResult {
     return {
       isValid: false,
       reason: 'keyboard_mashing',
-      message: 'Please provide thoughtful reasoning.',
+      message: lang('REASONING_VALIDATION_THOUGHTFUL'),
     };
   }
 
@@ -140,7 +141,7 @@ export function validateReasoningText(text: string): ValidationResult {
     return {
       isValid: false,
       reason: 'no_letters',
-      message: 'Please write in words.',
+      message: lang('REASONING_VALIDATION_WRITE_WORDS'),
     };
   }
 
@@ -151,7 +152,7 @@ export function validateReasoningText(text: string): ValidationResult {
     return {
       isValid: false,
       reason: 'only_numbers',
-      message: 'Please explain your reasoning in words.',
+      message: lang('REASONING_VALIDATION_EXPLAIN_WORDS'),
     };
   }
 
@@ -161,7 +162,7 @@ export function validateReasoningText(text: string): ValidationResult {
     return {
       isValid: false,
       reason: 'too_few_words',
-      message: 'Please write at least 3 words.',
+      message: lang('REASONING_VALIDATION_MIN_WORDS'),
     };
   }
 
@@ -171,7 +172,7 @@ export function validateReasoningText(text: string): ValidationResult {
     return {
       isValid: false,
       reason: 'gibberish',
-      message: 'Please provide meaningful text.',
+      message: lang('REASONING_VALIDATION_MEANINGFUL'),
     };
   }
 
@@ -193,7 +194,7 @@ export function validateReasoningText(text: string): ValidationResult {
     return {
       isValid: false,
       reason: 'profanity',
-      message: 'Please keep your language respectful.',
+      message: lang('REASONING_VALIDATION_RESPECTFUL'),
     };
   }
 
@@ -204,7 +205,7 @@ export function validateReasoningText(text: string): ValidationResult {
     return {
       isValid: false,
       reason: 'mostly_numbers',
-      message: 'Please explain your reasoning in words, not numbers.',
+      message: lang('REASONING_VALIDATION_NOT_NUMBERS'),
     };
   }
 

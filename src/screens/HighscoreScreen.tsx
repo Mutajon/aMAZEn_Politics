@@ -131,7 +131,7 @@ export default function HighscoreScreen() {
       } catch (err) {
         console.error("[HighscoreScreen] ❌ Error fetching global highscores:", err);
         if (isMounted) {
-          setError("Failed to load global leaderboard");
+          setError(lang("HIGHSCORE_ERROR_LOAD_GLOBAL"));
           // Fallback to local entries
           const currentLocalEntries = useHighscoreStore.getState().entries;
           setEntriesState(currentLocalEntries);
@@ -179,7 +179,7 @@ export default function HighscoreScreen() {
               {lang("HIGHSCORE_TITLE")}
             </h1>
             <p className="text-white/60 text-xs md:text-sm mt-1">
-              {loading ? "Loading global leaderboard..." : error || lang("HIGHSCORE_CLICK_LEADERS")}
+              {loading ? lang("HIGHSCORE_LOADING_GLOBAL") : error || lang("HIGHSCORE_CLICK_LEADERS")}
             </p>
           </div>
           <button
@@ -212,7 +212,7 @@ export default function HighscoreScreen() {
           <div className="max-h-[60vh] md:max-h-[70vh] overflow-y-auto divide-y divide-white/5">
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="text-white/60">Loading leaderboard...</div>
+                <div className="text-white/60">{lang("HIGHSCORE_LOADING")}</div>
               </div>
             ) : (
               <motion.div

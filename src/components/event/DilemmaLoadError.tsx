@@ -15,6 +15,7 @@ import { useDilemmaStore } from "../../store/dilemmaStore";
 import { useCompassStore } from "../../store/compassStore";
 import { useRoleStore } from "../../store/roleStore";
 import { bgStyle } from "../../lib/ui";
+import { lang } from "../../i18n/lang";
 
 type Props = {
   error: string;
@@ -48,7 +49,7 @@ export default function DilemmaLoadError({ error, onStartNew, onRetry }: Props) 
 
           {/* Error Heading */}
           <h2 className="text-2xl font-bold text-white mb-3">
-            Unable to Generate Challenge
+            {lang("DILEMMA_LOAD_ERROR_TITLE")}
           </h2>
 
           {/* Error Message */}
@@ -60,7 +61,7 @@ export default function DilemmaLoadError({ error, onStartNew, onRetry }: Props) 
           {debugMode && (
             <details className="mb-6 text-left">
               <summary className="text-sm text-white/50 cursor-pointer hover:text-white/70 mb-2">
-                Technical Details
+                {lang("DILEMMA_LOAD_ERROR_TECHNICAL_DETAILS")}
               </summary>
               <pre className="text-xs text-white/60 bg-black/20 p-3 rounded overflow-auto max-h-32">
                 {error}
@@ -84,7 +85,7 @@ export default function DilemmaLoadError({ error, onStartNew, onRetry }: Props) 
                   transform hover:scale-105
                 "
               >
-                Try Again
+                {lang("TRY_AGAIN")}
               </button>
             )}
 
@@ -100,16 +101,16 @@ export default function DilemmaLoadError({ error, onStartNew, onRetry }: Props) 
                 shadow-lg hover:shadow-xl
                 transform hover:scale-105
               "
-            >
-              Start New Game
+              >
+              {lang("START_NEW_GAME")}
             </button>
           </div>
 
           {/* Helper Text */}
           <p className="text-sm text-white/50 mt-4">
             {onRetry
-              ? "The AI service failed after 8 attempts. Wait a moment and try again, or start a new game."
-              : "The AI service failed after 8 attempts. Please start a new game to continue."
+              ? lang("DILEMMA_LOAD_ERROR_HELPER_WITH_RETRY")
+              : lang("DILEMMA_LOAD_ERROR_HELPER_NO_RETRY")
             }
           </p>
         </div>

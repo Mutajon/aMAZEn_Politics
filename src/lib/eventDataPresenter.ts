@@ -16,6 +16,8 @@
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import type { CollectedData } from "../hooks/useEventDataCollector";
+import { lang } from "../i18n/lang";
+import { POWER_DISTRIBUTION_TRANSLATIONS } from "../data/powerDistributionTranslations";
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -189,11 +191,24 @@ export function buildSupportItems(
   const { supportPeople, supportMiddle, supportMom, momAlive } = useDilemmaStore.getState();
   const { analysis } = useRoleStore.getState();
 
+  // Helper function to translate challenger seat name
+  const translateChallengerName = (name: string): string => {
+    // Check all predefined role translations for a matching holder name
+    for (const roleTranslations of Object.values(POWER_DISTRIBUTION_TRANSLATIONS)) {
+      const holderTranslation = roleTranslations.holders[name];
+      if (holderTranslation) {
+        return lang(holderTranslation.name);
+      }
+    }
+    // If no translation found, return name as-is (for AI-generated roles)
+    return name;
+  };
+
   // Get middle entity info from challenger seat (primary institutional opponent)
   const challengerSeat = analysis?.challengerSeat;
   const middleEntity = challengerSeat
-    ? { name: challengerSeat.name, icon: "🏛️" } // Use challenger seat name
-    : { name: "Council", icon: "🏛️" }; // Fallback to generic "Council"
+    ? { name: translateChallengerName(challengerSeat.name), icon: "🏛️" } // Translate challenger seat name
+    : { name: lang("COUNCIL"), icon: "🏛️" }; // Fallback to generic "Council"
 
   // Show deltas only after Step 2 (presentationStep >= 2)
   const showDeltas = presentationStep >= 2;
@@ -218,7 +233,7 @@ export function buildSupportItems(
   return [
     {
       id: "people",
-      name: "The People",
+      name: lang("SUPPORT_THE_PEOPLE"),
       percent: supportPeople,
       initialPercent: initialValues?.people, // Animation starts from this value
       delta: peopleEffect.delta,
@@ -242,7 +257,7 @@ export function buildSupportItems(
     },
     {
       id: "mom",
-      name: "Mom",
+      name: lang("MOM"),
       percent: momAlive ? supportMom : 0, // Force 0 if dead
       initialPercent: initialValues?.mom, // Animation starts from this value
       delta: momAlive ? momEffect.delta : null, // No delta if dead

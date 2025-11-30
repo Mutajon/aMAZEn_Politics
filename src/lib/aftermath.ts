@@ -31,6 +31,7 @@ export type AftermathRequest = {
   };
   topCompassValues: TopCompassValue[]; // top 2 per dimension (8 total)
   debug?: boolean;
+  language?: string; // language code (e.g., 'en', 'he')
 };
 
 /** Rating level for autonomy and liberalism */

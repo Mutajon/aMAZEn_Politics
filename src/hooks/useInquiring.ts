@@ -15,6 +15,7 @@
 
 import { useState, useCallback } from "react";
 import { useDilemmaStore } from "../store/dilemmaStore";
+import { lang } from "../i18n/lang";
 
 type InquiryEntry = {
   question: string;
@@ -69,23 +70,23 @@ export function useInquiring() {
     async (question: string) => {
       // Validation
       if (!gameId) {
-        setError("No active game session. Please restart the game.");
+        setError(lang("INQUIRING_ERROR_NO_GAME_SESSION"));
         return;
       }
 
       if (!currentDilemma) {
-        setError("No dilemma available to inquire about.");
+        setError(lang("INQUIRING_ERROR_NO_DILEMMA"));
         return;
       }
 
       if (!canInquire()) {
-        setError("No inquiry credits remaining.");
+        setError(lang("INQUIRING_ERROR_NO_CREDITS"));
         return;
       }
 
       const trimmedQuestion = question.trim();
       if (trimmedQuestion.length < 5) {
-        setError("Question must be at least 5 characters.");
+        setError(lang("INQUIRING_ERROR_QUESTION_TOO_SHORT"));
         return;
       }
 
@@ -118,7 +119,7 @@ export function useInquiring() {
         const data = await response.json();
 
         if (!data.answer) {
-          throw new Error("No answer received from server");
+          throw new Error(lang("INQUIRING_ERROR_NO_ANSWER"));
         }
 
         console.log("[useInquiring] Received answer:", data.answer.substring(0, 50));
@@ -139,11 +140,11 @@ export function useInquiring() {
 
         // User-friendly error messages
         if (errorMessage.includes("expired") || errorMessage.includes("404")) {
-          setError("Your game session has expired. Please restart the game.");
+          setError(lang("INQUIRING_ERROR_SESSION_EXPIRED"));
         } else if (errorMessage.includes("network") || errorMessage.includes("fetch")) {
-          setError("Connection lost. Please check your network and try again.");
+          setError(lang("INQUIRING_ERROR_CONNECTION_LOST"));
         } else {
-          setError("The advisor is unavailable right now. Please try again.");
+          setError(lang("INQUIRING_ERROR_ADVISOR_UNAVAILABLE"));
         }
       } finally {
         setIsLoading(false);

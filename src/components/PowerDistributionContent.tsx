@@ -89,14 +89,14 @@ export default function PowerDistributionContent({
         <div className="bg-red-900/30 text-red-100 border border-red-700/40 rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row items-start gap-2 sm:gap-3">
           <span className="mt-0.5">⚠️</span>
           <div className="flex-1">
-            <p className="font-semibold">We couldn't analyze that setting.</p>
+            <p className="font-semibold">{lang("POWER_DISTRIBUTION_ERROR_MESSAGE")}</p>
             <p className="text-sm opacity-90 mt-0.5">{error}</p>
           </div>
           <button
             onClick={onRetry}
             className="ml-2 rounded-lg bg-red-100/10 px-3 py-1.5 text-sm hover:bg-red-100/20"
           >
-            Try again
+            {lang("TRY_AGAIN")}
           </button>
         </div>
       )}
