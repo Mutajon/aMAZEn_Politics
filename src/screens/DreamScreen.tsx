@@ -1,9 +1,9 @@
 // src/screens/DreamScreen.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { PushFn } from "../lib/router";
 import { useLogger } from "../hooks/useLogger";
-import { useLang } from "../i18n/lang";
+import { useLang, getCurrentLanguage } from "../i18n/lang";
 import { useRoleStore } from "../store/roleStore";
 
 // Background style using etherPlace.jpg (same as IntroScreen)
@@ -142,7 +142,20 @@ function validateTrait(text: string): string | null {
   return null;
 }
 
-type Phase = "intro" | "name" | "trait";
+type Phase = "intro" | "name" | "trait" | "mirror" | "mirrorBroken" | "grandpaDialogue";
+
+// Grandpa dialogue lines
+const GRANDPA_DIALOGUES = [
+  "DREAM_GRANDPA_1",
+  "DREAM_GRANDPA_2",
+  "DREAM_GRANDPA_3",
+  "DREAM_GRANDPA_4",
+  "DREAM_GRANDPA_5",
+  "DREAM_GRANDPA_6",
+];
+
+// Typewriter speed in ms per character
+const TYPEWRITER_SPEED = 25;
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function DreamScreen({ push }: { push: PushFn }) {
@@ -165,6 +178,15 @@ export default function DreamScreen({ push }: { push: PushFn }) {
   const [showTraitModal, setShowTraitModal] = useState(false);
   const [customTraitText, setCustomTraitText] = useState("");
   const [traitError, setTraitError] = useState<string | null>(null);
+  const [shortTrait, setShortTrait] = useState<string | null>(null);
+  const [shortTraitHe, setShortTraitHe] = useState<string | null>(null);
+  const [extractingTrait, setExtractingTrait] = useState(false);
+
+  // Grandpa dialogue state
+  const [dialogueStep, setDialogueStep] = useState(0); // 0-5 for 6 bubbles
+  const [showShards, setShowShards] = useState(false);
+  const [typingComplete, setTypingComplete] = useState(false);
+  const [displayedText, setDisplayedText] = useState("");
 
   // Show arrow after intro text appears
   const handleIntroTextComplete = () => {
@@ -205,7 +227,8 @@ export default function DreamScreen({ push }: { push: PushFn }) {
   // Handle predefined trait selection
   const handleTraitSelect = (traitKey: string, traitLabel: string) => {
     const traitText = lang(traitLabel);
-    setPlayerTrait(traitText);
+    setPlayerTrait(traitText);  // Keep full text for logging
+    setShortTrait(traitKey);    // Use key as short trait: "smartest", "charismatic", etc.
     setTraitAccepted(true);
     logger.log("dream_trait_selected", { trait: traitKey, traitText }, "Player selected predefined trait");
   };
@@ -226,7 +249,7 @@ export default function DreamScreen({ push }: { push: PushFn }) {
   };
 
   // Handle confirm custom trait
-  const handleConfirmCustomTrait = () => {
+  const handleConfirmCustomTrait = async () => {
     const trimmed = customTraitText.trim();
     const validationError = validateTrait(trimmed);
 
@@ -236,12 +259,39 @@ export default function DreamScreen({ push }: { push: PushFn }) {
       return;
     }
 
-    // Custom trait is valid - save it
-    setPlayerTrait(trimmed);
-    setTraitAccepted(true);
-    setShowTraitModal(false);
-    setTraitError(null);
-    logger.log("dream_trait_selected", { trait: "custom", traitText: trimmed }, "Player submitted custom trait");
+    // Custom trait is valid - call AI to extract short trait (bilingual)
+    setExtractingTrait(true);
+    try {
+      const response = await fetch("/api/extract-trait", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description: trimmed,
+          language: getCurrentLanguage(),
+        }),
+      });
+      const data = await response.json();
+
+      setPlayerTrait(trimmed);                              // Keep full text for logging
+      setShortTrait(data.trait || trimmed);                 // English trait
+      setShortTraitHe(data.traitHe || data.trait || trimmed); // Hebrew trait
+      setTraitAccepted(true);
+      setShowTraitModal(false);
+      setTraitError(null);
+      logger.log("dream_trait_selected", { trait: "custom", traitText: trimmed, shortTrait: data.trait, shortTraitHe: data.traitHe }, "Player submitted custom trait");
+    } catch (error) {
+      // Fallback: use first word or trimmed text
+      setPlayerTrait(trimmed);
+      const fallback = trimmed.split(/\s+/)[0] || trimmed;
+      setShortTrait(fallback);
+      setShortTraitHe(fallback);
+      setTraitAccepted(true);
+      setShowTraitModal(false);
+      setTraitError(null);
+      logger.log("dream_trait_selected", { trait: "custom", traitText: trimmed, shortTrait: fallback }, "Player submitted custom trait (AI fallback)");
+    } finally {
+      setExtractingTrait(false);
+    }
   };
 
   // Handle Enter key in custom trait input
@@ -250,6 +300,104 @@ export default function DreamScreen({ push }: { push: PushFn }) {
       e.preventDefault();
       handleConfirmCustomTrait();
     }
+  };
+
+  // Transition to mirror phase when trait is accepted
+  useEffect(() => {
+    if (traitAccepted && shortTrait) {
+      // Small delay for fade out, then transition
+      setTimeout(() => setPhase("mirror"), 500);
+    }
+  }, [traitAccepted, shortTrait]);
+
+  // Handler for mirror continue button
+  const handleMirrorContinue = () => {
+    // Play glass break sound
+    const audio = new Audio("/assets/sounds/glassBreak.mp3");
+    audio.play().catch(() => {}); // Ignore autoplay errors
+    setPhase("mirrorBroken");
+    logger.log("dream_mirror_continue", true, "Player continued past mirror");
+  };
+
+  // Handler for broken mirror continue - transition to grandpa dialogue
+  const handleBrokenMirrorContinue = () => {
+    logger.log("dream_broken_mirror_continue", true, "Player continued after mirror break");
+    setPhase("grandpaDialogue");
+    setDialogueStep(0);
+    setTypingComplete(false);
+    setDisplayedText("");
+  };
+
+  // Typewriter effect for grandpa dialogue
+  useEffect(() => {
+    if (phase !== "grandpaDialogue") return;
+
+    const fullText = lang(GRANDPA_DIALOGUES[dialogueStep]);
+    if (!fullText) return;
+
+    setTypingComplete(false);
+    setDisplayedText("");
+
+    let currentIndex = 0;
+    const interval = setInterval(() => {
+      if (currentIndex < fullText.length) {
+        setDisplayedText(fullText.slice(0, currentIndex + 1));
+        currentIndex++;
+      } else {
+        clearInterval(interval);
+        setTypingComplete(true);
+      }
+    }, TYPEWRITER_SPEED);
+
+    return () => clearInterval(interval);
+  }, [phase, dialogueStep, lang]);
+
+  // Handler for dialogue bubble click
+  const handleDialogueClick = () => {
+    if (!typingComplete) {
+      // Skip to end of typing
+      const fullText = lang(GRANDPA_DIALOGUES[dialogueStep]);
+      setDisplayedText(fullText);
+      setTypingComplete(true);
+      return;
+    }
+
+    // Move to next dialogue step
+    if (dialogueStep < GRANDPA_DIALOGUES.length - 1) {
+      // After step 3 (4th bubble), show shards
+      if (dialogueStep === 3) {
+        setShowShards(true);
+        // Play fragments appear sound
+        const audio = new Audio("/assets/sounds/fragmentsAppear.mp3");
+        audio.play().catch(() => {});
+      }
+
+      setDialogueStep(dialogueStep + 1);
+      setTypingComplete(false);
+      setDisplayedText("");
+      logger.log("dream_grandpa_dialogue", { step: dialogueStep + 1 }, "Player advanced to next dialogue");
+    } else {
+      // After final dialogue (step 5), enable shard clicking
+      // dialogueStep stays at 5, but typingComplete enables clicking
+      logger.log("dream_grandpa_dialogue_complete", true, "Grandpa dialogue complete, shards clickable");
+    }
+  };
+
+  // Handler for shard click
+  const handleShardClick = () => {
+    logger.log("dream_shard_clicked", { shard: 0 }, "Player clicked first shard");
+    // Navigation TBD in future task
+  };
+
+  // Render text with emphasis for *text* patterns (black + bold on white background)
+  const renderDialogueText = (text: string) => {
+    const parts = text.split(/(\*[^*]+\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith("*") && part.endsWith("*")) {
+        return <em key={i} className="text-black font-bold not-italic">{part.slice(1, -1)}</em>;
+      }
+      return part;
+    });
   };
 
   return (
@@ -280,7 +428,27 @@ export default function DreamScreen({ push }: { push: PushFn }) {
                 textShadow: "0 2px 20px rgba(0,0,0,0.8)",
               }}
             >
-              {lang("DREAM_INTRO_TEXT")}
+              {/* Highlight "dreaming" / "חולם" with golden gradient */}
+              {(() => {
+                const text = lang("DREAM_INTRO_TEXT");
+                // Match "dreaming?" in English or "חולם?" in Hebrew
+                const dreamMatch = text.match(/(dreaming\?|חולם\?)/i);
+                if (dreamMatch) {
+                  const index = text.indexOf(dreamMatch[0]);
+                  return (
+                    <>
+                      {text.slice(0, index)}
+                      <span
+                        className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-300 bg-clip-text text-transparent"
+                        style={{ textShadow: "none" }}
+                      >
+                        {dreamMatch[0]}
+                      </span>
+                    </>
+                  );
+                }
+                return text;
+              })()}
             </motion.p>
 
             {/* Click to continue arrow */}
@@ -411,13 +579,50 @@ export default function DreamScreen({ push }: { push: PushFn }) {
                 className="text-white/90 text-2xl sm:text-3xl font-serif italic leading-relaxed mb-2"
                 style={{ textShadow: "0 2px 20px rgba(0,0,0,0.8)" }}
               >
-                {lang("DREAM_TRAIT_PROMPT_1").replace("{name}", name)}
+                {/* Split around {name} to apply golden gradient */}
+                {(() => {
+                  const text = lang("DREAM_TRAIT_PROMPT_1");
+                  const parts = text.split("{name}");
+                  return (
+                    <>
+                      {parts[0]}
+                      <span
+                        className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-300 bg-clip-text text-transparent"
+                        style={{ textShadow: "none" }}
+                      >
+                        {name}
+                      </span>
+                      {parts[1]}
+                    </>
+                  );
+                })()}
               </p>
               <p
                 className="text-white/90 text-2xl sm:text-3xl font-serif italic leading-relaxed mb-4"
                 style={{ textShadow: "0 2px 20px rgba(0,0,0,0.8)" }}
               >
-                {lang("DREAM_TRAIT_PROMPT_2")}
+                {/* Highlight "trait" with golden gradient */}
+                {(() => {
+                  const text = lang("DREAM_TRAIT_PROMPT_2");
+                  // Match "trait" in English or "תכונה" in Hebrew
+                  const traitMatch = text.match(/(trait|תכונה)/i);
+                  if (traitMatch) {
+                    const index = text.indexOf(traitMatch[0]);
+                    return (
+                      <>
+                        {text.slice(0, index)}
+                        <span
+                          className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-300 bg-clip-text text-transparent"
+                          style={{ textShadow: "none" }}
+                        >
+                          {traitMatch[0]}
+                        </span>
+                        {text.slice(index + traitMatch[0].length)}
+                      </>
+                    );
+                  }
+                  return text;
+                })()}
               </p>
               <p
                 className="text-white/90 text-2xl sm:text-3xl font-serif italic leading-relaxed"
@@ -472,6 +677,295 @@ export default function DreamScreen({ push }: { push: PushFn }) {
               >
                 {lang("DREAM_TRAIT_SUGGEST")}
               </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Mirror phase */}
+        {phase === "mirror" && (
+          <motion.div
+            key="mirror"
+            className="flex flex-col items-center justify-center px-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            {/* Mirror image */}
+            <motion.img
+              src="/assets/images/mirror.png"
+              alt="Ancient mirror"
+              className="w-48 h-auto mb-8"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.8, delay: 0.3 }}
+            />
+
+            {/* Mirror text */}
+            <motion.p
+              className="text-white/90 text-2xl sm:text-3xl font-serif italic text-center px-4 max-w-xl leading-relaxed"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.6 }}
+              style={{ textShadow: "0 2px 20px rgba(0,0,0,0.8)" }}
+            >
+              {/* Split around {trait} to apply golden gradient - always use English trait */}
+              {(() => {
+                const text = lang("DREAM_MIRROR_TEXT");
+                const parts = text.split("{trait}");
+                const displayTrait = shortTrait;  // Always English, even when UI is Hebrew
+                return (
+                  <>
+                    {parts[0]}
+                    <span
+                      className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-300 bg-clip-text text-transparent"
+                      style={{ textShadow: "none" }}
+                    >
+                      {displayTrait || ""}
+                    </span>
+                    {parts[1]}
+                  </>
+                );
+              })()}
+            </motion.p>
+
+            {/* Continue arrow */}
+            <motion.button
+              className="mt-12 flex flex-col items-center gap-2 text-white/60 hover:text-white/90 transition-colors cursor-pointer"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1.2 }}
+              onClick={handleMirrorContinue}
+            >
+              <span className="text-sm">{lang("DREAM_CLICK_CONTINUE")}</span>
+              <motion.span
+                className="text-2xl"
+                animate={{ y: [0, 6, 0] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+              >
+                ↓
+              </motion.span>
+            </motion.button>
+          </motion.div>
+        )}
+
+        {/* Mirror broken phase */}
+        {phase === "mirrorBroken" && (
+          <motion.div
+            key="mirrorBroken"
+            className="flex flex-col items-center justify-center px-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            {/* Broken mirror image - same layout as mirror phase */}
+            <img
+              src="/assets/images/mirrorBroken.png"
+              alt="Shattered mirror"
+              className="w-48 h-auto mb-8"
+            />
+
+            {/* Broken mirror text */}
+            <motion.div
+              className="text-white/90 text-2xl sm:text-3xl font-serif italic text-center px-4 max-w-xl leading-relaxed"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              style={{ textShadow: "0 2px 20px rgba(0,0,0,0.8)" }}
+            >
+              {/* Split text: main text + "It shatters." on new line with purple gradient */}
+              {(() => {
+                const text = lang("DREAM_MIRROR_BROKEN_TEXT");
+                // Match "It shatters." in English or "היא מתנפצת." in Hebrew
+                const shatterMatch = text.match(/(It shatters\.|היא מתנפצת\.)/i);
+                if (shatterMatch) {
+                  const index = text.indexOf(shatterMatch[0]);
+                  const mainText = text.slice(0, index).trim();
+                  const shatterText = shatterMatch[0];
+                  // Extract "shatters" or "מתנפצת" for gradient
+                  const wordMatch = shatterText.match(/(shatters|מתנפצת)/i);
+                  return (
+                    <>
+                      <p>{mainText}</p>
+                      <p className="mt-4">
+                        {shatterText.split(wordMatch?.[0] || "")[0]}
+                        <span
+                          className="bg-gradient-to-r from-purple-300 via-purple-500 to-purple-700 bg-clip-text text-transparent"
+                          style={{ textShadow: "none" }}
+                        >
+                          {wordMatch?.[0]}
+                        </span>
+                        {shatterText.split(wordMatch?.[0] || "")[1]}
+                      </p>
+                    </>
+                  );
+                }
+                return <p>{text}</p>;
+              })()}
+            </motion.div>
+
+            {/* Continue arrow */}
+            <motion.button
+              className="mt-12 flex flex-col items-center gap-2 text-white/60 hover:text-white/90 transition-colors cursor-pointer"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1.0 }}
+              onClick={handleBrokenMirrorContinue}
+            >
+              <span className="text-sm">{lang("DREAM_CLICK_CONTINUE")}</span>
+              <motion.span
+                className="text-2xl"
+                animate={{ y: [0, 6, 0] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+              >
+                ↓
+              </motion.span>
+            </motion.button>
+          </motion.div>
+        )}
+
+        {/* Grandpa dialogue phase */}
+        {phase === "grandpaDialogue" && (
+          <motion.div
+            key="grandpaDialogue"
+            className="absolute inset-0 flex flex-col"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            {/* Centered content area - broken mirror or shards */}
+            <div className="flex-1 flex items-center justify-center">
+              {!showShards ? (
+                /* Broken mirror - centered */
+                <img
+                  src="/assets/images/mirrorBroken.png"
+                  alt="Shattered mirror"
+                  className="w-48 h-auto"
+                />
+              ) : (
+                /* Shards - shown after dialogue step 3 */
+                <motion.div
+                  key="shards"
+                  className="flex gap-4 sm:gap-6 justify-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  {[0, 1, 2].map((index) => {
+                    const shardsClickable = dialogueStep >= 5 && typingComplete;
+                    return (
+                      <motion.div
+                        key={index}
+                        className={`relative ${!shardsClickable ? "pointer-events-none" : ""}`}
+                        initial={{ y: -200, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{
+                          type: "spring",
+                          damping: 20,
+                          stiffness: 300,
+                          delay: index * 0.15,
+                        }}
+                        onClick={() => index === 0 && shardsClickable && handleShardClick()}
+                      >
+                        <img
+                          src="/assets/images/mirrorShard.png"
+                          alt="Mirror shard"
+                          className={`w-20 sm:w-24 md:w-28 h-auto ${
+                            index === 0 && shardsClickable
+                              ? "cursor-pointer hover:scale-105 transition-transform"
+                              : ""
+                          }`}
+                        />
+                        {/* Lock overlay for shards 1 & 2 */}
+                        {index > 0 && (
+                          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center rounded-lg">
+                            <motion.span
+                              className="text-3xl sm:text-4xl"
+                              animate={{ scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
+                              transition={{ duration: 2, repeat: Infinity }}
+                            >
+                              🔒
+                            </motion.span>
+                          </div>
+                        )}
+                        {/* Hand click indicator for first shard */}
+                        {index === 0 && shardsClickable && (
+                          <motion.div
+                            className="absolute -bottom-10 left-1/2 -translate-x-1/2 text-3xl"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1, y: [0, 5, 0] }}
+                            transition={{
+                              opacity: { duration: 0.3 },
+                              y: { duration: 1, repeat: Infinity }
+                            }}
+                          >
+                            👆
+                          </motion.div>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </motion.div>
+              )}
+            </div>
+
+            {/* Grandpa sprite - bottom left, flipped horizontally */}
+            <motion.img
+              src="/assets/images/grandpa.png"
+              alt="Grandpa"
+              className="absolute bottom-0 left-2 sm:left-6 md:left-10 w-28 sm:w-36 md:w-44 h-auto z-10"
+              initial={{ y: "100%", opacity: 0, scaleX: -1 }}
+              animate={{ y: 0, opacity: 1, scaleX: -1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.3 }}
+            />
+
+            {/* Speech bubble with tail - positioned to the RIGHT of Grandpa (who is on the left) */}
+            <motion.div
+              className="absolute bottom-32 sm:bottom-40 left-24 sm:left-36 md:left-48 max-w-[65%] sm:max-w-[55%] z-20 cursor-pointer"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20, delay: 0.6 }}
+              onClick={handleDialogueClick}
+            >
+              {/* Bubble - white background, gray text */}
+              <div
+                className="relative px-5 py-4 rounded-2xl text-gray-700 text-base sm:text-lg leading-relaxed"
+                style={{
+                  background: "white",
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
+                }}
+              >
+                {/* Tail pointing LEFT toward Grandpa */}
+                <svg
+                  className="absolute -left-3 bottom-4 w-6 h-6"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <path
+                    d="M24 0 L0 12 L24 24 Z"
+                    fill="white"
+                  />
+                </svg>
+
+                {/* Dialogue text with typewriter effect */}
+                <span>{renderDialogueText(displayedText)}</span>
+                {!typingComplete && (
+                  <span className="inline-block w-0.5 h-5 bg-gray-500 ml-1 animate-pulse" />
+                )}
+              </div>
+
+              {/* Click to continue prompt - only shown for first bubble */}
+              {dialogueStep === 0 && typingComplete && (
+                <motion.p
+                  className="text-gray-500 text-sm mt-2 text-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  {lang("DREAM_CLICK_CONTINUE_BUBBLE")}
+                </motion.p>
+              )}
             </motion.div>
           </motion.div>
         )}
@@ -535,21 +1029,22 @@ export default function DreamScreen({ push }: { push: PushFn }) {
               <div className="mt-4 flex justify-end gap-3">
                 <button
                   onClick={handleCloseTraitModal}
-                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 ring-1 ring-white/15 text-white text-sm font-medium transition-colors"
+                  disabled={extractingTrait}
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 ring-1 ring-white/15 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {lang("CANCEL")}
                 </button>
                 <button
                   onClick={handleConfirmCustomTrait}
-                  disabled={!customTraitText.trim()}
+                  disabled={!customTraitText.trim() || extractingTrait}
                   className={[
-                    "px-4 py-2 rounded-xl text-sm font-semibold transition-all",
-                    customTraitText.trim()
+                    "px-4 py-2 rounded-xl text-sm font-semibold transition-all min-w-[80px]",
+                    customTraitText.trim() && !extractingTrait
                       ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow hover:shadow-emerald-500/30 active:scale-[0.98]"
                       : "bg-white/10 text-white/30 cursor-not-allowed",
                   ].join(" ")}
                 >
-                  {lang("CONFIRM")}
+                  {extractingTrait ? "..." : lang("CONFIRM")}
                 </button>
               </div>
             </motion.div>

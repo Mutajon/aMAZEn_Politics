@@ -175,6 +175,9 @@
   "THE_LAST_DAY": "The Last Day",
   "UNKNOWN_PHASE": "Unknown phase",
   "AFTERMATH_PENDING": "Aftermath pending...",
+  "AFTERMATH_RETRY_ATTEMPT": "Generating your legacy... (Attempt {current}/{max})",
+  "AFTERMATH_FALLBACK_MESSAGE": "We couldn't generate your full aftermath. This is a simplified version.",
+  "DISMISS": "Dismiss",
   "FAILED_TO_LOAD_AFTERMATH": "Failed to Load Aftermath",
   "RETRY": "Retry",
   "REVEAL_FINAL_SCORE": "Reveal Final Score",
@@ -1099,5 +1102,14 @@
   "DREAM_TRAIT_ERROR_TOO_SHORT": "Please describe your trait in more detail.",
   "DREAM_TRAIT_ERROR_GIBBERISH": "That's... interesting. But what does it mean? Try describing a real quality!",
   "DREAM_TRAIT_ERROR_PROFANITY": "Let's keep it friendly! Try a different description.",
-  "DREAM_TRAIT_HEBREW_HINT": "אפשר להקליד בעברית"
+  "DREAM_TRAIT_HEBREW_HINT": "אפשר להקליד בעברית",
+  "DREAM_MIRROR_TEXT": "You stand before the ancient glass, you smile and ask: Mirror, mirror on the wall, who's the {trait} of them all?",
+  "DREAM_MIRROR_BROKEN_TEXT": "As the words leave your lips, the glass cannot hold the weight of your ego. It shatters.",
+  "DREAM_GRANDPA_1": "Look, you broke it with your pride.",
+  "DREAM_GRANDPA_2": "Years ago, when I gave you the magic mirror, I told you: 'Keep the mirror, and it will keep you.'",
+  "DREAM_GRANDPA_3": "Now, you will have to *recollect yourself* - if you can recollect the broken pieces.",
+  "DREAM_GRANDPA_4": "Every jagged piece you touch is a door, a portal to a different time, a different place, a *different politics*.",
+  "DREAM_GRANDPA_5": "Pick one up, look into the reflection. It is time to see who you really are.",
+  "DREAM_GRANDPA_6": "Are you brave enough to step through and truly become you?",
+  "DREAM_CLICK_CONTINUE_BUBBLE": "Click to continue"
 }

@@ -24,7 +24,6 @@ import { bgStyleWithRoleImage } from "../lib/ui";
 import type { PushFn } from "../lib/router";
 import { useMirrorTop3 } from "../hooks/useMirrorTop3";
 import {
-  saveAftermathReturnRoute,
   loadAftermathScreenSnapshot,
   saveAftermathScreenSnapshot,
   clearAftermathScreenSnapshot
@@ -41,6 +40,7 @@ import { usePastGamesStore } from "../store/pastGamesStore";
 import { buildPastGameEntry } from "../lib/pastGamesService";
 import { useFragmentsStore } from "../store/fragmentsStore";
 import { audioManager } from "../lib/audioManager";
+import FallbackNotification from "../components/aftermath/FallbackNotification";
 
 type Props = {
   push: PushFn;
@@ -74,6 +74,12 @@ export default function AftermathScreen({ push }: Props) {
   // Fragments store for fragment collection
   const addFragment = useFragmentsStore((s) => s.addFragment);
   const fragmentCount = useFragmentsStore((s) => s.getFragmentCount());
+
+  // Retry progress state (for showing "Attempt 2/3" in loading overlay)
+  const [retryAttempt, setRetryAttempt] = useState<{ current: number; max: number } | null>(null);
+
+  // Fallback notification state (shown when isFallback is true)
+  const [showFallbackNotification, setShowFallbackNotification] = useState(false);
 
   // Navigation guard - prevent back button during aftermath
   useNavigationGuard({
@@ -110,7 +116,9 @@ export default function AftermathScreen({ push }: Props) {
     if (!initializedFromSnapshot && !data && !loading) {
       console.log('[AftermathScreen] Fetching aftermath data...');
       startProgress(); // Start progress animation
-      fetchAftermathData();
+      fetchAftermathData((attempt, maxAttempts) => {
+        setRetryAttempt({ current: attempt, max: maxAttempts });
+      });
     }
   }, [initializedFromSnapshot, data, loading, fetchAftermathData, startProgress]);
 
@@ -123,6 +131,13 @@ export default function AftermathScreen({ push }: Props) {
     if (data && !initializedFromSnapshot && !hasNotifiedReadyRef.current) {
       hasNotifiedReadyRef.current = true;
       notifyReady();
+      setRetryAttempt(null); // Clear retry progress
+
+      // Show fallback notification if data is fallback
+      if (data.isFallback) {
+        setShowFallbackNotification(true);
+        console.log('[AftermathScreen] ⚠️ Showing fallback notification - AI generation failed');
+      }
     }
   }, [data, notifyReady, initializedFromSnapshot]);
 
@@ -342,10 +357,17 @@ export default function AftermathScreen({ push }: Props) {
   // RENDER: Loading State
   // ========================================================================
   if (loading && !data && !initializedFromSnapshot) {
+    // Build loading message with retry progress if applicable
+    const loadingMessage = retryAttempt
+      ? lang("AFTERMATH_RETRY_ATTEMPT")
+          .replace("{current}", String(retryAttempt.current))
+          .replace("{max}", String(retryAttempt.max))
+      : lang("AFTERMATH_PENDING");
+
     return (
       <CollectorLoadingOverlay
         progress={progress}
-        message={lang("AFTERMATH_PENDING")}
+        message={loadingMessage}
       />
     );
   }
@@ -382,6 +404,13 @@ export default function AftermathScreen({ push }: Props) {
 
   return (
     <div className="min-h-screen px-5 py-8" style={roleBgStyle}>
+      {/* Fallback notification banner (dismissable) */}
+      {showFallbackNotification && (
+        <div className="max-w-3xl mx-auto">
+          <FallbackNotification onDismiss={() => setShowFallbackNotification(false)} />
+        </div>
+      )}
+
       <AftermathContent
         data={data}
         avatarUrl={character?.avatarUrl}

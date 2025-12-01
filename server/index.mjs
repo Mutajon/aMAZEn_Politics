@@ -1192,6 +1192,50 @@ app.post("/api/validate-role", async (req, res) => {
   return res.json({ valid: !!out.valid, reason: String(out.reason || "") });
 });
 
+// -------------------- EXTRACT SHORT TRAIT --------------------
+// Extracts a short trait keyword from a custom self-description
+// Used in DreamScreen mirror phase: "Mirror, mirror on the wall, who's the {trait} of them all?"
+// Uses Gemini 2.5 Flash for trait extraction
+app.post("/api/extract-trait", async (req, res) => {
+  const { description, language } = req.body;
+
+  if (!description) {
+    return res.status(400).json({ error: "Description required" });
+  }
+
+  const system = `You extract a trait from a user's self-description for a magic mirror game.
+The trait must fit seamlessly into: "Mirror, mirror on the wall, who's the ___ of them all?"
+
+Rules:
+1. The user's input language is: ${language || 'en'}
+2. If input is Hebrew, understand the meaning and translate to English
+3. Extract a SUPERLATIVE trait (e.g., "wisest", "bravest", "most creative", "richest")
+4. The trait should sound natural in the sentence above
+5. Return JSON: {"trait": "english superlative"}
+
+Examples:
+- Input: "I'm very smart" → {"trait": "smartest"}
+- Input: "I want to be rich" → {"trait": "richest"}
+- Input: "אני רוצה להיות הכי חכם" → {"trait": "wisest"}
+- Input: "I'm creative and artistic" → {"trait": "most creative"}
+- Input: "אני אמיץ" → {"trait": "bravest"}`;
+
+  try {
+    const result = await aiJSONGemini({
+      system,
+      user: description,
+      model: "gemini-2.5-flash",
+      temperature: 0.2,
+      fallback: { trait: description }
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error extracting trait:", error);
+    res.json({ trait: description });
+  }
+});
+
 // -------------------- Background object suggestion ----------
 function backgroundHeuristic(role = "") {
   const r = role.toLowerCase();
@@ -3006,7 +3050,11 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
       haiku: "Power came and went\nDecisions echo through time\nHistory records"
     };
 
+    // Detect if we're using fallback data (AI failed or returned incomplete response)
+    const isFallback = result === null || !Array.isArray(result?.decisions) || result.decisions.length === 0;
+
     const response = {
+      isFallback,
       intro: String(result?.intro || fallback.intro).slice(0, 500),
       snapshot: Array.isArray(result?.snapshot)
         ? result.snapshot.map((event) => ({
@@ -3035,6 +3083,7 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
   } catch (e) {
     console.error("Error in /api/aftermath:", e?.message || e);
     return res.status(502).json({
+      isFallback: true,
       intro: "After many years of rule, the leader passed into history.",
       snapshot: [
         { type: "positive", icon: "🏛️", text: "Governed their people", context: "Overall reign" },

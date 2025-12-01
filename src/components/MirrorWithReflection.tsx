@@ -59,7 +59,7 @@ export function MirrorImage({
 }: Pick<MirrorWithReflectionProps, "mirrorSize" | "className" | "mirrorAlt">) {
   return (
     <img
-      src="/assets/images/mirror.png"
+      src="/assets/images/mirrorBroken.png"
       alt={mirrorAlt}
       width={mirrorSize}
       height={mirrorSize}

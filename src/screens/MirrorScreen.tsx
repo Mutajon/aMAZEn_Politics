@@ -24,7 +24,7 @@ import {
 } from "../lib/eventScreenSnapshot";
 import { useLang } from "../i18n/lang";
 
-const MIRROR_SRC = "/assets/images/mirror.png";
+const MIRROR_SRC = "/assets/images/mirrorBroken.png";
 
 type Props = { push: PushFn };
 

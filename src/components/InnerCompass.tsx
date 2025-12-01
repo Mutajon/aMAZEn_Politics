@@ -4,8 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { COMPONENTS, PROPERTIES, PALETTE, type PropKey } from "../data/compass-data";
 import { useCompassStore } from "../store/compassStore";
 
-/* public image path (Vite serves /public at the root): put your file at public/assets/images/mirror.png */
-const MIRROR_SRC = "/assets/images/mirror.png";
+/* public image path (Vite serves /public at the root): put your file at public/assets/images/mirrorBroken.png */
+const MIRROR_SRC = "/assets/images/mirrorBroken.png";
 
 /* --------------------------- SVG helpers --------------------------------- */
 const TAU = Math.PI * 2;

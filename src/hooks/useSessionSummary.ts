@@ -69,6 +69,7 @@ export type SessionSummary = {
     liberalism: string;          // Same scale
     democracy: string;           // Same scale (extracted from decisions)
   } | null;
+  aftermathGeneration: 'normal' | 'fallback'; // Whether AI generation succeeded or used fallback
   incomplete: boolean;           // True if session ended early
 };
 
@@ -253,6 +254,7 @@ export function collectSessionSummary(
     selfJudgment: dilemmaStore.selfJudgment || null,
     selfTrait: roleStore.playerTrait || null,
     ideologyRatings,
+    aftermathGeneration: aftermathData?.isFallback ? 'fallback' : 'normal',
     incomplete,
   };
 
@@ -286,6 +288,7 @@ export function collectSessionSummary(
     customActions: summary.customActions.count,
     finalScore: summary.finalScore,
     supportBreakdown: summary.supportBreakdown,
+    aftermathGeneration: summary.aftermathGeneration,
     incomplete: summary.incomplete,
     hasInitialCompass: !!summary.initialCompass,
   });

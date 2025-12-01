@@ -29,7 +29,7 @@ type Props = {
 };
 
 // Mirror styling constants from MirrorCard
-const MIRROR_IMG_SRC = "/assets/images/mirror.png";
+const MIRROR_IMG_SRC = "/assets/images/mirrorBroken.png";
 const IMG_WIDTH_PX = 65;
 const IMG_OPACITY = 0.95;
 const IMG_OFFSET_X = -32;
