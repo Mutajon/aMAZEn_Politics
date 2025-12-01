@@ -60,6 +60,8 @@ export type Character = {
 
 /* ---------- Store ---------- */
 type RoleState = {
+  /** Player's real name (entered in DreamScreen) - separate from character name */
+  playerName: string | null;
   selectedRole: string | null;
   analysis: AnalysisResult | null;
   character: Character | null;
@@ -101,12 +103,16 @@ type RoleState = {
   /** Set role description (e.g., "Governor in Florence") */
   setRoleDescription: (description: string | null) => void;
 
+  /** Set player's real name (from DreamScreen) */
+  setPlayerName: (name: string | null) => void;
+
   reset: () => void;
 };
 
 export const useRoleStore = create<RoleState>()(
   persist(
     (set, get) => ({
+      playerName: null,
       selectedRole: null,
       analysis: null,
       character: null,
@@ -152,8 +158,10 @@ export const useRoleStore = create<RoleState>()(
       setSupportProfiles: (profiles: RoleSupportProfiles | null) => set({ supportProfiles: profiles }),
       setRoleScope: (scope) => set({ roleScope: scope }),
       setStoryThemes: (themes) => set({ storyThemes: themes }),
+      setPlayerName: (name) => set({ playerName: name }),
 
       reset: () => set({
+        playerName: null,
         selectedRole: null,
         analysis: null,
         character: null,

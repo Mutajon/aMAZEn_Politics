@@ -83,6 +83,13 @@ export default function ReflectionSection({ top3ByDimension, valuesSummary }: Pr
                   whither: lang("COMPASS_WHITHER")
                 }[dimension];
 
+                const dimensionSubtitle = {
+                  what: lang("COMPASS_WHAT_SUBTITLE"),
+                  whence: lang("COMPASS_WHENCE_SUBTITLE"),
+                  how: lang("COMPASS_HOW_SUBTITLE"),
+                  whither: lang("COMPASS_WHITHER_SUBTITLE")
+                }[dimension];
+
                 // Get top value for this dimension
                 const topValue = top3ByDimension[dimension]?.[0];
 
@@ -97,10 +104,13 @@ export default function ReflectionSection({ top3ByDimension, valuesSummary }: Pr
                     }}
                   >
                     <div
-                      className="font-bold uppercase text-xs mb-1"
+                      className="font-bold uppercase text-xs mb-0.5"
                       style={{ color: PALETTE[dimension].base }}
                     >
-                      {dimensionName}:
+                      {dimensionName}
+                    </div>
+                    <div className="text-white/50 text-xs mb-1">
+                      {dimensionSubtitle}
                     </div>
                     <div className="text-white/90 font-medium">
                       {topValue?.short || "—"}

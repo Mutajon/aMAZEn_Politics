@@ -9,7 +9,7 @@
  * - Routed from: src/App.tsx (route: /mirror)
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { PushFn } from "../lib/router";
 import { bgStyle } from "../lib/ui";
@@ -26,39 +26,12 @@ import { useLang } from "../i18n/lang";
 
 const MIRROR_SRC = "/assets/images/mirror.png";
 
-// Mirror shimmer effect configuration (matching MirrorCard.tsx)
-const MIRROR_SHIMMER_ENABLED = true;
-const MIRROR_SHIMMER_MIN_INTERVAL = 5000;   // 5 seconds
-const MIRROR_SHIMMER_MAX_INTERVAL = 10000;  // 10 seconds
-const MIRROR_SHIMMER_DURATION = 1500;       // 1.5 second sweep
-const MIRROR_SHIMMER_COLOR = "rgba(94, 234, 212, 0.6)"; // Cyan/teal
-
 type Props = { push: PushFn };
 
 export default function MirrorScreen({ push }: Props) {
   const lang = useLang();
   const top3ByDimension = useMirrorTop3();
   const [selectedDef, setSelectedDef] = useState<{ prop: PropKey; short: string; full: string } | null>(null);
-  const [mirrorShimmerTrigger, setMirrorShimmerTrigger] = useState(0);
-
-  // Random interval shimmer effect for mirror image
-  useEffect(() => {
-    if (!MIRROR_SHIMMER_ENABLED) return;
-
-    const scheduleNextShimmer = () => {
-      const randomInterval =
-        MIRROR_SHIMMER_MIN_INTERVAL +
-        Math.random() * (MIRROR_SHIMMER_MAX_INTERVAL - MIRROR_SHIMMER_MIN_INTERVAL);
-
-      return setTimeout(() => {
-        setMirrorShimmerTrigger(prev => prev + 1);
-        scheduleNextShimmer();
-      }, randomInterval);
-    };
-
-    const timerId = scheduleNextShimmer();
-    return () => clearTimeout(timerId);
-  }, []);
 
   // Check if we came from EventScreen (snapshot exists), AftermathScreen, or another screen (return route saved)
   const cameFromEvent = hasEventScreenSnapshot();
@@ -113,29 +86,10 @@ export default function MirrorScreen({ push }: Props) {
         {/* Header with mirror image and text */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-32 h-32 mb-4 rounded-full overflow-hidden shadow-2xl">
-            <motion.img
-              key={mirrorShimmerTrigger}
+            <img
               src={MIRROR_SRC}
               alt={lang("MIRROR_ALT")}
               className="w-full h-full object-cover"
-              animate={
-                MIRROR_SHIMMER_ENABLED
-                  ? {
-                      filter: [
-                        "drop-shadow(0px 0px 0px transparent)",
-                        `drop-shadow(-8px -8px 12px ${MIRROR_SHIMMER_COLOR})`,
-                        `drop-shadow(0px 0px 16px ${MIRROR_SHIMMER_COLOR})`,
-                        `drop-shadow(8px 8px 12px ${MIRROR_SHIMMER_COLOR})`,
-                        "drop-shadow(0px 0px 0px transparent)",
-                      ],
-                    }
-                  : {}
-              }
-              transition={{
-                duration: MIRROR_SHIMMER_DURATION / 1000,
-                ease: "easeInOut",
-                times: [0, 0.25, 0.5, 0.75, 1],
-              }}
             />
           </div>
           <h1 className="text-2xl font-semibold text-white/95 text-center mb-2">

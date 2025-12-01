@@ -29,12 +29,6 @@ import type { CompassPill } from "../../hooks/useEventDataCollector";
 import type { CompassEffectPing } from "../MiniCompass";
 import { lang } from "../../i18n/lang";
 
-// Mirror shimmer effect tunables (matching MirrorQuizScreen)
-const MIRROR_SHIMMER_MIN_INTERVAL = 5000;   // 5 seconds minimum
-const MIRROR_SHIMMER_MAX_INTERVAL = 10000;  // 10 seconds maximum
-const MIRROR_SHIMMER_DURATION = 1500;       // 1.5 second sweep duration
-const MIRROR_SHIMMER_COLOR = "rgba(94, 234, 212, 0.6)";  // Cyan/teal, semi-transparent
-
 // Speaker avatar constants
 const AVATAR_SIZE_PX = 120; // Sized to show full face and upper body
 
@@ -69,8 +63,6 @@ export default function ReasoningModal({
   const [compassPills, setCompassPills] = useState<CompassPill[]>([]);
   const [thankYouMessage, setThankYouMessage] = useState<string>("");
 
-  // Mirror shimmer state (triggers animation restart)
-  const [mirrorShimmerTrigger, setMirrorShimmerTrigger] = useState(0);
 
   // Logging hooks
   const timingLogger = useTimingLogger();
@@ -130,24 +122,6 @@ export default function ReasoningModal({
     }
   }, [isOpen, timingLogger]);
 
-  // Random interval shimmer effect for mirror image
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const scheduleNextShimmer = () => {
-      const randomInterval =
-        MIRROR_SHIMMER_MIN_INTERVAL +
-        Math.random() * (MIRROR_SHIMMER_MAX_INTERVAL - MIRROR_SHIMMER_MIN_INTERVAL);
-
-      return setTimeout(() => {
-        setMirrorShimmerTrigger(prev => prev + 1);
-        scheduleNextShimmer();
-      }, randomInterval);
-    };
-
-    const timerId = scheduleNextShimmer();
-    return () => clearTimeout(timerId);
-  }, [isOpen]);
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -347,34 +321,19 @@ export default function ReasoningModal({
                 className="relative flex-shrink-0"
                 style={{ width: AVATAR_SIZE_PX, height: AVATAR_SIZE_PX }}
               >
-                {/* Shimmer wrapper - only contains the mirror image */}
-                <motion.div
-                  key={mirrorShimmerTrigger}
+                {/* Mirror image (shimmer disabled) */}
+                <div
                   className="pointer-events-none select-none"
                   style={{
                     width: AVATAR_SIZE_PX,
                     height: AVATAR_SIZE_PX,
                     opacity: 0.95,
                   }}
-                  animate={{
-                    filter: [
-                      "drop-shadow(0px 0px 0px transparent)",
-                      `drop-shadow(-8px -8px 12px ${MIRROR_SHIMMER_COLOR})`,
-                      `drop-shadow(0px 0px 16px ${MIRROR_SHIMMER_COLOR})`,
-                      `drop-shadow(8px 8px 12px ${MIRROR_SHIMMER_COLOR})`,
-                      "drop-shadow(0px 0px 0px transparent)",
-                    ],
-                  }}
-                  transition={{
-                    duration: MIRROR_SHIMMER_DURATION / 1000,
-                    ease: "easeInOut",
-                    times: [0, 0.25, 0.5, 0.75, 1],
-                  }}
                 >
                   <MirrorImage mirrorSize={AVATAR_SIZE_PX} mirrorAlt="Mystic mirror" />
-                </motion.div>
+                </div>
 
-                {/* Reflection overlay - outside shimmer wrapper to avoid filter interference */}
+                {/* Reflection overlay */}
                 <MirrorReflection
                   mirrorSize={AVATAR_SIZE_PX}
                   avatarUrl={avatarUrl}

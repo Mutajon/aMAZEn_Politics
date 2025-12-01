@@ -42,13 +42,6 @@ const DEFAULT_AVATAR_DATA_URL =
     </svg>`
   );
 
-// Mirror shimmer effect configuration (matching MirrorCard.tsx)
-const MIRROR_SHIMMER_ENABLED = true;
-const MIRROR_SHIMMER_MIN_INTERVAL = 5000;   // 5 seconds
-const MIRROR_SHIMMER_MAX_INTERVAL = 10000;  // 10 seconds
-const MIRROR_SHIMMER_DURATION = 1500;       // 1.5 second sweep
-const MIRROR_SHIMMER_COLOR = "rgba(94, 234, 212, 0.6)"; // Cyan/teal
-
 /** fixed epilogue */
 export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   const lang = useLang();
@@ -117,9 +110,6 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
   // Track timing for each question
   const questionTimingIdRef = useRef<string | null>(null);
 
-  // Mirror shimmer trigger
-  const [mirrorShimmerTrigger, setMirrorShimmerTrigger] = useState(0);
-
   // Only initialize quiz if it hasn't been started yet
   // This allows returning from MirrorScreen without resetting the completed state
   // New games are handled by resetAll() in SplashScreen
@@ -141,25 +131,6 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only on mount, not on quiz/init/resetCompass changes
-
-  // Random interval shimmer effect for mirror image
-  useEffect(() => {
-    if (!MIRROR_SHIMMER_ENABLED) return;
-
-    const scheduleNextShimmer = () => {
-      const randomInterval =
-        MIRROR_SHIMMER_MIN_INTERVAL +
-        Math.random() * (MIRROR_SHIMMER_MAX_INTERVAL - MIRROR_SHIMMER_MIN_INTERVAL);
-
-      return setTimeout(() => {
-        setMirrorShimmerTrigger(prev => prev + 1);
-        scheduleNextShimmer();
-      }, randomInterval);
-    };
-
-    const timerId = scheduleNextShimmer();
-    return () => clearTimeout(timerId);
-  }, []);
 
   // Log when a new question is presented (system event) + start timing
   // Uses ref to prevent duplicate logging when effect dependencies trigger multiple times
@@ -325,32 +296,10 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
             className="relative self-start"
             style={{ width: MIRROR_SIZE, height: MIRROR_SIZE }}
           >
-            {/* Shimmer wrapper - only contains the mirror image */}
-            <motion.div
-              key={mirrorShimmerTrigger}
-              animate={
-                MIRROR_SHIMMER_ENABLED
-                  ? {
-                      filter: [
-                        "drop-shadow(0px 0px 0px transparent)",
-                        `drop-shadow(-8px -8px 12px ${MIRROR_SHIMMER_COLOR})`,
-                        `drop-shadow(0px 0px 16px ${MIRROR_SHIMMER_COLOR})`,
-                        `drop-shadow(8px 8px 12px ${MIRROR_SHIMMER_COLOR})`,
-                        "drop-shadow(0px 0px 0px transparent)",
-                      ],
-                    }
-                  : {}
-              }
-              transition={{
-                duration: MIRROR_SHIMMER_DURATION / 1000,
-                ease: "easeInOut",
-                times: [0, 0.25, 0.5, 0.75, 1],
-              }}
-            >
-              <MirrorImage mirrorSize={MIRROR_SIZE} />
-            </motion.div>
+            {/* Mirror image (shimmer disabled) */}
+            <MirrorImage mirrorSize={MIRROR_SIZE} />
 
-            {/* Reflection overlay - outside shimmer wrapper to avoid filter interference */}
+            {/* Reflection overlay */}
             <MirrorReflection
               mirrorSize={MIRROR_SIZE}
               avatarUrl={displayAvatar}

@@ -18,6 +18,7 @@ import SplashScreen from "./screens/SplashScreen";
 import BackstageScreen from "./screens/BackstageScreen";
 // import CompassIntro from "./screens/CompassIntro"; // (legacy monolith – no longer used)
 import IntroScreen from "./screens/IntroScreen";
+import DreamScreen from "./screens/DreamScreen";
 import RoleSelectionScreen from "./screens/RoleSelectionScreen";
 import CampaignScreen from "./screens/CampaignScreen";
 import PowerDistributionScreen from "./screens/PowerDistributionScreen";
@@ -219,6 +220,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
           className="absolute inset-0 min-h-screen bg-black"
           style={{ width: '100%', height: '100%' }}
         >
+          {route === "/dream" && <DreamScreen push={push} />}
           {route === "/intro" && <IntroScreen push={push} />}
           {route === "/role" && <RoleSelectionScreen push={push} />}
           {route === "/campaign" && <CampaignScreen />}
@@ -263,7 +265,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
           {/* Default route - SplashScreen */}
           {route === "/" && (
             <SplashScreen
-              onStart={() => push("/intro")}
+              onStart={() => push("/dream")}
               onHighscores={() => push("/highscores")}
               onAchievements={() => push("/achievements")}
               push={push}
