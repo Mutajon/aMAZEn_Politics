@@ -1187,5 +1187,19 @@
   "DREAM_NAME_CONFIRM": "המשך",
   "DREAM_NAME_ERROR_REPEATED": "הממ, זה לא נראה כמו שם אמיתי. נסה שוב?",
   "DREAM_NAME_ERROR_PROFANITY": "בוא נשמור על זה ידידותי! נסה שם אחר.",
-  "DREAM_NAME_ERROR_TOO_SHORT": "השם שלך נראה קצר מדי. אפשר לנסות שוב?"
+  "DREAM_NAME_ERROR_TOO_SHORT": "השם שלך נראה קצר מדי. אפשר לנסות שוב?",
+  "DREAM_TRAIT_PROMPT_1": "לכולנו יש תכונה מגדירה, {name}.",
+  "DREAM_TRAIT_PROMPT_2": "התכונה האחת שהופכת אותנו למי שאנחנו.",
+  "DREAM_TRAIT_PROMPT_3": "כשאתה מסתכל על עצמך, מה אתה רואה?",
+  "DREAM_TRAIT_SMARTEST": "אני הכי חכם",
+  "DREAM_TRAIT_CHARISMATIC": "אני הכי כריזמטי",
+  "DREAM_TRAIT_JUST": "אני הכי צודק",
+  "DREAM_TRAIT_STRONGEST": "אני הכי חזק",
+  "DREAM_TRAIT_SUGGEST": "הצע משהו אחר",
+  "DREAM_TRAIT_MODAL_TITLE": "תאר את התכונה המגדירה שלך",
+  "DREAM_TRAIT_MODAL_PLACEHOLDER": "מה הופך אותך למי שאתה...",
+  "DREAM_TRAIT_ERROR_TOO_SHORT": "אנא תאר את התכונה שלך בפירוט רב יותר.",
+  "DREAM_TRAIT_ERROR_GIBBERISH": "זה לא נראה נכון. נסה לתאר את עצמך אחרת.",
+  "DREAM_TRAIT_ERROR_PROFANITY": "בוא נשמור על זה ידידותי! נסה תיאור אחר.",
+  "DREAM_TRAIT_HEBREW_HINT": "אפשר להקליד בעברית"
 }

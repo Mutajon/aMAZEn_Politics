@@ -63,6 +63,7 @@ export type SessionSummary = {
   };
   finalScore: number;            // Total final score
   selfJudgment: string | null;   // Player's self-assessment (Day 8)
+  selfTrait: string | null;      // Player's self-identified defining trait (from DreamScreen)
   ideologyRatings: {             // From aftermath API
     autonomy: string;            // "very-low" | "low" | "medium" | "high" | "very-high"
     liberalism: string;          // Same scale
@@ -250,6 +251,7 @@ export function collectSessionSummary(
     },
     finalScore: scoreBreakdown.final,
     selfJudgment: dilemmaStore.selfJudgment || null,
+    selfTrait: roleStore.playerTrait || null,
     ideologyRatings,
     incomplete,
   };

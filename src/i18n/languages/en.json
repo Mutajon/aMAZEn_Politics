@@ -1085,5 +1085,19 @@
   "DREAM_NAME_CONFIRM": "Continue",
   "DREAM_NAME_ERROR_REPEATED": "Hmm, that doesn't look like a real name. Try again?",
   "DREAM_NAME_ERROR_PROFANITY": "Let's keep it friendly! Try a different name.",
-  "DREAM_NAME_ERROR_TOO_SHORT": "Your name seems a bit short. Mind trying again?"
+  "DREAM_NAME_ERROR_TOO_SHORT": "Your name seems a bit short. Mind trying again?",
+  "DREAM_TRAIT_PROMPT_1": "We all have a defining quality, {name}.",
+  "DREAM_TRAIT_PROMPT_2": "The one trait that makes us who we are.",
+  "DREAM_TRAIT_PROMPT_3": "When you look at yourself, what do you see?",
+  "DREAM_TRAIT_SMARTEST": "I am the smartest",
+  "DREAM_TRAIT_CHARISMATIC": "I am the most charismatic",
+  "DREAM_TRAIT_JUST": "I am the most just",
+  "DREAM_TRAIT_STRONGEST": "I am the strongest",
+  "DREAM_TRAIT_SUGGEST": "Suggest something else",
+  "DREAM_TRAIT_MODAL_TITLE": "Describe your defining trait",
+  "DREAM_TRAIT_MODAL_PLACEHOLDER": "What makes you who you are...",
+  "DREAM_TRAIT_ERROR_TOO_SHORT": "Please describe your trait in more detail.",
+  "DREAM_TRAIT_ERROR_GIBBERISH": "That doesn't seem right. Try describing yourself differently.",
+  "DREAM_TRAIT_ERROR_PROFANITY": "Let's keep it friendly! Try a different description.",
+  "DREAM_TRAIT_HEBREW_HINT": "אפשר להקליד בעברית"
 }

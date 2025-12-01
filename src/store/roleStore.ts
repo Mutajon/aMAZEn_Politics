@@ -62,6 +62,8 @@ export type Character = {
 type RoleState = {
   /** Player's real name (entered in DreamScreen) - separate from character name */
   playerName: string | null;
+  /** Player's self-identified defining trait (entered in DreamScreen) */
+  playerTrait: string | null;
   selectedRole: string | null;
   analysis: AnalysisResult | null;
   character: Character | null;
@@ -106,6 +108,9 @@ type RoleState = {
   /** Set player's real name (from DreamScreen) */
   setPlayerName: (name: string | null) => void;
 
+  /** Set player's defining trait (from DreamScreen) */
+  setPlayerTrait: (trait: string | null) => void;
+
   reset: () => void;
 };
 
@@ -113,6 +118,7 @@ export const useRoleStore = create<RoleState>()(
   persist(
     (set, get) => ({
       playerName: null,
+      playerTrait: null,
       selectedRole: null,
       analysis: null,
       character: null,
@@ -159,9 +165,11 @@ export const useRoleStore = create<RoleState>()(
       setRoleScope: (scope) => set({ roleScope: scope }),
       setStoryThemes: (themes) => set({ storyThemes: themes }),
       setPlayerName: (name) => set({ playerName: name }),
+      setPlayerTrait: (trait) => set({ playerTrait: trait }),
 
       reset: () => set({
         playerName: null,
+        playerTrait: null,
         selectedRole: null,
         analysis: null,
         character: null,
