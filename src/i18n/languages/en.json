@@ -1097,7 +1097,7 @@
   "DREAM_TRAIT_MODAL_TITLE": "Describe your defining trait",
   "DREAM_TRAIT_MODAL_PLACEHOLDER": "What makes you who you are...",
   "DREAM_TRAIT_ERROR_TOO_SHORT": "Please describe your trait in more detail.",
-  "DREAM_TRAIT_ERROR_GIBBERISH": "That doesn't seem right. Try describing yourself differently.",
+  "DREAM_TRAIT_ERROR_GIBBERISH": "That's... interesting. But what does it mean? Try describing a real quality!",
   "DREAM_TRAIT_ERROR_PROFANITY": "Let's keep it friendly! Try a different description.",
   "DREAM_TRAIT_HEBREW_HINT": "אפשר להקליד בעברית"
 }

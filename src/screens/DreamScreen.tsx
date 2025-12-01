@@ -67,6 +67,43 @@ function validateName(name: string): string | null {
   return null;
 }
 
+// Keyboard patterns to detect random key mashing
+const KEYBOARD_PATTERNS = [
+  "qwerty", "asdf", "zxcv", "qwer", "asdfgh", "zxcvbn",
+  "hjkl", "yuiop", "ghjkl", "bnm", "fghj", "vbnm"
+];
+
+/**
+ * Check if a word looks like gibberish
+ * Returns true if the word appears to be random characters
+ */
+function isGibberishWord(word: string): boolean {
+  const lowerWord = word.toLowerCase();
+
+  // Skip short words (2 chars or less) - could be valid abbreviations
+  if (lowerWord.length <= 2) return false;
+
+  // Check for keyboard patterns
+  for (const pattern of KEYBOARD_PATTERNS) {
+    if (lowerWord.includes(pattern)) return true;
+  }
+
+  // Count vowels (English vowels - Hebrew text passes through)
+  const vowels = lowerWord.match(/[aeiou]/gi) || [];
+  const vowelRatio = vowels.length / lowerWord.length;
+
+  // Real English words typically have 20-50% vowels
+  // Gibberish like "xzqwk" has 0% vowels
+  // Only apply this check to words that look like they're trying to be English (Latin chars)
+  const isLatinWord = /^[a-z]+$/i.test(lowerWord);
+  if (isLatinWord && vowelRatio < 0.1 && lowerWord.length > 3) return true;
+
+  // Check for 4+ consonants in a row (rare in real English words)
+  if (/[bcdfghjklmnpqrstvwxyz]{4,}/i.test(lowerWord)) return true;
+
+  return false;
+}
+
 /**
  * Validate custom trait
  * Returns error key for i18n, or null if valid
@@ -79,7 +116,18 @@ function validateTrait(text: string): string | null {
     return "DREAM_TRAIT_ERROR_TOO_SHORT";
   }
 
-  // Check for repeated characters (gibberish)
+  // Split into words
+  const words = trimmed.split(/\s+/);
+
+  // Check each word for gibberish patterns
+  const gibberishWords = words.filter(isGibberishWord);
+
+  // If more than half the words are gibberish, reject
+  if (gibberishWords.length > words.length / 2) {
+    return "DREAM_TRAIT_ERROR_GIBBERISH";
+  }
+
+  // Check for repeated characters (original check)
   const uniqueChars = new Set(trimmed.toLowerCase().replace(/\s/g, ""));
   if (uniqueChars.size < 3) {
     return "DREAM_TRAIT_ERROR_GIBBERISH";
@@ -209,12 +257,15 @@ export default function DreamScreen({ push }: { push: PushFn }) {
       className="relative min-h-[100dvh] flex items-center justify-center"
       style={etherPlaceBackground}
     >
-      {/* Intro phase - no black overlay, content displayed over background */}
-      <AnimatePresence>
+      {/* All phases in single AnimatePresence with mode="wait" for sequential transitions */}
+      <AnimatePresence mode="wait">
+        {/* Intro phase */}
         {phase === "intro" && (
           <motion.div
+            key="intro"
             className="absolute inset-0 flex flex-col items-center justify-center z-10"
-            initial={{ opacity: 1 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5, ease: "easeInOut" }}
           >
@@ -256,24 +307,23 @@ export default function DreamScreen({ push }: { push: PushFn }) {
             </AnimatePresence>
           </motion.div>
         )}
-      </AnimatePresence>
 
-      {/* Name input phase */}
-      <AnimatePresence>
+        {/* Name input phase */}
         {phase === "name" && (
           <motion.div
+            key="name"
             className="flex flex-col items-center justify-center px-6 max-w-md w-full"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.8, delay: 0.5 }}
+            transition={{ duration: 0.5 }}
           >
             {/* Name prompt - same font style as intro dream text */}
             <motion.p
               className="text-white/90 text-2xl sm:text-3xl font-serif italic text-center mb-8 max-w-2xl leading-relaxed"
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.8 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
               style={{
                 textShadow: "0 2px 20px rgba(0,0,0,0.8)",
               }}
@@ -286,7 +336,7 @@ export default function DreamScreen({ push }: { push: PushFn }) {
               className="w-full space-y-4"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 1.0 }}
+              transition={{ duration: 0.6, delay: 0.5 }}
             >
               <input
                 type="text"
@@ -332,31 +382,30 @@ export default function DreamScreen({ push }: { push: PushFn }) {
                 ].join(" ")}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 1.2 }}
+                transition={{ delay: 0.7 }}
               >
                 {lang("DREAM_NAME_CONFIRM")}
               </motion.button>
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
 
-      {/* Trait selection phase */}
-      <AnimatePresence>
+        {/* Trait selection phase */}
         {phase === "trait" && !traitAccepted && (
           <motion.div
+            key="trait"
             className="flex flex-col items-center justify-center px-6 max-w-lg w-full"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
+            transition={{ duration: 0.5 }}
           >
             {/* Trait prompt text - same font style as intro */}
             <motion.div
               className="text-center mb-10"
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.5 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
             >
               <p
                 className="text-white/90 text-2xl sm:text-3xl font-serif italic leading-relaxed mb-2"
@@ -385,7 +434,7 @@ export default function DreamScreen({ push }: { push: PushFn }) {
               animate="show"
               variants={{
                 hidden: {},
-                show: { transition: { staggerChildren: TRAIT_STAGGER, delayChildren: 0.8 } },
+                show: { transition: { staggerChildren: TRAIT_STAGGER, delayChildren: 0.5 } },
               }}
             >
               {TRAITS.map((trait) => (
