@@ -4,6 +4,43 @@ import { useSettingsStore } from '../store/settingsStore';
 import type { TreatmentType } from '../data/experimentConfig';
 import { lang } from '../i18n/lang';
 
+// Keyboard patterns to detect random key mashing
+const KEYBOARD_PATTERNS = [
+  "qwerty", "asdf", "zxcv", "qwer", "asdfgh", "zxcvbn",
+  "hjkl", "yuiop", "ghjkl", "bnm", "fghj", "vbnm"
+];
+
+/**
+ * Check if a word looks like gibberish
+ * Returns true if the word appears to be random characters
+ */
+function isGibberishWord(word: string): boolean {
+  const lowerWord = word.toLowerCase();
+
+  // Skip short words (2 chars or less) - could be valid abbreviations
+  if (lowerWord.length <= 2) return false;
+
+  // Check for keyboard patterns
+  for (const pattern of KEYBOARD_PATTERNS) {
+    if (lowerWord.includes(pattern)) return true;
+  }
+
+  // Vowel ratio check for Latin words only (Hebrew passes through)
+  const isLatinWord = /^[a-z]+$/i.test(lowerWord);
+  if (isLatinWord) {
+    const vowels = lowerWord.match(/[aeiou]/gi) || [];
+    const vowelRatio = vowels.length / lowerWord.length;
+    // Real English words typically have 20-50% vowels
+    // Gibberish like "xzqwk" has 0% vowels
+    if (vowelRatio < 0.1 && lowerWord.length > 3) return true;
+  }
+
+  // Check for 4+ consecutive consonants (rare in real English words)
+  if (/[bcdfghjklmnpqrstvwxyz]{4,}/i.test(lowerWord)) return true;
+
+  return false;
+}
+
 /**
  * Hook for managing reasoning prompts during gameplay.
  *
@@ -169,6 +206,16 @@ export function validateReasoningText(text: string): ValidationResult {
   // Check for gibberish: ensure not all words are single characters
   const singleCharWords = words.filter(word => word.length === 1);
   if (singleCharWords.length === words.length && words.length > 2) {
+    return {
+      isValid: false,
+      reason: 'gibberish',
+      message: lang('REASONING_VALIDATION_MEANINGFUL'),
+    };
+  }
+
+  // Check for keyboard mashing gibberish patterns (e.g., "asdf qwer zxcv")
+  const gibberishWords = words.filter(isGibberishWord);
+  if (gibberishWords.length > words.length / 2) {
     return {
       isValid: false,
       reason: 'gibberish',
