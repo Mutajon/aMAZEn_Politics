@@ -175,8 +175,8 @@ export const useRoleStore = create<RoleState>()(
       setPendingAvatarThumbnail: (thumbnail) => set({ pendingAvatarThumbnail: thumbnail }),
 
       reset: () => set({
-        playerName: null,
-        playerTrait: null,
+        // playerName and playerTrait are intentionally NOT reset
+        // They represent the player's real identity and persist across all playthroughs
         selectedRole: null,
         analysis: null,
         character: null,

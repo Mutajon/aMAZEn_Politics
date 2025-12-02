@@ -240,9 +240,17 @@ export default function DreamScreen({ push }: { push: PushFn }) {
   const [showThreeWayComparison, setShowThreeWayComparison] = useState(false);
   const [showPreferenceButtons, setShowPreferenceButtons] = useState(false);
 
-  // Single shard popup state (for clicking completed shard when fragmentCount < 3)
-  const [showSingleShardPopup, setShowSingleShardPopup] = useState(false);
-  const [singleGameForPopup, setSingleGameForPopup] = useState<typeof pastGames[0] | null>(null);
+  // Build games array with games in their correct shard positions (Athens=0, North America=1, Mars=2)
+  const getGamesInShardOrder = () => {
+    const gamesInOrder: (typeof pastGames[0] | undefined)[] = [undefined, undefined, undefined];
+    fragments.forEach((fragment, index) => {
+      const game = pastGames.find(g => g.gameId === fragment.gameId);
+      if (game && index < 3) {
+        gamesInOrder[index] = game;
+      }
+    });
+    return gamesInOrder.filter((g): g is typeof pastGames[0] => g !== undefined);
+  };
 
   // Show arrow after intro text appears
   const handleIntroTextComplete = () => {
@@ -533,19 +541,10 @@ export default function DreamScreen({ push }: { push: PushFn }) {
       return;
     }
 
-    // Completed shard (shardIndex < fragmentCount) → open single popup summary
+    // Completed shard (shardIndex < fragmentCount) → open three-way comparison showing all earned games
     if (shardIndex < fragmentCount) {
       logger.log("dream_shard_clicked_completed", { shard: shardIndex }, "Player clicked completed shard");
-
-      // Find the game data for this fragment
-      const fragment = fragments[shardIndex];
-      if (fragment) {
-        const game = pastGames.find(g => g.gameId === fragment.gameId);
-        if (game) {
-          setSingleGameForPopup(game);
-          setShowSingleShardPopup(true);
-        }
-      }
+      setShowThreeWayComparison(true);
       return;
     }
 
@@ -1235,25 +1234,13 @@ export default function DreamScreen({ push }: { push: PushFn }) {
         )}
       </AnimatePresence>
 
-      {/* Three-way comparison popup */}
-      {showThreeWayComparison && fragmentCount === 3 && (
+      {/* Three-way comparison popup - shows all earned games in fixed positions */}
+      {showThreeWayComparison && (
         <ThreeShardComparison
-          games={pastGames.slice(0, 3)}
+          games={getGamesInShardOrder()}
           onClose={handleCloseComparison}
           showPreferenceButtons={showPreferenceButtons}
           onPreferenceSelected={handlePreferenceSelected}
-        />
-      )}
-
-      {/* Single shard popup - shows one game card when clicking completed shard */}
-      {showSingleShardPopup && singleGameForPopup && (
-        <ThreeShardComparison
-          games={[singleGameForPopup]}
-          onClose={() => {
-            setShowSingleShardPopup(false);
-            setSingleGameForPopup(null);
-          }}
-          showPreferenceButtons={false}
         />
       )}
 

@@ -10,7 +10,6 @@ import {
   Building2,
   Heart,
   Trophy,
-  RotateCcw,
   ArrowRight,
 } from "lucide-react";
 import { bgStyleWithRoleImage } from "../lib/ui";
@@ -76,7 +75,6 @@ export default function FinalScoreScreen({ push }: Props) {
   const finalScoreSubmitted = useDilemmaStore((s) => s.finalScoreSubmitted);
   const markScoreSubmitted = useDilemmaStore((s) => s.markScoreSubmitted);
   const saveFinalScore = useDilemmaStore((s) => s.saveFinalScore);
-  const clearFinalScore = useDilemmaStore((s) => s.clearFinalScore);
 
   const character = useRoleStore((s) => s.character);
   const analysis = useRoleStore((s) => s.analysis);
@@ -405,14 +403,6 @@ export default function FinalScoreScreen({ push }: Props) {
     }
   }, [finalScoreSubmitted, breakdown, character, playerRank]);
 
-  const handleReplayAnimation = () => {
-    clearFinalScore();
-    setDisplayValues(new Array(sequence.length + 1).fill(0));
-    setStep(0);
-    setRunning(true);
-    startTimeRef.current = 0;
-  };
-
   const handleBackToAftermath = () => {
     audioManager.playSfx('click-soft');
     logger.log(
@@ -548,14 +538,6 @@ export default function FinalScoreScreen({ push }: Props) {
           </div>
         )}
         <div className="flex flex-wrap gap-3">
-          <button
-            onClick={handleReplayAnimation}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-white/80 hover:bg-white/20 transition"
-            disabled={running}
-          >
-            <RotateCcw className="h-4 w-4" />
-            {lang("FINAL_SCORE_REPLAY_ANIMATION")}
-          </button>
           <button
             onClick={handlePlayAgain}
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-400 px-4 py-2 font-semibold text-white shadow-lg hover:from-amber-400 hover:to-orange-300 transition"
