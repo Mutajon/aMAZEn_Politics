@@ -1,9 +1,9 @@
 // src/data/compass-data.ts
 export const PROPERTIES = [
-    { key: "what", title: "What", subtitle: "Ultimate goals" },
-    { key: "whence", title: "Whence", subtitle: "Goals justification" },
-    { key: "how", title: "How", subtitle: "Means to get goals" },
-    { key: "whither", title: "Whither", subtitle: "Recipient of goals" },
+    { key: "what", title: "What", subtitle: "Your main goals" },
+    { key: "whence", title: "Whence", subtitle: "How do you justify your goals" },
+    { key: "how", title: "How", subtitle: "The means you use to get your goals" },
+    { key: "whither", title: "Whither", subtitle: "Who are the main recipients of your goals" },
   ] as const;
   
   export type PropKey = (typeof PROPERTIES)[number]["key"];

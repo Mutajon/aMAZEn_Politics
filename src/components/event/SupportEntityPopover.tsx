@@ -131,7 +131,11 @@ export default function SupportEntityPopover({
               </h3>
               <div className="bg-white/5 rounded-xl p-4 border border-white/10">
                 <p className="text-white/90 leading-relaxed">
-                  {supportProfile.summary}
+                  {supportProfile.summary?.includes("Assembly citizens prize direct democracy")
+                    ? lang("SUPPORT_ATHENS_PEOPLE_SUMMARY")
+                    : supportProfile.summary?.includes("Generals seek strategic flexibility")
+                    ? lang("SUPPORT_ATHENS_CHALLENGER_SUMMARY")
+                    : supportProfile.summary}
                 </p>
               </div>
             </div>

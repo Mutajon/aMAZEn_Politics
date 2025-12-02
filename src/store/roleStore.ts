@@ -60,6 +60,10 @@ export type Character = {
 
 /* ---------- Store ---------- */
 type RoleState = {
+  /** Player's real name (entered in DreamScreen) - separate from character name */
+  playerName: string | null;
+  /** Player's self-identified defining trait (entered in DreamScreen) */
+  playerTrait: string | null;
   selectedRole: string | null;
   analysis: AnalysisResult | null;
   character: Character | null;
@@ -79,6 +83,8 @@ type RoleState = {
   roleScope: string | null;
   /** Core story themes to rotate through */
   storyThemes: string[] | null;
+  /** Compressed avatar thumbnail for fragment storage (~5-10KB WebP) - temporary until fragment collected */
+  pendingAvatarThumbnail: string | null;
 
   setRole: (r: string | null) => void;
   setAnalysis: (a: AnalysisResult | null) => void;
@@ -101,12 +107,23 @@ type RoleState = {
   /** Set role description (e.g., "Governor in Florence") */
   setRoleDescription: (description: string | null) => void;
 
+  /** Set player's real name (from DreamScreen) */
+  setPlayerName: (name: string | null) => void;
+
+  /** Set player's defining trait (from DreamScreen) */
+  setPlayerTrait: (trait: string | null) => void;
+
+  /** Set pending avatar thumbnail for fragment collection */
+  setPendingAvatarThumbnail: (thumbnail: string | null) => void;
+
   reset: () => void;
 };
 
 export const useRoleStore = create<RoleState>()(
   persist(
     (set, get) => ({
+      playerName: null,
+      playerTrait: null,
       selectedRole: null,
       analysis: null,
       character: null,
@@ -118,6 +135,7 @@ export const useRoleStore = create<RoleState>()(
       supportProfiles: null,
       roleScope: null,
       storyThemes: null,
+      pendingAvatarThumbnail: null,
 
       setRole: (r) => set({ selectedRole: r }),
       setAnalysis: (a) => set((state) => ({
@@ -152,8 +170,13 @@ export const useRoleStore = create<RoleState>()(
       setSupportProfiles: (profiles: RoleSupportProfiles | null) => set({ supportProfiles: profiles }),
       setRoleScope: (scope) => set({ roleScope: scope }),
       setStoryThemes: (themes) => set({ storyThemes: themes }),
+      setPlayerName: (name) => set({ playerName: name }),
+      setPlayerTrait: (trait) => set({ playerTrait: trait }),
+      setPendingAvatarThumbnail: (thumbnail) => set({ pendingAvatarThumbnail: thumbnail }),
 
       reset: () => set({
+        // playerName and playerTrait are intentionally NOT reset
+        // They represent the player's real identity and persist across all playthroughs
         selectedRole: null,
         analysis: null,
         character: null,
@@ -164,7 +187,8 @@ export const useRoleStore = create<RoleState>()(
         roleDescription: null,
         supportProfiles: null,
         roleScope: null,
-        storyThemes: null
+        storyThemes: null,
+        pendingAvatarThumbnail: null
       }),
     }),
     {

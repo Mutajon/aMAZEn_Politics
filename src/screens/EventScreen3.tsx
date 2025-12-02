@@ -49,6 +49,7 @@ import SelfJudgmentModal from "../components/event/SelfJudgmentModal";
 import { useDay2Tutorial } from "../hooks/useDay2Tutorial";
 import { TutorialOverlay } from "../components/event/TutorialOverlay";
 import MomDeathToast from "../components/event/MomDeathToast";
+import { useAftermathPrefetch } from "../hooks/useAftermathPrefetch";
 
 type Props = {
   push: (path: string) => void;
@@ -157,6 +158,9 @@ export default function EventScreen3({ push }: Props) {
 
   // Self-judgment modal (Day 8 only)
   const [showSelfJudgmentModal, setShowSelfJudgmentModal] = useState(false);
+
+  // Aftermath prefetch (triggered when Day 8 modal opens)
+  const { startPrefetch: startAftermathPrefetch } = useAftermathPrefetch();
 
   // Tutorial system (Day 2 only)
   const tutorial = useDay2Tutorial();
@@ -1045,6 +1049,7 @@ export default function EventScreen3({ push }: Props) {
                     <button
                       onClick={() => {
                         stopNarration(); // Stop any playing narration before opening modal
+                        startAftermathPrefetch(); // Start fetching aftermath data in background
                         setShowSelfJudgmentModal(true);
                       }}
                       className="w-full px-6 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-amber-500/50"

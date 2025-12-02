@@ -14,7 +14,7 @@ import {
   deleteConversation,
   startCleanupTask
 } from "./conversationStore.mjs";
-import { getCountersCollection, incrementCounter, getUsersCollection, getScenarioSuggestionsCollection } from "./db/mongodb.mjs";
+import { getCountersCollection, incrementCounter, getUsersCollection, getScenarioSuggestionsCollection, getHighscoresCollection } from "./db/mongodb.mjs";
 import { getTheoryPrompt } from "./theory-loader.mjs";
 
 // -------------------- Process Error Handlers ---------------------------
@@ -1190,6 +1190,50 @@ app.post("/api/validate-role", async (req, res) => {
     return res.status(503).json({ error: "AI validator unavailable" });
   }
   return res.json({ valid: !!out.valid, reason: String(out.reason || "") });
+});
+
+// -------------------- EXTRACT SHORT TRAIT --------------------
+// Extracts a short trait keyword from a custom self-description
+// Used in DreamScreen mirror phase: "Mirror, mirror on the wall, who's the {trait} of them all?"
+// Uses Gemini 2.5 Flash for trait extraction
+app.post("/api/extract-trait", async (req, res) => {
+  const { description, language } = req.body;
+
+  if (!description) {
+    return res.status(400).json({ error: "Description required" });
+  }
+
+  const system = `You extract a trait from a user's self-description for a magic mirror game.
+The trait must fit seamlessly into: "Mirror, mirror on the wall, who's the ___ of them all?"
+
+Rules:
+1. The user's input language is: ${language || 'en'}
+2. If input is Hebrew, understand the meaning and translate to English
+3. Extract a SUPERLATIVE trait (e.g., "wisest", "bravest", "most creative", "richest")
+4. The trait should sound natural in the sentence above
+5. Return JSON: {"trait": "english superlative"}
+
+Examples:
+- Input: "I'm very smart" → {"trait": "smartest"}
+- Input: "I want to be rich" → {"trait": "richest"}
+- Input: "אני רוצה להיות הכי חכם" → {"trait": "wisest"}
+- Input: "I'm creative and artistic" → {"trait": "most creative"}
+- Input: "אני אמיץ" → {"trait": "bravest"}`;
+
+  try {
+    const result = await aiJSONGemini({
+      system,
+      user: description,
+      model: "gemini-2.5-flash",
+      temperature: 0.2,
+      fallback: { trait: description }
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error extracting trait:", error);
+    res.json({ trait: description });
+  }
 });
 
 // -------------------- Background object suggestion ----------
@@ -2788,7 +2832,8 @@ app.post("/api/aftermath", async (req, res) => {
       dilemmaHistory,
       finalSupport,
       topCompassValues,
-      debug
+      debug,
+      language = 'en' // Get language from client (default: English)
     } = req.body || {};
 
     if (debug) {
@@ -2800,7 +2845,8 @@ app.post("/api/aftermath", async (req, res) => {
         systemName,
         historyLength: dilemmaHistory?.length,
         finalSupport,
-        topCompassValues
+        topCompassValues,
+        language
       });
     }
 
@@ -2820,6 +2866,8 @@ app.post("/api/aftermath", async (req, res) => {
     };
 
     // Build system prompt using EXACT text from user's preliminary plan
+    const languageCode = String(language || "en").toLowerCase();
+    const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
     const system = `PLAYER ROLE & CONTEXT:
 - Setting: ${setting || role || "Unknown Setting"}
 - Player Role: ${role || "Unknown Role"}
@@ -2830,6 +2878,7 @@ Write in clear, vivid, reflective language; no jargon or game terms.
 Tone: ironic-cinematic, like a historical epilogue (Reigns, Frostpunk, Democracy 3).
 Accessible for teens; mix wit with weight.
 Use roles/descriptions, not obscure names.
+${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.` : ''}
 
 CONTENT
 Generate an in-world epilogue for the leader based on their decisions, outcomes, supports, and values.
@@ -2970,7 +3019,7 @@ ${compassSummary || "None"}
 DECISION HISTORY:
 ${historySummary || "No decisions recorded"}${conversationContext}
 
-Generate the aftermath epilogue following the structure above. Return STRICT JSON ONLY.`;
+Generate the aftermath epilogue following the structure above. Return STRICT JSON ONLY.${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}.` : ''}`;
 
     // Call AI with Gemini model
     // No fallback - let errors propagate so frontend can show retry button
@@ -3001,7 +3050,11 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
       haiku: "Power came and went\nDecisions echo through time\nHistory records"
     };
 
+    // Detect if we're using fallback data (AI failed or returned incomplete response)
+    const isFallback = result === null || !Array.isArray(result?.decisions) || result.decisions.length === 0;
+
     const response = {
+      isFallback,
       intro: String(result?.intro || fallback.intro).slice(0, 500),
       snapshot: Array.isArray(result?.snapshot)
         ? result.snapshot.map((event) => ({
@@ -3030,6 +3083,7 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
   } catch (e) {
     console.error("Error in /api/aftermath:", e?.message || e);
     return res.status(502).json({
+      isFallback: true,
       intro: "After many years of rule, the leader passed into history.",
       snapshot: [
         { type: "positive", icon: "🏛️", text: "Governed their people", context: "Overall reign" },
@@ -3616,7 +3670,7 @@ function sanitizeDilemmaResponse(rawResponse) {
  * Build unified Game Master system prompt (sent ONCE on Day 1)
  * Focused, short prompt with essential rules only
  */
-function buildGameMasterSystemPromptUnified(gameContext) {
+function buildGameMasterSystemPromptUnified(gameContext, languageCode = 'en', languageName = 'English') {
   const {
     role,
     systemName,
@@ -3644,10 +3698,11 @@ function buildGameMasterSystemPromptUnified(gameContext) {
 You are the Game Master of a historical-political simulation.
 You speak directly to the player as "you".
 Tone: amused, observant, challenging, slightly teasing, but always clear.
-Use simple English (CEFR B1-B2).
+Use simple ${languageCode === 'en' ? 'English' : languageName} (CEFR B1-B2).
 Short sentences (8-16 words).
 No metaphors, no poetic phrasing, no idioms, no fancy adjectives.
 Your job is to TEST the player's values by creating specific moral traps based on their compass, while making them feel what it is like to be this exact person in this exact historical moment.
+${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.` : ''}
 
 1. CORE IDENTITY OF THE PLAYER
 
@@ -4006,7 +4061,7 @@ CRITICAL JSON RULES:
  *
  * Rollback: Set USE_PROMPT_V3 = false to use original prompt
  */
-function buildGameMasterSystemPromptUnifiedV3(gameContext) {
+function buildGameMasterSystemPromptUnifiedV3(gameContext, languageCode = 'en', languageName = 'English') {
   const {
     role,
     systemName,
@@ -4036,13 +4091,14 @@ You speak directly to the player as "you".
 Tone: amused, observant, challenging, slightly teasing, but always clear.
 
 LANGUAGE RULES:
-- Simple English (CEFR B1-B2), short sentences (8-16 words)
+- Simple ${languageCode === 'en' ? 'English' : languageName} (CEFR B1-B2), short sentences (8-16 words)
 - NO metaphors, poetic phrasing, idioms, or fancy adjectives
 - NO technical jargon, academic language, or bureaucratic terms
   BAD: "preliminary audits", "unsanctioned bio-agent trials", "scientific standards demand transparency"
   GOOD: "the inspectors found out", "illegal experiments", "people want answers"
 - Use concrete language: "Citizens protest" NOT "tensions rise"
 - If a movie camera cannot record it, DO NOT WRITE IT
+${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.` : ''}
 
 YOUR MISSION:
 Create VALUE TRAPS in the player's PRIVATE LIFE that force them to choose between their stated values and their survival, rooted in the specific details and atmosphere of the setting.
@@ -4412,7 +4468,7 @@ DAY 8 SCHEMA (Aftermath):
  * @param {array|null} currentCompassTopValues - Current top compass values
  * @param {string} mirrorMode - 'lastAction' or 'dilemma' (default: 'dilemma')
  */
-function buildGameMasterUserPrompt(day, playerChoice = null, currentCompassTopValues = null, mirrorMode = 'dilemma') {
+function buildGameMasterUserPrompt(day, playerChoice = null, currentCompassTopValues = null, mirrorMode = 'dilemma', languageCode = 'en', languageName = 'English') {
   // General instruction for all days
   let prompt = `First, carefully review the entire system prompt to understand all context and rules.\n\n`;
 
@@ -4477,6 +4533,11 @@ Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
     }
   }
 
+  // Add language instruction if not English
+  if (languageCode !== 'en') {
+    prompt += `\n\nWrite your response in ${languageName}.`;
+  }
+
   return prompt;
 }
 
@@ -4512,7 +4573,8 @@ app.post("/api/game-turn-v2", async (req, res) => {
       generateActions = true,
       useXAI = false,
       useGemini = false,
-      debugMode = false
+      debugMode = false,
+      language = 'en' // Get language from client (default: English)
     } = req.body;
 
     // Validation
@@ -4524,7 +4586,7 @@ app.post("/api/game-turn-v2", async (req, res) => {
       return res.status(400).json({ error: "Missing or invalid day (must be 1-8)" });
     }
 
-    console.log(`[GAME-TURN-V2] gameId=${gameId}, day=${day}, isFirstDilemma=${isFirstDilemma}`);
+    console.log(`[GAME-TURN-V2] gameId=${gameId}, day=${day}, isFirstDilemma=${isFirstDilemma}, language=${language}`);
 
     // Get or create conversation
     let conversation = getConversation(gameId);
@@ -4576,12 +4638,14 @@ app.post("/api/game-turn-v2", async (req, res) => {
 
       // Build unified system prompt (sent ONCE)
       // Use V3 if feature flag enabled, otherwise use original
+      const languageCode = String(language || "en").toLowerCase();
+      const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
       const systemPrompt = USE_PROMPT_V3
-        ? buildGameMasterSystemPromptUnifiedV3(enrichedContext)
-        : buildGameMasterSystemPromptUnified(enrichedContext);
+        ? buildGameMasterSystemPromptUnifiedV3(enrichedContext, languageCode, languageName)
+        : buildGameMasterSystemPromptUnified(enrichedContext, languageCode, languageName);
 
       // Build minimal Day 1 user prompt
-      const userPrompt = buildGameMasterUserPrompt(day);
+      const userPrompt = buildGameMasterUserPrompt(day, null, null, 'dilemma', languageCode, languageName);
 
       // Debug logging (Day 1 request payload)
       if (debugMode) {
@@ -4595,6 +4659,7 @@ app.post("/api/game-turn-v2", async (req, res) => {
           isFirstDilemma: true,
           generateActions,
           useXAI,
+          language: languageCode,
           gameContext: {
             role: enrichedContext.role,
             systemName: enrichedContext.systemName,
@@ -4779,7 +4844,9 @@ app.post("/api/game-turn-v2", async (req, res) => {
       console.log(`[GAME-TURN-V2] Day ${day} - Mirror mode: ${mirrorMode}`);
 
       // Build Day 2+ user prompt with current compass values and mirror mode
-      const userPrompt = buildGameMasterUserPrompt(day, playerChoice, currentCompassTopValues, mirrorMode);
+      const languageCode = String(language || "en").toLowerCase();
+      const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
+      const userPrompt = buildGameMasterUserPrompt(day, playerChoice, currentCompassTopValues, mirrorMode, languageCode, languageName);
 
       // Prepare messages array (history + new user message)
       const messages = [
@@ -4801,6 +4868,7 @@ app.post("/api/game-turn-v2", async (req, res) => {
           isFollowUp: true,
           generateActions,
           useXAI,
+          language: languageCode,
           playerChoice: {
             title: playerChoice?.title,
             description: playerChoice?.description,
@@ -6128,6 +6196,322 @@ if (process.env.NODE_ENV === "production") {
 
   console.log(`[server] serving static files from ${distPath}`);
 }
+
+// -------------------- Highscores API Endpoints ---------------------------
+/**
+ * POST /api/highscores/submit
+ * Submit a highscore entry to the global leaderboard (V2)
+ * Note: Avatars are NOT stored on server - only stored locally in browser
+ * 
+ * Request Body:
+ * {
+ *   userId: string,         // REQUIRED: Anonymous UUID or researcher ID
+ *   gameId?: string,        // OPTIONAL: Game session ID (for linking to logs)
+ *   sessionId?: string,     // OPTIONAL: Session ID (for linking to logs)
+ *   name: string,
+ *   about: string,
+ *   democracy: string,
+ *   autonomy: string,
+ *   values: string,
+ *   score: number,
+ *   politicalSystem: string,
+ *   period?: string,
+ *   avatarUrl?: string      // OPTIONAL: Compressed 64x64 WebP thumbnail (~5-10KB)
+ * }
+ */
+app.post("/api/highscores/submit", async (req, res) => {
+  try {
+    const {
+      userId,           // NEW: Required
+      gameId,           // NEW: Optional (for linking to logs)
+      sessionId,        // NEW: Optional (for linking to logs)
+      name,
+      about,
+      democracy,
+      autonomy,
+      values,
+      score,
+      politicalSystem,
+      period,
+      avatarUrl         // NEW: Optional compressed thumbnail (~5-10KB)
+    } = req.body;
+
+    // Validation
+    if (!userId || typeof userId !== 'string' || userId.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "userId is required"
+      });
+    }
+
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Name is required"
+      });
+    }
+
+    if (typeof score !== 'number' || score < 0 || score > 1500) {
+      return res.status(400).json({
+        success: false,
+        error: "Score must be between 0 and 1500"
+      });
+    }
+
+    const collection = await getHighscoresCollection();
+    
+    // Insert entry
+    const entry = {
+      userId: userId.trim(),
+      gameId: gameId || null,
+      sessionId: sessionId || null,
+      name: name.trim(),
+      about: about?.trim() || "",
+      democracy: democracy || "Medium",
+      autonomy: autonomy || "Medium",
+      values: values || "",
+      score: Math.round(score),
+      politicalSystem: politicalSystem?.trim() || "Unknown",
+      period: period || undefined,
+      avatarUrl: avatarUrl || undefined,  // Compressed 64x64 WebP thumbnail
+      createdAt: new Date()
+    };
+
+    await collection.insertOne(entry);
+
+    // Get global rank (across all users)
+    const globalRank = await collection.countDocuments({ score: { $gt: score } }) + 1;
+
+    // Get user's personal rank (among their own scores)
+    const userRank = await collection.countDocuments({ 
+      userId: userId,
+      score: { $gt: score } 
+    }) + 1;
+
+    // Check if this is user's best score
+    const userBestScore = await collection.findOne(
+      { userId: userId },
+      { sort: { score: -1 }, projection: { score: 1 } }
+    );
+    const isPersonalBest = !userBestScore || score >= userBestScore.score;
+
+    console.log(`[Highscores] ✅ Submitted: ${name} (userId: ${userId}, Score: ${score}, Global Rank: ${globalRank}, User Rank: ${userRank})`);
+
+    res.json({
+      success: true,
+      globalRank,
+      userRank,
+      isPersonalBest,
+      totalUserScores: await collection.countDocuments({ userId }),
+      message: "Highscore submitted successfully"
+    });
+
+  } catch (error) {
+    console.error("[Highscores] ❌ Error submitting:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to submit highscore"
+    });
+  }
+});
+
+/**
+ * GET /api/highscores/global
+ * Get global leaderboard - highest score per user (top 50 users)
+ * 
+ * Query Parameters:
+ * - limit: number (default: 50, max: 100)
+ * - offset: number (default: 0)
+ */
+app.get("/api/highscores/global", async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
+    const collection = await getHighscoresCollection();
+    
+    // MongoDB aggregation to get best score per user
+    const pipeline = [
+      // Sort by score descending to get best scores first
+      { $sort: { score: -1 } },
+      
+      // Group by userId, take first (highest) score for each user
+      {
+        $group: {
+          _id: { $ifNull: ["$userId", { $concat: ["anonymous-", { $toString: "$_id" }] }] },
+          bestEntry: { $first: "$$ROOT" }
+        }
+      },
+      
+      // Replace root with the best entry document
+      { $replaceRoot: { newRoot: "$bestEntry" } },
+      
+      // Sort by score again (after grouping)
+      { $sort: { score: -1 } },
+      
+      // Pagination
+      { $skip: offset },
+      { $limit: limit }
+    ];
+
+    const entries = await collection.aggregate(pipeline).toArray();
+
+    // Format response (remove _id, sensitive data)
+    const formattedEntries = entries.map(({ _id, userId, gameId, sessionId, ...entry }) => ({
+      ...entry,
+      createdAt: entry.createdAt?.toISOString?.() || entry.createdAt,
+      // Note: userId intentionally excluded for privacy in global view
+      // avatarUrl included (compressed 64x64 WebP thumbnail, ~5-10KB)
+    }));
+
+    // Get total unique users count (for pagination)
+    const totalUsers = await collection.distinct("userId").then(arr => arr.length);
+
+    console.log(`[Highscores] ✅ Fetched global leaderboard: ${formattedEntries.length} entries (offset: ${offset}, totalUsers: ${totalUsers})`);
+
+    res.json({
+      success: true,
+      entries: formattedEntries,
+      totalUsers,
+      limit,
+      offset
+    });
+
+  } catch (error) {
+    console.error("[Highscores] ❌ Error fetching global leaderboard:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch global leaderboard"
+    });
+  }
+});
+
+/**
+ * GET /api/highscores/user/:userId
+ * Get all scores for a specific user (personal history)
+ * 
+ * Query Parameters:
+ * - limit: number (default: 50, max: 100)
+ * - offset: number (default: 0)
+ * - sortBy: "score" | "date" (default: "score")
+ */
+app.get("/api/highscores/user/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+    const sortBy = req.query.sortBy === "date" ? "createdAt" : "score";
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: "userId is required"
+      });
+    }
+
+    const collection = await getHighscoresCollection();
+    
+    // Get all scores for this user
+    const sortOrder = sortBy === "score" ? { score: -1 } : { createdAt: -1 };
+    
+    const entries = await collection
+      .find({ userId })
+      .sort(sortOrder)
+      .skip(offset)
+      .limit(limit)
+      .toArray();
+
+    // Format response
+    const formattedEntries = entries.map(({ _id, userId, gameId, sessionId, ...entry }) => ({
+      ...entry,
+      createdAt: entry.createdAt?.toISOString?.() || entry.createdAt,
+      gameId, // Include gameId for user's own scores (helps with debugging)
+      // avatarUrl included (compressed 64x64 WebP thumbnail, ~5-10KB)
+    }));
+
+    // Get total count for this user
+    const total = await collection.countDocuments({ userId });
+
+    // Get user's best score
+    const bestScore = entries.length > 0 
+      ? Math.max(...entries.map(e => e.score))
+      : 0;
+
+    console.log(`[Highscores] ✅ Fetched user scores: ${userId} (${formattedEntries.length} entries, best: ${bestScore})`);
+
+    res.json({
+      success: true,
+      entries: formattedEntries,
+      total,
+      bestScore,
+      limit,
+      offset
+    });
+
+  } catch (error) {
+    console.error("[Highscores] ❌ Error fetching user scores:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch user scores"
+    });
+  }
+});
+
+/**
+ * GET /api/highscores (DEPRECATED)
+ * Get global highscores leaderboard
+ * 
+ * @deprecated Use /api/highscores/global or /api/highscores/user/:userId instead
+ * 
+ * Query Parameters:
+ * - limit: number (default: 50, max: 100)
+ * - offset: number (default: 0)
+ */
+app.get("/api/highscores", async (req, res) => {
+  console.warn('[Highscores] ⚠️ DEPRECATED: /api/highscores endpoint called. Use /api/highscores/global or /api/highscores/user/:userId instead.');
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
+    const collection = await getHighscoresCollection();
+    
+    // Get top scores, sorted by score descending
+    const entries = await collection
+      .find({})
+      .sort({ score: -1 })
+      .skip(offset)
+      .limit(limit)
+      .toArray();
+
+    // Remove MongoDB _id field and format response
+    // Note: Avatars are NOT included - they're only stored locally in browser
+    const formattedEntries = entries.map(({ _id, ...entry }) => ({
+      ...entry,
+      // Convert MongoDB date to ISO string if needed
+      createdAt: entry.createdAt?.toISOString?.() || entry.createdAt
+    }));
+
+    // Get total count for pagination
+    const total = await collection.countDocuments({});
+
+    console.log(`[Highscores] ✅ Fetched ${formattedEntries.length} entries (offset: ${offset}, total: ${total})`);
+
+    res.json({
+      success: true,
+      entries: formattedEntries,
+      total,
+      limit,
+      offset
+    });
+
+  } catch (error) {
+    console.error("[Highscores] ❌ Error fetching highscores:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch highscores"
+    });
+  }
+});
 
 // -------------------- Health Check Endpoint ---------------------------
 /**

@@ -18,6 +18,8 @@ import SplashScreen from "./screens/SplashScreen";
 import BackstageScreen from "./screens/BackstageScreen";
 // import CompassIntro from "./screens/CompassIntro"; // (legacy monolith – no longer used)
 import IntroScreen from "./screens/IntroScreen";
+import DreamScreen from "./screens/DreamScreen";
+import RoleIntroScreen from "./screens/RoleIntroScreen";
 import RoleSelectionScreen from "./screens/RoleSelectionScreen";
 import CampaignScreen from "./screens/CampaignScreen";
 import PowerDistributionScreen from "./screens/PowerDistributionScreen";
@@ -31,7 +33,8 @@ import DifficultyScreen from "./screens/DifficultyScreen";
 import GoalsSelectionScreen from "./screens/GoalsSelectionScreen";
 import { useEnsureMirroredAvatarOnce } from "./hooks/useEnsureMirroredAvatarOnce";
 import EventScreen3 from "./screens/EventScreen3";
-import HighscoreScreen from "./screens/HighscoreScreen";
+import HighscoreScreen from "./screens/HighscoreScreen"; // Legacy (V1)
+import HighscoreScreenV2 from "./screens/HighscoreScreenV2"; // V2: Global/Local tabs with userId tracking
 import AchievementsScreen from "./screens/AchievementsScreen";
 import MirrorScreen from "./screens/MirrorScreen";
 import AftermathScreen from "./screens/AftermathScreen";
@@ -95,11 +98,12 @@ function RTLHandler() {
 
 // Loading screen while translations are loading
 function LoadingScreen() {
+  const { lang } = useLanguage();
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-        <p className="text-white/80">Loading...</p>
+        <p className="text-white/80">{lang("LOADING")}</p>
       </div>
     </div>
   );
@@ -197,7 +201,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
 
   const pageTransition = {
     duration: 0.3,
-    ease: "easeInOut"
+    ease: "easeInOut" as const
   };
 
   return (
@@ -217,6 +221,8 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
           className="absolute inset-0 min-h-screen bg-black"
           style={{ width: '100%', height: '100%' }}
         >
+          {route === "/dream" && <DreamScreen push={push} />}
+          {route === "/role-intro" && <RoleIntroScreen push={push} />}
           {route === "/intro" && <IntroScreen push={push} />}
           {route === "/role" && <RoleSelectionScreen push={push} />}
           {route === "/campaign" && <CampaignScreen />}
@@ -242,7 +248,8 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
           })()}
           {route === "/event" && <EventScreen3 push={push} />}
           {route === "/downfall" && <DownfallScreen push={push} />}
-          {route.startsWith("/highscores") && <HighscoreScreen />}
+          {/*{route === "/highscores-v1" && <HighscoreScreen />} /!* Legacy V1 *!/*/}
+          {route.startsWith("/highscores") && <HighscoreScreenV2 />} {/* V2: Global/Local tabs */}
           {route === "/achievements" && <AchievementsScreen />}
           {route === "/aftermath" && <AftermathScreen push={push} />}
           {route === "/final-score" && <FinalScoreScreen key={gameId} push={push} />}
@@ -260,7 +267,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
           {/* Default route - SplashScreen */}
           {route === "/" && (
             <SplashScreen
-              onStart={() => push("/intro")}
+              onStart={() => push("/dream")}
               onHighscores={() => push("/highscores")}
               onAchievements={() => push("/achievements")}
               push={push}

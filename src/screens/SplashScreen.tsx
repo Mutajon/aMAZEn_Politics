@@ -19,9 +19,8 @@ import IDCollectionModal from "../components/IDCollectionModal";
 import { useLogger } from "../hooks/useLogger";
 import { audioManager } from "../lib/audioManager";
 
-const SUBTITLES = [
-  "Choose your path. Discover yourself."
-];
+// SUBTITLES now uses GAME_SUBTITLE from i18n
+const SUBTITLES: string[] = [];
 
 export default function SplashScreen({
   onStart,
@@ -82,6 +81,13 @@ export default function SplashScreen({
   const setDilemmasSubjectEnabled = useSettingsStore((s) => s.setDilemmasSubjectEnabled);
   const dilemmasSubject = useSettingsStore((s) => s.dilemmasSubject);
   const setDilemmasSubject = useSettingsStore((s) => s.setDilemmasSubject);
+
+  // Initialize default dilemmas subject if empty (only once)
+  useEffect(() => {
+    if (!dilemmasSubject) {
+      setDilemmasSubject(lang("SETTINGS_DEFAULT_DILEMMAS_SUBJECT"));
+    }
+  }, []); // Only run once on mount
 
   // Enable modifiers
   const enableModifiers = useSettingsStore((s) => s.enableModifiers);
@@ -181,10 +187,52 @@ export default function SplashScreen({
     }
   };
 
+  // Helper function to request fullscreen
+  const requestFullscreen = async () => {
+    try {
+      // TypeScript interfaces for browser-specific fullscreen APIs
+      interface DocumentElementWithFullscreen extends HTMLElement {
+        webkitRequestFullscreen?: () => Promise<void>;
+        msRequestFullscreen?: () => Promise<void>;
+      }
+      
+      const elem = document.documentElement as DocumentElementWithFullscreen;
+      
+      if (elem.requestFullscreen) {
+        await elem.requestFullscreen();
+      } else if (elem.webkitRequestFullscreen) {
+        // Safari
+        await elem.webkitRequestFullscreen();
+      } else if (elem.msRequestFullscreen) {
+        // IE11
+        await elem.msRequestFullscreen();
+      }
+      
+      logger.log(
+        'fullscreen_entered',
+        'requested',
+        'User entered fullscreen mode on game start'
+      );
+      console.log('[SplashScreen] Fullscreen mode activated');
+    } catch (error) {
+      // Fullscreen request can fail (user denied, browser policy, etc.)
+      // This is non-critical, so we just log it and continue
+      console.warn('[SplashScreen] Fullscreen request failed:', error);
+      logger.log(
+        'fullscreen_failed',
+        { error: (error as Error).message },
+        'Fullscreen request was denied or failed'
+      );
+    }
+  };
+
   // Handle start button click (when not in experiment mode, skip ID modal)
   const handleStartClick = async () => {
     // Play click sound
     audioManager.playSfx('click-soft');
+
+    // Request fullscreen mode
+    await requestFullscreen();
 
     if (experimentMode) {
       // In experiment mode, show ID modal
@@ -227,14 +275,14 @@ export default function SplashScreen({
     logger.logSystem('splash_screen_loaded', true, 'Splash screen loaded');
   }, [logger]);
 
-  // Simple subtitle reveal: show title, wait 0.5s, fade in all subtitles
+  // Simple subtitle reveal: show title, wait 0.5s, fade in subtitle
   useEffect(() => {
-    // Wait 500ms after title, then show all subtitles at once
+    // Wait 500ms after title, then show subtitle
     const subtitleTimer = setTimeout(() => {
-      setVisibleSubtitles(SUBTITLES.length);
+      setVisibleSubtitles(1);
     }, 500);
 
-    // Then show button 500ms after subtitles appear
+    // Then show button 500ms after subtitle appears
     const buttonTimer = setTimeout(() => {
       setShowButton(true);
     }, 1000);
@@ -533,7 +581,7 @@ export default function SplashScreen({
         <div className="relative min-h-[80px] flex flex-col items-center justify-start pt-4">
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: visibleSubtitles >= SUBTITLES.length ? 1 : 0 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
             className="relative"
           >

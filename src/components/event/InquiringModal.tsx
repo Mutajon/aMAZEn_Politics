@@ -20,6 +20,7 @@ import { X, MessageCircle, Loader2 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { useTimingLogger } from "../../hooks/useTimingLogger";
 import { useLogger } from "../../hooks/useLogger";
+import { lang } from "../../i18n/lang";
 
 type InquiryEntry = {
   question: string;
@@ -208,7 +209,7 @@ export default function InquiringModal({
                 <MessageCircle className="h-8 w-8" />
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="text-xl font-bold text-white mb-1">Inquire More</h2>
+                <h2 className="text-xl font-bold text-white mb-1">{lang("INQUIRING_MODAL_TITLE")}</h2>
                 <p className="text-sm font-semibold text-white/80 mb-1">{dilemmaTitle}</p>
                 <p className="text-xs text-white/60 line-clamp-3">{dilemmaDescription}</p>
               </div>
@@ -224,7 +225,7 @@ export default function InquiringModal({
                   onClick={() => setShowPreviousInquiries(!showPreviousInquiries)}
                   className="flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors"
                 >
-                  <span>📜 Previous Inquiries ({previousInquiries.length})</span>
+                  <span>{lang("INQUIRING_MODAL_PREVIOUS_INQUIRIES").replace("{count}", previousInquiries.length.toString())}</span>
                   <span className="text-xs">{showPreviousInquiries ? "▼" : "▶"}</span>
                 </button>
 
@@ -242,11 +243,11 @@ export default function InquiringModal({
                           className="bg-white/5 rounded-lg p-4 space-y-2 border border-white/10"
                         >
                           <div>
-                            <span className="text-xs text-white/50 font-semibold uppercase">Question:</span>
+                            <span className="text-xs text-white/50 font-semibold uppercase">{lang("INQUIRING_MODAL_QUESTION_LABEL")}</span>
                             <p className="text-sm text-white/80 mt-1">{inquiry.question}</p>
                           </div>
                           <div>
-                            <span className="text-xs text-yellow-500/70 font-semibold uppercase">Answer:</span>
+                            <span className="text-xs text-yellow-500/70 font-semibold uppercase">{lang("INQUIRING_MODAL_ANSWER_LABEL")}</span>
                             <p className="text-sm text-white mt-1">{inquiry.answer}</p>
                           </div>
                         </div>
@@ -260,11 +261,11 @@ export default function InquiringModal({
             {/* New Inquiry Section */}
             <div className="space-y-3">
               <label className="block text-sm font-semibold text-white/80">
-                Type your inquiry:
+                {lang("INQUIRING_MODAL_TYPE_INQUIRY")}
               </label>
 
               <p className="text-sm text-yellow-400/70 mb-2" dir="rtl">
-                אפשר להקליד בעברית
+                {lang("INQUIRING_MODAL_CAN_TYPE_HEBREW")}
               </p>
 
               <textarea
@@ -278,7 +279,7 @@ export default function InquiringModal({
                   });
                 }}
                 onKeyPress={handleKeyPress}
-                placeholder="What would you like to know about this situation?"
+                placeholder={lang("INQUIRING_MODAL_PLACEHOLDER")}
                 className="w-full h-24 px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-yellow-500/50 transition-all resize-none"
                 disabled={isLoading || remainingCredits === 0}
               />
@@ -288,7 +289,7 @@ export default function InquiringModal({
                 {!validation.valid && currentQuestion.length > 0 ? (
                   <span className="text-red-400">{validation.message}</span>
                 ) : (
-                  <span className="text-white/40">5-200 characters</span>
+                  <span className="text-white/40">{lang("INQUIRING_MODAL_CHAR_RANGE")}</span>
                 )}
                 <span className={`${currentQuestion.length > 200 ? 'text-red-400' : 'text-white/40'}`}>
                   {currentQuestion.length}/200
@@ -309,13 +310,13 @@ export default function InquiringModal({
                 {isLoading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Inquiring...</span>
+                    <span>{lang("INQUIRING_MODAL_INQUIRING")}</span>
                   </>
                 ) : (
                   <>
                     <MessageCircle className="w-5 h-5" />
                     <span>
-                      Inquire {remainingCredits > 0 && `(${remainingCredits} remaining)`}
+                      {lang("INQUIRING_MODAL_INQUIRE")} {remainingCredits > 0 && `(${remainingCredits} ${lang("INQUIRING_MODAL_REMAINING")})`}
                     </span>
                   </>
                 )}
@@ -323,7 +324,7 @@ export default function InquiringModal({
 
               {remainingCredits === 0 && (
                 <p className="text-xs text-yellow-500/70 text-center">
-                  No inquiry credits remaining for this dilemma
+                  {lang("INQUIRING_MODAL_NO_CREDITS")}
                 </p>
               )}
 
@@ -353,7 +354,7 @@ export default function InquiringModal({
                       </div>
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-yellow-500 mb-1">Answer:</p>
+                      <p className="text-sm font-semibold text-yellow-500 mb-1">{lang("INQUIRING_MODAL_ANSWER_LABEL")}</p>
                       <p className="text-white leading-relaxed">{latestAnswer}</p>
                     </div>
                   </div>

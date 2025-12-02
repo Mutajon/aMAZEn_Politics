@@ -16,6 +16,7 @@ import { useAudioManager } from "../../hooks/useAudioManager";
 import { useLogger } from "../../hooks/useLogger";
 import { getTreatmentConfig, type TreatmentType } from "../../data/experimentConfig";
 import { useSettingsStore } from "../../store/settingsStore";
+import { useLang } from "../../i18n/lang";
 
 // Visual constants (Mobile-first responsive)
 const ENTER_STAGGER = 0.12;
@@ -105,6 +106,7 @@ export default function ActionDeckContent({
   onSuggestTextChange,
   onConfirmSuggestion,
 }: ActionDeckContentProps) {
+  const lang = useLang();
   const { playSfx } = useAudioManager();
   const logger = useLogger();
 
@@ -304,7 +306,7 @@ export default function ActionDeckContent({
             onClick={handleOpenSuggest}
             disabled={Boolean(confirmingId) || validatingSuggest || !canAffordSuggestion}
           >
-            <span className="text-[12.5px] font-semibold">Suggest your own</span>
+            <span className="text-[12.5px] font-semibold">{lang("SUGGEST_YOUR_OWN")}</span>
             {showBudget && (
               <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-black/35 ring-1 ring-white/25">
                 <span className={`text-[11px] font-semibold ${suggestCost < 0 ? "text-rose-100" : "text-emerald-100"}`}>
@@ -375,14 +377,14 @@ export default function ActionDeckContent({
                     disabled={showBudget && !selectedCard.affordable}
                     onClick={() => handleConfirmCard(selectedCard.id)}
                   >
-                    Confirm
+                    {lang("CONFIRM")}
                   </button>
                   <button
                     type="button"
                     className="px-3 py-1.5 rounded-full bg-white/10 ring-1 ring-white/15 text-white text-[12px]"
                     onClick={handleCancelSelection}
                   >
-                    Cancel
+                    {lang("CANCEL")}
                   </button>
                 </div>
               </motion.div>
@@ -424,7 +426,7 @@ export default function ActionDeckContent({
                 )}
 
                 <div className="flex items-center justify-between">
-                  <div className="text-[13px] font-semibold text-white">Suggest your own</div>
+                  <div className="text-[13px] font-semibold text-white">{lang("SUGGEST_YOUR_OWN")}</div>
                   {showBudget && (
                     <div className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-black/35 ring-1 ring-white/25">
                       <span className="text-[12px] font-semibold text-rose-100">{suggestCost}</span>
@@ -479,7 +481,7 @@ export default function ActionDeckContent({
                     onClick={handleCloseSuggest}
                     disabled={validatingSuggest}
                   >
-                    Cancel
+                    {lang("CANCEL")}
                   </button>
                   <button
                     type="button"
@@ -487,7 +489,7 @@ export default function ActionDeckContent({
                     disabled={validatingSuggest || !canAffordSuggestion || !suggestTextValid}
                     onClick={handleConfirmSuggestion}
                   >
-                    {validatingSuggest ? "Validating..." : "Confirm"}
+                    {validatingSuggest ? lang("VALIDATING_ACTION") : lang("CONFIRM")}
                   </button>
                 </div>
               </motion.div>

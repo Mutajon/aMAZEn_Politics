@@ -23,6 +23,7 @@ import { calculateLiveScoreBreakdown } from "../lib/scoring";
 import { shouldGenerateAIOptions, type TreatmentType } from "../data/experimentConfig";
 import { useAIOutputLogger } from "./useAIOutputLogger";
 import { getConfidantByLegacyKey } from "../data/confidants";
+import { useLanguage } from "../i18n/LanguageContext";
 
 // ============================================================================
 // TYPES
@@ -146,7 +147,7 @@ async function waitForNarrativeMemory(timeoutMs = 4000, pollIntervalMs = 75) {
  * - Better narrative continuity
  * - ~50% token savings after Day 1
  */
-async function fetchGameTurn(): Promise<{
+async function fetchGameTurn(language: string = 'en'): Promise<{
   dilemma: Dilemma;
   supportEffects: SupportEffect[] | null;
   newsItems: TickerItem[];
@@ -284,6 +285,9 @@ async function fetchGameTurn(): Promise<{
   const useGemini = useSettingsStore.getState().useGemini;
   payload.useGemini = useGemini;
 
+  // Pass language setting
+  payload.language = language;
+
   // Day 1: Initialize compass conversation with game context
   if (day === 1 && payload.gameContext) {
     try {
@@ -313,7 +317,7 @@ async function fetchGameTurn(): Promise<{
     }
   }
 
-  console.log(`[fetchGameTurn] Calling /api/game-turn-v2 for Day ${day}, gameId=${currentGameId}, treatment=${treatment}, generateActions=${payload.generateActions}, useXAI=${useXAI}, useGemini=${useGemini}`);
+  console.log(`[fetchGameTurn] Calling /api/game-turn-v2 for Day ${day}, gameId=${currentGameId}, treatment=${treatment}, generateActions=${payload.generateActions}, useXAI=${useXAI}, useGemini=${useGemini}, language=${language}`);
 
   // Log compass values being sent for mirror advice debugging
   if (payload.gameContext?.playerCompassTopValues) {
@@ -786,6 +790,9 @@ async function fetchMirrorText(dilemma: Dilemma): Promise<string> {
 // ============================================================================
 
 export function useEventDataCollector() {
+  // Get current language from context
+  const { language } = useLanguage();
+
   // Progressive state - data arrives in 3 phases
   const [phase1Data, setPhase1Data] = useState<Phase1Data | null>(null);
   const [phase2Data, setPhase2Data] = useState<Phase2Data | null>(null);
@@ -833,9 +840,9 @@ export function useEventDataCollector() {
       // ========================================================================
       // UNIFIED API CALL - Get ALL data in one request using hosted state
       // ========================================================================
-      console.log(`[Collector] Day ${day}: Fetching unified game turn data...`);
+      console.log(`[Collector] Day ${day}: Fetching unified game turn data... (language: ${language})`);
 
-      const turnData = await fetchGameTurn();
+      const turnData = await fetchGameTurn(language);
 
       // Extract all data from unified response
       const {

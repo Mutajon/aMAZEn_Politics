@@ -21,6 +21,7 @@ import { getAllTopCompassValues, type CompassComponentValue } from "../../lib/co
 import { useRoleStore } from "../../store/roleStore";
 import { useCompassStore } from "../../store/compassStore";
 import { ValueExplanationModal } from "./ValueExplanationModal";
+import { useLang } from "../../i18n/lang";
 
 type Props = {
   isOpen: boolean;
@@ -137,6 +138,7 @@ export default function PlayerCardModal({
   const [selectedValueForExplanation, setSelectedValueForExplanation] = useState<SelectedValueForExplanation | null>(null);
 
   // Read live data from stores
+  const lang = useLang();
   const character = useRoleStore((s) => s.character);
   const analysis = useRoleStore((s) => s.analysis);
   const roleTitle = useRoleStore((s) => s.roleTitle);
@@ -287,7 +289,7 @@ export default function PlayerCardModal({
             {/* Compass Values Grid */}
             <div>
               <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3">
-                Your Main Values
+                {lang("YOUR_CURRENT_MAIN_VALUES")}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {PROPERTIES.map((prop) => (

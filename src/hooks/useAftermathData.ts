@@ -1,5 +1,5 @@
 // src/hooks/useAftermathData.ts
-// Hook for fetching aftermath data from the API
+// Hook for fetching aftermath data from the API with automatic retry on fallback
 //
 // Connects to:
 // - server/index.mjs: POST /api/aftermath
@@ -15,6 +15,12 @@ import { useSettingsStore } from "../store/settingsStore";
 import { COMPONENTS, type PropKey } from "../data/compass-data";
 import type { AftermathRequest, AftermathResponse, TopCompassValue } from "../lib/aftermath";
 import { calculateOverallRatings } from "../lib/aftermath";
+import { useLanguage } from "../i18n/LanguageContext";
+import { getPrefetchedAftermathData, clearAftermathPrefetch } from "./useAftermathPrefetch";
+
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1500;
 
 /**
  * Extract top 2 compass values per dimension
@@ -55,110 +61,156 @@ function extractTopCompassValues(): TopCompassValue[] {
   return result;
 }
 
+/** Progress callback type for retry attempts */
+export type RetryProgressCallback = (attempt: number, maxAttempts: number) => void;
+
 /**
- * Hook for loading aftermath data
+ * Build aftermath request from current game state
+ */
+function buildAftermathRequest(language: string): AftermathRequest {
+  const { character, selectedRole, analysis, roleTitle, roleDescription } = useRoleStore.getState();
+  const { gameId, dilemmaHistory, supportPeople, supportMiddle, supportMom } = useDilemmaStore.getState();
+  const { debugMode } = useSettingsStore.getState();
+
+  return {
+    gameId: gameId || undefined,
+    playerName: character?.name || "Leader",
+    role: roleDescription || selectedRole || "Unknown Role",
+    setting: roleTitle || selectedRole || "Unknown Setting",
+    systemName: analysis?.systemName || "Unknown System",
+    dilemmaHistory: dilemmaHistory || [],
+    finalSupport: {
+      people: supportPeople,
+      middle: supportMiddle,
+      mom: supportMom
+    },
+    topCompassValues: extractTopCompassValues(),
+    debug: debugMode,
+    language
+  };
+}
+
+/**
+ * Process API result into AftermathResponse with calculated ratings
+ */
+function processApiResult(apiResult: any): AftermathResponse {
+  const calculatedRatings = calculateOverallRatings(apiResult.decisions || []);
+
+  // Store globally for console access
+  (window as any).__democracyRating = calculatedRatings.democracy;
+  (window as any).__allRatings = calculatedRatings;
+
+  return {
+    ...apiResult,
+    isFallback: apiResult.isFallback || false,
+    ratings: {
+      democracy: calculatedRatings.democracy,
+      autonomy: calculatedRatings.autonomy,
+      liberalism: calculatedRatings.liberalism
+    }
+  };
+}
+
+/**
+ * Hook for loading aftermath data with automatic retry on fallback
  * Collects all game state and calls /api/aftermath
  */
 export function useAftermathData() {
+  const { language } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<AftermathResponse | null>(null);
 
-  const fetchAftermathData = useCallback(async () => {
+  const fetchAftermathData = useCallback(async (onRetryProgress?: RetryProgressCallback) => {
     setLoading(true);
     setError(null);
 
-    try {
-      // Collect data from stores
-      const { character, selectedRole, analysis, roleTitle, roleDescription } = useRoleStore.getState();
-      const {
-        gameId,
-        dilemmaHistory,
-        supportPeople,
-        supportMiddle,
-        supportMom
-      } = useDilemmaStore.getState();
-      const { debugMode } = useSettingsStore.getState();
+    const { debugMode } = useSettingsStore.getState();
 
-      // Extract player name (fallback to "Leader" if not set)
-      const playerName = character?.name || "Leader";
+    // Check for prefetched data first
+    const prefetched = getPrefetchedAftermathData();
+    if (prefetched) {
+      console.log('[useAftermathData] Using prefetched data', prefetched.isFallback ? '(fallback)' : '(success)');
+      clearAftermathPrefetch();
 
-      // Extract role, setting, and system (fallback to generic values)
-      const role = roleDescription || selectedRole || "Unknown Role";
-      const setting = roleTitle || selectedRole || "Unknown Setting"; // roleTitle contains legacyKey (e.g., "Athens — Shadows of War (-431)")
-      const systemName = analysis?.systemName || "Unknown System";
-
-      // Extract top compass values (top 2 per dimension)
-      const topCompassValues = extractTopCompassValues();
-
-      // Build request
-      const request: AftermathRequest = {
-        gameId: gameId || undefined, // Add gameId to get conversation history from backend (convert null to undefined)
-        playerName,
-        role,
-        setting,
-        systemName,
-        dilemmaHistory: dilemmaHistory || [],
-        finalSupport: {
-          people: supportPeople,
-          middle: supportMiddle,
-          mom: supportMom
-        },
-        topCompassValues,
-        debug: debugMode
-      };
-
-      if (debugMode) {
-        console.log("[useAftermathData] Request:", request);
-      }
-
-      // Call API
-      const response = await fetch("/api/aftermath", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request)
-      });
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`);
-      }
-
-      const apiResult = await response.json();
-
-      // Calculate overall ratings from individual decision ratings (including democracy)
-      const calculatedRatings = calculateOverallRatings(apiResult.decisions || []);
-
-      // Store democracy rating globally for console access
-      (window as any).__democracyRating = calculatedRatings.democracy;
-      (window as any).__allRatings = calculatedRatings;
-
-      // Merge calculated ratings into response (including democracy - now visible in UI)
-      const result: AftermathResponse = {
-        ...apiResult,
-        ratings: {
-          democracy: calculatedRatings.democracy,
-          autonomy: calculatedRatings.autonomy,
-          liberalism: calculatedRatings.liberalism
-        }
-      };
-
-      if (debugMode) {
-        console.log("[useAftermathData] API Response (before calculation):", apiResult);
-        console.log("[useAftermathData] Calculated Ratings (ALL):", calculatedRatings);
-        console.log("[useAftermathData] Democracy Rating (HIDDEN):", calculatedRatings.democracy);
-        console.log("[useAftermathData] Final Response (democracy excluded):", result);
-      }
-
+      const result = processApiResult(prefetched);
       setData(result);
       setLoading(false);
-
-    } catch (err: any) {
-      const message = err?.message || "Failed to load aftermath data";
-      console.error("[useAftermathData] Error:", message);
-      setError(message);
-      setLoading(false);
+      return;
     }
-  }, []);
+
+    // Build request
+    const request = buildAftermathRequest(language);
+
+    if (debugMode) {
+      console.log("[useAftermathData] Request:", request);
+    }
+
+    let lastError: string | null = null;
+
+    // Retry loop
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        // Notify progress callback (for attempts 2+)
+        if (attempt > 1 && onRetryProgress) {
+          onRetryProgress(attempt, MAX_RETRIES);
+        }
+
+        console.log(`[useAftermathData] Attempt ${attempt}/${MAX_RETRIES}...`);
+
+        // Call API
+        const response = await fetch("/api/aftermath", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(request)
+        });
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+
+        const apiResult = await response.json();
+
+        // Check if this is fallback data - retry if not the last attempt
+        if (apiResult.isFallback && attempt < MAX_RETRIES) {
+          console.log(`[useAftermathData] Attempt ${attempt}/${MAX_RETRIES}: Received fallback, retrying...`);
+          lastError = "Received fallback response";
+          await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+          continue;
+        }
+
+        // Success (or final attempt with fallback)
+        const result = processApiResult(apiResult);
+
+        if (debugMode) {
+          console.log("[useAftermathData] API Response:", apiResult);
+          console.log("[useAftermathData] Calculated Ratings:", result.ratings);
+          console.log("[useAftermathData] Is Fallback:", result.isFallback);
+        }
+
+        if (result.isFallback) {
+          console.log(`[useAftermathData] Final result is fallback after ${attempt} attempts`);
+        }
+
+        setData(result);
+        setLoading(false);
+        return;
+
+      } catch (err: any) {
+        lastError = err?.message || "Failed to load aftermath data";
+        console.error(`[useAftermathData] Attempt ${attempt}/${MAX_RETRIES} failed:`, lastError);
+
+        if (attempt < MAX_RETRIES) {
+          await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+        }
+      }
+    }
+
+    // All retries exhausted
+    console.error("[useAftermathData] All retries exhausted:", lastError);
+    setError(lastError);
+    setLoading(false);
+  }, [language]);
 
   // Method to restore data from snapshot (bypasses API call)
   const restoreData = useCallback((restoredData: AftermathResponse) => {

@@ -27,12 +27,7 @@ import { MirrorImage, MirrorReflection } from "../MirrorWithReflection";
 import CompassPillsOverlay from "./CompassPillsOverlay";
 import type { CompassPill } from "../../hooks/useEventDataCollector";
 import type { CompassEffectPing } from "../MiniCompass";
-
-// Mirror shimmer effect tunables (matching MirrorQuizScreen)
-const MIRROR_SHIMMER_MIN_INTERVAL = 5000;   // 5 seconds minimum
-const MIRROR_SHIMMER_MAX_INTERVAL = 10000;  // 10 seconds maximum
-const MIRROR_SHIMMER_DURATION = 1500;       // 1.5 second sweep duration
-const MIRROR_SHIMMER_COLOR = "rgba(94, 234, 212, 0.6)";  // Cyan/teal, semi-transparent
+import { lang } from "../../i18n/lang";
 
 // Speaker avatar constants
 const AVATAR_SIZE_PX = 120; // Sized to show full face and upper body
@@ -68,8 +63,6 @@ export default function ReasoningModal({
   const [compassPills, setCompassPills] = useState<CompassPill[]>([]);
   const [thankYouMessage, setThankYouMessage] = useState<string>("");
 
-  // Mirror shimmer state (triggers animation restart)
-  const [mirrorShimmerTrigger, setMirrorShimmerTrigger] = useState(0);
 
   // Logging hooks
   const timingLogger = useTimingLogger();
@@ -129,24 +122,6 @@ export default function ReasoningModal({
     }
   }, [isOpen, timingLogger]);
 
-  // Random interval shimmer effect for mirror image
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const scheduleNextShimmer = () => {
-      const randomInterval =
-        MIRROR_SHIMMER_MIN_INTERVAL +
-        Math.random() * (MIRROR_SHIMMER_MAX_INTERVAL - MIRROR_SHIMMER_MIN_INTERVAL);
-
-      return setTimeout(() => {
-        setMirrorShimmerTrigger(prev => prev + 1);
-        scheduleNextShimmer();
-      }, randomInterval);
-    };
-
-    const timerId = scheduleNextShimmer();
-    return () => clearTimeout(timerId);
-  }, [isOpen]);
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -228,7 +203,7 @@ export default function ReasoningModal({
       }
     } else {
       // Fallback message if analysis failed
-      setThankYouMessage("Thank you for sharing your thoughts with me.");
+      setThankYouMessage(lang("REASONING_MODAL_THANK_YOU"));
       setCompassPills([]);
     }
 
@@ -241,7 +216,7 @@ export default function ReasoningModal({
       {
         day,
         actionTitle,
-        acknowledgmentText: thankYouMessage || "Thank you for sharing your thoughts with me.",
+        acknowledgmentText: thankYouMessage || lang("REASONING_MODAL_THANK_YOU"),
         hasPills: result ? result.pills.length > 0 : false
       },
       "Acknowledgment displayed to player with compass pills"
@@ -346,34 +321,19 @@ export default function ReasoningModal({
                 className="relative flex-shrink-0"
                 style={{ width: AVATAR_SIZE_PX, height: AVATAR_SIZE_PX }}
               >
-                {/* Shimmer wrapper - only contains the mirror image */}
-                <motion.div
-                  key={mirrorShimmerTrigger}
+                {/* Mirror image (shimmer disabled) */}
+                <div
                   className="pointer-events-none select-none"
                   style={{
                     width: AVATAR_SIZE_PX,
                     height: AVATAR_SIZE_PX,
                     opacity: 0.95,
                   }}
-                  animate={{
-                    filter: [
-                      "drop-shadow(0px 0px 0px transparent)",
-                      `drop-shadow(-8px -8px 12px ${MIRROR_SHIMMER_COLOR})`,
-                      `drop-shadow(0px 0px 16px ${MIRROR_SHIMMER_COLOR})`,
-                      `drop-shadow(8px 8px 12px ${MIRROR_SHIMMER_COLOR})`,
-                      "drop-shadow(0px 0px 0px transparent)",
-                    ],
-                  }}
-                  transition={{
-                    duration: MIRROR_SHIMMER_DURATION / 1000,
-                    ease: "easeInOut",
-                    times: [0, 0.25, 0.5, 0.75, 1],
-                  }}
                 >
                   <MirrorImage mirrorSize={AVATAR_SIZE_PX} mirrorAlt="Mystic mirror" />
-                </motion.div>
+                </div>
 
-                {/* Reflection overlay - outside shimmer wrapper to avoid filter interference */}
+                {/* Reflection overlay */}
                 <MirrorReflection
                   mirrorSize={AVATAR_SIZE_PX}
                   avatarUrl={avatarUrl}
@@ -381,9 +341,9 @@ export default function ReasoningModal({
               </div>
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl font-bold text-white mb-2" style={{ fontFamily: "Georgia, serif" }}>
-                  May I ask, what made you choose that?
+                  {lang("REASONING_MODAL_TITLE")}
                 </h2>
-                <p className="text-xs text-white/50 uppercase tracking-wide mb-1">Your Decision:</p>
+                <p className="text-xs text-white/50 uppercase tracking-wide mb-1">{lang("REASONING_MODAL_YOUR_DECISION")}</p>
                 <p className="text-sm font-semibold text-white/90 mb-1">{actionTitle}</p>
                 <p className="text-xs text-white/60 line-clamp-3">{actionSummary}</p>
               </div>
@@ -397,7 +357,7 @@ export default function ReasoningModal({
                 {/* Input Section */}
                 <div className="space-y-3">
                   <p className="text-sm text-purple-400/70 mb-2" dir="rtl">
-                    אפשר להקליד בעברית
+                    {lang("REASONING_MODAL_CAN_TYPE_HEBREW")}
                   </p>
 
                   <textarea
@@ -412,7 +372,7 @@ export default function ReasoningModal({
                       });
                     }}
                     onKeyPress={handleKeyPress}
-                    placeholder="Explain why you made this decision... and be honest."
+                    placeholder={lang("REASONING_MODAL_PLACEHOLDER")}
                     className="w-full h-32 px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all resize-none"
                     disabled={isSubmitting}
                     autoFocus
@@ -425,14 +385,14 @@ export default function ReasoningModal({
                     ) : !validation.isValid && reasoningText.length > 0 ? (
                       <span className="text-yellow-400">{validation.message}</span>
                     ) : (
-                      <span className="text-white/40">Minimum 10 characters</span>
+                      <span className="text-white/40">{lang("REASONING_MODAL_MIN_CHARS")}</span>
                     )}
                     <span
                       className={`${
                         reasoningText.length >= 10 ? "text-green-400" : "text-white/40"
                       }`}
                     >
-                      {reasoningText.length} characters
+                      {reasoningText.length} {lang("REASONING_MODAL_CHARACTERS")}
                     </span>
                   </div>
 
@@ -452,12 +412,12 @@ export default function ReasoningModal({
                     {isSubmitting ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        <span>Submitting...</span>
+                        <span>{lang("REASONING_MODAL_SUBMITTING")}</span>
                       </>
                     ) : (
                       <>
                         <Sparkles className="w-5 h-5" />
-                        <span>Submit Reasoning</span>
+                        <span>{lang("REASONING_MODAL_SUBMIT")}</span>
                       </>
                     )}
                   </button>
@@ -469,7 +429,7 @@ export default function ReasoningModal({
                       disabled={isSubmitting}
                       className="w-full px-6 py-2 rounded-lg font-medium text-white/60 hover:text-white hover:bg-white/5 transition-all duration-200"
                     >
-                      Skip
+                      {lang("REASONING_MODAL_SKIP")}
                     </button>
                   )}
                 </div>
@@ -517,7 +477,7 @@ export default function ReasoningModal({
                   onClick={handleCloseAfterAcknowledgment}
                   className="w-full px-6 py-3 rounded-lg font-semibold bg-purple-500 hover:bg-purple-400 text-white transition-all duration-200 mt-4"
                 >
-                  Close
+                  {lang("REASONING_MODAL_CLOSE")}
                 </button>
               </>
             )}

@@ -16,6 +16,7 @@ import { clearAllSnapshots } from "../lib/eventScreenSnapshot";
 import { loggingService } from "../lib/loggingService";
 import { useLoggingStore } from "../store/loggingStore";
 import { useLang } from "../i18n/lang";
+import { useLogger } from "../hooks/useLogger";
 
 const SUBTITLES = [
   "Choose your path. Discover yourself."
@@ -31,6 +32,7 @@ export default function BackstageScreen({
   onAchievements?: () => void;
 }) {
   const lang = useLang();
+  const logger = useLogger();
 
   const [visibleSubtitles, setVisibleSubtitles] = useState(0);
   const [showButton, setShowButton] = useState(false);
@@ -94,9 +96,52 @@ export default function BackstageScreen({
     };
   }, []);
 
+  // Helper function to request fullscreen
+  const requestFullscreen = async () => {
+    try {
+      // TypeScript interfaces for browser-specific fullscreen APIs
+      interface DocumentElementWithFullscreen extends HTMLElement {
+        webkitRequestFullscreen?: () => Promise<void>;
+        msRequestFullscreen?: () => Promise<void>;
+      }
+      
+      const elem = document.documentElement as DocumentElementWithFullscreen;
+      
+      if (elem.requestFullscreen) {
+        await elem.requestFullscreen();
+      } else if (elem.webkitRequestFullscreen) {
+        // Safari
+        await elem.webkitRequestFullscreen();
+      } else if (elem.msRequestFullscreen) {
+        // IE11
+        await elem.msRequestFullscreen();
+      }
+      
+      logger.log(
+        'fullscreen_entered',
+        'requested',
+        'User entered fullscreen mode on game start (backstage)'
+      );
+      console.log('[Backstage] Fullscreen mode activated');
+    } catch (error) {
+      // Fullscreen request can fail (user denied, browser policy, etc.)
+      // This is non-critical, so we just log it and continue
+      console.warn('[Backstage] Fullscreen request failed:', error);
+      logger.log(
+        'fullscreen_failed',
+        { error: (error as Error).message },
+        'Fullscreen request was denied or failed (backstage)'
+      );
+    }
+  };
+
   // Handle game start (no ID collection required)
   const handleStart = async () => {
     console.log("[Backstage] Starting game...");
+    
+    // Request fullscreen mode
+    await requestFullscreen();
+    
     setIsLoading(true);
 
     // Start new logging session (will respect disabled data collection)

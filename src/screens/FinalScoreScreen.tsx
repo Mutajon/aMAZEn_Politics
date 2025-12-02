@@ -10,7 +10,6 @@ import {
   Building2,
   Heart,
   Trophy,
-  RotateCcw,
   ArrowRight,
 } from "lucide-react";
 import { bgStyleWithRoleImage } from "../lib/ui";
@@ -32,6 +31,7 @@ import { useCompassStore } from "../store/compassStore";
 import { useMirrorQuizStore } from "../store/mirrorQuizStore";
 import { useHighscoreStore } from "../store/highscoreStore";
 import { useRoleProgressStore } from "../store/roleProgressStore";
+import { useLoggingStore } from "../store/loggingStore";
 import { useMirrorTop3 } from "../hooks/useMirrorTop3";
 import { useAudioManager } from "../hooks/useAudioManager";
 import { useLogger } from "../hooks/useLogger";
@@ -40,6 +40,7 @@ import { loggingService } from "../lib/loggingService";
 import type { PushFn } from "../lib/router";
 import { useLang } from "../i18n/lang";
 import { audioManager } from "../lib/audioManager";
+import { generateAvatarThumbnail } from "../lib/avatarThumbnail";
 
 type Props = {
   push: PushFn;
@@ -74,7 +75,6 @@ export default function FinalScoreScreen({ push }: Props) {
   const finalScoreSubmitted = useDilemmaStore((s) => s.finalScoreSubmitted);
   const markScoreSubmitted = useDilemmaStore((s) => s.markScoreSubmitted);
   const saveFinalScore = useDilemmaStore((s) => s.saveFinalScore);
-  const clearFinalScore = useDilemmaStore((s) => s.clearFinalScore);
 
   const character = useRoleStore((s) => s.character);
   const analysis = useRoleStore((s) => s.analysis);
@@ -292,8 +292,77 @@ export default function FinalScoreScreen({ push }: Props) {
         top3ByDimension
       );
 
+      // Add to local store first (for immediate UI feedback)
       addHighscoreEntry(entry);
       markScoreSubmitted();
+
+      // Submit to global leaderboard (non-blocking)
+      // Generate compressed thumbnail from avatar before sending
+      const submitToLeaderboard = async () => {
+        try {
+          const userId = useLoggingStore.getState().userId;
+          const gameId = useDilemmaStore.getState().gameId;
+          const sessionId = useLoggingStore.getState().sessionId;
+
+          // Generate 64x64 WebP thumbnail if avatar exists (~5-10KB vs 50-100KB full size)
+          let avatarThumbnail: string | undefined;
+          if (entry.avatarUrl) {
+            try {
+              avatarThumbnail = await generateAvatarThumbnail(entry.avatarUrl, 64, 0.7);
+              console.log(`[FinalScore] 📸 Generated avatar thumbnail: ${(avatarThumbnail.length / 1024).toFixed(1)}KB`);
+            } catch (err) {
+              console.warn("[FinalScore] ⚠️ Failed to generate thumbnail, submitting without avatar:", err);
+            }
+          }
+
+          const response = await fetch("/api/highscores/submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId,           // User ID for tracking
+              gameId,           // Game session ID (for linking to logs)
+              sessionId,        // Session ID (for linking to logs)
+              name: entry.name,
+              about: entry.about,
+              democracy: entry.democracy,
+              autonomy: entry.autonomy,
+              values: entry.values,
+              score: entry.score,
+              politicalSystem: entry.politicalSystem,
+              period: entry.period,
+              avatarUrl: avatarThumbnail  // Compressed 64x64 WebP thumbnail (~5-10KB)
+            })
+          });
+
+          const data = await response.json();
+          
+          if (data.success) {
+            console.log(`[FinalScore] ✅ Submitted to global leaderboard`);
+            console.log(`  - Global Rank: ${data.globalRank}`);
+            console.log(`  - User Rank: ${data.userRank}`);
+            console.log(`  - Personal Best: ${data.isPersonalBest ? "YES" : "NO"}`);
+            
+            logger.log(
+              "highscore_submitted",
+              { 
+                globalRank: data.globalRank, 
+                userRank: data.userRank,
+                isPersonalBest: data.isPersonalBest,
+                score: entry.score 
+              },
+              `Highscore submitted: Global #${data.globalRank}, Personal #${data.userRank}`
+            );
+          } else {
+            console.warn("[FinalScore] ⚠️ Failed to submit to global leaderboard:", data.error);
+          }
+        } catch (error) {
+          console.error("[FinalScore] ❌ Error submitting to global leaderboard:", error);
+          // Don't block user experience - local storage still works
+        }
+      };
+
+      // Submit in background (non-blocking)
+      submitToLeaderboard();
 
       const freshEntries = useHighscoreStore.getState().entries;
       const rank = findPlayerRank(entry.name, breakdown.final, freshEntries);
@@ -334,14 +403,6 @@ export default function FinalScoreScreen({ push }: Props) {
     }
   }, [finalScoreSubmitted, breakdown, character, playerRank]);
 
-  const handleReplayAnimation = () => {
-    clearFinalScore();
-    setDisplayValues(new Array(sequence.length + 1).fill(0));
-    setStep(0);
-    setRunning(true);
-    startTimeRef.current = 0;
-  };
-
   const handleBackToAftermath = () => {
     audioManager.playSfx('click-soft');
     logger.log(
@@ -362,12 +423,20 @@ export default function FinalScoreScreen({ push }: Props) {
       },
       "User clicked Play Again"
     );
+
+    // Save the score before reset for grandpa dialogue
+    const finalScore = breakdown.final;
+
     useDilemmaStore.getState().reset();
     useRoleStore.getState().reset();
     useCompassStore.getState().reset();
     useMirrorQuizStore.getState().resetAll();
     clearAllSnapshots();
-    push("/intro"); // Route to intro screen (to show fragment collection)
+
+    // Mark that player just finished a game (for grandpa's score-based message)
+    useDilemmaStore.getState().setJustFinishedGame(true, finalScore);
+
+    push("/dream"); // Route to dream screen (to show fragments and grandpa dialogue)
   };
 
   const handleVisitHallOfFame = () => {
@@ -469,14 +538,6 @@ export default function FinalScoreScreen({ push }: Props) {
           </div>
         )}
         <div className="flex flex-wrap gap-3">
-          <button
-            onClick={handleReplayAnimation}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-white/80 hover:bg-white/20 transition"
-            disabled={running}
-          >
-            <RotateCcw className="h-4 w-4" />
-            {lang("FINAL_SCORE_REPLAY_ANIMATION")}
-          </button>
           <button
             onClick={handlePlayAgain}
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-400 px-4 py-2 font-semibold text-white shadow-lg hover:from-amber-400 hover:to-orange-300 transition"

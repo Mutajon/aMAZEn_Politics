@@ -17,6 +17,7 @@ import { motion } from "framer-motion";
 import React, { useMemo, useEffect, useState } from "react";
 import { mirrorBubbleTheme as T } from "../../theme/mirrorBubbleTheme";
 import { PALETTE, type PropKey } from "../../data/compass-data";
+import { useLang } from "../../i18n/lang";
 
 type TopValue = {
   short: string;
@@ -28,7 +29,7 @@ type Props = {
 };
 
 // Mirror styling constants from MirrorCard
-const MIRROR_IMG_SRC = "/assets/images/mirror.png";
+const MIRROR_IMG_SRC = "/assets/images/mirrorBroken.png";
 const IMG_WIDTH_PX = 65;
 const IMG_OPACITY = 0.95;
 const IMG_OFFSET_X = -32;
@@ -39,6 +40,7 @@ const TYPEWRITER_DURATION_S = 2.0;
 const FADE_DURATION_S = 0.5;
 
 export default function ReflectionSection({ top3ByDimension, valuesSummary }: Props) {
+  const lang = useLang();
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -68,17 +70,24 @@ export default function ReflectionSection({ top3ByDimension, valuesSummary }: Pr
             }}
           >
             <h2 className="text-xl font-bold text-amber-400 mb-4">
-              Reflection
+              {lang("AFTERMATH_REFLECTION_TITLE")}
             </h2>
 
             {/* Compass Value Pills - Show top value per dimension */}
             <div className="grid grid-cols-2 gap-3 mb-4">
               {(["what", "whence", "how", "whither"] as PropKey[]).map(dimension => {
                 const dimensionName = {
-                  what: "WHAT",
-                  whence: "WHENCE",
-                  how: "HOW",
-                  whither: "WHITHER"
+                  what: lang("COMPASS_WHAT"),
+                  whence: lang("COMPASS_WHENCE"),
+                  how: lang("COMPASS_HOW"),
+                  whither: lang("COMPASS_WHITHER")
+                }[dimension];
+
+                const dimensionSubtitle = {
+                  what: lang("COMPASS_WHAT_SUBTITLE"),
+                  whence: lang("COMPASS_WHENCE_SUBTITLE"),
+                  how: lang("COMPASS_HOW_SUBTITLE"),
+                  whither: lang("COMPASS_WHITHER_SUBTITLE")
                 }[dimension];
 
                 // Get top value for this dimension
@@ -95,10 +104,13 @@ export default function ReflectionSection({ top3ByDimension, valuesSummary }: Pr
                     }}
                   >
                     <div
-                      className="font-bold uppercase text-xs mb-1"
+                      className="font-bold uppercase text-xs mb-0.5"
                       style={{ color: PALETTE[dimension].base }}
                     >
-                      {dimensionName}:
+                      {dimensionName}
+                    </div>
+                    <div className="text-white/50 text-xs mb-1">
+                      {dimensionSubtitle}
                     </div>
                     <div className="text-white/90 font-medium">
                       {topValue?.short || "—"}

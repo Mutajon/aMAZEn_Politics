@@ -46,13 +46,6 @@ const SHIMMER_PAUSE_S       = 3.0;          // Pause between shimmer cycles
 const SHIMMER_GLOW_COLOR    = "rgba(255, 255, 255, 0.8)";  // Bright white glow
 const SHIMMER_GLOW_SIZE     = "8px";        // Glow radius
 
-// Mirror image shimmer effect (cyan sweep)
-const MIRROR_SHIMMER_ENABLED      = true;
-const MIRROR_SHIMMER_MIN_INTERVAL = 5000;   // 5 seconds minimum
-const MIRROR_SHIMMER_MAX_INTERVAL = 10000;  // 10 seconds maximum
-const MIRROR_SHIMMER_DURATION     = 1500;   // 1.5 second sweep duration
-const MIRROR_SHIMMER_COLOR        = "rgba(94, 234, 212, 0.6)";  // Cyan/teal, semi-transparent
-
 // Spacing around the card
 const OUTER_MARGIN_Y  = "my-2";
 /* ================================================================= */
@@ -72,9 +65,6 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
   // Track typewriter reveal completion
   const [typewriterComplete, setTypewriterComplete] = useState(!TYPEWRITER_ENABLED);
 
-  // Track mirror shimmer trigger (toggles to trigger animation)
-  const [mirrorShimmerTrigger, setMirrorShimmerTrigger] = useState(0);
-
   // Reset typewriter when text changes
   useEffect(() => {
     if (TYPEWRITER_ENABLED) {
@@ -86,26 +76,6 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
       return () => clearTimeout(timer);
     }
   }, [text]);
-
-  // Random interval shimmer effect for mirror image
-  useEffect(() => {
-    if (!MIRROR_SHIMMER_ENABLED) return;
-
-    const scheduleNextShimmer = () => {
-      // Random interval between min and max
-      const randomInterval =
-        MIRROR_SHIMMER_MIN_INTERVAL +
-        Math.random() * (MIRROR_SHIMMER_MAX_INTERVAL - MIRROR_SHIMMER_MIN_INTERVAL);
-
-      return setTimeout(() => {
-        setMirrorShimmerTrigger(prev => prev + 1);
-        scheduleNextShimmer();
-      }, randomInterval);
-    };
-
-    const timerId = scheduleNextShimmer();
-    return () => clearTimeout(timerId);
-  }, []);
 
   // Removed dynamic vertical centering - using fixed offset to match speaker avatar pattern
 
@@ -168,38 +138,19 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
             height: IMG_WIDTH_PX,
           }}
         >
-          {/* Shimmer wrapper - only contains the mirror image */}
-          <motion.div
-            key={mirrorShimmerTrigger} // Key change triggers animation restart
+          {/* Mirror image (shimmer disabled) */}
+          <div
             className="pointer-events-none select-none"
             style={{
               width: IMG_WIDTH_PX,
               height: IMG_WIDTH_PX,
               opacity: IMG_OPACITY,
             }}
-            animate={
-              MIRROR_SHIMMER_ENABLED
-                ? {
-                    filter: [
-                      "drop-shadow(0px 0px 0px transparent)",
-                      `drop-shadow(-8px -8px 12px ${MIRROR_SHIMMER_COLOR})`,
-                      `drop-shadow(0px 0px 16px ${MIRROR_SHIMMER_COLOR})`,
-                      `drop-shadow(8px 8px 12px ${MIRROR_SHIMMER_COLOR})`,
-                      "drop-shadow(0px 0px 0px transparent)",
-                    ],
-                  }
-                : {}
-            }
-            transition={{
-              duration: MIRROR_SHIMMER_DURATION / 1000,
-              ease: "easeInOut",
-              times: [0, 0.25, 0.5, 0.75, 1],
-            }}
           >
             <MirrorImage mirrorSize={IMG_WIDTH_PX} mirrorAlt="Mirror" />
-          </motion.div>
+          </div>
 
-          {/* Reflection overlay - outside shimmer wrapper to avoid filter interference */}
+          {/* Reflection overlay */}
           <MirrorReflection
             mirrorSize={IMG_WIDTH_PX}
             avatarUrl={avatarUrl}

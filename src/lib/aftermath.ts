@@ -31,6 +31,7 @@ export type AftermathRequest = {
   };
   topCompassValues: TopCompassValue[]; // top 2 per dimension (8 total)
   debug?: boolean;
+  language?: string; // language code (e.g., 'en', 'he')
 };
 
 /** Rating level for autonomy and liberalism */
@@ -56,6 +57,7 @@ export type DecisionAnalysis = {
 
 /** Response from /api/aftermath */
 export type AftermathResponse = {
+  isFallback?: boolean; // true when AI generation failed and fallback data is used
   intro: string; // "After X years, [leader] died of Z."
   snapshot: SnapshotEvent[]; // 6-10 extreme events (both positive and negative)
   decisions: DecisionAnalysis[]; // one per day (7 decisions with per-decision ratings)

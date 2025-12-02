@@ -123,7 +123,7 @@ export const useSettingsStore = create<SettingsState>()(
       setDilemmasSubjectEnabled: (v) => set({ dilemmasSubjectEnabled: v }),
       toggleDilemmasSubjectEnabled: () =>
         set({ dilemmasSubjectEnabled: !get().dilemmasSubjectEnabled }),
-      dilemmasSubject: "Personal freedom",
+      dilemmasSubject: "", // Will be set from i18n on initialization
       setDilemmasSubject: (s) => set({ dilemmasSubject: s }),
 
       // NEW: Enable modifiers

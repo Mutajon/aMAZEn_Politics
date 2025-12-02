@@ -6,21 +6,28 @@
  */
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 const MAX_FRAGMENTS = 3;
 
+/** Fragment data with avatar thumbnail for display on shards */
+export interface Fragment {
+  gameId: string;
+  avatarThumbnail: string | null; // Compressed 64x64 WebP (~5-10KB)
+}
+
 export interface FragmentsState {
   firstIntro: boolean; // true on first visit, false after completing intro
-  fragmentGameIds: string[]; // Array of gameIds from pastGamesStore (max 3)
+  fragments: Fragment[]; // Array of fragments with avatars (max 3)
   hasClickedFragment: boolean; // true after user clicks a fragment for the first time
   preferredFragmentId: string | null; // gameId of preferred fragment (final selection)
 
   // Actions
   markIntroCompleted: () => void;
-  addFragment: (gameId: string) => void;
+  addFragment: (gameId: string, avatarThumbnail: string | null) => void;
   getFragmentCount: () => number;
-  getFragmentByIndex: (index: number) => string | null;
+  getFragmentByIndex: (index: number) => Fragment | null;
+  getFragmentGameIds: () => string[]; // Helper to get just gameIds for compatibility
   hasCompletedThreeFragments: () => boolean;
   clearFragments: () => void; // For testing/reset
   resetIntro: () => void; // Reset firstIntro flag for testing
@@ -33,7 +40,7 @@ export const useFragmentsStore = create<FragmentsState>()(
   persist(
     (set, get) => ({
       firstIntro: true,
-      fragmentGameIds: [],
+      fragments: [],
       hasClickedFragment: false,
       preferredFragmentId: null,
 
@@ -42,11 +49,11 @@ export const useFragmentsStore = create<FragmentsState>()(
         set({ firstIntro: false });
       },
 
-      addFragment: (gameId: string) => {
-        const current = get().fragmentGameIds;
+      addFragment: (gameId: string, avatarThumbnail: string | null) => {
+        const current = get().fragments;
 
         // Check if fragment already exists
-        if (current.includes(gameId)) {
+        if (current.some(f => f.gameId === gameId)) {
           console.warn(`[Fragments] Fragment ${gameId} already collected. Skipping.`);
           return;
         }
@@ -57,12 +64,16 @@ export const useFragmentsStore = create<FragmentsState>()(
           return;
         }
 
-        // Add the fragment
-        const updated = [...current, gameId];
-        set({ fragmentGameIds: updated });
+        // Add the fragment with avatar thumbnail
+        const newFragment: Fragment = { gameId, avatarThumbnail };
+        const updated = [...current, newFragment];
+        set({ fragments: updated });
 
+        const thumbnailSize = avatarThumbnail
+          ? `${(avatarThumbnail.length / 1024).toFixed(1)}KB`
+          : 'none';
         console.log(
-          `[Fragments] Added fragment ${gameId}. Total: ${updated.length}/${MAX_FRAGMENTS}`
+          `[Fragments] Added fragment ${gameId} (avatar: ${thumbnailSize}). Total: ${updated.length}/${MAX_FRAGMENTS}`
         );
 
         // Log if all fragments collected
@@ -72,23 +83,27 @@ export const useFragmentsStore = create<FragmentsState>()(
       },
 
       getFragmentCount: () => {
-        return get().fragmentGameIds.length;
+        return get().fragments.length;
       },
 
       getFragmentByIndex: (index: number) => {
-        const fragments = get().fragmentGameIds;
+        const fragments = get().fragments;
         if (index < 0 || index >= fragments.length) {
           return null;
         }
         return fragments[index];
       },
 
+      getFragmentGameIds: () => {
+        return get().fragments.map(f => f.gameId);
+      },
+
       hasCompletedThreeFragments: () => {
-        return get().fragmentGameIds.length >= MAX_FRAGMENTS;
+        return get().fragments.length >= MAX_FRAGMENTS;
       },
 
       clearFragments: () => {
-        set({ fragmentGameIds: [] });
+        set({ fragments: [] });
         console.log("[Fragments] Cleared all fragments");
       },
 
@@ -114,13 +129,34 @@ export const useFragmentsStore = create<FragmentsState>()(
       },
     }),
     {
-      name: "amaze-politics-fragments-v1", // localStorage key
+      name: "amaze-politics-fragments-v2", // Bumped version for migration
+      version: 2,
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         firstIntro: state.firstIntro,
-        fragmentGameIds: state.fragmentGameIds.slice(0, MAX_FRAGMENTS),
+        fragments: state.fragments.slice(0, MAX_FRAGMENTS),
         hasClickedFragment: state.hasClickedFragment,
         preferredFragmentId: state.preferredFragmentId,
       }),
+      migrate: (persistedState: unknown, version: number) => {
+        const state = persistedState as Record<string, unknown>;
+
+        // Migrate from v1 (fragmentGameIds) to v2 (fragments with avatars)
+        if (version < 2 && state.fragmentGameIds && Array.isArray(state.fragmentGameIds)) {
+          console.log("[Fragments] Migrating from v1 to v2 (adding avatar support)");
+          const migratedFragments: Fragment[] = (state.fragmentGameIds as string[]).map(gameId => ({
+            gameId,
+            avatarThumbnail: null, // No thumbnails for old data
+          }));
+          return {
+            ...state,
+            fragments: migratedFragments,
+            fragmentGameIds: undefined, // Remove old field
+          };
+        }
+
+        return state;
+      },
     }
   )
 );

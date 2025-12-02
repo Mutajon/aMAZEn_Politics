@@ -13,6 +13,7 @@ import { getPredefinedRole } from "../data/predefinedRoles";
 import { useLogger } from "../hooks/useLogger";
 import { useNavigationGuard } from "../hooks/useNavigationGuard";
 import { audioManager } from "../lib/audioManager";
+import { generateAvatarThumbnail } from "../lib/avatarThumbnail";
 
 /** Small built-in placeholder (no asset file needed). */
 const DEFAULT_AVATAR_DATA_URL =
@@ -144,6 +145,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
   const selectedRole = useRoleStore((s) => s.selectedRole);
   const character = useRoleStore((s) => s.character);
   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
+  const playerName = useRoleStore((s) => s.playerName); // Player name from DreamScreen
   const setCharacter = useRoleStore((s) => s.setCharacter);
   const updateCharacter = useRoleStore((s) => s.updateCharacter);
   const generateImages = useSettingsStore((s) => s.generateImages);
@@ -152,7 +154,8 @@ export default function NameScreen({ push }: { push: PushFn }) {
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
 
   const [gender, setGender] = useState<"male" | "female" | "any">(character?.gender || "any");
-  const [name, setName] = useState<string>(character?.name || "");
+  // Player name comes from DreamScreen and is constant - not changed by gender selection
+  const name = playerName || character?.name || "";
   const [physical, setPhysical] = useState<string>(character?.description || "");
   const [trio, setTrio] = useState<Trio | null>(null);
   const [bgObject, setBgObject] = useState<string>(character?.bgObject || "");
@@ -194,7 +197,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
 
       if (predefined) {
         console.log("[NameScreen] Using predefined characters for role:", selectedRole);
-        // Use predefined characters - no AI processing needed
+        // Use predefined characters for physical description suggestions
         const data: Trio = {
           male: predefined.male,
           female: predefined.female,
@@ -202,7 +205,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
         };
         setTrio(data);
         const pick = data[gender] || data.any;
-        setName(lang(pick?.nameKey || ""));
+        // Name comes from playerName (DreamScreen), only update physical description
         setPhysical(extractPhysical(lang(pick?.promptKey || "")));
         setBgObject((prev) => prev || suggestBackgroundObject(selectedRole));
       } else {
@@ -211,7 +214,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
         const data: Trio = GENERIC_CHARACTERS;
         setTrio(data);
         const pick = data[gender] || data.any;
-        setName(lang(pick?.nameKey || ""));
+        // Name comes from playerName (DreamScreen), only update physical description
         setPhysical(extractPhysical(lang(pick?.promptKey || "")));
         setBgObject((prev) => prev || suggestBackgroundObject(selectedRole));
       }
@@ -234,7 +237,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
   useEffect(() => {
     if (!trio) return;
     const pick = trio[gender] || trio.any;
-    setName(lang(pick?.nameKey || ""));
+    // Name comes from playerName (DreamScreen), only update physical description on gender change
     setPhysical(extractPhysical(lang(pick?.promptKey || "")));
     setBgObject((prev) => prev || suggestBackgroundObject(selectedRole || ""));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -279,8 +282,20 @@ export default function NameScreen({ push }: { push: PushFn }) {
             if ((data as any)?.dataUrl) {
               if (req === avatarReqRef.current) {
                 console.log(`[NameScreen] Avatar generated successfully on attempt ${attempt}`);
-                setAvatarUrl((data as any).dataUrl);
-                updateCharacter({ avatarUrl: (data as any).dataUrl });
+                const avatarDataUrl = (data as any).dataUrl;
+                setAvatarUrl(avatarDataUrl);
+                updateCharacter({ avatarUrl: avatarDataUrl });
+
+                // Generate compressed thumbnail for fragment storage (~5-10KB)
+                try {
+                  const thumbnail = await generateAvatarThumbnail(avatarDataUrl, 64, 0.7);
+                  useRoleStore.getState().setPendingAvatarThumbnail(thumbnail);
+                  console.log(`[NameScreen] Generated avatar thumbnail: ${(thumbnail.length / 1024).toFixed(1)}KB`);
+                } catch (thumbnailErr) {
+                  console.warn("[NameScreen] Failed to generate thumbnail:", thumbnailErr);
+                  useRoleStore.getState().setPendingAvatarThumbnail(null);
+                }
+
                 setAvatarLoading(false);
               }
               return; // Success!
@@ -306,6 +321,17 @@ export default function NameScreen({ push }: { push: PushFn }) {
         console.log("[NameScreen] All avatar generation attempts failed, using fallback");
         setAvatarUrl(DEFAULT_AVATAR_DATA_URL);
         updateCharacter({ avatarUrl: DEFAULT_AVATAR_DATA_URL });
+
+        // Generate compressed thumbnail for fallback avatar too
+        try {
+          const thumbnail = await generateAvatarThumbnail(DEFAULT_AVATAR_DATA_URL, 64, 0.7);
+          useRoleStore.getState().setPendingAvatarThumbnail(thumbnail);
+          console.log(`[NameScreen] Generated fallback avatar thumbnail: ${(thumbnail.length / 1024).toFixed(1)}KB`);
+        } catch (thumbnailErr) {
+          console.warn("[NameScreen] Failed to generate fallback thumbnail:", thumbnailErr);
+          useRoleStore.getState().setPendingAvatarThumbnail(null);
+        }
+
         setAvatarLoading(false);
       }
     })();
@@ -415,18 +441,13 @@ export default function NameScreen({ push }: { push: PushFn }) {
                 </label>
               </div>
 
-              <div className="mt-6">
-                <div className="text-white/90 mb-2">{lang("NAME_LABEL")}</div>
-                <input
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    logger.log('character_name', e.target.value, 'User entered character name');
-                  }}
-                  placeholder={lang("NAME_PLACEHOLDER")}
-                  className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
-                />
-              </div>
+              {/* Player name display (entered in DreamScreen) */}
+              {name && (
+                <div className="mt-6 text-center">
+                  <div className="text-white/70 text-sm mb-1">{lang("PLAYER_NAME")}</div>
+                  <div className="text-xl font-semibold text-amber-300">{name}</div>
+                </div>
+              )}
 
               <div className="mt-6">
                 <div className="text-white/90 mb-2">{lang("DESCRIPTION_LABEL")}</div>
@@ -444,10 +465,10 @@ export default function NameScreen({ push }: { push: PushFn }) {
 
               <div className="mt-6 flex justify-center">
                 <button
-                  disabled={loading || !name.trim() || !physical.trim()}
+                  disabled={loading || !physical.trim()}
                   onClick={onContinue}
                   className={`rounded-2xl px-5 py-3 font-semibold text-lg shadow-lg ${
-                    !loading && name.trim() && physical.trim()
+                    !loading && physical.trim()
                       ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] hover:scale-[1.02] active:scale-[0.98]"
                       : "bg-white/10 text-white/60 cursor-not-allowed"
                   }`}
