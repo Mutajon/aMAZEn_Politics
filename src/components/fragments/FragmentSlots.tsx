@@ -28,7 +28,7 @@ export default function FragmentSlots({
   onAnimationComplete,
   playAppearSound = false,
 }: FragmentSlotsProps) {
-  const fragmentGameIds = useFragmentsStore((s) => s.fragmentGameIds);
+  const fragmentGameIds = useFragmentsStore((s) => s.getFragmentGameIds());
   const hasClickedFragment = useFragmentsStore((s) => s.hasClickedFragment);
   const markFragmentClicked = useFragmentsStore((s) => s.markFragmentClicked);
   const pastGames = usePastGamesStore((s) => s.getGames());

@@ -91,11 +91,11 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
   // Enhanced handlers with navigation
   const handleLooksGoodWithNavigation = () => {
     handleLooksGood();
-    // Navigate to difficulty screen if modifiers are enabled, otherwise go to compass intro
+    // Navigate to difficulty screen if modifiers are enabled, otherwise go to mirror dialogue
     if (enableModifiers) {
       push("/difficulty");
     } else {
-      push("/compass-intro");
+      push("/compass-mirror");
     }
   };
 

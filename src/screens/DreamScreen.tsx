@@ -5,6 +5,13 @@ import type { PushFn } from "../lib/router";
 import { useLogger } from "../hooks/useLogger";
 import { useLang, getCurrentLanguage } from "../i18n/lang";
 import { useRoleStore } from "../store/roleStore";
+import { useFragmentsStore } from "../store/fragmentsStore";
+import { useDilemmaStore } from "../store/dilemmaStore";
+import { usePastGamesStore } from "../store/pastGamesStore";
+import { PREDEFINED_ROLES_ARRAY, getRoleImagePaths } from "../data/predefinedRoles";
+import { audioManager } from "../lib/audioManager";
+import { ShardWithAvatar } from "../components/fragments/ShardWithAvatar";
+import { ThreeShardComparison } from "../components/fragments/ThreeShardComparison";
 
 // Background style using etherPlace.jpg (same as IntroScreen)
 const etherPlaceBackground = {
@@ -142,7 +149,7 @@ function validateTrait(text: string): string | null {
   return null;
 }
 
-type Phase = "intro" | "name" | "trait" | "mirror" | "mirrorBroken" | "grandpaDialogue";
+type Phase = "intro" | "name" | "trait" | "mirror" | "mirrorBroken" | "grandpaDialogue" | "returnVisitor";
 
 // Grandpa dialogue lines
 const GRANDPA_DIALOGUES = [
@@ -157,16 +164,51 @@ const GRANDPA_DIALOGUES = [
 // Typewriter speed in ms per character
 const TYPEWRITER_SPEED = 25;
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// Shard to role mapping: Athens (index 0), North America (index 3), Mars (index 9)
+const SHARD_ROLES = [
+  PREDEFINED_ROLES_ARRAY[0],  // Shard 0 → Athens
+  PREDEFINED_ROLES_ARRAY[3],  // Shard 1 → North America (locked)
+  PREDEFINED_ROLES_ARRAY[9],  // Shard 2 → Mars (locked)
+];
+
 export default function DreamScreen({ push }: { push: PushFn }) {
-  // Note: `push` is not used yet - will be used in future step to navigate after trait selection
   const logger = useLogger();
   const lang = useLang();
+
+  // Role store actions
   const setPlayerName = useRoleStore((s) => s.setPlayerName);
   const setPlayerTrait = useRoleStore((s) => s.setPlayerTrait);
+  const setRole = useRoleStore((s) => s.setRole);
+  const setAnalysis = useRoleStore((s) => s.setAnalysis);
+  const setRoleBackgroundImage = useRoleStore((s) => s.setRoleBackgroundImage);
+  const setRoleContext = useRoleStore((s) => s.setRoleContext);
+  const setRoleDescription = useRoleStore((s) => s.setRoleDescription);
+  const setSupportProfiles = useRoleStore((s) => s.setSupportProfiles);
+  const setRoleScope = useRoleStore((s) => s.setRoleScope);
+  const setStoryThemes = useRoleStore((s) => s.setStoryThemes);
 
-  // Phase state
-  const [phase, setPhase] = useState<Phase>("intro");
+  // Fragment store - for avatar thumbnails on shards
+  const fragments = useFragmentsStore((s) => s.fragments);
+  const firstIntro = useFragmentsStore((s) => s.firstIntro);
+  const markIntroCompleted = useFragmentsStore((s) => s.markIntroCompleted);
+
+  // Dilemma store - for return visitor detection
+  const justFinishedGame = useDilemmaStore((s) => s.justFinishedGame);
+  const lastGameScore = useDilemmaStore((s) => s.lastGameScore);
+  const clearJustFinishedGame = useDilemmaStore((s) => s.clearJustFinishedGame);
+
+  // Past games store - for three-way comparison popup
+  const pastGames = usePastGamesStore((s) => s.getGames());
+
+  // Determine if this is a return visitor
+  const isReturnVisitor = !firstIntro || justFinishedGame;
+  const fragmentCount = fragments.length;
+
+  // Phase state - start with return visitor phase if applicable
+  const [phase, setPhase] = useState<Phase>(() => {
+    if (isReturnVisitor) return "returnVisitor";
+    return "intro";
+  });
   const [showArrow, setShowArrow] = useState(false);
 
   // Name state
@@ -179,7 +221,7 @@ export default function DreamScreen({ push }: { push: PushFn }) {
   const [customTraitText, setCustomTraitText] = useState("");
   const [traitError, setTraitError] = useState<string | null>(null);
   const [shortTrait, setShortTrait] = useState<string | null>(null);
-  const [shortTraitHe, setShortTraitHe] = useState<string | null>(null);
+  const [_shortTraitHe, setShortTraitHe] = useState<string | null>(null); // Kept for logging, display always uses English
   const [extractingTrait, setExtractingTrait] = useState(false);
 
   // Grandpa dialogue state
@@ -187,6 +229,20 @@ export default function DreamScreen({ push }: { push: PushFn }) {
   const [showShards, setShowShards] = useState(false);
   const [typingComplete, setTypingComplete] = useState(false);
   const [displayedText, setDisplayedText] = useState("");
+
+  // Return visitor state
+  const [returnGrandpaVisible, setReturnGrandpaVisible] = useState(false);
+  const [returnDialogueKey, setReturnDialogueKey] = useState<string | null>(null);
+  const [returnTypingComplete, setReturnTypingComplete] = useState(false);
+  const [returnDisplayedText, setReturnDisplayedText] = useState("");
+
+  // Three-way comparison popup state
+  const [showThreeWayComparison, setShowThreeWayComparison] = useState(false);
+  const [showPreferenceButtons, setShowPreferenceButtons] = useState(false);
+
+  // Single shard popup state (for clicking completed shard when fragmentCount < 3)
+  const [showSingleShardPopup, setShowSingleShardPopup] = useState(false);
+  const [singleGameForPopup, setSingleGameForPopup] = useState<typeof pastGames[0] | null>(null);
 
   // Show arrow after intro text appears
   const handleIntroTextComplete = () => {
@@ -352,6 +408,88 @@ export default function DreamScreen({ push }: { push: PushFn }) {
     return () => clearInterval(interval);
   }, [phase, dialogueStep, lang]);
 
+  // Effect for return visitor phase - determine dialogue and animate grandpa
+  useEffect(() => {
+    if (phase !== "returnVisitor") return;
+
+    // Determine dialogue message based on context
+    let dialogueKey: string;
+
+    if (justFinishedGame && fragmentCount === 3) {
+      // Just finished 3rd shard - ask which version they prefer
+      dialogueKey = "GRANDPA_ALL_COMPLETE";
+      setShowPreferenceButtons(true);
+    } else if (justFinishedGame && lastGameScore !== null) {
+      // Just finished a game - show score-based message
+      const goalScore = 1000; // Target score for comparison
+      const percentage = (lastGameScore / goalScore) * 100;
+
+      if (percentage <= 30) dialogueKey = "GRANDPA_SCORE_TERRIBLE";
+      else if (percentage <= 50) dialogueKey = "GRANDPA_SCORE_POOR";
+      else if (percentage <= 70) dialogueKey = "GRANDPA_SCORE_OK";
+      else if (percentage <= 90) dialogueKey = "GRANDPA_SCORE_GOOD";
+      else if (percentage <= 100) dialogueKey = "GRANDPA_SCORE_EXCELLENT";
+      else dialogueKey = "GRANDPA_SCORE_INCREDIBLE";
+
+      setShowPreferenceButtons(false);
+    } else if (fragmentCount === 3) {
+      // Returning from splash with all 3 collected
+      dialogueKey = "GRANDPA_ALREADY_COLLECTED";
+      setShowPreferenceButtons(false);
+    } else {
+      // Returning with < 3 collected
+      dialogueKey = "GRANDPA_READY_NEXT";
+      setShowPreferenceButtons(false);
+    }
+
+    setReturnDialogueKey(dialogueKey);
+
+    // Animate grandpa in after short delay
+    const timer = setTimeout(() => {
+      setReturnGrandpaVisible(true);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [phase, justFinishedGame, lastGameScore, fragmentCount]);
+
+  // Typewriter effect for return visitor dialogue
+  useEffect(() => {
+    if (phase !== "returnVisitor" || !returnDialogueKey || !returnGrandpaVisible) return;
+
+    const fullText = lang(returnDialogueKey);
+    if (!fullText) return;
+
+    // Wait for grandpa tween to complete (~600ms) before starting typewriter
+    const startDelay = setTimeout(() => {
+      setReturnTypingComplete(false);
+      setReturnDisplayedText("");
+
+      let currentIndex = 0;
+      const interval = setInterval(() => {
+        if (currentIndex < fullText.length) {
+          setReturnDisplayedText(fullText.slice(0, currentIndex + 1));
+          currentIndex++;
+        } else {
+          clearInterval(interval);
+          setReturnTypingComplete(true);
+        }
+      }, TYPEWRITER_SPEED);
+
+      return () => clearInterval(interval);
+    }, 600);
+
+    return () => clearTimeout(startDelay);
+  }, [phase, returnDialogueKey, returnGrandpaVisible, lang]);
+
+  // Handler for return visitor dialogue click (skip typing)
+  const handleReturnDialogueClick = () => {
+    if (!returnTypingComplete && returnDialogueKey) {
+      const fullText = lang(returnDialogueKey);
+      setReturnDisplayedText(fullText);
+      setReturnTypingComplete(true);
+    }
+  };
+
   // Handler for dialogue bubble click
   const handleDialogueClick = () => {
     if (!typingComplete) {
@@ -383,10 +521,81 @@ export default function DreamScreen({ push }: { push: PushFn }) {
     }
   };
 
-  // Handler for shard click
-  const handleShardClick = () => {
-    logger.log("dream_shard_clicked", { shard: 0 }, "Player clicked first shard");
-    // Navigation TBD in future task
+  // Handler for shard click - behavior depends on shard state
+  const handleShardClick = (shardIndex: number) => {
+    // Play click sound
+    audioManager.playSfx("click-soft");
+
+    // If all 3 fragments collected, any click opens three-way comparison
+    if (fragmentCount === 3) {
+      logger.log("dream_shard_clicked_comparison", { shard: shardIndex }, "Player clicked shard, opening three-way comparison");
+      setShowThreeWayComparison(true);
+      return;
+    }
+
+    // Completed shard (shardIndex < fragmentCount) → open single popup summary
+    if (shardIndex < fragmentCount) {
+      logger.log("dream_shard_clicked_completed", { shard: shardIndex }, "Player clicked completed shard");
+
+      // Find the game data for this fragment
+      const fragment = fragments[shardIndex];
+      if (fragment) {
+        const game = pastGames.find(g => g.gameId === fragment.gameId);
+        if (game) {
+          setSingleGameForPopup(game);
+          setShowSingleShardPopup(true);
+        }
+      }
+      return;
+    }
+
+    // Playable shard (shardIndex === fragmentCount) → start new game with that role
+    if (shardIndex === fragmentCount) {
+      const roleData = SHARD_ROLES[shardIndex];
+      if (!roleData) return;
+
+      // Mark intro as complete (only matters on first visit)
+      if (firstIntro) {
+        markIntroCompleted();
+      }
+
+      // Clear the justFinishedGame flag
+      clearJustFinishedGame();
+
+      // Set all role data in store (same as RoleSelectionScreen)
+      setRole(roleData.legacyKey);
+      setAnalysis(roleData.powerDistribution);
+      setRoleBackgroundImage(getRoleImagePaths(roleData.imageId).full);
+      setRoleContext(lang(roleData.titleKey), lang(roleData.introKey), roleData.year);
+      setRoleDescription(lang(roleData.youAreKey));
+      setSupportProfiles(roleData.powerDistribution.supportProfiles ?? null);
+      setRoleScope(roleData.roleScope);
+      setStoryThemes(roleData.storyThemes);
+
+      logger.log("dream_shard_clicked_playable", { shard: shardIndex, role: roleData.legacyKey }, "Player clicked playable shard, starting new game");
+
+      // Navigate to role intro screen
+      push("/role-intro");
+      return;
+    }
+
+    // Locked shard → do nothing (shouldn't reach here due to isLocked prop)
+    logger.log("dream_shard_clicked_locked", { shard: shardIndex }, "Player clicked locked shard (ignored)");
+  };
+
+  // Handler for preference selection in three-way comparison
+  const handlePreferenceSelected = (gameId: string) => {
+    logger.log("dream_preference_selected", { gameId }, "Player selected preferred game version");
+    // TODO: Store preference in fragmentsStore
+    setShowThreeWayComparison(false);
+    setShowPreferenceButtons(false);
+    clearJustFinishedGame();
+  };
+
+  // Close three-way comparison
+  const handleCloseComparison = () => {
+    setShowThreeWayComparison(false);
+    clearJustFinishedGame();
   };
 
   // Render text with emphasis for *text* patterns (black + bold on white background)
@@ -854,56 +1063,21 @@ export default function DreamScreen({ push }: { push: PushFn }) {
                 >
                   {[0, 1, 2].map((index) => {
                     const shardsClickable = dialogueStep >= 5 && typingComplete;
+                    const fragment = fragments[index];
+                    // First intro: only shard 0 is playable, rest are locked
+                    const isCompleted = false; // No completed shards on first intro
+                    const isPlayable = index === 0 && shardsClickable;
+                    const isLocked = index > 0;
                     return (
-                      <motion.div
+                      <ShardWithAvatar
                         key={index}
-                        className={`relative ${!shardsClickable ? "pointer-events-none" : ""}`}
-                        initial={{ y: -200, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        transition={{
-                          type: "spring",
-                          damping: 20,
-                          stiffness: 300,
-                          delay: index * 0.15,
-                        }}
-                        onClick={() => index === 0 && shardsClickable && handleShardClick()}
-                      >
-                        <img
-                          src="/assets/images/mirrorShard.png"
-                          alt="Mirror shard"
-                          className={`w-20 sm:w-24 md:w-28 h-auto ${
-                            index === 0 && shardsClickable
-                              ? "cursor-pointer hover:scale-105 transition-transform"
-                              : ""
-                          }`}
-                        />
-                        {/* Lock overlay for shards 1 & 2 */}
-                        {index > 0 && (
-                          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center rounded-lg">
-                            <motion.span
-                              className="text-3xl sm:text-4xl"
-                              animate={{ scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
-                              transition={{ duration: 2, repeat: Infinity }}
-                            >
-                              🔒
-                            </motion.span>
-                          </div>
-                        )}
-                        {/* Hand click indicator for first shard */}
-                        {index === 0 && shardsClickable && (
-                          <motion.div
-                            className="absolute -bottom-10 left-1/2 -translate-x-1/2 text-3xl"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1, y: [0, 5, 0] }}
-                            transition={{
-                              opacity: { duration: 0.3 },
-                              y: { duration: 1, repeat: Infinity }
-                            }}
-                          >
-                            👆
-                          </motion.div>
-                        )}
-                      </motion.div>
+                        avatarUrl={fragment?.avatarThumbnail}
+                        isCompleted={isCompleted}
+                        isPlayable={isPlayable}
+                        isLocked={isLocked}
+                        onClick={() => handleShardClick(index)}
+                        index={index}
+                      />
                     );
                   })}
                 </motion.div>
@@ -969,7 +1143,119 @@ export default function DreamScreen({ push }: { push: PushFn }) {
             </motion.div>
           </motion.div>
         )}
+
+        {/* Return visitor phase - grandpa tween in with dialogue and shards */}
+        {phase === "returnVisitor" && (
+          <motion.div
+            key="returnVisitor"
+            className="absolute inset-0 flex flex-col"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            {/* Centered content area - shards with proper states */}
+            <div className="flex-1 flex items-center justify-center">
+              <motion.div
+                className="flex gap-4 sm:gap-6 justify-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                {[0, 1, 2].map((index) => {
+                  const fragment = fragments[index];
+                  // Shard states based on fragment count
+                  const isCompleted = index < fragmentCount;
+                  const isPlayable = index === fragmentCount && returnTypingComplete;
+                  const isLocked = index > fragmentCount;
+                  return (
+                    <ShardWithAvatar
+                      key={index}
+                      avatarUrl={fragment?.avatarThumbnail}
+                      isCompleted={isCompleted}
+                      isPlayable={isPlayable}
+                      isLocked={isLocked}
+                      onClick={() => handleShardClick(index)}
+                      index={index}
+                    />
+                  );
+                })}
+              </motion.div>
+            </div>
+
+            {/* Grandpa sprite - tweens in from left */}
+            {returnGrandpaVisible && (
+              <motion.img
+                src="/assets/images/grandpa.png"
+                alt="Grandpa"
+                className="absolute bottom-0 left-2 sm:left-6 md:left-10 w-28 sm:w-36 md:w-44 h-auto z-10"
+                initial={{ x: "-100%", opacity: 0, scaleX: -1 }}
+                animate={{ x: 0, opacity: 1, scaleX: -1 }}
+                transition={{ type: "spring", stiffness: 200, damping: 20 }}
+              />
+            )}
+
+            {/* Speech bubble with tail - only shown after grandpa is visible */}
+            {returnGrandpaVisible && returnDisplayedText && (
+              <motion.div
+                className="absolute bottom-32 sm:bottom-40 left-24 sm:left-36 md:left-48 max-w-[65%] sm:max-w-[55%] z-20 cursor-pointer"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: "spring", stiffness: 260, damping: 20, delay: 0.3 }}
+                onClick={handleReturnDialogueClick}
+              >
+                {/* Bubble - white background, gray text */}
+                <div
+                  className="relative px-5 py-4 rounded-2xl text-gray-700 text-base sm:text-lg leading-relaxed"
+                  style={{
+                    background: "white",
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
+                  }}
+                >
+                  {/* Tail pointing LEFT toward Grandpa */}
+                  <svg
+                    className="absolute -left-3 bottom-4 w-6 h-6"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <path
+                      d="M24 0 L0 12 L24 24 Z"
+                      fill="white"
+                    />
+                  </svg>
+
+                  {/* Dialogue text with typewriter effect */}
+                  <span>{renderDialogueText(returnDisplayedText)}</span>
+                  {!returnTypingComplete && (
+                    <span className="inline-block w-0.5 h-5 bg-gray-500 ml-1 animate-pulse" />
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </motion.div>
+        )}
       </AnimatePresence>
+
+      {/* Three-way comparison popup */}
+      {showThreeWayComparison && fragmentCount === 3 && (
+        <ThreeShardComparison
+          games={pastGames.slice(0, 3)}
+          onClose={handleCloseComparison}
+          showPreferenceButtons={showPreferenceButtons}
+          onPreferenceSelected={handlePreferenceSelected}
+        />
+      )}
+
+      {/* Single shard popup - shows one game card when clicking completed shard */}
+      {showSingleShardPopup && singleGameForPopup && (
+        <ThreeShardComparison
+          games={[singleGameForPopup]}
+          onClose={() => {
+            setShowSingleShardPopup(false);
+            setSingleGameForPopup(null);
+          }}
+          showPreferenceButtons={false}
+        />
+      )}
 
       {/* Custom trait modal */}
       <AnimatePresence>

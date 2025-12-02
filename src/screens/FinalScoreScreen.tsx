@@ -433,12 +433,20 @@ export default function FinalScoreScreen({ push }: Props) {
       },
       "User clicked Play Again"
     );
+
+    // Save the score before reset for grandpa dialogue
+    const finalScore = breakdown.final;
+
     useDilemmaStore.getState().reset();
     useRoleStore.getState().reset();
     useCompassStore.getState().reset();
     useMirrorQuizStore.getState().resetAll();
     clearAllSnapshots();
-    push("/intro"); // Route to intro screen (to show fragment collection)
+
+    // Mark that player just finished a game (for grandpa's score-based message)
+    useDilemmaStore.getState().setJustFinishedGame(true, finalScore);
+
+    push("/dream"); // Route to dream screen (to show fragments and grandpa dialogue)
   };
 
   const handleVisitHallOfFame = () => {

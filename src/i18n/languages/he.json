@@ -1213,5 +1213,25 @@
   "DREAM_GRANDPA_4": "כל שבר משונן שתיגע בו הוא דלת, פורטל לזמן אחר, למקום אחר, ל*פוליטיקה אחרת*.",
   "DREAM_GRANDPA_5": "הרם אחד, הסתכל בהשתקפות. הגיע הזמן לראות מי אתה באמת.",
   "DREAM_GRANDPA_6": "האם אתה אמיץ מספיק לצעוד דרכו ולהפוך באמת לעצמך?",
-  "DREAM_CLICK_CONTINUE_BUBBLE": "לחץ להמשך"
+  "DREAM_CLICK_CONTINUE_BUBBLE": "לחץ להמשך",
+
+  "GRANDPA_SCORE_TERRIBLE": "זה ממש לא הלך טוב... אבל היי, זה קורה! מוכן לאסוף את השבר הבא?",
+  "GRANDPA_SCORE_POOR": "ובכן, זה יכול היה להיות יותר טוב... מוכן לאסוף את השבר הבא?",
+  "GRANDPA_SCORE_OK": "ובכן, זה הלך בסדר. מוכן לאסוף את השבר הבא?",
+  "GRANDPA_SCORE_GOOD": "עשית טוב! מוכן לאסוף את השבר הבא?",
+  "GRANDPA_SCORE_EXCELLENT": "עשית מצוין! כל הכבוד. מוכן לאסוף את השבר הבא?",
+  "GRANDPA_SCORE_INCREDIBLE": "זה היה מדהים! מוכן לאסוף את השבר הבא?",
+  "GRANDPA_ALL_COMPLETE": "כל הכבוד! סיימת לאסוף את השברים, ואת עצמך. איזו גרסה של עצמך אהבת הכי הרבה?",
+  "GRANDPA_ALREADY_COLLECTED": "כבר אספת את כל השברים הזמינים. אתה יכול ללחוץ עליהם כדי להיזכר.",
+  "GRANDPA_READY_NEXT": "מוכן לאסוף את השבר הבא?",
+
+  "THREE_SHARD_TITLE": "שלושת העצמים שלך",
+  "SHARD_LABEL_ATHENS": "אתונה",
+  "SHARD_LABEL_NORTH_AMERICA": "צפון אמריקה",
+  "SHARD_LABEL_MARS": "מאדים",
+  "TOP_VALUES": "ערכים מובילים",
+  "SUPPORT_VALUES": "ערכי תמיכה",
+  "SELF_EVALUATION": "הערכה עצמית",
+  "SHARD_NOT_YET_EARNED": "טרם הושג",
+  "I_PREFER_THIS_VERSION": "אני מעדיף את הגרסה הזו"
 }

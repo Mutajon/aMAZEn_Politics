@@ -1111,5 +1111,25 @@
   "DREAM_GRANDPA_4": "Every jagged piece you touch is a door, a portal to a different time, a different place, a *different politics*.",
   "DREAM_GRANDPA_5": "Pick one up, look into the reflection. It is time to see who you really are.",
   "DREAM_GRANDPA_6": "Are you brave enough to step through and truly become you?",
-  "DREAM_CLICK_CONTINUE_BUBBLE": "Click to continue"
+  "DREAM_CLICK_CONTINUE_BUBBLE": "Click to continue",
+
+  "GRANDPA_SCORE_TERRIBLE": "That really didn't go very well... but hey, it happens! Ready to collect the next shard?",
+  "GRANDPA_SCORE_POOR": "Well, I guess that could have gone better... Ready to collect the next shard?",
+  "GRANDPA_SCORE_OK": "Well, that went ok. Ready to collect the next shard?",
+  "GRANDPA_SCORE_GOOD": "You did good! Ready to collect the next shard?",
+  "GRANDPA_SCORE_EXCELLENT": "You did excellent! Good for you. Ready to collect the next shard?",
+  "GRANDPA_SCORE_INCREDIBLE": "That was incredible! Ready to collect the next shard?",
+  "GRANDPA_ALL_COMPLETE": "Good job! You finished recollecting the shards, and yourself. Which version of yourself did you like the most?",
+  "GRANDPA_ALREADY_COLLECTED": "You have already collected all available shards. You can click them to remember.",
+  "GRANDPA_READY_NEXT": "Ready to collect the next shard?",
+
+  "THREE_SHARD_TITLE": "Your Three Selves",
+  "SHARD_LABEL_ATHENS": "Athens",
+  "SHARD_LABEL_NORTH_AMERICA": "North America",
+  "SHARD_LABEL_MARS": "Mars",
+  "TOP_VALUES": "Top Values",
+  "SUPPORT_VALUES": "Support Values",
+  "SELF_EVALUATION": "Self Evaluation",
+  "SHARD_NOT_YET_EARNED": "Not yet earned",
+  "I_PREFER_THIS_VERSION": "I prefer this version"
 }

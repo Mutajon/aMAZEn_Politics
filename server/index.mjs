@@ -2846,7 +2846,7 @@ app.post("/api/aftermath", async (req, res) => {
         historyLength: dilemmaHistory?.length,
         finalSupport,
         topCompassValues,
-        language: languageCode
+        language
       });
     }
 

@@ -228,10 +228,10 @@ export default function GoalsSelectionScreen({ push }: Props) {
       return;
     }
 
-    console.log("[GoalsSelectionScreen] 🚀 Calling push('/compass-intro')...");
+    console.log("[GoalsSelectionScreen] 🚀 Calling push('/compass-mirror')...");
     try {
-      push("/compass-intro");
-      console.log("[GoalsSelectionScreen] ✅ push('/compass-intro') called successfully");
+      push("/compass-mirror");
+      console.log("[GoalsSelectionScreen] ✅ push('/compass-mirror') called successfully");
     } catch (error) {
       console.error("[GoalsSelectionScreen] ❌ push threw an error:", error);
     }

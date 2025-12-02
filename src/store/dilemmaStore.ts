@@ -82,6 +82,10 @@ type DilemmaState = {
   // Self-judgment (Day 8 aftermath questionnaire)
   selfJudgment: string | null;  // Player's self-assessment of their choices
 
+  // Return-to-dream tracking (for grandpa dialogue)
+  justFinishedGame: boolean;  // True when player clicked "Play Again" from FinalScoreScreen
+  lastGameScore: number | null;  // Final score from just-finished game (for score-based grandpa message)
+
   current: Dilemma | null;
   history: Dilemma[];
   loading: boolean;
@@ -226,6 +230,10 @@ type DilemmaState = {
   // Self-judgment methods (Day 8 aftermath questionnaire)
   addSelfJudgment: (judgment: string) => void;                  // Store player self-assessment
 
+  // Return-to-dream tracking methods
+  setJustFinishedGame: (finished: boolean, score?: number | null) => void;  // Mark that player just finished a game
+  clearJustFinishedGame: () => void;                             // Clear after reading in DreamScreen
+
   // Crisis detection methods (NEW)
   detectAndSetCrisis: () => "downfall" | "people" | "challenger" | "caring" | null;  // Detect crisis after support updates, returns crisis mode
   clearCrisis: () => void;          // Clear crisis state after handling
@@ -270,6 +278,10 @@ export const useDilemmaStore = create<DilemmaState>()(
 
   // Self-judgment (null until day 8 aftermath questionnaire)
   selfJudgment: null,
+
+  // Return-to-dream tracking (for grandpa dialogue)
+  justFinishedGame: false,
+  lastGameScore: null,
 
   current: null,
   history: [],
@@ -438,6 +450,8 @@ export const useDilemmaStore = create<DilemmaState>()(
       reasoningTimes: [],
       customActionTexts: [],
       selfJudgment: null,
+      justFinishedGame: false,
+      lastGameScore: null,
     });
   },
 
@@ -910,6 +924,20 @@ export const useDilemmaStore = create<DilemmaState>()(
   addSelfJudgment(judgment) {
     dlog("addSelfJudgment ->", judgment);
     set({ selfJudgment: judgment });
+  },
+
+  // ========================================================================
+  // RETURN-TO-DREAM TRACKING METHODS
+  // ========================================================================
+
+  setJustFinishedGame(finished, score = null) {
+    dlog("setJustFinishedGame ->", finished, "score:", score);
+    set({ justFinishedGame: finished, lastGameScore: score ?? null });
+  },
+
+  clearJustFinishedGame() {
+    dlog("clearJustFinishedGame -> clearing return state");
+    set({ justFinishedGame: false, lastGameScore: null });
   },
 
   // ========================================================================

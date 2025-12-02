@@ -244,7 +244,7 @@ const useStrict = import.meta.env.MODE !== "development";
 
 // Fragment collection commands
 (window as any).getFragments = () => {
-  const fragments = useFragmentsStore.getState().fragmentGameIds;
+  const fragments = useFragmentsStore.getState().getFragmentGameIds();
   const fragmentCount = useFragmentsStore.getState().getFragmentCount();
   const firstIntro = useFragmentsStore.getState().firstIntro;
   const hasAllFragments = useFragmentsStore.getState().hasCompletedThreeFragments();

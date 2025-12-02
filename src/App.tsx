@@ -19,6 +19,7 @@ import BackstageScreen from "./screens/BackstageScreen";
 // import CompassIntro from "./screens/CompassIntro"; // (legacy monolith – no longer used)
 import IntroScreen from "./screens/IntroScreen";
 import DreamScreen from "./screens/DreamScreen";
+import RoleIntroScreen from "./screens/RoleIntroScreen";
 import RoleSelectionScreen from "./screens/RoleSelectionScreen";
 import CampaignScreen from "./screens/CampaignScreen";
 import PowerDistributionScreen from "./screens/PowerDistributionScreen";
@@ -221,6 +222,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
           style={{ width: '100%', height: '100%' }}
         >
           {route === "/dream" && <DreamScreen push={push} />}
+          {route === "/role-intro" && <RoleIntroScreen push={push} />}
           {route === "/intro" && <IntroScreen push={push} />}
           {route === "/role" && <RoleSelectionScreen push={push} />}
           {route === "/campaign" && <CampaignScreen />}

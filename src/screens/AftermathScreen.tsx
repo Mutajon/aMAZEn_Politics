@@ -169,9 +169,6 @@ export default function AftermathScreen({ push }: Props) {
     // Mark as logged immediately to prevent any re-fires
     hasLoggedAftermathRef.current = true;
 
-    // Play beholdFragment voiceover (first visit only)
-    audioManager.playVoiceover('behold-fragment');
-
     // Calculate total inquiries across all days
     let totalInquiries = 0;
     inquiryHistory.forEach((dayInquiries) => {
@@ -265,7 +262,12 @@ export default function AftermathScreen({ push }: Props) {
     // TRY BLOCK 2: Collect fragment (CRITICAL, must succeed even if past game failed)
     if (fragmentCount < 3) {
       try {
-        addFragment(currentGameId);
+        // Get the pending avatar thumbnail from roleStore
+        const pendingThumbnail = useRoleStore.getState().pendingAvatarThumbnail;
+        addFragment(currentGameId, pendingThumbnail);
+
+        // Clear the pending thumbnail after use
+        useRoleStore.getState().setPendingAvatarThumbnail(null);
 
         // CRITICAL FIX: Force immediate localStorage write to prevent race condition
         // Zustand persist middleware is async and can fail silently if tab loses focus
@@ -274,12 +276,14 @@ export default function AftermathScreen({ push }: Props) {
           const persistData = {
             state: {
               firstIntro: fragmentsState.firstIntro,
-              fragmentGameIds: fragmentsState.fragmentGameIds.slice(0, 3)
+              fragments: fragmentsState.fragments.slice(0, 3),
+              hasClickedFragment: fragmentsState.hasClickedFragment,
+              preferredFragmentId: fragmentsState.preferredFragmentId
             },
-            version: 0
+            version: 2
           };
-          localStorage.setItem('amaze-politics-fragments-v1', JSON.stringify(persistData));
-          console.log('[AftermathScreen] ✅ Fragment manually persisted to localStorage');
+          localStorage.setItem('amaze-politics-fragments-v2', JSON.stringify(persistData));
+          console.log('[AftermathScreen] ✅ Fragment manually persisted to localStorage (with avatar)');
         } catch (persistError) {
           console.error('[AftermathScreen] ❌ Failed to persist fragment to localStorage:', persistError);
           logger.logSystem(
