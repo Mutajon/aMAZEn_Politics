@@ -584,7 +584,11 @@ export default function DreamScreen({ push }: { push: PushFn }) {
 
   // Handler for preference selection in three-way comparison
   const handlePreferenceSelected = (gameId: string) => {
-    logger.log("dream_preference_selected", { gameId }, "Player selected preferred game version");
+    // Find the selected game to get its role title for meaningful logging
+    const selectedGame = pastGames.find(g => g.gameId === gameId);
+    const roleTitle = selectedGame?.roleTitle || "unknown";
+
+    logger.log("dream_preference_selected", { gameId, roleTitle }, "Player selected preferred game version");
     // TODO: Store preference in fragmentsStore
     setShowThreeWayComparison(false);
     setShowPreferenceButtons(false);

@@ -50,7 +50,7 @@ export function ThreeShardComparison({
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 pt-8 sm:pt-4 overflow-y-auto"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -66,7 +66,7 @@ export function ThreeShardComparison({
 
         {/* Content container */}
         <motion.div
-          className="relative z-10 w-full max-w-5xl mx-auto"
+          className="relative z-10 w-full max-w-5xl mx-auto max-h-[90vh] overflow-y-auto"
           initial={{ y: 30, scale: 0.95, opacity: 0 }}
           animate={{ y: 0, scale: 1, opacity: 1 }}
           exit={{ y: 20, scale: 0.95, opacity: 0 }}

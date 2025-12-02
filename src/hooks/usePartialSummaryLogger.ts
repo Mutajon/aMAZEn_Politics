@@ -10,21 +10,40 @@
 
 import { useEffect } from 'react';
 import { useDilemmaStore } from '../store/dilemmaStore';
+import { useRoleStore } from '../store/roleStore';
+import { useLoggingStore } from '../store/loggingStore';
 import { collectSessionSummary } from './useSessionSummary';
 
 export function usePartialSummaryLogger() {
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Check if session is active (day > 0 means game started)
-      const { day } = useDilemmaStore.getState();
-      if (day === 0 || day > 7) {
-        // Game not started or already ended naturally
-        return;
-      }
+      const dilemmaState = useDilemmaStore.getState();
+      const roleState = useRoleStore.getState();
+      const loggingState = useLoggingStore.getState();
+
+      const { day, gameId } = dilemmaState;
+      const { selectedRole } = roleState;
+      const { sessionId, sessionStartTime } = loggingState;
+
+      // Guard 1: Game not started or already ended naturally
+      if (day === 0 || day > 7) return;
+
+      // Guard 2: No game session ID = not actually in an active game
+      if (!gameId) return;
+
+      // Guard 3: No role selected = user hasn't progressed past role selection
+      if (!selectedRole) return;
+
+      // Guard 4: No valid session = logging not properly initialized
+      if (!sessionId || sessionId === 'unknown') return;
 
       try {
-        // Collect partial summary (aftermathData = null, incomplete = true, sessionDuration = null)
-        const summary = collectSessionSummary(null, true, null);
+        // Calculate actual session duration instead of passing null
+        const sessionDuration = sessionStartTime
+          ? Date.now() - sessionStartTime
+          : null;
+
+        const summary = collectSessionSummary(null, true, sessionDuration);
 
         // Convert to JSON
         const payload = JSON.stringify(summary);
