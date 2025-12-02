@@ -448,11 +448,11 @@ export default function EventScreen3({ push }: Props) {
   }, [speaking, day]);
 
   // ========================================================================
-  // EFFECT 5B: Trigger Day 2 tutorial when narration completes
+  // EFFECT 5B: Trigger Day 2 tutorial when narration completes OR times out
   // ========================================================================
   useEffect(() => {
     if (day === 2 && phase === 'interacting' && !tutorial.tutorialCompleted) {
-      // Only start if narration was playing and is now done
+      // If narration completed normally
       const narrationComplete = narrationWasPlaying && !speaking;
 
       if (narrationComplete) {
@@ -460,8 +460,17 @@ export default function EventScreen3({ push }: Props) {
           console.log('[EventScreen3] 🎓 Starting Day 2 tutorial (narration complete)');
           tutorial.startTutorial();
         }, 500);
-
         return () => clearTimeout(timer);
+      }
+
+      // Fallback: If narration hasn't started after 3 seconds, start tutorial anyway
+      // This handles: disabled narration, TTS errors, credit exhausted, etc.
+      if (!narrationWasPlaying) {
+        const fallbackTimer = setTimeout(() => {
+          console.log('[EventScreen3] 🎓 Starting Day 2 tutorial (narration fallback - TTS may have failed or be disabled)');
+          tutorial.startTutorial();
+        }, 3000);
+        return () => clearTimeout(fallbackTimer);
       }
     }
   }, [day, phase, narrationWasPlaying, speaking, tutorial.tutorialCompleted, tutorial.startTutorial]);
