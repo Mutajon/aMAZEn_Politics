@@ -101,7 +101,7 @@ export function ShardWithAvatar({
       {/* Hand click indicator ONLY for playable shards (not completed) */}
       {isPlayable && !isCompleted && (
         <motion.div
-          className="absolute -bottom-10 left-1/2 -translate-x-1/2 text-3xl"
+          className="absolute -bottom-12 left-1/2 -translate-x-1/2 text-5xl"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1, y: [0, 5, 0] }}
           transition={{

@@ -37,10 +37,10 @@ const PROFANITY_LIST = [
 
 // Predefined traits
 const TRAITS = [
-  { key: "smartest", label: "DREAM_TRAIT_SMARTEST" },
-  { key: "charismatic", label: "DREAM_TRAIT_CHARISMATIC" },
-  { key: "just", label: "DREAM_TRAIT_JUST" },
-  { key: "strongest", label: "DREAM_TRAIT_STRONGEST" },
+  { key: "smartest", label: "DREAM_TRAIT_SMARTEST", adjLabel: "DREAM_TRAIT_SMARTEST_ADJ" },
+  { key: "charismatic", label: "DREAM_TRAIT_CHARISMATIC", adjLabel: "DREAM_TRAIT_CHARISMATIC_ADJ" },
+  { key: "just", label: "DREAM_TRAIT_JUST", adjLabel: "DREAM_TRAIT_JUST_ADJ" },
+  { key: "strongest", label: "DREAM_TRAIT_STRONGEST", adjLabel: "DREAM_TRAIT_STRONGEST_ADJ" },
 ];
 
 // Animation constants
@@ -151,14 +151,13 @@ function validateTrait(text: string): string | null {
 
 type Phase = "intro" | "name" | "trait" | "mirror" | "mirrorBroken" | "grandpaDialogue" | "returnVisitor";
 
-// Grandpa dialogue lines
+// Grandpa dialogue lines (5 total - lines 5+6 were combined)
 const GRANDPA_DIALOGUES = [
   "DREAM_GRANDPA_1",
   "DREAM_GRANDPA_2",
   "DREAM_GRANDPA_3",
   "DREAM_GRANDPA_4",
   "DREAM_GRANDPA_5",
-  "DREAM_GRANDPA_6",
 ];
 
 // Typewriter speed in ms per character
@@ -221,11 +220,12 @@ export default function DreamScreen({ push }: { push: PushFn }) {
   const [customTraitText, setCustomTraitText] = useState("");
   const [traitError, setTraitError] = useState<string | null>(null);
   const [shortTrait, setShortTrait] = useState<string | null>(null);
+  const [adjTrait, setAdjTrait] = useState<string | null>(null); // Adjective form for mirror prompt (e.g., "most intelligent")
   const [_shortTraitHe, setShortTraitHe] = useState<string | null>(null); // Kept for logging, display always uses English
   const [extractingTrait, setExtractingTrait] = useState(false);
 
   // Grandpa dialogue state
-  const [dialogueStep, setDialogueStep] = useState(0); // 0-5 for 6 bubbles
+  const [dialogueStep, setDialogueStep] = useState(0); // 0-4 for 5 bubbles
   const [showShards, setShowShards] = useState(false);
   const [typingComplete, setTypingComplete] = useState(false);
   const [displayedText, setDisplayedText] = useState("");
@@ -289,12 +289,14 @@ export default function DreamScreen({ push }: { push: PushFn }) {
   };
 
   // Handle predefined trait selection
-  const handleTraitSelect = (traitKey: string, traitLabel: string) => {
+  const handleTraitSelect = (traitKey: string, traitLabel: string, adjLabel: string) => {
     const traitText = lang(traitLabel);
+    const adjText = lang(adjLabel);
     setPlayerTrait(traitText);  // Keep full text for logging
     setShortTrait(traitKey);    // Use key as short trait: "smartest", "charismatic", etc.
+    setAdjTrait(adjText);       // Use adjective form for mirror prompt (e.g., "most intelligent")
     setTraitAccepted(true);
-    logger.log("dream_trait_selected", { trait: traitKey, traitText }, "Player selected predefined trait");
+    logger.log("dream_trait_selected", { trait: traitKey, traitText, adjText }, "Player selected predefined trait");
   };
 
   // Handle "Suggest something else" click
@@ -336,23 +338,32 @@ export default function DreamScreen({ push }: { push: PushFn }) {
       });
       const data = await response.json();
 
+      const extractedTrait = data.trait || trimmed;
+      // Build adjective form: prepend "most" for English, use Hebrew form as-is
+      const adjForm = getCurrentLanguage() === "he"
+        ? (data.traitHe || extractedTrait)
+        : `most ${extractedTrait}`;
+
       setPlayerTrait(trimmed);                              // Keep full text for logging
-      setShortTrait(data.trait || trimmed);                 // English trait
-      setShortTraitHe(data.traitHe || data.trait || trimmed); // Hebrew trait
+      setShortTrait(extractedTrait);                        // English trait
+      setAdjTrait(adjForm);                                 // Adjective form for mirror prompt
+      setShortTraitHe(data.traitHe || extractedTrait);      // Hebrew trait
       setTraitAccepted(true);
       setShowTraitModal(false);
       setTraitError(null);
-      logger.log("dream_trait_selected", { trait: "custom", traitText: trimmed, shortTrait: data.trait, shortTraitHe: data.traitHe }, "Player submitted custom trait");
+      logger.log("dream_trait_selected", { trait: "custom", traitText: trimmed, shortTrait: extractedTrait, adjTrait: adjForm, shortTraitHe: data.traitHe }, "Player submitted custom trait");
     } catch (error) {
       // Fallback: use first word or trimmed text
       setPlayerTrait(trimmed);
       const fallback = trimmed.split(/\s+/)[0] || trimmed;
+      const fallbackAdj = getCurrentLanguage() === "he" ? fallback : `most ${fallback}`;
       setShortTrait(fallback);
+      setAdjTrait(fallbackAdj);
       setShortTraitHe(fallback);
       setTraitAccepted(true);
       setShowTraitModal(false);
       setTraitError(null);
-      logger.log("dream_trait_selected", { trait: "custom", traitText: trimmed, shortTrait: fallback }, "Player submitted custom trait (AI fallback)");
+      logger.log("dream_trait_selected", { trait: "custom", traitText: trimmed, shortTrait: fallback, adjTrait: fallbackAdj }, "Player submitted custom trait (AI fallback)");
     } finally {
       setExtractingTrait(false);
     }
@@ -857,7 +868,7 @@ export default function DreamScreen({ push }: { push: PushFn }) {
               {TRAITS.map((trait) => (
                 <motion.button
                   key={trait.key}
-                  onClick={() => handleTraitSelect(trait.key, trait.label)}
+                  onClick={() => handleTraitSelect(trait.key, trait.label, trait.adjLabel)}
                   className="w-full py-4 px-6 rounded-2xl font-semibold text-lg bg-white/15 hover:bg-white/25 text-white border border-white/20 shadow-lg hover:shadow-xl active:scale-[0.98] transition-all"
                   variants={{
                     hidden: { opacity: 0, y: 20, scale: 0.95 },
@@ -921,11 +932,11 @@ export default function DreamScreen({ push }: { push: PushFn }) {
               transition={{ duration: 0.6, delay: 0.6 }}
               style={{ textShadow: "0 2px 20px rgba(0,0,0,0.8)" }}
             >
-              {/* Split around {trait} to apply golden gradient - always use English trait */}
+              {/* Split around {trait} to apply golden gradient - use adjective form */}
               {(() => {
                 const text = lang("DREAM_MIRROR_TEXT");
                 const parts = text.split("{trait}");
-                const displayTrait = shortTrait;  // Always English, even when UI is Hebrew
+                const displayTrait = adjTrait || shortTrait;  // Use adjective form (e.g., "most intelligent")
                 return (
                   <>
                     {parts[0]}
@@ -1041,11 +1052,12 @@ export default function DreamScreen({ push }: { push: PushFn }) {
         {phase === "grandpaDialogue" && (
           <motion.div
             key="grandpaDialogue"
-            className="absolute inset-0 flex flex-col"
+            className="absolute inset-0 flex flex-col cursor-pointer"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5 }}
+            onClick={handleDialogueClick}
           >
             {/* Centered content area - broken mirror or shards */}
             <div className="flex-1 flex items-center justify-center">
@@ -1065,7 +1077,7 @@ export default function DreamScreen({ push }: { push: PushFn }) {
                   animate={{ opacity: 1 }}
                 >
                   {[0, 1, 2].map((index) => {
-                    const shardsClickable = dialogueStep >= 5 && typingComplete;
+                    const shardsClickable = dialogueStep >= 4 && typingComplete;
                     const fragment = fragments[index];
                     // First intro: only shard 0 is playable, rest are locked
                     const isCompleted = false; // No completed shards on first intro
@@ -1135,7 +1147,7 @@ export default function DreamScreen({ push }: { push: PushFn }) {
               {/* Click to continue prompt - only shown for first bubble */}
               {dialogueStep === 0 && typingComplete && (
                 <motion.p
-                  className="text-gray-500 text-sm mt-2 text-center"
+                  className="text-gray-500 text-lg mt-2 text-center"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.3 }}
