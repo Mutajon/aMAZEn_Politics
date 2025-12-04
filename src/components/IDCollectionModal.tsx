@@ -37,7 +37,8 @@ function validateID(id: string): string | null {
     return "ID_VALIDATION_EMAIL";
   }
 
-  if (!trimmed.toLowerCase().endsWith("@tau.ac.il")) {
+  const lowerEmail = trimmed.toLowerCase();
+  if (!lowerEmail.endsWith("@tau.ac.il") && !lowerEmail.endsWith("@mail.tau.ac.il")) {
     return "ID_VALIDATION_DOMAIN";
   }
 
