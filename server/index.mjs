@@ -1204,21 +1204,23 @@ app.post("/api/extract-trait", async (req, res) => {
   }
 
   const system = `You extract a trait from a user's self-description for a magic mirror game.
-The trait must fit seamlessly into: "Mirror, mirror on the wall, who's the ___ of them all?"
+The trait must fit seamlessly into the mirror sentence.
 
 Rules:
 1. The user's input language is: ${language || 'en'}
-2. If input is Hebrew, understand the meaning and translate to English
-3. Extract a SUPERLATIVE trait (e.g., "wisest", "bravest", "most creative", "richest")
-4. The trait should sound natural in the sentence above
-5. Return JSON: {"trait": "english superlative"}
+2. If language is Hebrew (he), return a Hebrew ADJECTIVE trait that fits: "מראה מראה שעל הקיר, מי ה___ מכולם?"
+   The trait must be a masculine singular adjective.
+   Examples: חכם, כריזמטי, צודק, עוצמתי, אמיץ, יפה, יצירתי
+3. If language is English, return an English SUPERLATIVE that fits: "Mirror, mirror on the wall, who's the ___ of them all?"
+   Examples: smartest, bravest, most creative
+4. Return JSON: {"trait": "adjective in appropriate language"}
 
 Examples:
-- Input: "I'm very smart" → {"trait": "smartest"}
-- Input: "I want to be rich" → {"trait": "richest"}
-- Input: "אני רוצה להיות הכי חכם" → {"trait": "wisest"}
-- Input: "I'm creative and artistic" → {"trait": "most creative"}
-- Input: "אני אמיץ" → {"trait": "bravest"}`;
+- Input (en): "I'm very smart" → {"trait": "smartest"}
+- Input (he): "אני רוצה להיות הכי חכם" → {"trait": "חכם"}
+- Input (he): "אני אמיץ מאוד" → {"trait": "אמיץ"}
+- Input (he): "אני רוצה להיות עשיר" → {"trait": "עשיר"}
+- Input (en): "I'm creative and artistic" → {"trait": "most creative"}`;
 
   try {
     const result = await aiJSONGemini({
@@ -4061,7 +4063,7 @@ CRITICAL JSON RULES:
  *
  * Rollback: Set USE_PROMPT_V3 = false to use original prompt
  */
-function buildGameMasterSystemPromptUnifiedV3(gameContext, languageCode = 'en', languageName = 'English') {
+function buildGameMasterSystemPromptUnifiedV3(gameContext, languageCode = 'en', languageName = 'English', dilemmaEmphasis = null) {
   const {
     role,
     systemName,
@@ -4125,7 +4127,12 @@ ${compassText}
 IMPORTANT: For Days 2+, you will receive UPDATED "CURRENT TOP VALUES" in each daily prompt.
 These values may shift due to the player's actions and their consequences (compass pills).
 ALWAYS use the most recent values provided to ensure maximum personal relevance.
+${dilemmaEmphasis ? `
 
+═══════════════════════════════════════════════════════════════════════════════
+${dilemmaEmphasis}
+═══════════════════════════════════════════════════════════════════════════════
+` : ''}
 
 2. THE THREE-STEP PROCESS
 
@@ -4468,7 +4475,7 @@ DAY 8 SCHEMA (Aftermath):
  * @param {array|null} currentCompassTopValues - Current top compass values
  * @param {string} mirrorMode - 'lastAction' or 'dilemma' (default: 'dilemma')
  */
-function buildGameMasterUserPrompt(day, playerChoice = null, currentCompassTopValues = null, mirrorMode = 'dilemma', languageCode = 'en', languageName = 'English') {
+function buildGameMasterUserPrompt(day, playerChoice = null, currentCompassTopValues = null, mirrorMode = 'dilemma', languageCode = 'en', languageName = 'English', dilemmaEmphasis = null) {
   // General instruction for all days
   let prompt = `First, carefully review the entire system prompt to understand all context and rules.\n\n`;
 
@@ -4490,6 +4497,11 @@ Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
     }
 
     prompt += `DAY ${day} of 7\n\nPrevious action: "${playerChoice.title}" - ${playerChoice.description}${compassUpdateText}\n\n`;
+
+    // Add reminder for role-specific emphasis (if exists)
+    if (dilemmaEmphasis) {
+      prompt += `REMINDER: Follow the ROLE-SPECIFIC EMPHASIS from the system prompt.\n\n`;
+    }
 
     // Add mirror mode instruction for Days 2+
     prompt += `MIRROR MODE FOR THIS TURN: "${mirrorMode}"
@@ -4640,8 +4652,9 @@ app.post("/api/game-turn-v2", async (req, res) => {
       // Use V3 if feature flag enabled, otherwise use original
       const languageCode = String(language || "en").toLowerCase();
       const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
+      const dilemmaEmphasis = gameContext.dilemmaEmphasis || null;
       const systemPrompt = USE_PROMPT_V3
-        ? buildGameMasterSystemPromptUnifiedV3(enrichedContext, languageCode, languageName)
+        ? buildGameMasterSystemPromptUnifiedV3(enrichedContext, languageCode, languageName, dilemmaEmphasis)
         : buildGameMasterSystemPromptUnified(enrichedContext, languageCode, languageName);
 
       // Build minimal Day 1 user prompt
@@ -4761,6 +4774,7 @@ app.post("/api/game-turn-v2", async (req, res) => {
         systemName: gameContext.systemName,
         challengerName,
         authorityLevel,
+        dilemmaEmphasis, // Store for Day 2+ reminders
         topicHistory: [{
           day: 1,
           topic: parsed.dilemma?.topic || 'Unknown',
@@ -4846,7 +4860,8 @@ app.post("/api/game-turn-v2", async (req, res) => {
       // Build Day 2+ user prompt with current compass values and mirror mode
       const languageCode = String(language || "en").toLowerCase();
       const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
-      const userPrompt = buildGameMasterUserPrompt(day, playerChoice, currentCompassTopValues, mirrorMode, languageCode, languageName);
+      const dilemmaEmphasis = conversation.meta.dilemmaEmphasis || null;
+      const userPrompt = buildGameMasterUserPrompt(day, playerChoice, currentCompassTopValues, mirrorMode, languageCode, languageName, dilemmaEmphasis);
 
       // Prepare messages array (history + new user message)
       const messages = [

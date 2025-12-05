@@ -22,28 +22,28 @@ export type RoleSupportProfiles = {
 };
 
 export const ROLE_SUPPORT_PROFILES: Record<string, RoleSupportProfiles> = {
-  "Athens — Shadows of War (-431)": {
+  "Railroad Strike — The Great Upheaval (1877)": {
     people: {
-      summary: "Assembly citizens prize direct democracy, naval power, and imperial tribute but fear costly wars.",
+      summary: "Workers demand fair wages, safe conditions, and dignity; fear starvation but also bloodshed.",
       stances: {
-        governance: "Preserve Assembly sovereignty; resist oligarchic plots.",
-        order: "Trust law courts and citizen oversight over military strongmen.",
-        economy: "Secure tribute from allies; fund public works and navy.",
-        justice: "Favor mass juries and ostracism to check elites.",
-        foreign: "Expand Delian League; contain Sparta; avoid land wars.",
-        culture: "Celebrate festivals, drama, philosophy; honor Athena.",
+        governance: "Seek worker representation and collective bargaining rights.",
+        order: "Prefer peaceful protest but will defend themselves if attacked.",
+        economy: "Demand living wages and an end to arbitrary pay cuts.",
+        justice: "Want fair treatment and an end to blacklisting.",
+        foreign: "Solidarity with workers in other cities and industries.",
+        culture: "Value community, family, and mutual aid among workers.",
       },
       origin: "predefined",
     },
     challenger: {
-      summary: "Generals seek strategic flexibility and military prestige, sometimes chafing under popular oversight.",
+      summary: "Railroad owners prioritize profits, property rights, and crushing labor organization.",
       stances: {
-        governance: "Value expert military judgment over crowd emotion.",
-        order: "Enforce discipline in ranks; demand loyalty and obedience.",
-        economy: "Prioritize fleet funding and campaign supplies.",
-        justice: "Prefer commanders' authority over Assembly trials.",
-        foreign: "Pursue bold campaigns and decisive victories for glory.",
-        culture: "Honor martial virtue and strategic excellence.",
+        governance: "Maintain owner control; resist any worker influence.",
+        order: "Use state force to break strikes and restore operations.",
+        economy: "Cut wages to maintain dividends; workers are expendable.",
+        justice: "Blacklist agitators; prosecute strike leaders.",
+        foreign: "Coordinate with other railroads to prevent spread.",
+        culture: "Frame strikers as criminals and foreign agitators.",
       },
       origin: "predefined",
     },

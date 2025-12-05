@@ -1,21 +1,30 @@
 // src/components/LanguageSelector.tsx
 import { useLanguage } from '../i18n/LanguageContext';
+import type { Language } from '../i18n/LanguageContext';
 
 interface LanguageSelectorProps {
   variant?: 'compact' | 'full';
   className?: string;
+  onLanguageChange?: (lang: Language) => void;
 }
 
-export default function LanguageSelector({ 
-  variant = 'compact', 
-  className = '' 
+export default function LanguageSelector({
+  variant = 'compact',
+  className = '',
+  onLanguageChange
 }: LanguageSelectorProps) {
   const { language, setLanguage } = useLanguage();
 
+  const handleLanguageChange = (newLang: Language) => {
+    setLanguage(newLang);
+    onLanguageChange?.(newLang);
+  };
+
   if (variant === 'compact') {
+    const newLang = language === 'he' ? 'en' : 'he';
     return (
       <button
-        onClick={() => setLanguage(language === 'he' ? 'en' : 'he')}
+        onClick={() => handleLanguageChange(newLang)}
         className={`flex items-center justify-center w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white/90 backdrop-blur shadow-sm transition-colors ${className}`}
         aria-label={`Switch to ${language === 'he' ? 'English' : 'Hebrew'}`}
         title={`Switch to ${language === 'he' ? 'English' : 'Hebrew'}`}
@@ -40,20 +49,20 @@ export default function LanguageSelector({
       </div>
       <div className="flex gap-2">
         <button
-          onClick={() => setLanguage('he')}
+          onClick={() => handleLanguageChange('he')}
           className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-            language === 'he' 
-              ? 'bg-emerald-500/70 text-white' 
+            language === 'he'
+              ? 'bg-emerald-500/70 text-white'
               : 'bg-white/10 text-white/70 hover:bg-white/20'
           }`}
         >
           עברית
         </button>
         <button
-          onClick={() => setLanguage('en')}
+          onClick={() => handleLanguageChange('en')}
           className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-            language === 'en' 
-              ? 'bg-emerald-500/70 text-white' 
+            language === 'en'
+              ? 'bg-emerald-500/70 text-white'
               : 'bg-white/10 text-white/70 hover:bg-white/20'
           }`}
         >

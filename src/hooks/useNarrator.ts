@@ -9,6 +9,7 @@
 import { useCallback, useState } from "react";
 import { useSettingsStore } from "../store/settingsStore";
 import { TTS_VOICE } from "../lib/ttsConfig";
+import { getCurrentLanguage } from "../i18n/lang";
 
 type SpeakOptions = {
   voiceName?: string;           // Gemini voice name; default from VITE_TTS_VOICE env var
@@ -95,8 +96,9 @@ export function useNarrator() {
         };
       }
 
-      if (!narrationEnabled) {
-        // narration off → don't block UI; provide a no-op that is "ready"
+      // Disable TTS if narration is off OR if language is Hebrew (TTS not supported)
+      if (!narrationEnabled || getCurrentLanguage() === 'he') {
+        // narration off or Hebrew → don't block UI; provide a no-op that is "ready"
         return {
           start: async () => {},
           dispose: () => {},

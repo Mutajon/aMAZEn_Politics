@@ -2,7 +2,7 @@
 // Displays role information after shard selection in DreamScreen
 // Shows role background, title, year, intro, score goal, and high scores
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import type { PushFn } from "../lib/router";
 import { bgStyleWithRoleImage } from "../lib/ui";
@@ -13,12 +13,19 @@ import { getPredefinedRole } from "../data/predefinedRoles";
 import { useUserBestScore } from "../hooks/useUserBestScore";
 import { useGlobalBestScore } from "../hooks/useGlobalBestScore";
 import { useLogger } from "../hooks/useLogger";
+import { useNarrator } from "../hooks/useNarrator";
+import type { PreparedTTS } from "../hooks/useNarrator";
+import { TTS_VOICE } from "../lib/ttsConfig";
+import { useSettingsStore } from "../store/settingsStore";
 import { Trophy, Crown } from "lucide-react";
 import { audioManager } from "../lib/audioManager";
 
 export default function RoleIntroScreen({ push }: { push: PushFn }) {
   const lang = useLang();
   const logger = useLogger();
+  const narrator = useNarrator();
+  const narrationEnabled = useSettingsStore((s) => s.narrationEnabled);
+  const preparedTTSRef = useRef<PreparedTTS | null>(null);
 
   const selectedRole = useRoleStore((s) => s.selectedRole);
   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
@@ -39,6 +46,38 @@ export default function RoleIntroScreen({ push }: { push: PushFn }) {
     () => bgStyleWithRoleImage(roleBackgroundImage),
     [roleBackgroundImage]
   );
+
+  // Get translated intro text for TTS
+  const introText = roleData?.introKey ? lang(roleData.introKey) : "";
+
+  // Track if TTS has been played to prevent re-triggering
+  const ttsPlayedRef = useRef(false);
+
+  // TTS for role intro paragraph - only run once on mount
+  useEffect(() => {
+    if (!narrationEnabled || !introText || ttsPlayedRef.current) return;
+
+    ttsPlayedRef.current = true;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const p = await narrator.prepare(introText, { voiceName: TTS_VOICE });
+        if (cancelled) { p.dispose(); return; }
+        preparedTTSRef.current = p;
+        await p.start();
+      } catch (e) {
+        console.warn("[RoleIntroScreen] TTS failed:", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      preparedTTSRef.current?.dispose();
+      narrator.stop();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [introText, narrationEnabled]);
 
   // Continue handler
   const handleContinue = () => {
@@ -110,9 +149,9 @@ export default function RoleIntroScreen({ push }: { push: PushFn }) {
           </div>
 
           {/* Intro paragraph */}
-          {roleData.introKey && (
+          {introText && (
             <p className="text-sm text-white/90 leading-relaxed mb-4">
-              {lang(roleData.introKey)}
+              {introText}
             </p>
           )}
 

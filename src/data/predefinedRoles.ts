@@ -53,100 +53,111 @@ export interface PredefinedRoleData {
  */
 export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
   {
-    id: "athens_431",
-    legacyKey: "Athens — Shadows of War (-431)",
-    titleKey: "ATHENS_TITLE",
-    subtitleKey: "ATHENS_SUBTITLE",
-    introKey: "ATHENS_INTRO",
-    youAreKey: "ATHENS_YOU_ARE",
-    year: "-431",
-    imageId: "greece",
-    avatarPrompt: "citizen of ancient Athens",
-    roleScope: "You are a citizen of Athens. You may propose measures, and the Assembly will vote on them. You cannot enact major changes by yourself.",
-    storyThemes: ["democracy_vs_empire", "glory_vs_pragmatism", "citizen_vs_expert"],
+    id: "railroad_1877",
+    legacyKey: "Railroad Strike — The Great Upheaval (1877)",
+    titleKey: "RAILROAD_TITLE",
+    subtitleKey: "RAILROAD_SUBTITLE",
+    introKey: "RAILROAD_INTRO",
+    youAreKey: "RAILROAD_YOU_ARE",
+    year: "1877",
+    imageId: "1877Strike",
+    avatarPrompt: "19th century American railroad worker, worn overalls, determined expression",
+    roleScope: "You are a worker thrust into leadership. You can rally crowds, call meetings, and negotiate, but you cannot command troops or enact laws.",
+    storyThemes: ["labor_rights", "class_solidarity", "violence_vs_nonviolence", "survival_vs_principle"],
     scoreGoal: 1000,
     defaultGoalStatus: "uncompleted",
     defaultHighScore: 0,
     powerDistribution: {
-      systemName: "Democracy",
-      systemDesc: "Direct democracy where citizen Assembly holds decisive authority over war, peace, laws, and leaders through open vote.",
-      flavor: "40,000 citizens shout, vote, and rule themselves—glory or chaos, the demos decides.",
+      systemName: "Plutocratic Republic",
+      systemDesc: "Industrial capitalism where railroad barons control capital and influence state action; workers hold strikes as their only lever.",
+      flavor: "Wage cuts and desperation spark a wildfire—your family starves while you lead.",
       holders: [
         {
-          name: "Assembly (Ekklesia)",
-          percent: 45,
-          icon: "👥",
-          note: "All citizens vote directly on laws, war, exile, and finances",
+          name: "Railroad Owners",
+          percent: 35,
+          icon: "🚂",
+          note: "Economic power; can bribe, blacklist, and manipulate public opinion",
           role: { A: true, E: true },
           stype: { t: "Author", i: "+" }
         },
         {
-          name: "Strategos (Generals)",
+          name: "State Executives",
           percent: 25,
-          icon: "⚔️",
-          note: "10 elected generals lead military, propose strategy, sway crowds",
-          role: { A: true, E: false },
-          stype: { t: "Author", i: "•" }
-        },
-        {
-          name: "Council of 500 (Boule)",
-          percent: 15,
           icon: "🏛️",
-          note: "Selected by lot; prepares Assembly agenda, oversees daily affairs",
-          role: { A: true, E: false },
-          stype: { t: "Agent", i: "•" }
+          note: "Political authority to negotiate or deploy armed force",
+          role: { A: true, E: true },
+          stype: { t: "Author", i: "+" }
         },
         {
-          name: "Law Courts (Dikasteria)",
-          percent: 10,
-          icon: "⚖️",
-          note: "Mass citizen juries; can overturn laws, punish officials",
+          name: "Coercive Force",
+          percent: 20,
+          icon: "⚔️",
+          note: "Militia, police, federal troops—can crush the strike",
           role: { A: false, E: true },
-          stype: { t: "Eraser", i: "•" }
+          stype: { t: "Eraser", i: "+" }
         },
         {
-          name: "Wealthy Elite (Liturgy Payers)",
+          name: "Workers & Crowds",
+          percent: 15,
+          icon: "👥",
+          note: "Your base of power, but volatile; follow or turn based on choices",
+          role: { A: true, E: false },
+          stype: { t: "Actor", i: "•" }
+        },
+        {
+          name: "Local Newspapers",
           percent: 5,
-          icon: "💰",
-          note: "Fund triremes, festivals; influence through prestige, not votes",
+          icon: "📰",
+          note: "Control the narrative; frame strike as justice or treason",
           role: { A: false, E: false },
           stype: { t: "Actor", i: "-" }
         }
       ],
-      playerIndex: 0,
+      playerIndex: 3,
       challengerSeat: {
-        name: "Strategos (Generals)",
-        percent: 25,
-        index: 1
+        name: "Railroad Owners",
+        percent: 35,
+        index: 0
       },
       e12: {
-        tierI: ["Security", "CivilLib", "InfoOrder"],
-        tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
-        tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
+        tierI: ["Economy", "Order", "CivilLib"],
+        tierII: ["Justice", "InfoOrder", "Diplomacy"],
+        tierIII: ["Infrastructure", "Healthcare", "Appointments"],
         stopA: false,
         stopB: false,
-        decisive: ["Assembly (Ekklesia)", "Strategos (Generals)", "Council of 500 (Boule)"]
+        decisive: ["Railroad Owners", "State Executives", "Coercive Force"]
       },
       grounding: {
         settingType: "real",
-        era: "431 BCE Athens (outbreak of Peloponnesian War)"
+        era: "1877 United States (Great Railroad Strike)"
       },
-      supportProfiles: ROLE_SUPPORT_PROFILES["Athens — Shadows of War (-431)"] ?? null,
-      roleScope: "Acts as a citizen-assemblyman with equal voting rights, able to propose decrees and sway crowds but holding no permanent office or command authority.",
-      storyThemes: ["democracy_vs_empire", "glory_vs_pragmatism", "citizen_vs_expert"]
+      supportProfiles: ROLE_SUPPORT_PROFILES["Railroad Strike — The Great Upheaval (1877)"] ?? null,
+      roleScope: "A worker thrust into strike leadership; can rally crowds and negotiate but cannot command troops or enact laws.",
+      storyThemes: ["labor_rights", "class_solidarity", "violence_vs_nonviolence", "survival_vs_principle"],
+      authorityLevel: "low",
+      dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (1877 Railroad Strike):
+- Focus on AUTONOMY vs DEMOCRACY tension: collective action vs individual survival
+- Every dilemma must blur PRIVATE and PUBLIC life: leadership responsibilities vs family's immediate physical needs (hunger, safety, illness)
+- TONE: Gritty, material hardship, threat of violence always present
+- PERSONAL COST: Force choices between the cause and loved ones
+- STYLE EXAMPLES (for inspiration, generate unique variations):
+  • Violence accountability: A striker kills someone in self-defense—protect the movement's image or protect the person?
+  • Family vs cause: Immediate family need conflicts with strike demands—sacrifice family or weaken the cause?
+  • Bribery/corruption: Offers of personal gain in exchange for betrayal—accept, reject publicly, or exploit secretly?
+  • Macro consequences: The strike causes wider suffering—humanitarian concession or leverage through pain?`
     },
     characters: {
       male: {
-        nameKey: "ATHENS_CHAR_MALE_NAME",
-        promptKey: "ATHENS_CHAR_MALE_PROMPT"
+        nameKey: "RAILROAD_CHAR_MALE_NAME",
+        promptKey: "RAILROAD_CHAR_MALE_PROMPT"
       },
       female: {
-        nameKey: "ATHENS_CHAR_FEMALE_NAME",
-        promptKey: "ATHENS_CHAR_FEMALE_PROMPT"
+        nameKey: "RAILROAD_CHAR_FEMALE_NAME",
+        promptKey: "RAILROAD_CHAR_FEMALE_PROMPT"
       },
       any: {
-        nameKey: "ATHENS_CHAR_ANY_NAME",
-        promptKey: "ATHENS_CHAR_ANY_PROMPT"
+        nameKey: "RAILROAD_CHAR_ANY_NAME",
+        promptKey: "RAILROAD_CHAR_ANY_PROMPT"
       }
     }
   },

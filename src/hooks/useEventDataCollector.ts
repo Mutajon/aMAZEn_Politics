@@ -237,7 +237,8 @@ async function fetchGameTurn(language: string = 'en'): Promise<{
         { dimension: "whither", values: topKWithNames(compassValues?.whither, 'whither', 2).map(v => v.name) }
       ],
       confidant: confidant ? { name: confidant.name, description: confidant.description, imageId: confidant.imageId } : null,
-      e12: roleState.analysis?.e12 || null
+      e12: roleState.analysis?.e12 || null,
+      dilemmaEmphasis: roleState.analysis?.dilemmaEmphasis ?? null
     };
 
     // Subject focus (outside gameContext for v2)

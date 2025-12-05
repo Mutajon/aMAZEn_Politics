@@ -22,6 +22,11 @@ import { audioManager } from "../lib/audioManager";
 // SUBTITLES now uses GAME_SUBTITLE from i18n
 const SUBTITLES: string[] = [];
 
+// Module-level flag to persist Hebrew warning across component remounts
+let pendingHebrewWarningFlag = false;
+// Key for localStorage to track if Hebrew warning has been shown
+const HEBREW_WARNING_SHOWN_KEY = 'hebrew-warning-shown';
+
 export default function SplashScreen({
   onStart,
   onHighscores,
@@ -41,6 +46,7 @@ export default function SplashScreen({
   const [showButton, setShowButton] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showHebrewWarning, setShowHebrewWarning] = useState(false);
 
   // Helper function to get correct transform for toggle
   const getToggleTransform = (isEnabled: boolean) => {
@@ -293,26 +299,51 @@ export default function SplashScreen({
     };
   }, []);
 
+  // Show Hebrew warning on first load if language is Hebrew and warning hasn't been shown
+  useEffect(() => {
+    // Check if pending from language switch (no longer used, but keep for safety)
+    if (pendingHebrewWarningFlag) {
+      pendingHebrewWarningFlag = false;
+      // Don't show warning on language switch anymore
+      return;
+    }
+
+    // Show warning on first visit when language is Hebrew
+    if (language === 'he' && !localStorage.getItem(HEBREW_WARNING_SHOWN_KEY)) {
+      setShowHebrewWarning(true);
+      localStorage.setItem(HEBREW_WARNING_SHOWN_KEY, 'true');
+    }
+  }, [language]);
+
   return (
     <div
       className="relative min-h-[100dvh] flex items-center justify-center px-5"
       style={bgStyleSplash}
     >
-      {/* Settings cog (top-right) - visible only in debug mode and when not loading */}
-{!isLoading && debugMode && (
-<div className="absolute top-4 right-4 z-[40] pointer-events-auto">
-  <button
-    onClick={() => setShowSettings((v) => !v)}
-    className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white/90 backdrop-blur shadow-sm"
-    aria-haspopup="dialog"
-    aria-expanded={showSettings}
-    aria-label="Settings"
-    title="Settings"
-  >
-    <span aria-hidden className="text-lg leading-none">⚙</span>
-  </button>
-</div>
-)}
+      {/* Language selector (top-right) - always visible when not loading */}
+      {!isLoading && (
+        <div className="absolute top-4 right-4 z-[40] pointer-events-auto">
+          <LanguageSelector
+            variant="compact"
+          />
+        </div>
+      )}
+
+      {/* Settings cog (top-right, shifted left) - visible only in debug mode and when not loading */}
+      {!isLoading && debugMode && (
+        <div className="absolute top-4 right-14 z-[40] pointer-events-auto">
+          <button
+            onClick={() => setShowSettings((v) => !v)}
+            className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white/90 backdrop-blur shadow-sm"
+            aria-haspopup="dialog"
+            aria-expanded={showSettings}
+            aria-label="Settings"
+            title="Settings"
+          >
+            <span aria-hidden className="text-lg leading-none">⚙</span>
+          </button>
+        </div>
+      )}
 
 {/* Settings panel (fixed, above gear, outside its wrapper) - debug only */}
 {debugMode && showSettings && (
@@ -683,6 +714,32 @@ export default function SplashScreen({
 
       {/* ID Collection Modal - only show in experiment mode */}
       {experimentMode && <IDCollectionModal isOpen={showIDModal} onSubmit={handleIDSubmit} />}
+
+      {/* Hebrew Translation Warning Popup */}
+      {showHebrewWarning && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            className="bg-neutral-900 p-6 rounded-2xl max-w-sm text-center border border-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-white/90 mb-4 text-right leading-relaxed" dir="rtl">
+              השפה מוגדרת כרגע על עברית. דעו שהתרגום לעברית לא מלא, ייתכנו שגיאות ובפרט ניסוחים לא ניטרליים מבחינה מגדרית. אנו מתנצלים על כך. אם תעדיפו לשחק באנגלית, לחצו בפינה ימין למעלה אחרי סגירת הפופאפ הזה.
+            </p>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowHebrewWarning(false);
+              }}
+              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-medium transition-colors"
+            >
+              הבנתי
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

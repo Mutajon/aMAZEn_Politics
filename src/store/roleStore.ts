@@ -30,6 +30,8 @@ export type AnalysisResult = {
   supportProfiles?: RoleSupportProfiles | null;
   roleScope?: string | null;
   storyThemes?: string[] | null;
+  authorityLevel?: "low" | "medium" | "high"; // Player's authority level in the scenario
+  dilemmaEmphasis?: string; // Role-specific instructions for dilemma generation
   e12?: { // NEW: Exception-12 analysis
     tierI: string[];
     tierII: string[];
