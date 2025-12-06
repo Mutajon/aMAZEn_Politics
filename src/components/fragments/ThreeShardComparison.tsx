@@ -137,8 +137,8 @@ function GameCard({
   const matchingFragment = fragments.find(f => f.gameId === game.gameId);
   const avatarToShow = matchingFragment?.avatarThumbnail || game.avatarUrl;
 
-  // Shard labels: Athens, North America, Mars
-  const SHARD_LABELS = ["SHARD_LABEL_ATHENS", "SHARD_LABEL_NORTH_AMERICA", "SHARD_LABEL_MARS"];
+  // Shard labels: Railroad Strike, Tel Aviv, Mars
+  const SHARD_LABELS = ["SHARD_LABEL_RAILROAD", "SHARD_LABEL_TELAVIV", "SHARD_LABEL_MARS"];
 
   return (
     <motion.div
@@ -331,7 +331,7 @@ function SupportBar({ icon, value, color }: SupportBarProps) {
 
 function PlaceholderCard({ index }: { index: number }) {
   const lang = useLang();
-  const SHARD_LABELS = ["SHARD_LABEL_ATHENS", "SHARD_LABEL_NORTH_AMERICA", "SHARD_LABEL_MARS"];
+  const SHARD_LABELS = ["SHARD_LABEL_RAILROAD", "SHARD_LABEL_TELAVIV", "SHARD_LABEL_MARS"];
 
   return (
     <motion.div

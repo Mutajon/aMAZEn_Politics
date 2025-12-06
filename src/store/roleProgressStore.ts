@@ -95,6 +95,13 @@ export const useRoleProgressStore = create<RoleProgressState>()(
           goals: mergeWithDefaults(stored, overwriteGoals),
         };
       },
+      // Merge defaults after hydration to ensure new roles are always added
+      // (migrate only runs on version mismatch, not when adding new roles)
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.goals = mergeWithDefaults(state.goals, false);
+        }
+      },
     }
   )
 );

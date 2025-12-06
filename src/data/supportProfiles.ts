@@ -48,6 +48,30 @@ export const ROLE_SUPPORT_PROFILES: Record<string, RoleSupportProfiles> = {
       origin: "predefined",
     },
   },
+  "Tel Aviv — The Campus Uprising (2025)": {
+    people: {
+      summary: "Students demand democratic voice and national relevance for university actions.",
+      stances: {
+        governance: "Expand direct democracy; let students vote on major issues.",
+        order: "Strikes are legitimate protest; disruption is speech.",
+        economy: "Protect vulnerable workers and first-gen students from harm.",
+        culture: "University should be a moral beacon, not a neutral bystander.",
+        foreign: "National politics belong on campus; we are citizens first.",
+      },
+      origin: "predefined",
+    },
+    challenger: {
+      summary: "University management seeks stability, legal safety, and donor confidence.",
+      stances: {
+        governance: "Representative bodies, not referendums, should decide policy.",
+        order: "Maintain normal operations; disruption harms everyone.",
+        economy: "Protect tuition revenue, donor relations, and staff jobs.",
+        culture: "Academic neutrality requires avoiding political entanglement.",
+        foreign: "Keep national politics off campus; focus on education.",
+      },
+      origin: "predefined",
+    },
+  },
   "Alexandria — Fire over the Nile (-48)": {
     people: {
       summary: "Alexandrians cling to local rule, scholarship, and open markets.",

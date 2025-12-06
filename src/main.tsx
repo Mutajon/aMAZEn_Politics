@@ -363,20 +363,20 @@ const useStrict = import.meta.env.MODE !== "development";
 (window as any).clearExperimentProgress = (window as any).resetExperimentProgress;
 
 // Skip to specific scenarios for testing
-(window as any).skipToNorthAmerica = () => {
-  useLoggingStore.getState().markExperimentRoleCompleted('Athens — Shadows of War (-431)');
+(window as any).skipToTelAviv = () => {
+  useLoggingStore.getState().markExperimentRoleCompleted('Railroad Strike — The Great Upheaval (1877)');
   useDilemmaStore.getState().reset();
   useRoleStore.getState().reset();
-  console.log('✅ Athens marked complete. North America unlocked.');
-  console.log('💡 Navigate to /role to start North America scenario.');
+  console.log('✅ Railroad Strike marked complete. Tel Aviv unlocked.');
+  console.log('💡 Navigate to /role to start Tel Aviv scenario.');
 };
 
 (window as any).skipToMars = () => {
-  useLoggingStore.getState().markExperimentRoleCompleted('Athens — Shadows of War (-431)');
-  useLoggingStore.getState().markExperimentRoleCompleted('North America — The First Frontier (1607)');
+  useLoggingStore.getState().markExperimentRoleCompleted('Railroad Strike — The Great Upheaval (1877)');
+  useLoggingStore.getState().markExperimentRoleCompleted('Tel Aviv — The Campus Uprising (2025)');
   useDilemmaStore.getState().reset();
   useRoleStore.getState().reset();
-  console.log('✅ Athens + North America marked complete. Mars unlocked.');
+  console.log('✅ Railroad Strike + Tel Aviv marked complete. Mars unlocked.');
   console.log('💡 Navigate to /role to start Mars scenario.');
 };
 

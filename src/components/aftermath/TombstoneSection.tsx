@@ -10,6 +10,7 @@
 
 import { motion } from "framer-motion";
 import { useRoleStore } from "../../store/roleStore";
+import { useLanguage } from "../../i18n/LanguageContext";
 
 type Props = {
   haiku: string;
@@ -19,6 +20,8 @@ const FADE_DURATION_S = 0.5;
 
 export default function TombstoneSection({ haiku }: Props) {
   const characterName = useRoleStore((state) => state.character?.name);
+  const { language } = useLanguage();
+  const isHebrew = language === 'he';
 
   return (
     <motion.div
@@ -36,11 +39,15 @@ export default function TombstoneSection({ haiku }: Props) {
         {/* Name and Haiku Overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-center px-8">
           {characterName && (
-            <p className="text-gray-900 text-center font-serif font-semibold text-sm mb-2">
+            <p className={`text-gray-900 text-center font-serif font-semibold mb-2 ${
+              isHebrew ? 'text-base' : 'text-sm'
+            }`}>
               {characterName}
             </p>
           )}
-          <p className="text-gray-900 text-center font-serif italic text-xs whitespace-pre-line max-w-[140px]">
+          <p className={`text-gray-900 text-center font-serif italic whitespace-pre-line max-w-[140px] ${
+            isHebrew ? 'text-sm' : 'text-xs'
+          }`}>
             {haiku}
           </p>
         </div>

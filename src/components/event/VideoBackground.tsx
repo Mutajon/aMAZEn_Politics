@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface VideoBackgroundProps {
   videoPath: string;
@@ -17,31 +17,43 @@ interface VideoBackgroundProps {
  * - Object-fit cover for full-screen scaling
  * - Error handling with automatic fallback to static image
  * - No overlay layers (video displays at full brightness)
+ * - Enhanced mobile support with webkit-playsinline and preload
  */
 export function VideoBackground({ videoPath, imagePath }: VideoBackgroundProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [hasError, setHasError] = useState(false);
+  const playAttemptedRef = useRef(false);
+
+  // Attempt to play the video with fallback handling
+  const attemptPlay = useCallback(() => {
+    if (!videoRef.current || playAttemptedRef.current) return;
+    playAttemptedRef.current = true;
+
+    // Set playback speed to half (0.5x)
+    videoRef.current.playbackRate = 0.5;
+
+    videoRef.current.play().catch(() => {
+      // If autoplay fails (e.g., browser policy), ensure muted and try again
+      if (videoRef.current) {
+        videoRef.current.muted = true;
+        videoRef.current.play().catch(() => {
+          setHasError(true);
+        });
+      }
+    });
+  }, []);
 
   useEffect(() => {
-    // Reset error state when video path changes
+    // Reset state when video path changes
     setHasError(false);
+    playAttemptedRef.current = false;
 
-    // Attempt to play the video when mounted
-    if (videoRef.current) {
-      // Set playback speed to half (0.5x)
-      videoRef.current.playbackRate = 0.5;
-
-      videoRef.current.play().catch(() => {
-        // If autoplay fails (e.g., browser policy), try muted playback
-        if (videoRef.current) {
-          videoRef.current.muted = true;
-          videoRef.current.play().catch(() => {
-            setHasError(true);
-          });
-        }
-      });
+    // If video is already ready (cached), play immediately
+    if (videoRef.current && videoRef.current.readyState >= 3) {
+      attemptPlay();
     }
-  }, [videoPath]);
+    // Otherwise, onCanPlay handler will trigger playback
+  }, [videoPath, attemptPlay]);
 
   // If video failed to load or video path doesn't exist, show static image
   if (hasError || !videoPath) {
@@ -67,6 +79,9 @@ export function VideoBackground({ videoPath, imagePath }: VideoBackgroundProps) 
         loop
         muted
         playsInline
+        webkit-playsinline=""
+        preload="auto"
+        onCanPlay={attemptPlay}
         onError={() => setHasError(true)}
         className="fixed inset-0 z-0 w-full h-full object-cover"
         style={{ objectFit: 'cover' }}

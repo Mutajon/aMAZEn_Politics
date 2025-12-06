@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { HelpCircle } from "lucide-react";
 import { mirrorBubbleTheme as T } from "../../theme/mirrorBubbleTheme";
 import { MirrorImage, MirrorReflection } from "../MirrorWithReflection";
+import { useSettingsStore } from "../../store/settingsStore";
 
 /* ====================== TUNABLES (EDIT HERE) ====================== */
 // Card visuals
@@ -59,6 +60,13 @@ export type MirrorCardProps = {
 };
 
 export default function MirrorCard({ text, italic = true, className, onExploreClick, avatarUrl }: MirrorCardProps) {
+  // Mobile detection for responsive mirror positioning
+  const isMobile = useSettingsStore((s) => s.isMobileDevice);
+
+  // Responsive mirror offset (reduce protrusion on mobile to prevent horizontal scroll)
+  const mirrorOffsetX = isMobile ? 0 : IMG_OFFSET_X; // 0 on mobile (no protrusion), -40 on desktop
+  const cardPadLeft = isMobile ? 50 : CARD_PAD_LEFT;   // Adjust padding accordingly
+
   // Use word-level splitting to prevent mid-word line breaks while maintaining shimmer effect
   const segments = useMemo(() => splitWords(text), [text]);
 
@@ -95,7 +103,7 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
           color: CARD_TEXT_COLOR,
           fontFamily: CARD_FONT_FF,
           fontSize: `${CARD_FONT_PX}px`,
-          padding: `${CARD_PAD_Y}px ${CARD_PAD_X}px ${CARD_PAD_Y}px ${CARD_PAD_LEFT}px`,
+          padding: `${CARD_PAD_Y}px ${CARD_PAD_X}px ${CARD_PAD_Y}px ${cardPadLeft}px`,
           boxShadow: CARD_SHADOW,
           borderTopLeftRadius: RADIUS_TL,
           borderTopRightRadius: RADIUS_TR,
@@ -130,7 +138,7 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
         <div
           className="absolute"
           style={{
-            left: `${IMG_OFFSET_X}px`,  // Protrudes to the left
+            left: `calc(${mirrorOffsetX}px - 50px)`,  // Protrudes to the left (responsive)
             top: "50%",                  // Center vertically
             transform: "translateY(-50%)", // Adjust for center alignment
             zIndex: 10,                  // In front like speaker avatar

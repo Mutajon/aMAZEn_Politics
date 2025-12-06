@@ -189,11 +189,11 @@ export default function InquiringModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="relative w-full max-w-2xl mx-4 max-h-[85vh] bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl border border-white/20 shadow-2xl overflow-hidden flex flex-col"
+          className="relative w-full max-w-2xl mx-3 sm:mx-4 max-h-[90vh] sm:max-h-[85vh] bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl border border-white/20 shadow-2xl overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="relative px-6 pt-6 pb-4 border-b border-white/10">
+          <div className="relative px-4 pt-4 pb-3 md:px-6 md:pt-6 md:pb-4 border-b border-white/10">
             {/* Close Button */}
             <button
               onClick={onClose}
@@ -204,12 +204,12 @@ export default function InquiringModal({
             </button>
 
             {/* Icon and Title */}
-            <div className="flex items-start gap-4 pr-12">
-              <div className="rounded-2xl bg-yellow-500/10 p-4 text-yellow-500">
-                <MessageCircle className="h-8 w-8" />
+            <div className="flex items-start gap-3 md:gap-4 pr-10 md:pr-12">
+              <div className="rounded-2xl bg-yellow-500/10 p-2 md:p-4 text-yellow-500">
+                <MessageCircle className="h-6 w-6 md:h-8 md:w-8" />
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="text-xl font-bold text-white mb-1">{lang("INQUIRING_MODAL_TITLE")}</h2>
+                <h2 className="text-lg md:text-xl font-bold text-white mb-1">{lang("INQUIRING_MODAL_TITLE")}</h2>
                 <p className="text-sm font-semibold text-white/80 mb-1">{dilemmaTitle}</p>
                 <p className="text-xs text-white/60 line-clamp-3">{dilemmaDescription}</p>
               </div>
@@ -217,7 +217,7 @@ export default function InquiringModal({
           </div>
 
           {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          <div className="flex-1 overflow-y-auto px-4 py-3 md:px-6 md:py-4 space-y-4">
             {/* Previous Inquiries Section */}
             {previousInquiries.length > 0 && (
               <div className="space-y-2">

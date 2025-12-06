@@ -136,15 +136,58 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       storyThemes: ["labor_rights", "class_solidarity", "violence_vs_nonviolence", "survival_vs_principle"],
       authorityLevel: "low",
       dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (1877 Railroad Strike):
-- Focus on AUTONOMY vs DEMOCRACY tension: collective action vs individual survival
-- Every dilemma must blur PRIVATE and PUBLIC life: leadership responsibilities vs family's immediate physical needs (hunger, safety, illness)
-- TONE: Gritty, material hardship, threat of violence always present
-- PERSONAL COST: Force choices between the cause and loved ones
-- STYLE EXAMPLES (for inspiration, generate unique variations):
-  • Violence accountability: A striker kills someone in self-defense—protect the movement's image or protect the person?
-  • Family vs cause: Immediate family need conflicts with strike demands—sacrifice family or weaken the cause?
-  • Bribery/corruption: Offers of personal gain in exchange for betrayal—accept, reject publicly, or exploit secretly?
-  • Macro consequences: The strike causes wider suffering—humanitarian concession or leverage through pain?`
+
+═══════════════════════════════════════════════════════════════════════════════
+CORE TENSION TRIANGLE: AUTONOMY vs DEMOCRACY vs LIBERALISM
+═══════════════════════════════════════════════════════════════════════════════
+
+Probe these tensions throughout the game:
+- How do strikes STRAIN democratic life? (collective action vs individual rights)
+- What is the PERSONAL COST of activism? (leadership risks becoming complicity)
+- Every dilemma MUST blur private/public spheres with MATERIAL REALITY: hunger, violence, solidarity, betrayal, fear
+
+═══════════════════════════════════════════════════════════════════════════════
+MANDATORY THEMATIC ARCHETYPES — HARD ROTATION REQUIRED
+═══════════════════════════════════════════════════════════════════════════════
+
+You MUST cycle through these 7 archetypes. Do NOT repeat an archetype until at least 4 others have been used.
+Track usage internally. Each day's dilemma must fit ONE archetype clearly.
+
+1. VIOLENCE ACCOUNTABILITY (tensionCluster: LawJustice or SocialOrder)
+   A striker kills in self-defense. A mob destroys railroad property. A Pinkerton is beaten.
+   → Protect the movement's image? Protect the individual? Sacrifice someone to appease authorities?
+
+2. FAMILY VS CAUSE (tensionCluster: FamilyPersonal)
+   Your child is sick. Your spouse begs you to quit. Your elderly parent needs medicine the company doctor won't give.
+   → Sacrifice your family's immediate survival, or weaken the collective struggle?
+
+3. BRIBERY & CORRUPTION (tensionCluster: EconomyResources or InternalPower)
+   Railroad owners offer you money, a job, or safe passage for your family.
+   → Accept and betray openly? Reject publicly and become a target? Accept secretly and play double agent?
+
+4. MACRO CONSEQUENCES (tensionCluster: HealthDisaster or EconomyResources)
+   The strike causes suffering beyond strikers: hospitals lack coal, food shipments rot, a nearby town goes hungry, mail stops.
+   → Make humanitarian concessions that weaken your leverage, or hold firm and be blamed for civilian suffering?
+
+5. SOLIDARITY VS BETRAYAL (tensionCluster: InternalPower or SocialOrder)
+   A fellow leader is accused of being a company spy. A splinter faction wants dynamite. Ethnic tensions fracture the coalition.
+   → Purge the accused? Let factions splinter? Compromise your principles to maintain unity?
+
+6. STATE VIOLENCE (tensionCluster: ExternalConflict or LawJustice)
+   Militia is mobilizing. Federal troops are coming. You have intelligence on their plans.
+   → Prepare for armed confrontation? Disperse and survive? Negotiate surrender? Leak to newspapers to shame the governor?
+
+7. MORAL COMPROMISE (tensionCluster: ReligionCulture or DiplomacyTreaty)
+   A preacher offers sanctuary but demands you renounce violence. A journalist offers coverage but wants exaggerated atrocities. A politician offers support but wants you to betray another union.
+   → Trade your integrity for tactical advantage?
+
+═══════════════════════════════════════════════════════════════════════════════
+TONE & STYLE
+═══════════════════════════════════════════════════════════════════════════════
+
+- GRITTY: Material hardship, physical threat of violence always present
+- CONCRETE: Ground every choice in physical consequences (hunger, injury, arrest, death, eviction)
+- NO ABSTRACT IDEALISM: "The cause" must always have a body count or a bread line attached`
     },
     characters: {
       male: {
@@ -158,6 +201,161 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       any: {
         nameKey: "RAILROAD_CHAR_ANY_NAME",
         promptKey: "RAILROAD_CHAR_ANY_PROMPT"
+      }
+    }
+  },
+
+  {
+    id: "telaviv_2025",
+    legacyKey: "Tel Aviv — The Campus Uprising (2025)",
+    titleKey: "TELAVIV_TITLE",
+    subtitleKey: "TELAVIV_SUBTITLE",
+    introKey: "TELAVIV_INTRO",
+    youAreKey: "TELAVIV_YOU_ARE",
+    year: "2025",
+    imageId: "telavivStrike",
+    avatarPrompt: "Israeli university student in casual clothes, clipboard in hand, standing at a voting booth on campus",
+    roleScope: "A student supervisor selected by lottery to oversee strike referendum procedures; can set ballot language, validate petitions, and announce results but cannot dictate how people vote or override Assembly decisions.",
+    storyThemes: ["direct_democracy", "institutional_neutrality", "crisis_definition", "collective_vs_individual"],
+    scoreGoal: 1100,
+    defaultGoalStatus: "uncompleted",
+    defaultHighScore: 0,
+    powerDistribution: {
+      systemName: "Direct Democracy",
+      systemDesc: "Dual-track legitimacy: an informed Student Assembly debates and votes, while mass Referendums can override or ratify. The supervisor must navigate both.",
+      flavor: "Your neutrality is your power—and your prison.",
+      holders: [
+        {
+          name: "Executive (University Mgmt & State)",
+          percent: 30,
+          icon: "🏛️",
+          note: "Controls budgets, operations, and disciplinary mechanisms",
+          role: { A: true, E: true },
+          stype: { t: "Author", i: "+" }
+        },
+        {
+          name: "Demos (Students)",
+          percent: 25,
+          icon: "👥",
+          note: "Main voting body; capable of mobilization but prone to emotional shifts",
+          role: { A: true, E: false },
+          stype: { t: "Author", i: "•" }
+        },
+        {
+          name: "Ideology (Political Factions)",
+          percent: 20,
+          icon: "📢",
+          note: "Frame the strike as moral duty or treason; exert peer pressure",
+          role: { A: true, E: true },
+          stype: { t: "Author", i: "•" }
+        },
+        {
+          name: "Wealth (Donors/Parents)",
+          percent: 15,
+          icon: "💰",
+          note: "Paying clients and donors pressure the university to avoid disruption",
+          role: { A: false, E: true },
+          stype: { t: "Eraser", i: "•" }
+        },
+        {
+          name: "General Population (Israeli Society/Media)",
+          percent: 10,
+          icon: "📰",
+          note: "External public opinion; views the university as a symbolic battleground",
+          role: { A: false, E: false },
+          stype: { t: "Actor", i: "•" }
+        }
+      ],
+      playerIndex: 1,
+      challengerSeat: {
+        name: "Executive (University Mgmt & State)",
+        percent: 30,
+        index: 0
+      },
+      e12: {
+        tierI: ["CivilLib", "InfoOrder", "Justice"],
+        tierII: ["Economy", "Appointments", "Curricula"],
+        tierIII: ["Security", "Infrastructure", "Healthcare", "Diplomacy", "Immigration", "Environment"],
+        stopA: false,
+        stopB: false,
+        decisive: ["Executive (University Mgmt & State)", "Demos (Students)", "Ideology (Political Factions)"]
+      },
+      grounding: {
+        settingType: "real",
+        era: "Tel Aviv University, 2025"
+      },
+      supportProfiles: ROLE_SUPPORT_PROFILES["Tel Aviv — The Campus Uprising (2025)"] ?? null,
+      roleScope: "A student supervisor selected by lottery to oversee strike referendum procedures; can set ballot language, validate petitions, and announce results but cannot dictate how people vote or override Assembly decisions.",
+      storyThemes: ["direct_democracy", "institutional_neutrality", "crisis_definition", "collective_vs_individual"],
+      authorityLevel: "low",
+      dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (Tel Aviv University Strike 2025):
+
+═══════════════════════════════════════════════════════════════════════════════
+CORE TENSION TRIANGLE: AUTONOMY vs DEMOCRACY vs LIBERALISM
+═══════════════════════════════════════════════════════════════════════════════
+
+Probe these tensions throughout the game:
+- DELIBERATIVE vs POPULAR authority: When does the informed Assembly override raw Referendum results?
+- THE GREY ZONE: How do you define "crisis" when the threat is bureaucratic defiance, not open rebellion?
+- ETHICS OF ENFORCEMENT: Balance the right to strike against dissenters' rights and harm to vulnerable populations
+- PRIVATE vs CIVIC: When is strict neutrality ethical, and when does it become evasion of responsibility?
+
+═══════════════════════════════════════════════════════════════════════════════
+MANDATORY THEMATIC ARCHETYPES — HARD ROTATION REQUIRED
+═══════════════════════════════════════════════════════════════════════════════
+
+You MUST cycle through these 7 archetypes. Do NOT repeat an archetype until at least 4 others have been used.
+Track usage internally. Each day's dilemma must fit ONE archetype clearly.
+
+1. THE GREY ZONE (tensionCluster: LawJustice or InternalPower)
+   The government uses passive delays rather than open defiance. A petition demands a "preemptive" strike.
+   → Validate the petition (legitimize preemption) or reject it as premature (preserve the "crisis" label for real emergencies)?
+
+2. THE MANDATE MISMATCH (tensionCluster: SocialOrder or InternalPower)
+   The Assembly voted 90% to strike, but mass polls show student apathy. The Referendum may fail.
+   → Use neutral ballot framing (risking failure) or biased urgency language to align the popular vote with the Assembly?
+
+3. THE INVISIBLE COST (tensionCluster: EconomyResources or FamilyPersonal)
+   Unpaid contract workers and first-gen students beg for exemptions—they need wages and grades to survive.
+   → Weaken the strike's signal by granting exemptions, or force the most vulnerable to bear the heaviest cost?
+
+4. THE PICKET LINE (tensionCluster: LawJustice or SocialOrder)
+   A professor defies the strike to teach class. Students want to physically block him.
+   → Authorize the blockade (enforce collective democracy) or clear the way (protect individual dissent)?
+
+5. LEGAL LIABILITY (tensionCluster: DiplomacyTreaty or LawJustice)
+   Counsel warns that an official "Shutdown" invites lawsuits from students who want to study.
+   → Water down language to "Voluntary Absence" (weaker signal, legal cover) or risk institutional liability for a stronger stance?
+
+6. THE EXIT STRATEGY (tensionCluster: InternalPower or SocialOrder)
+   The strike fails to generate reaction after four days. Momentum is dying.
+   → Declare a "symbolic victory" and fold with dignity, or escalate to risky tactics to regain attention?
+
+7. STRIKE INFLATION (tensionCluster: ReligionCulture or SocialOrder)
+   Students cite your precedent to demand a strike over cafeteria prices or parking fees.
+   → Democratize the strike tool for all grievances, or gatekeep it strictly for constitutional crises?
+
+═══════════════════════════════════════════════════════════════════════════════
+TONE & STYLE
+═══════════════════════════════════════════════════════════════════════════════
+
+- PROCEDURAL PRESSURE: Every choice involves forms, votes, quorums, and deadlines
+- MORAL AMBIGUITY: No clear heroes or villains—everyone has legitimate grievances
+- PERSONAL ENTANGLEMENT: Private friendships, grades, and career prospects are always at stake
+- CONCRETE CONSEQUENCES: Lawsuits, expulsions, career damage, broken friendships`
+    },
+    characters: {
+      male: {
+        nameKey: "TELAVIV_CHAR_MALE_NAME",
+        promptKey: "TELAVIV_CHAR_MALE_PROMPT"
+      },
+      female: {
+        nameKey: "TELAVIV_CHAR_FEMALE_NAME",
+        promptKey: "TELAVIV_CHAR_FEMALE_PROMPT"
+      },
+      any: {
+        nameKey: "TELAVIV_CHAR_ANY_NAME",
+        promptKey: "TELAVIV_CHAR_ANY_PROMPT"
       }
     }
   },
@@ -1054,11 +1252,11 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
   }
 ];
 
-// Experiment roles: Athens (index 0), North America (index 3), Mars (index 9)
+// Experiment roles: Railroad Strike (index 0), Tel Aviv (index 1), Mars (index 10)
 export const EXPERIMENT_PREDEFINED_ROLE_KEYS = [
-  PREDEFINED_ROLES_ARRAY[0].legacyKey,  // Athens (-404)
-  PREDEFINED_ROLES_ARRAY[3].legacyKey,  // North America (1607)
-  PREDEFINED_ROLES_ARRAY[9].legacyKey   // Mars (2179)
+  PREDEFINED_ROLES_ARRAY[0].legacyKey,  // Railroad Strike (1877)
+  PREDEFINED_ROLES_ARRAY[1].legacyKey,  // Tel Aviv (2025)
+  PREDEFINED_ROLES_ARRAY[10].legacyKey  // Mars (2179)
 ];
 
 /**

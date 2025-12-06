@@ -90,7 +90,35 @@ export const POWER_DISTRIBUTION_TRANSLATIONS: Record<string, {
       }
     }
   },
-  
+
+  "telaviv_2025": {
+    systemName: "TELAVIV_SYSTEM_NAME",
+    systemDesc: "TELAVIV_SYSTEM_DESC",
+    flavor: "TELAVIV_FLAVOR",
+    holders: {
+      "Executive (University Mgmt & State)": {
+        name: "TELAVIV_HOLDER_EXECUTIVE_NAME",
+        note: "TELAVIV_HOLDER_EXECUTIVE_NOTE"
+      },
+      "Demos (Students)": {
+        name: "TELAVIV_HOLDER_DEMOS_NAME",
+        note: "TELAVIV_HOLDER_DEMOS_NOTE"
+      },
+      "Ideology (Political Factions)": {
+        name: "TELAVIV_HOLDER_IDEOLOGY_NAME",
+        note: "TELAVIV_HOLDER_IDEOLOGY_NOTE"
+      },
+      "Wealth (Donors/Parents)": {
+        name: "TELAVIV_HOLDER_WEALTH_NAME",
+        note: "TELAVIV_HOLDER_WEALTH_NOTE"
+      },
+      "General Population (Israeli Society/Media)": {
+        name: "TELAVIV_HOLDER_MEDIA_NAME",
+        note: "TELAVIV_HOLDER_MEDIA_NOTE"
+      }
+    }
+  },
+
   "north_america_1607": {
     systemName: "NORTH_AMERICA_SYSTEM_NAME",
     systemDesc: "NORTH_AMERICA_SYSTEM_DESC",

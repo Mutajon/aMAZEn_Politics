@@ -28,9 +28,11 @@ import CompassPillsOverlay from "./CompassPillsOverlay";
 import type { CompassPill } from "../../hooks/useEventDataCollector";
 import type { CompassEffectPing } from "../MiniCompass";
 import { lang } from "../../i18n/lang";
+import { useSettingsStore } from "../../store/settingsStore";
 
-// Speaker avatar constants
-const AVATAR_SIZE_PX = 120; // Sized to show full face and upper body
+// Speaker avatar constants - responsive sizes
+const AVATAR_SIZE_DESKTOP_PX = 120; // Desktop: show full face and upper body
+const AVATAR_SIZE_MOBILE_PX = 80;   // Mobile: smaller for better fit
 
 type Props = {
   isOpen: boolean;
@@ -62,6 +64,10 @@ export default function ReasoningModal({
   const [validationError, setValidationError] = useState<string>("");
   const [compassPills, setCompassPills] = useState<CompassPill[]>([]);
   const [thankYouMessage, setThankYouMessage] = useState<string>("");
+
+  // Responsive avatar size
+  const isMobile = useSettingsStore((s) => s.isMobileDevice);
+  const avatarSize = isMobile ? AVATAR_SIZE_MOBILE_PX : AVATAR_SIZE_DESKTOP_PX;
 
 
   // Logging hooks
@@ -298,11 +304,11 @@ export default function ReasoningModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="relative w-full max-w-2xl mx-4 max-h-[85vh] bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl border border-white/20 shadow-2xl overflow-hidden flex flex-col"
+          className="relative w-full max-w-2xl mx-3 sm:mx-4 max-h-[90vh] sm:max-h-[85vh] bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl border border-white/20 shadow-2xl overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="relative px-6 pt-6 pb-4 border-b border-white/10">
+          <div className="relative px-4 pt-4 pb-3 md:px-6 md:pt-6 md:pb-4 border-b border-white/10">
             {/* Close Button (only shown after submission) */}
             {showAcknowledgment && (
               <button
@@ -315,32 +321,32 @@ export default function ReasoningModal({
             )}
 
             {/* Icon and Title */}
-            <div className="flex items-start gap-4">
+            <div className="flex items-start gap-3 md:gap-4">
               {/* Mirror with Avatar Reflection */}
               <div
                 className="relative flex-shrink-0"
-                style={{ width: AVATAR_SIZE_PX, height: AVATAR_SIZE_PX }}
+                style={{ width: avatarSize, height: avatarSize }}
               >
                 {/* Mirror image (shimmer disabled) */}
                 <div
                   className="pointer-events-none select-none"
                   style={{
-                    width: AVATAR_SIZE_PX,
-                    height: AVATAR_SIZE_PX,
+                    width: avatarSize,
+                    height: avatarSize,
                     opacity: 0.95,
                   }}
                 >
-                  <MirrorImage mirrorSize={AVATAR_SIZE_PX} mirrorAlt="Mystic mirror" />
+                  <MirrorImage mirrorSize={avatarSize} mirrorAlt="Mystic mirror" />
                 </div>
 
                 {/* Reflection overlay */}
                 <MirrorReflection
-                  mirrorSize={AVATAR_SIZE_PX}
+                  mirrorSize={avatarSize}
                   avatarUrl={avatarUrl}
                 />
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="text-xl font-bold text-white mb-2" style={{ fontFamily: "Georgia, serif" }}>
+                <h2 className="text-lg md:text-xl font-bold text-white mb-2" style={{ fontFamily: "Georgia, serif" }}>
                   {lang("REASONING_MODAL_TITLE")}
                 </h2>
                 <p className="text-xs text-white/50 uppercase tracking-wide mb-1">{lang("REASONING_MODAL_YOUR_DECISION")}</p>
@@ -351,7 +357,7 @@ export default function ReasoningModal({
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+          <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-6 space-y-4">
             {!showAcknowledgment ? (
               <>
                 {/* Input Section */}

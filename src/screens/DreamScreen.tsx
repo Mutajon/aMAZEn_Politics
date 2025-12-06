@@ -163,11 +163,11 @@ const GRANDPA_DIALOGUES = [
 // Typewriter speed in ms per character
 const TYPEWRITER_SPEED = 25;
 
-// Shard to role mapping: Athens (index 0), North America (index 3), Mars (index 9)
+// Shard to role mapping: Railroad Strike (index 0), Tel Aviv (index 1), Mars (index 10)
 const SHARD_ROLES = [
-  PREDEFINED_ROLES_ARRAY[0],  // Shard 0 → Athens
-  PREDEFINED_ROLES_ARRAY[3],  // Shard 1 → North America (locked)
-  PREDEFINED_ROLES_ARRAY[9],  // Shard 2 → Mars (locked)
+  PREDEFINED_ROLES_ARRAY[0],   // Shard 0 → Railroad Strike (1877)
+  PREDEFINED_ROLES_ARRAY[1],   // Shard 1 → Tel Aviv (2025)
+  PREDEFINED_ROLES_ARRAY[10],  // Shard 2 → Mars (2179)
 ];
 
 export default function DreamScreen({ push }: { push: PushFn }) {

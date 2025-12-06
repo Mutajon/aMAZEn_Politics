@@ -213,7 +213,7 @@ export default function ActionDeckContent({
                   CARD_BASE,
                   CARD_PAD,
                   c.cardGradientClass,
-                  "text-left relative transition-transform",
+                  "text-start relative transition-transform",
                   disabled ? "opacity-50 saturate-75 cursor-not-allowed" : "cursor-pointer hover:brightness-[1.03]",
                   isSelected ? "ring-2 ring-white/30" : "",
                 ].join(" ")}
