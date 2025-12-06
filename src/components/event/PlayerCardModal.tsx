@@ -22,6 +22,7 @@ import { useRoleStore } from "../../store/roleStore";
 import { useCompassStore } from "../../store/compassStore";
 import { ValueExplanationModal } from "./ValueExplanationModal";
 import { useLang } from "../../i18n/lang";
+import { translateCompassValue } from "../../i18n/translateGameData";
 
 type Props = {
   isOpen: boolean;
@@ -63,6 +64,7 @@ function CompassBox({
   onValueClick?: (value: CompassComponentValue, idx: number) => void;
   valueRef?: (element: HTMLElement | null) => void;
 }) {
+  const lang = useLang();
   return (
     <div
       className="rounded-xl p-4 border"
@@ -82,7 +84,7 @@ function CompassBox({
       {/* Values */}
       <div className="space-y-2">
         {topValues.length === 0 ? (
-          <p className="text-sm text-white/50 italic">Yet to be determined...</p>
+          <p className="text-sm text-white/50 italic">{lang("COMPASS_VALUES_YET_TO_BE_DETERMINED")}</p>
         ) : (
           topValues.map((component, idx) => {
             const isHighlighted = tutorialMode && highlightedIndex === idx;
@@ -100,7 +102,7 @@ function CompassBox({
                 style={{ backgroundColor: `${color}10` }}
               >
                 <span className="text-sm text-white/90 font-medium">
-                  {component.short}
+                  {translateCompassValue(component.short, lang)}
                 </span>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <div
@@ -177,8 +179,8 @@ export default function PlayerCardModal({
   if (!isOpen) return null;
 
   // Compute derived values
-  const playerName = character?.name || "Unknown Leader";
-  const systemName = analysis?.systemName || "Unknown System";
+  const playerName = character?.name || lang("PLAYER_CARD_UNKNOWN_LEADER");
+  const systemName = analysis?.systemName || lang("PLAYER_CARD_UNKNOWN_SYSTEM");
   const topValues = getAllTopCompassValues(compassValues, 2);
 
   // Handle value click (works in both tutorial and normal mode)
@@ -232,7 +234,7 @@ export default function PlayerCardModal({
             <button
               onClick={onClose}
               className="absolute top-4 right-4 p-2 rounded-lg transition-colors z-20 hover:bg-white/10"
-              aria-label="Close"
+              aria-label={lang("CLOSE")}
             >
               <X className="w-5 h-5 text-white/70" />
             </button>
@@ -263,7 +265,7 @@ export default function PlayerCardModal({
 
               {/* Info Stack */}
               <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-bold text-white/80 mb-1">Who are you?</h2>
+                <h2 className="text-lg font-bold text-white/80 mb-1">{lang("PLAYER_CARD_WHO_ARE_YOU")}</h2>
                 <p className="text-2xl font-bold text-white mb-1 truncate">
                   {playerName}
                 </p>
@@ -292,13 +294,28 @@ export default function PlayerCardModal({
                 {lang("YOUR_CURRENT_MAIN_VALUES")}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {PROPERTIES.map((prop) => (
-                  <CompassBox
-                    key={prop.key}
-                    propKey={prop.key}
-                    title={prop.title}
-                    subtitle={prop.subtitle}
-                    color={PALETTE[prop.key].base}
+                {PROPERTIES.map((prop) => {
+                  const dimensionName = {
+                    what: lang("COMPASS_WHAT"),
+                    whence: lang("COMPASS_WHENCE"),
+                    how: lang("COMPASS_HOW"),
+                    whither: lang("COMPASS_WHITHER")
+                  }[prop.key];
+
+                  const dimensionSubtitle = {
+                    what: lang("COMPASS_WHAT_SUBTITLE"),
+                    whence: lang("COMPASS_WHENCE_SUBTITLE"),
+                    how: lang("COMPASS_HOW_SUBTITLE"),
+                    whither: lang("COMPASS_WHITHER_SUBTITLE")
+                  }[prop.key];
+
+                  return (
+                    <CompassBox
+                      key={prop.key}
+                      propKey={prop.key}
+                      title={dimensionName}
+                      subtitle={dimensionSubtitle}
+                      color={PALETTE[prop.key].base}
                     topValues={topValues[prop.key]}
                     tutorialMode={tutorialMode}
                     highlightedIndex={
@@ -312,8 +329,9 @@ export default function PlayerCardModal({
                         ? tutorialValueRef
                         : undefined
                     }
-                  />
-                ))}
+                    />
+                  );
+                })}
               </div>
             </div>
           </div>

@@ -15,7 +15,7 @@
 
 import { useState, useCallback } from "react";
 import { useDilemmaStore } from "../store/dilemmaStore";
-import { lang } from "../i18n/lang";
+import { lang, getCurrentLanguage } from "../i18n/lang";
 
 type InquiryEntry = {
   question: string;
@@ -106,7 +106,8 @@ export function useInquiring() {
               title: currentDilemma.title,
               description: currentDilemma.description
             },
-            day
+            day,
+            language: getCurrentLanguage()
           })
         });
 

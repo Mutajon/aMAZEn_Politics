@@ -5,6 +5,8 @@ import { X } from "lucide-react";
 import type { CompassEffectPing } from "../MiniCompass";
 import { COMPONENTS, PALETTE } from "../../data/compass-data";
 import { useAudioManager } from "../../hooks/useAudioManager";
+import { translateCompassValue } from "../../i18n/translateGameData";
+import { useLang } from "../../i18n/lang";
 
 type Props = {
   effectPills: CompassEffectPing[];
@@ -32,6 +34,7 @@ export default function CompassPillsOverlay({
   forceCollapse = false,
 }: Props) {
   const { playSfx } = useAudioManager();
+  const lang = useLang();
 
   // Track expand/collapse
   const [expanded, setExpanded] = useState<boolean>(true);
@@ -142,7 +145,8 @@ export default function CompassPillsOverlay({
               </motion.button>
 
               {effectPills.map((p, index) => {
-                const label = COMPONENTS[p.prop][p.idx]?.short ?? "";
+                const englishLabel = COMPONENTS[p.prop][p.idx]?.short ?? "";
+                const label = translateCompassValue(englishLabel, lang);
                 const bg = (PALETTE as any)[p.prop]?.base ?? "#fff";
 
                 // Calculate vertical offset for stacked layout

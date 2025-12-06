@@ -18,6 +18,7 @@ import MirrorBubbleTyping from "../components/MirrorBubbleTyping";
 import { COMPONENTS, PALETTE } from "../data/compass-data";
 import { useLogger } from "../hooks/useLogger";
 import { useNavigationGuard } from "../hooks/useNavigationGuard";
+import { translateCompassValue } from "../i18n/translateGameData";
 import { useTimingLogger } from "../hooks/useTimingLogger";
 import { useLang } from "../i18n/lang";
 import { translateQuizQuestion, translateQuizAnswer } from "../i18n/translateGameData";
@@ -310,7 +311,8 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
               <AnimatePresence>
                 {pings.map((p, i) => {
                   const color = (PALETTE)[p.prop]?.base ?? "#fff";
-                  const label = COMPONENTS[p.prop][p.idx]?.short ?? "";
+                  const englishLabel = COMPONENTS[p.prop][p.idx]?.short ?? "";
+                  const label = translateCompassValue(englishLabel, lang);
                   const topPx = MIRROR_SIZE / 2 - i * 28; // Stack vertically
                   const delay = i * 0.15; // Stagger animation
 

@@ -12,6 +12,7 @@ import type { PastGameEntry } from "../../lib/types/pastGames";
 import type { PropKey } from "../../data/compass-data";
 import { PALETTE } from "../../data/compass-data";
 import { useEffect } from "react";
+import { useLang } from "../../i18n/lang";
 
 interface FragmentPopupProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export default function FragmentPopup({
   showSelectionButton = false,
   onSelectPreferred,
 }: FragmentPopupProps) {
+  const lang = useLang();
   // Handle ESC key to close
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -173,7 +175,7 @@ export default function FragmentPopup({
                 <div className="mb-4">
                   <div className="bg-purple-900/20 border border-purple-700/40 rounded-lg px-4 py-3">
                     <p className="text-sm text-purple-200">
-                      <span className="font-semibold">Self judgment:</span> {fragment.selfJudgment}
+                      <span className="font-semibold">{lang("SELF_JUDGMENT_LABEL")}</span> {fragment.selfJudgment}
                     </p>
                   </div>
                 </div>

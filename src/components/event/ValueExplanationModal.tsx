@@ -1,5 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
+import { useLang } from '../../i18n/lang';
+import { translateCompassValue, translateCompassValueFull } from '../../i18n/translateGameData';
 
 interface ValueExplanationModalProps {
   value: {
@@ -17,15 +19,17 @@ const DIMENSION_COLORS = {
   whither: 'from-orange-500/20 to-yellow-500/20 ring-orange-400/40',
 };
 
-const DIMENSION_LABELS = {
-  what: 'What (Values)',
-  whence: 'Whence (Sources)',
-  how: 'How (Methods)',
-  whither: 'Whither (Goals)',
-};
-
 export function ValueExplanationModal({ value, onClose }: ValueExplanationModalProps) {
+  const lang = useLang();
+  
   if (!value) return null;
+
+  const dimensionLabels = {
+    what: lang("VALUE_EXPLANATION_DIMENSION_WHAT"),
+    whence: lang("VALUE_EXPLANATION_DIMENSION_WHENCE"),
+    how: lang("VALUE_EXPLANATION_DIMENSION_HOW"),
+    whither: lang("VALUE_EXPLANATION_DIMENSION_WHITHER"),
+  };
 
   return createPortal(
     <AnimatePresence>
@@ -54,18 +58,18 @@ export function ValueExplanationModal({ value, onClose }: ValueExplanationModalP
           >
             {/* Dimension label */}
             <div className="text-xs font-medium text-white/60 mb-2 uppercase tracking-wider">
-              {DIMENSION_LABELS[value.dimension]}
+              {dimensionLabels[value.dimension]}
             </div>
 
             {/* Value name */}
-            <h3 className="text-xl font-bold text-white mb-3">{value.short}</h3>
+            <h3 className="text-xl font-bold text-white mb-3">{translateCompassValue(value.short, lang)}</h3>
 
             {/* Explanation */}
-            <p className="text-sm leading-relaxed text-white/90">{value.full}</p>
+            <p className="text-sm leading-relaxed text-white/90">{translateCompassValueFull(value.short, lang)}</p>
 
             {/* Close hint */}
             <div className="mt-4 pt-4 border-t border-white/10">
-              <p className="text-xs text-white/50 text-center">Click anywhere to close</p>
+              <p className="text-xs text-white/50 text-center">{lang("VALUE_EXPLANATION_CLICK_TO_CLOSE")}</p>
             </div>
           </div>
         </motion.div>

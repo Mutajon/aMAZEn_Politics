@@ -39,6 +39,7 @@ import type { CompassEffectPing } from "../components/MiniCompass";
 import { loadEventScreenSnapshot, clearEventScreenSnapshot } from "../lib/eventScreenSnapshot";
 import { useLang } from "../i18n/lang";
 import { useRoleProgressStore } from "../store/roleProgressStore";
+import { POWER_DISTRIBUTION_TRANSLATIONS } from "../data/powerDistributionTranslations";
 import { useTimingLogger } from "../hooks/useTimingLogger";
 import { useReasoning } from "../hooks/useReasoning";
 import { useLogger } from "../hooks/useLogger";
@@ -226,8 +227,22 @@ export default function EventScreen3({ push }: Props) {
       supportMom,
     });
 
-    const middleLabel =
-      analysis?.challengerSeat?.name || lang("FINAL_SCORE_POWER_HOLDERS_SUPPORT");
+    // Helper function to translate challenger seat name
+    const translateChallengerName = (name: string): string => {
+      // Check all predefined role translations for a matching holder name
+      for (const roleTranslations of Object.values(POWER_DISTRIBUTION_TRANSLATIONS)) {
+        const holderTranslation = roleTranslations.holders[name];
+        if (holderTranslation) {
+          return lang(holderTranslation.name);
+        }
+      }
+      // If no translation found, return name as-is (for AI-generated roles)
+      return name;
+    };
+
+    const middleLabel = analysis?.challengerSeat?.name
+      ? translateChallengerName(analysis.challengerSeat.name)
+      : lang("FINAL_SCORE_POWER_HOLDERS_SUPPORT");
 
     return {
       total: breakdown.final,
@@ -686,6 +701,11 @@ export default function EventScreen3({ push }: Props) {
    * Handle action confirmation - delegates ALL logic to EventDataCleaner
    */
   const handleConfirm = async (id: string) => {
+    // Track choice for tutorial (Day 2 only)
+    if (day === 2 && !tutorial.tutorialCompleted) {
+      tutorial.onChoiceMade();
+    }
+
     // Set phase to confirming immediately to show loading overlay
     setPhase('confirming');
 
@@ -1179,6 +1199,7 @@ export default function EventScreen3({ push }: Props) {
                 ? tutorialPillsRef
                 : tutorialValueRef
             }
+            onOverlayClick={tutorial.onTutorialOverlayClick}
           />
         )}
 

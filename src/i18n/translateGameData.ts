@@ -57,6 +57,25 @@ export function translateCompassValue(value: string, lang: (key: string) => stri
 }
 
 /**
+ * Translates compass value full descriptions to translation keys
+ */
+export function translateCompassValueFull(value: string, lang: (key: string) => string): string {
+  // Normalize the compass value to a key format
+  const normalizedKey = value
+    .toUpperCase()
+    .replace(/\s+/g, "_")
+    .replace(/\//g, "_")
+    .replace(/[()]/g, "")
+    .replace(/\./g, "");
+  
+  const key = `COMPASS_VALUE_${normalizedKey}_FULL`;
+  const translated = lang(key);
+  
+  // If the translation returns the key itself (not found), return original value
+  return translated !== key ? translated : value;
+}
+
+/**
  * Translates leader description based on leader name
  */
 export function translateLeaderDescription(leaderName: string, description: string, lang: (key: string) => string): string {

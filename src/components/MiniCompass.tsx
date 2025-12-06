@@ -2,6 +2,8 @@
 import { motion, AnimatePresence } from "framer-motion";
 import PetalRing from "../components/PetalRing";
 import { COMPONENTS, PALETTE, type PropKey } from "../data/compass-data";
+import { translateCompassValue } from "../i18n/translateGameData";
+import { useLang } from "../i18n/lang";
 
 /** transient pill shown for compass effects */
 export type CompassEffectPing = {
@@ -29,6 +31,7 @@ export default function MiniCompass({
   effectPills?: CompassEffectPing[];
 }) {
   const center = size / 2;
+  const lang = useLang();
 
   return (
     <div className="relative" style={{ width: size, height: size }}>
@@ -47,7 +50,8 @@ export default function MiniCompass({
         <AnimatePresence>
           {effectPills.map((p, i) => {
             const color = (PALETTE as any)[p.prop]?.base ?? "#fff";
-            const label = COMPONENTS[p.prop][p.idx]?.short ?? "";
+            const englishLabel = COMPONENTS[p.prop][p.idx]?.short ?? "";
+            const label = translateCompassValue(englishLabel, lang);
             const topPx = center - i * 28;   // show one above the other
             const delay = i * 0.15;          // stagger them
 
