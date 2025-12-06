@@ -1249,6 +1249,160 @@ TONE & STYLE
         promptKey: "MARS_CHAR_ANY_PROMPT"
       }
     }
+  },
+
+  {
+    id: "namek_2099",
+    legacyKey: "Planet Namek — The Democratic Overload (2099)",
+    titleKey: "NAMEK_TITLE",
+    subtitleKey: "NAMEK_SUBTITLE",
+    introKey: "NAMEK_INTRO",
+    youAreKey: "NAMEK_YOU_ARE",
+    year: "2099",
+    imageId: "futuristicStrike",
+    avatarPrompt: "Sci-fi citizen journalist with holographic press badge, futuristic cityscape behind",
+    roleScope: "A citizen-journalist on Planet Namek; can publish stories, cast votes on AgoraNet, and influence public opinion but cannot pass laws or command security forces.",
+    storyThemes: ["direct_democracy", "information_ethics", "democratic_fatigue", "truth_vs_responsibility"],
+    scoreGoal: 1100,
+    defaultGoalStatus: "uncompleted",
+    defaultHighScore: 0,
+    powerDistribution: {
+      systemName: "Digital Direct Democracy",
+      systemDesc: "Citizens vote daily via AgoraNet; constant democratic participation causes decision fatigue and volatile swings.",
+      flavor: "Every voice counts—but who can still hear above the noise?",
+      holders: [
+        {
+          name: "Demos (Citizens)",
+          percent: 40,
+          icon: "👥",
+          note: "Supreme power through volatile daily voting",
+          role: { A: true, E: true },
+          stype: { t: "Author", i: "+" }
+        },
+        {
+          name: "Media (Journalists)",
+          percent: 25,
+          icon: "📡",
+          note: "Frame narratives that calm or inflame",
+          role: { A: true, E: false },
+          stype: { t: "Author", i: "•" }
+        },
+        {
+          name: "Wealth (Owners)",
+          percent: 15,
+          icon: "💰",
+          note: "Control production, subject to Demos whims",
+          role: { A: false, E: true },
+          stype: { t: "Eraser", i: "•" }
+        },
+        {
+          name: "Ideology (Normative Frames)",
+          percent: 15,
+          icon: "📢",
+          note: "Interpret strikes as rights or chaos",
+          role: { A: true, E: false },
+          stype: { t: "Actor", i: "•" }
+        },
+        {
+          name: "Police (Civic Security)",
+          percent: 5,
+          icon: "🛡️",
+          note: "Minimal power; contested during shutdowns",
+          role: { A: false, E: false },
+          stype: { t: "Actor", i: "-" }
+        }
+      ],
+      playerIndex: 1,
+      challengerSeat: {
+        name: "Demos (Citizens)",
+        percent: 40,
+        index: 0
+      },
+      e12: {
+        tierI: ["InfoOrder", "CivilLib", "Economy"],
+        tierII: ["Order", "Infrastructure", "Justice"],
+        tierIII: ["Healthcare", "Environment", "Appointments"],
+        stopA: false,
+        stopB: false,
+        decisive: ["Demos (Citizens)", "Media (Journalists)", "Ideology (Normative Frames)"]
+      },
+      grounding: {
+        settingType: "fictional",
+        era: "Planet Namek, 2099"
+      },
+      supportProfiles: ROLE_SUPPORT_PROFILES["Planet Namek — The Democratic Overload (2099)"] ?? null,
+      roleScope: "A citizen-journalist; can publish, vote, and influence opinion but not legislate or command forces.",
+      storyThemes: ["direct_democracy", "information_ethics", "democratic_fatigue", "truth_vs_responsibility"],
+      authorityLevel: "low",
+      dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (Planet Namek 2099):
+
+═══════════════════════════════════════════════════════════════════════════════
+CORE TENSION TRIANGLE: DEMOCRACY vs LIBERTY vs AUTONOMY
+═══════════════════════════════════════════════════════════════════════════════
+
+Probe these tensions throughout the game:
+- How do DIGITAL PLATFORMS amplify or distort democratic impulses?
+- Strikes EMPOWER citizens but EXHAUST societies—explore both sides
+- DEMOCRATIC FATIGUE: constant civic participation becomes pressure, burnout, conflict
+- Player must decide: EXPOSE, SHIELD, CRITICIZE, or JOIN movements
+
+═══════════════════════════════════════════════════════════════════════════════
+MANDATORY THEMATIC ARCHETYPES — HARD ROTATION REQUIRED
+═══════════════════════════════════════════════════════════════════════════════
+
+You MUST cycle through these 7 archetypes. Do NOT repeat until at least 4 others used.
+
+1. THE TRUTH DILEMMA (tensionCluster: InfoOrder or LawJustice)
+   You discover damaging truth about strike leaders. Publishing destabilizes the movement.
+   → Publish and risk chaos? Shield and compromise journalistic integrity? Leak selectively?
+
+2. THE AMPLIFICATION TRAP (tensionCluster: InternalPower or SocialOrder)
+   AgoraNet algorithms push your story viral—but distort its meaning into rage.
+   → Retract and lose influence? Ride the wave? Try to correct mid-crisis?
+
+3. THE VOTE FATIGUE (tensionCluster: EconomyResources or HealthDisaster)
+   Citizens are exhausted. A crucial infrastructure vote has 12% turnout. Your story could drive turnout—or deepen cynicism.
+   → Sensationalize to drive turnout? Report honestly and risk infrastructure collapse?
+
+4. THE STRIKE CROSSFIRE (tensionCluster: SocialOrder or ExternalConflict)
+   Workers strike essential services. Hospitals run low. Both sides want you to tell their story.
+   → Cover the strikers' grievances? Document the humanitarian cost? Attempt neutrality?
+
+5. THE PLATFORM SHUTDOWN (tensionCluster: CivilLib or InternalPower)
+   AgoraNet threatens to suspend your credentials for "destabilizing content."
+   → Self-censor to stay online? Go underground? Become a martyr for press freedom?
+
+6. THE JOINING POINT (tensionCluster: FamilyPersonal or ReligionCulture)
+   You're asked to stop reporting and join the strike leadership yourself.
+   → Abandon observer role? Maintain distance? Secretly advise while appearing neutral?
+
+7. THE EXIT QUESTION (tensionCluster: DiplomacyTreaty or SocialOrder)
+   The strike is failing. Movement leaders want you to fabricate a "victory narrative."
+   → Help them save face (lie)? Document the defeat honestly? Propose a negotiated ending?
+
+═══════════════════════════════════════════════════════════════════════════════
+TONE & STYLE
+═══════════════════════════════════════════════════════════════════════════════
+
+- SCI-FI GROUNDED: Technology is pervasive but problems are human
+- INFORMATION WARFARE: Truth is a weapon; platforms shape reality
+- DEMOCRATIC BURNOUT: Everyone is tired of voting, deciding, participating
+- MORAL AMBIGUITY: Strikes are both liberating and destructive`
+    },
+    characters: {
+      male: {
+        nameKey: "NAMEK_CHAR_MALE_NAME",
+        promptKey: "NAMEK_CHAR_MALE_PROMPT"
+      },
+      female: {
+        nameKey: "NAMEK_CHAR_FEMALE_NAME",
+        promptKey: "NAMEK_CHAR_FEMALE_PROMPT"
+      },
+      any: {
+        nameKey: "NAMEK_CHAR_ANY_NAME",
+        promptKey: "NAMEK_CHAR_ANY_PROMPT"
+      }
+    }
   }
 ];
 

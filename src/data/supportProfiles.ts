@@ -288,5 +288,31 @@ export const ROLE_SUPPORT_PROFILES: Record<string, RoleSupportProfiles> = {
       origin: "predefined",
     },
   },
+  "Planet Namek — The Democratic Overload (2099)": {
+    people: {
+      summary: "Citizens demand responsive governance but suffer from decision fatigue and information overload.",
+      stances: {
+        governance: "Direct democracy is sacred; every issue deserves a vote.",
+        order: "Strikes are legitimate democratic expression, even when disruptive.",
+        economy: "Infrastructure must serve all equally; no elite exemptions.",
+        justice: "Transparent algorithms; no hidden manipulation of AgoraNet.",
+        culture: "Information freedom is the highest value.",
+        foreign: "Planetary autonomy; resist external governance models.",
+      },
+      origin: "predefined",
+    },
+    challenger: {
+      summary: "The volatile Demos swings wildly, demanding contradictory outcomes and exhausting the system.",
+      stances: {
+        governance: "Vote on everything, even contradictory measures.",
+        order: "Strike when dissatisfied; the system will adapt.",
+        economy: "Demand services but resist the votes needed to fund them.",
+        justice: "Punish unpopular decisions retroactively.",
+        culture: "Viral outrage is democratic participation.",
+        foreign: "Reject expert advice as elitism.",
+      },
+      origin: "predefined",
+    },
+  },
 };
 
