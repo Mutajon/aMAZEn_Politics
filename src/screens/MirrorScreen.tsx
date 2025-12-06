@@ -23,6 +23,7 @@ import {
   clearAftermathReturnRoute
 } from "../lib/eventScreenSnapshot";
 import { useLang } from "../i18n/lang";
+import { translateCompassValue } from "../i18n/translateGameData";
 
 const MIRROR_SRC = "/assets/images/mirrorBroken.png";
 
@@ -162,7 +163,7 @@ export default function MirrorScreen({ push }: Props) {
                       >
                         {/* Label and value */}
                         <div className="flex items-center justify-between text-sm mb-1.5 px-1">
-                          <span className="text-white/90 font-medium">{comp.short}</span>
+                          <span className="text-white/90 font-medium">{translateCompassValue(comp.short, lang)}</span>
                           <span className="text-white/70 tabular-nums font-semibold">{comp.value}</span>
                         </div>
 
@@ -228,7 +229,7 @@ export default function MirrorScreen({ push }: Props) {
                     className="text-xl font-bold"
                     style={{ color: PALETTE[selectedDef.prop].base }}
                   >
-                    {selectedDef.short}
+                    {translateCompassValue(selectedDef.short, lang)}
                   </h3>
                   <button
                     onClick={() => setSelectedDef(null)}

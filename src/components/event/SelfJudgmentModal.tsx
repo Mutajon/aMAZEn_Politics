@@ -16,18 +16,10 @@ import { useState, useEffect } from "react";
 import { useLogger } from "../../hooks/useLogger";
 import MirrorWithReflection from "../MirrorWithReflection";
 import { useRoleStore } from "../../store/roleStore";
+import { useLang } from "../../i18n/lang";
 
 // Speaker avatar constants
 const AVATAR_SIZE_PX = 120; // Sized to show full face and upper body
-
-// Self-judgment options (5-point scale)
-const JUDGMENT_OPTIONS = [
-  "A Disaster — Let's pretend that never happened.",
-  "Not Great — I stumbled through it.",
-  "Eh, Decent — Could've been worse.",
-  "Pretty Solid — I did alright, actually.",
-  "A Triumph — I surprised even myself.",
-] as const;
 
 type Props = {
   isOpen: boolean;
@@ -43,6 +35,16 @@ export default function SelfJudgmentModal({
   const [selectedJudgment, setSelectedJudgment] = useState<string | null>(null);
   const logger = useLogger();
   const character = useRoleStore((s) => s.character);
+  const lang = useLang();
+
+  // Self-judgment options (5-point scale) - translated
+  const JUDGMENT_OPTIONS = [
+    lang("SELF_JUDGMENT_OPTION_1"),
+    lang("SELF_JUDGMENT_OPTION_2"),
+    lang("SELF_JUDGMENT_OPTION_3"),
+    lang("SELF_JUDGMENT_OPTION_4"),
+    lang("SELF_JUDGMENT_OPTION_5"),
+  ] as const;
 
   // Log when modal opens
   useEffect(() => {
@@ -114,7 +116,7 @@ export default function SelfJudgmentModal({
               </div>
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl font-bold text-white mb-2" style={{ fontFamily: "Georgia, serif" }}>
-                  Your time is up. Before we look at your fragment, how would you judge your own choices?
+                  {lang("SELF_JUDGMENT_TITLE")}
                 </h2>
               </div>
             </div>
@@ -165,7 +167,7 @@ export default function SelfJudgmentModal({
               `}
             >
               <Sparkles className="w-5 h-5" />
-              <span>Continue to Aftermath</span>
+              <span>{lang("SELF_JUDGMENT_CONTINUE")}</span>
             </button>
           </div>
         </motion.div>

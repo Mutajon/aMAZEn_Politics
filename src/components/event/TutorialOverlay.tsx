@@ -2,23 +2,26 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { useState, useLayoutEffect } from 'react';
 import type { TutorialStep } from '../../hooks/useDay2Tutorial';
+import { useLang } from '../../i18n/lang';
 
 interface TutorialOverlayProps {
   step: TutorialStep;
   targetElement?: HTMLElement | null;
+  onOverlayClick?: () => void;
 }
 
-// Tutorial messages for each step
-const STEP_MESSAGES: Partial<Record<TutorialStep, string>> = {
-  'awaiting-avatar':
-    'Click on your avatar to see the current top values exhibited by your actions',
-  'awaiting-value': 'Click on a value for further details',
-  'awaiting-compass-pills': 'Click the compass to see the most recent change to your values',
-};
-
-export function TutorialOverlay({ step, targetElement }: TutorialOverlayProps) {
+export function TutorialOverlay({ step, targetElement, onOverlayClick }: TutorialOverlayProps) {
+  const lang = useLang();
+  
   // Don't render for inactive/complete steps
   if (step === 'inactive' || step === 'complete') return null;
+
+  // Tutorial messages for each step
+  const STEP_MESSAGES: Partial<Record<TutorialStep, string>> = {
+    'awaiting-avatar': lang("TUTORIAL_TIP_AVATAR"),
+    'awaiting-value': lang("TUTORIAL_TIP_VALUE"),
+    'awaiting-compass-pills': lang("TUTORIAL_TIP_COMPASS_PILLS"),
+  };
 
   const message = STEP_MESSAGES[step];
   if (!message) return null;
@@ -29,13 +32,14 @@ export function TutorialOverlay({ step, targetElement }: TutorialOverlayProps) {
         {/* Highlight ring around target element */}
         {targetElement && <HighlightRing targetElement={targetElement} />}
 
-        {/* Fixed bottom-center tooltip */}
+        {/* Fixed bottom-center tooltip - clickable */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
           transition={{ duration: 0.3 }}
-          className="fixed left-1/2 -translate-x-1/2 bottom-24 bg-gray-900/95 text-white rounded-xl p-4 ring-2 ring-amber-400/60 shadow-2xl max-w-[300px]"
+          onClick={onOverlayClick}
+          className="fixed left-1/2 -translate-x-1/2 bottom-24 bg-gray-900/95 text-white rounded-xl p-4 ring-2 ring-amber-400/60 shadow-2xl max-w-[300px] pointer-events-auto cursor-pointer hover:bg-gray-800/95 transition-colors"
           style={{ zIndex: 90 }}
         >
           <p className="text-sm text-center leading-relaxed">{message}</p>

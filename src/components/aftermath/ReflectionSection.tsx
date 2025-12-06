@@ -18,6 +18,7 @@ import React, { useMemo, useEffect, useState } from "react";
 import { mirrorBubbleTheme as T } from "../../theme/mirrorBubbleTheme";
 import { PALETTE, type PropKey } from "../../data/compass-data";
 import { useLang } from "../../i18n/lang";
+import { translateCompassValue } from "../../i18n/translateGameData";
 
 type TopValue = {
   short: string;
@@ -113,7 +114,7 @@ export default function ReflectionSection({ top3ByDimension, valuesSummary }: Pr
                       {dimensionSubtitle}
                     </div>
                     <div className="text-white/90 font-medium">
-                      {topValue?.short || "—"}
+                      {topValue?.short ? translateCompassValue(topValue.short, lang) : "—"}
                     </div>
                   </div>
                 );

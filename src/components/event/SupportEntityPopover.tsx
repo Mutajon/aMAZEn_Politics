@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ChevronUp, X, Users, Landmark, Scale, Shield, TrendingUp, Gavel, Users2, Globe } from "lucide-react";
 import type { SupportProfile } from "../../data/supportProfiles";
 import { useLang } from "../../i18n/lang";
+import { translateSupportStance } from "../../i18n/translateSupportStances";
 
 type Props = {
   entityType: "people" | "challenger";
@@ -95,7 +96,7 @@ export default function SupportEntityPopover({
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-2 rounded-lg hover:bg-white/10 transition-colors"
-            aria-label="Close"
+            aria-label={lang("CLOSE")}
           >
             <X className="w-5 h-5 text-white/70" />
           </button>
@@ -189,7 +190,7 @@ export default function SupportEntityPopover({
                                 </div>
                               </div>
                               <div className="text-white/75 leading-relaxed">
-                                {stanceValue}
+                                {translateSupportStance(stanceValue, entityType, stanceKey, lang)}
                               </div>
                             </div>
                           );

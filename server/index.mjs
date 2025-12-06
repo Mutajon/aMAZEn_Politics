@@ -3346,7 +3346,7 @@ app.post("/api/inquire", async (req, res) => {
     console.log("❓ [INQUIRY] /api/inquire called");
     console.log("========================================\n");
 
-    const { gameId, question, currentDilemma, day } = req.body;
+    const { gameId, question, currentDilemma, day, language } = req.body;
     const useXAI = !!req.body?.useXAI;
     const useGemini = !!req.body?.useGemini;
 
@@ -3367,7 +3367,7 @@ app.post("/api/inquire", async (req, res) => {
       return res.status(400).json({ error: "Missing or invalid day" });
     }
 
-    console.log(`[INQUIRY] gameId=${gameId}, day=${day}`);
+    console.log(`[INQUIRY] gameId=${gameId}, day=${day}, language=${language || 'en'}`);
     console.log(`[INQUIRY] question="${question.substring(0, 100)}..."`);
 
     // Retrieve conversation
@@ -3396,6 +3396,10 @@ app.post("/api/inquire", async (req, res) => {
 
     console.log(`[INQUIRY] Added user inquiry to conversation (${messages.length} total messages)`);
 
+    // Get language configuration
+    const languageCode = String(language || "en").toLowerCase();
+    const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
+
     // System prompt for answering inquiries - uses Game Master voice
     const systemPrompt = `You are the Game Master answering a player's question about the current political situation.
 
@@ -3418,7 +3422,7 @@ CRITICAL GUIDELINES:
 - Maximum 2 sentences - be concise and engaging
 
 LANGUAGE RULES:
-- Simple English for non-native speakers
+- Simple ${languageCode === 'en' ? 'English' : languageName} for non-native speakers
 - NO metaphors ("dark cloud", "storm brewing", "shadows grow")
 - NO poetic phrasing ("lingering unease", "whispers swirling")
 - Use direct concrete language ("Citizens protest", "Food is scarce")
@@ -3440,7 +3444,7 @@ Examples of BAD answers (too formal, breaks Game Master voice):
 "There exists a bifurcation in public opinion across socioeconomic strata regarding this labor dispute."
 "Based on historical analysis, the workers are motivated by economic factors."
 
-Remember: Game Master voice (playful, knowing), 2 sentences max, natural language, role-appropriate.`;
+Remember: Game Master voice (playful, knowing), 2 sentences max, natural language, role-appropriate.${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.` : ''}`;
 
     // Get AI response using Gemini
     let answer;

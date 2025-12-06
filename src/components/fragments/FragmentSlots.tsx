@@ -13,7 +13,7 @@ import { usePastGamesStore } from "../../store/pastGamesStore";
 import type { PastGameEntry } from "../../lib/types/pastGames";
 import { useEffect, useState, useRef } from "react";
 import { audioManager } from "../../lib/audioManager";
-import { lang } from "../../i18n/lang";
+import { useLang } from "../../i18n/lang";
 
 interface FragmentSlotsProps {
   onFragmentClick?: (fragment: PastGameEntry, index: number) => void;
@@ -28,6 +28,7 @@ export default function FragmentSlots({
   onAnimationComplete,
   playAppearSound = false,
 }: FragmentSlotsProps) {
+  const lang = useLang();
   const fragmentGameIds = useFragmentsStore((s) => s.getFragmentGameIds());
   const hasClickedFragment = useFragmentsStore((s) => s.hasClickedFragment);
   const markFragmentClicked = useFragmentsStore((s) => s.markFragmentClicked);
@@ -113,7 +114,7 @@ export default function FragmentSlots({
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 3.5, duration: 0.5 }}
         >
-          Tap to learn more
+          {lang("FRAGMENT_TAP_TO_LEARN_MORE")}
         </motion.p>
       )}
       <div className="flex items-center gap-6 md:gap-8">

@@ -6,6 +6,7 @@ import { useState, useCallback } from "react";
 import { useRoleStore } from "../store/roleStore";
 import type { SupportProfile } from "../data/supportProfiles";
 import { useLang } from "../i18n/lang";
+import { POWER_DISTRIBUTION_TRANSLATIONS } from "../data/powerDistributionTranslations";
 
 export type OpenEntityType = "people" | "challenger" | null;
 
@@ -55,7 +56,23 @@ export function useSupportEntityPopover() {
 
       if (entityType === "challenger") {
         const profile = supportProfiles.challenger;
-        const name = challengerSeat?.name || lang("OPPOSITION");
+        
+        // Helper function to translate challenger seat name
+        const translateChallengerName = (name: string): string => {
+          // Check all predefined role translations for a matching holder name
+          for (const roleTranslations of Object.values(POWER_DISTRIBUTION_TRANSLATIONS)) {
+            const holderTranslation = roleTranslations.holders[name];
+            if (holderTranslation) {
+              return lang(holderTranslation.name);
+            }
+          }
+          // If no translation found, return name as-is (for AI-generated roles)
+          return name;
+        };
+        
+        const name = challengerSeat?.name
+          ? translateChallengerName(challengerSeat.name)
+          : lang("OPPOSITION");
         if (!profile) return null;
         return {
           name,

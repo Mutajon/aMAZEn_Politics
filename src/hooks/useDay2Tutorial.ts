@@ -16,11 +16,18 @@ export function useDay2Tutorial() {
     return localStorage.getItem(TUTORIAL_STORAGE_KEY) === 'true';
   });
   const [valueClicked, setValueClicked] = useState(false);
+  const [choiceCount, setChoiceCount] = useState(0);
+
+  // Track when a choice is made
+  const onChoiceMade = useCallback(() => {
+    setChoiceCount(prev => prev + 1);
+  }, []);
 
   // Start the tutorial
   const startTutorial = useCallback(() => {
     if (tutorialCompleted) return;
     setTutorialStep('awaiting-avatar');
+    setChoiceCount(0); // Reset choice count when tutorial starts
   }, [tutorialCompleted]);
 
   // Handle avatar being clicked - advance to awaiting-value after delay
@@ -78,6 +85,27 @@ export function useDay2Tutorial() {
     }
   }, [tutorialStep]);
 
+  // Handle tutorial overlay click - dismiss immediately
+  const onTutorialOverlayClick = useCallback(() => {
+    console.log('[Tutorial] Tutorial overlay clicked, completing tutorial');
+    setTutorialStep('complete');
+    localStorage.setItem(TUTORIAL_STORAGE_KEY, 'true');
+    setTutorialCompleted(true);
+  }, []);
+
+  // Check if tutorial should auto-dismiss after second choice
+  const shouldAutoDismiss = choiceCount >= 2 && tutorialStep === 'awaiting-compass-pills';
+  
+  // Auto-dismiss after second choice
+  if (shouldAutoDismiss) {
+    console.log('[Tutorial] Auto-dismissing after second choice');
+    setTimeout(() => {
+      setTutorialStep('complete');
+      localStorage.setItem(TUTORIAL_STORAGE_KEY, 'true');
+      setTutorialCompleted(true);
+    }, 0);
+  }
+
   // Complete the tutorial manually
   const completeTutorial = useCallback(() => {
     setTutorialStep('complete');
@@ -110,6 +138,8 @@ export function useDay2Tutorial() {
     onValueClicked,
     onModalClosed,
     onCompassPillsClicked,
+    onTutorialOverlayClick,
+    onChoiceMade,
     completeTutorial,
     resetTutorial,
   };
