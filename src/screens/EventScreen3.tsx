@@ -708,6 +708,7 @@ export default function EventScreen3({ push }: Props) {
 
     // Set phase to confirming immediately to show loading overlay
     setPhase('confirming');
+    resetProgress(); // Reset from 100% to 0% so we don't show "finished" state during cleanup
 
     // Find the action card
     const actionsForDeck = collectedData?.dilemma
@@ -784,6 +785,7 @@ export default function EventScreen3({ push }: Props) {
   const handleSuggest = async (text?: string) => {
     // Set phase to confirming immediately to show loading overlay
     setPhase('confirming');
+    resetProgress(); // Reset from 100% to 0% so we don't show "finished" state during cleanup
 
     if (!text || !text.trim()) {
       console.warn('[EventScreen3] ❌ handleSuggest called with empty text');

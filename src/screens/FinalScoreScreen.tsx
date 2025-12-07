@@ -271,7 +271,9 @@ export default function FinalScoreScreen({ push }: Props) {
       setRoleGoalStatus(selectedRoleKey, "completed");
     }
 
-    setRoleBestScore(selectedRoleKey, breakdown.final);
+    if (breakdown.final > roleProgress.bestScore) {
+      setRoleBestScore(selectedRoleKey, breakdown.final);
+    }
   }, [
     step,
     sequence.length,
