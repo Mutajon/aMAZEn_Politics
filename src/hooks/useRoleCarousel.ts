@@ -39,7 +39,6 @@ export interface CarouselItem {
   roleKey?: string;
   scoreGoal?: number;
   goalStatus?: string;
-  highScore?: number;
 }
 
 interface TouchPosition {
@@ -139,7 +138,6 @@ export const useRoleCarousel = () => {
         role: roleData,
         scoreGoal: roleData.scoreGoal,
         goalStatus: roleGoals[roleData.legacyKey]?.status ?? roleData.defaultGoalStatus,
-        highScore: roleGoals[roleData.legacyKey]?.bestScore ?? roleData.defaultHighScore,
       });
     });
 

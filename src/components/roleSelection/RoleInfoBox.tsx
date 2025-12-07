@@ -35,7 +35,7 @@ export default function RoleInfoBox({
   const lang = useLang();
   const character = useRoleStore((s) => s.character);
   const playerName = character?.name;
-  
+
   // Determine goal color based on score goal
   const goalColorClass = (() => {
     if (!item.scoreGoal) return "text-white";
@@ -55,7 +55,7 @@ export default function RoleInfoBox({
     }
   })();
 
-  const highScoreDisplay = item.highScore && item.highScore > 0 ? item.highScore.toLocaleString() : "-";
+
 
   const statusCompleted = item.goalStatus === "completed";
   const statusClasses = statusCompleted
@@ -132,21 +132,13 @@ export default function RoleInfoBox({
           </p>
         )}
 
-        {/* Player name and highscore */}
-        {(playerName || (item.highScore && item.highScore > 0)) && (
-          <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-700/40">
-            {playerName && (
-              <div className="flex items-center gap-2">
-                <span className="text-white/70">{lang("PLAYER_NAME")}:</span>
-                <span className="font-semibold text-amber-200">{playerName}</span>
-              </div>
-            )}
-            {item.highScore && item.highScore > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-white/70">{lang("FINAL_SCORE_HIGH_SCORE")}:</span>
-                <span className="font-semibold text-amber-300">{highScoreDisplay}</span>
-              </div>
-            )}
+        {/* Player name */}
+        {playerName && (
+          <div className="flex items-center text-xs pt-2 border-t border-slate-700/40">
+            <div className="flex items-center gap-2">
+              <span className="text-white/70">{lang("PLAYER_NAME")}:</span>
+              <span className="font-semibold text-amber-200">{playerName}</span>
+            </div>
           </div>
         )}
 
@@ -169,7 +161,7 @@ export default function RoleInfoBox({
                 <span className="font-bold text-amber-300">{userBestScore.toLocaleString()}</span>
               </div>
             )}
-            
+
             {/* Global Best */}
             {globalBestScore && globalBestScore > 0 && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gradient-to-r from-purple-500/20 via-violet-400/20 to-purple-500/20 border border-purple-400/30">

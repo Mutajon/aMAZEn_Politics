@@ -218,6 +218,8 @@ async function createIndexes() {
     // V2: User-based tracking indexes
     await highscoresCollection.createIndex({ userId: 1, score: -1 }, { name: 'userId_score', background: true });
     await highscoresCollection.createIndex({ userId: 1, createdAt: -1 }, { name: 'userId_timestamp', background: true });
+    // NEW: Role-based filtering index
+    await highscoresCollection.createIndex({ role: 1, score: -1 }, { name: 'role_score', background: true });
 
     console.log('[MongoDB] ✅ Indexes created/verified');
   } catch (error) {

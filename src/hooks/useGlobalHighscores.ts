@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import type { HighscoreEntry } from "../data/highscores-default";
 import { lang } from "../i18n/lang";
 
-export function useGlobalHighscores(limit = 50) {
+export function useGlobalHighscores(limit = 50, role?: string) {
   const [entries, setEntries] = useState<HighscoreEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -10,11 +10,14 @@ export function useGlobalHighscores(limit = 50) {
   const fetchGlobal = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      const response = await fetch(`/api/highscores/global?limit=${limit}`);
+      const url = role
+        ? `/api/highscores/global?limit=${limit}&role=${encodeURIComponent(role)}`
+        : `/api/highscores/global?limit=${limit}`;
+      const response = await fetch(url);
       const data = await response.json();
-      
+
       if (data.success && data.entries) {
         setEntries(data.entries);
       } else {
@@ -30,7 +33,7 @@ export function useGlobalHighscores(limit = 50) {
 
   useEffect(() => {
     fetchGlobal();
-  }, [limit]);
+  }, [limit, role]);
 
   return {
     entries,

@@ -44,7 +44,6 @@ export interface PredefinedRoleData {
   characters: RoleCharacters;          // Character name options (male/female/any)
   scoreGoal: number;                   // Target score to mark role as completed
   defaultGoalStatus: RoleGoalStatus;   // Initial completion status
-  defaultHighScore: number;            // Baseline high score (persisted separately)
 }
 
 /**
@@ -66,7 +65,6 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     storyThemes: ["labor_rights", "class_solidarity", "violence_vs_nonviolence", "survival_vs_principle"],
     scoreGoal: 1000,
     defaultGoalStatus: "uncompleted",
-    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Plutocratic Republic",
       systemDesc: "Industrial capitalism where railroad barons control capital and influence state action; workers hold strikes as their only lever.",
@@ -374,7 +372,6 @@ TONE & STYLE
     storyThemes: ["cultural_survival", "foreign_domination", "knowledge_vs_power"],
     scoreGoal: 1000,
     defaultGoalStatus: "uncompleted",
-    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Autocratizing (Military)",
       systemDesc: "Under siege, the foreign general and local army overrule the court; force sets terms, others adapt.",
@@ -473,7 +470,6 @@ TONE & STYLE
     storyThemes: ["faith_vs_freedom", "economic_stability", "civic_identity"],
     scoreGoal: 1100,
     defaultGoalStatus: "uncompleted",
-    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Mental-Might Oligarchy — Theocracy",
       systemDesc: "Wide-vote republic led by a strong preacher; laws and diplomacy follow sermons and public piety.",
@@ -572,7 +568,6 @@ TONE & STYLE
     storyThemes: ["territorial_autonomy", "cultural_preservation", "exchange_vs_exploitation"],
     scoreGoal: 1100,
     defaultGoalStatus: "uncompleted",
-    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Personalist Monarchy / Autocracy",
       systemDesc: "Single paramount chief directs war, trade, and justice; councils advise, but his word usually decides.",
@@ -671,7 +666,6 @@ TONE & STYLE
     storyThemes: ["loyalty_vs_survival", "clan_honor", "centralization"],
     scoreGoal: 1200,
     defaultGoalStatus: "uncompleted",
-    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Hard-Power Oligarchy — Stratocracy",
       systemDesc: "Warlord coalitions rule by force; law follows the armies, not councils.",
@@ -770,7 +764,6 @@ TONE & STYLE
     storyThemes: ["emancipation", "justice_vs_vengeance", "unity_vs_fragmentation"],
     scoreGoal: 1200,
     defaultGoalStatus: "uncompleted",
-    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Hard-Power Oligarchy — Stratocracy",
       systemDesc: "Warring armed factions decide outcomes; civil authority is weak.",
@@ -869,7 +862,6 @@ TONE & STYLE
     storyThemes: ["autocracy_vs_revolution", "bread_land_peace", "loyalty_crisis"],
     scoreGoal: 1300,
     defaultGoalStatus: "uncompleted",
-    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Personalist Monarchy / Autocracy",
       systemDesc: "Tsar rules personally; army compliance and urban revolt now decide what sticks.",
@@ -968,7 +960,6 @@ TONE & STYLE
     storyThemes: ["communal_trust", "order_vs_liberty", "refugee_protection"],
     scoreGoal: 1300,
     defaultGoalStatus: "uncompleted",
-    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Hard-Power Oligarchy — Stratocracy",
       systemDesc: "Armed forces and communal leaders shape rules; administrators improvise to contain violence amid state breakdown.",
@@ -1067,7 +1058,6 @@ TONE & STYLE
     storyThemes: ["justice_vs_amnesty", "public_safety", "institutional_trust"],
     scoreGoal: 1400,
     defaultGoalStatus: "uncompleted",
-    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Autocratizing (Executive)",
       systemDesc: "Late-apartheid South Africa: executive-led minority rule with strong security forces and rising mass opposition.",
@@ -1166,7 +1156,6 @@ TONE & STYLE
     storyThemes: ["autonomy_vs_dependency", "survival_ethics", "science_vs_populism"],
     scoreGoal: 1400,
     defaultGoalStatus: "uncompleted",
-    defaultHighScore: 0,
     powerDistribution: {
       systemName: "Mental-Might Oligarchy — Technocracy",
       systemDesc: "Engineers and safety rules steer decisions; an elected governor balances Earth supply leverage and local freedoms.",

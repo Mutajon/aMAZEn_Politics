@@ -34,18 +34,18 @@ function imgForLeader(entry: HighscoreEntry, rank: number): string {
   if (entry.avatarUrl) {
     return entry.avatarUrl;
   }
-  
+
   // Priority 2: Try historical leader image (for predefined roles)
   const first = entry.name.split(" ")[0];
   const historicalImage = `/assets/images/leaders/${first}.jpg`;
-  
+
   // Priority 3: Placeholder fallback
   // Note: We could return historicalImage here and let onError handle fallback,
   // but for ranks 21+ we go straight to placeholder to avoid image load attempts
   if (rank >= 20) {
     return "/assets/images/leaders/placeholder.jpg";
   }
-  
+
   return historicalImage;
 }
 
@@ -68,7 +68,7 @@ export function HighscoreTable({
 }: Props) {
   const lang = useLang();
   const highlightedRef = useRef<HTMLButtonElement | null>(null);
-  
+
   const sortedEntries = useMemo(
     () => [...entries].sort((a, b) => b.score - a.score),
     [entries]
@@ -95,11 +95,12 @@ export function HighscoreTable({
         style={{
           gridTemplateColumns: window.innerWidth < 640
             ? "44px 1fr 80px"
-            : "44px 1.2fr 1.1fr 1fr 1fr 0.7fr"
+            : "44px 1.2fr 0.8fr 1.1fr 1fr 1fr 0.7fr"
         }}
       >
         <div className="text-right">{lang("HIGHSCORE_RANK")}</div>
         <div>{lang("HIGHSCORE_LEADER")}</div>
+        <div className="hidden sm:block">Role</div>
         <div className="hidden sm:block">{lang("HIGHSCORE_SYSTEM")}</div>
         <div className="hidden sm:block">{lang("HIGHSCORE_LIBERALISM")}</div>
         <div className="hidden sm:block">{lang("HIGHSCORE_AUTONOMY")}</div>
@@ -126,7 +127,7 @@ export function HighscoreTable({
               const color = rankColor(i);
               const isHighlighted = highlightName && e.name === highlightName;
               const isMobile = window.innerWidth < 640;
-              
+
               return (
                 <motion.button
                   type="button"
@@ -142,7 +143,7 @@ export function HighscoreTable({
                   style={{
                     gridTemplateColumns: isMobile
                       ? "44px 1fr 80px"
-                      : "44px 1.2fr 1.1fr 1fr 1fr 0.7fr"
+                      : "44px 1.2fr 0.8fr 1.1fr 1fr 1fr 0.7fr"
                   }}
                   variants={rowVariants}
                 >
@@ -176,6 +177,13 @@ export function HighscoreTable({
                     />
                     <span className="truncate px-2 py-1 rounded-md bg-white/10 text-white/90 text-xs md:text-sm font-medium">
                       {e.name}
+                    </span>
+                  </div>
+
+                  {/* Role */}
+                  <div className="hidden sm:block text-white/90 text-sm">
+                    <span className="px-2 py-1 rounded-md bg-white/10 truncate">
+                      {e.role || "Unknown"}
                     </span>
                   </div>
 

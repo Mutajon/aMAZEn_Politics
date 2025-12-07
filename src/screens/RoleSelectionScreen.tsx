@@ -19,8 +19,8 @@ import NavigationArrows from "../components/roleSelection/NavigationArrows";
 import PositionIndicator from "../components/roleSelection/PositionIndicator";
 import RoleInfoBox from "../components/roleSelection/RoleInfoBox";
 import { audioManager } from "../lib/audioManager";
-import { useUserBestScore } from "../hooks/useUserBestScore";
-import { useGlobalBestScore } from "../hooks/useGlobalBestScore";
+import { useUserRoleBests } from "../hooks/useUserRoleBests";
+import { useGlobalRoleBests } from "../hooks/useGlobalRoleBests";
 
 export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const lang = useLang();
@@ -44,11 +44,11 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const debugMode = useSettingsStore(s => s.debugMode);
   const experimentMode = useSettingsStore(s => s.experimentMode);
   const setExperimentActiveRole = useLoggingStore((s) => s.setExperimentActiveRole);
-  
-  // Fetch user's best score and global best for greeting
+
+  // Fetch user's best score and global best for role display
   const userId = useLoggingStore((s) => s.userId);
-  const { bestScore } = useUserBestScore(userId);
-  const { globalBest } = useGlobalBestScore();
+  const { bests: userBests } = useUserRoleBests(userId);
+  const { bests: globalBests } = useGlobalRoleBests();
 
   // Carousel hook
   const {
@@ -359,8 +359,8 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
         onConfirm={handleRoleConfirm}
         onOpenCustomRole={openSuggest}
         onOpenScenario={openScenarioModal}
-        userBestScore={bestScore}
-        globalBestScore={globalBest}
+        userBestScore={currentItem.roleKey ? (userBests[currentItem.roleKey] || 0) : 0}
+        globalBestScore={currentItem.roleKey ? (globalBests[currentItem.roleKey] || 0) : 0}
       />
 
       {/* Suggest-your-own Modal */}
@@ -443,11 +443,10 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                 <button
                   disabled={input.trim().length < 10 || checking || !!aiError}
                   onClick={handleConfirmSuggest}
-                  className={`rounded-xl px-4 py-2 text-sm font-semibold shadow ${
-                    input.trim().length < 10 || checking || !!aiError
-                      ? "bg-amber-300/40 text-[#0b1335]/60 cursor-not-allowed"
-                      : "bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335]"
-                  }`}
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold shadow ${input.trim().length < 10 || checking || !!aiError
+                    ? "bg-amber-300/40 text-[#0b1335]/60 cursor-not-allowed"
+                    : "bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335]"
+                    }`}
                 >
                   {checking ? lang("CHECKING") : lang("CONFIRM")}
                 </button>
@@ -594,11 +593,10 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
                   <button
                     type="submit"
                     disabled={scenarioSubmitting || !scenarioForm.title.trim() || !scenarioForm.role.trim() || !scenarioForm.settings.trim()}
-                    className={`rounded-xl px-5 py-2.5 text-sm font-semibold shadow transition-all ${
-                      scenarioSubmitting || !scenarioForm.title.trim() || !scenarioForm.role.trim() || !scenarioForm.settings.trim()
-                        ? "bg-amber-300/40 text-[#0b1335]/60 cursor-not-allowed"
-                        : "bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] hover:from-amber-400 hover:to-amber-600"
-                    }`}
+                    className={`rounded-xl px-5 py-2.5 text-sm font-semibold shadow transition-all ${scenarioSubmitting || !scenarioForm.title.trim() || !scenarioForm.role.trim() || !scenarioForm.settings.trim()
+                      ? "bg-amber-300/40 text-[#0b1335]/60 cursor-not-allowed"
+                      : "bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] hover:from-amber-400 hover:to-amber-600"
+                      }`}
                   >
                     {scenarioSubmitting ? lang("SUBMITTING") : lang("SUBMIT_SUGGESTION")}
                   </button>

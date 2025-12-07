@@ -337,9 +337,9 @@ const anthropic = ANTHROPIC_KEY ? new Anthropic({ apiKey: ANTHROPIC_KEY }) : nul
 // One default text model + per-task overrides from .env
 const CHAT_MODEL_DEFAULT = process.env.CHAT_MODEL || "gpt-4o-mini";
 const MODEL_VALIDATE = process.env.MODEL_VALIDATE || CHAT_MODEL_DEFAULT;
-const MODEL_NAMES    = process.env.MODEL_NAMES    || CHAT_MODEL_DEFAULT;
-const MODEL_ANALYZE  = process.env.MODEL_ANALYZE  || CHAT_MODEL_DEFAULT;
-const MODEL_MIRROR   = process.env.MODEL_MIRROR   || CHAT_MODEL_DEFAULT;
+const MODEL_NAMES = process.env.MODEL_NAMES || CHAT_MODEL_DEFAULT;
+const MODEL_ANALYZE = process.env.MODEL_ANALYZE || CHAT_MODEL_DEFAULT;
+const MODEL_MIRROR = process.env.MODEL_MIRROR || CHAT_MODEL_DEFAULT;
 const MODEL_MIRROR_ANTHROPIC = process.env.MODEL_MIRROR_ANTHROPIC || ""; // No fallback - must be set in .env
 // Dilemma models (no generation here yet — just configuration)
 // Cheap default now; premium can be used later on demand.
@@ -1520,11 +1520,11 @@ app.post("/api/analyze-role", async (req, res) => {
       systemDesc: "Formal offices dominate without direct demos in core areas.",
       flavor: "Institutions grind; factions bargain.",
       holders: [
-        { name: "Executive", percent: 28, role: {A:true, E:false}, stype: {t:"Author", i:"•"}, note: "Agenda & decrees" },
-        { name: "Legislative", percent: 32, role: {A:true, E:false}, stype: {t:"Author", i:"•"}, note: "Law & purse" },
-        { name: "Judicial", percent: 14, role: {A:false, E:true}, stype: {t:"Eraser", i:"•"}, note: "Review & injunctions" },
-        { name: "Bureaucracy", percent: 12, role: {A:false, E:false}, stype: {t:"Agent", i:"•"}, note: "Implements/filters" },
-        { name: "Wealth", percent: 14, role: {A:false, E:false}, stype: {t:"Actor", i:"-"}, note: "Lobby & capture" }
+        { name: "Executive", percent: 28, role: { A: true, E: false }, stype: { t: "Author", i: "•" }, note: "Agenda & decrees" },
+        { name: "Legislative", percent: 32, role: { A: true, E: false }, stype: { t: "Author", i: "•" }, note: "Law & purse" },
+        { name: "Judicial", percent: 14, role: { A: false, E: true }, stype: { t: "Eraser", i: "•" }, note: "Review & injunctions" },
+        { name: "Bureaucracy", percent: 12, role: { A: false, E: false }, stype: { t: "Agent", i: "•" }, note: "Implements/filters" },
+        { name: "Wealth", percent: 14, role: { A: false, E: false }, stype: { t: "Actor", i: "-" }, note: "Lobby & capture" }
       ],
       playerIndex: null,
       e12: {
@@ -2786,11 +2786,11 @@ Based on this political decision, generate 1-3 specific dynamic parameters that 
 
       const mapped = Array.isArray(result.parameters)
         ? result.parameters.slice(0, 3).map((param, index) => ({
-            id: param.id || `param_${index}`,
-            icon: param.icon || "AlertTriangle",
-            text: param.text || "Unknown effect",
-            tone: ["up", "down", "neutral"].includes(param.tone) ? param.tone : "neutral"
-          }))
+          id: param.id || `param_${index}`,
+          icon: param.icon || "AlertTriangle",
+          text: param.text || "Unknown effect",
+          tone: ["up", "down", "neutral"].includes(param.tone) ? param.tone : "neutral"
+        }))
         : [];
 
       const hasForbidden = mapped.some(param => hasForbiddenDynamicText(param.text));
@@ -3060,21 +3060,21 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
       intro: String(result?.intro || fallback.intro).slice(0, 500),
       snapshot: Array.isArray(result?.snapshot)
         ? result.snapshot.map((event) => ({
-            type: validTypes.includes(event?.type) ? event.type : "positive",
-            icon: String(event?.icon || "📌").slice(0, 10),
-            text: String(event?.text || "Event occurred").slice(0, 50),
-            estimate: typeof event?.estimate === 'number' ? event.estimate : undefined,
-            context: String(event?.context || "Unknown").slice(0, 100)
-          }))
+          type: validTypes.includes(event?.type) ? event.type : "positive",
+          icon: String(event?.icon || "📌").slice(0, 10),
+          text: String(event?.text || "Event occurred").slice(0, 50),
+          estimate: typeof event?.estimate === 'number' ? event.estimate : undefined,
+          context: String(event?.context || "Unknown").slice(0, 100)
+        }))
         : fallback.snapshot,
       decisions: Array.isArray(result?.decisions)
         ? result.decisions.map((d, i) => ({
-            title: String(d?.title || "").slice(0, 120),
-            reflection: String(d?.reflection || "").slice(0, 300),
-            autonomy: validRatings.includes(d?.autonomy) ? d.autonomy : "medium",
-            liberalism: validRatings.includes(d?.liberalism) ? d.liberalism : "medium",
-            democracy: validRatings.includes(d?.democracy) ? d.democracy : "medium"
-          }))
+          title: String(d?.title || "").slice(0, 120),
+          reflection: String(d?.reflection || "").slice(0, 300),
+          autonomy: validRatings.includes(d?.autonomy) ? d.autonomy : "medium",
+          liberalism: validRatings.includes(d?.liberalism) ? d.liberalism : "medium",
+          democracy: validRatings.includes(d?.democracy) ? d.democracy : "medium"
+        }))
         : fallback.decisions,
       valuesSummary: String(result?.valuesSummary || fallback.valuesSummary).slice(0, 500),
       haiku: String(result?.haiku || fallback.haiku).slice(0, 300)
@@ -3129,7 +3129,7 @@ app.post("/api/narrative-seed", async (req, res) => {
 
     console.log(`[NARRATIVE-SEED] Generating narrative scaffold for gameId=${gameId}`);
 
-// Fallback response if AI fails
+    // Fallback response if AI fails
     const fallback = {
       threads: [
         "Rising tensions with institutional opposition",
@@ -3167,7 +3167,7 @@ app.post("/api/narrative-seed", async (req, res) => {
     console.log(`  - Compass values: ${Array.isArray(topCompassValues) ? topCompassValues.length : 'invalid'}`);
     console.log(`  - Support profiles: ${supportProfiles ? (supportProfiles.people || supportProfiles.challenger ? 'valid object' : 'empty object') : 'null'}`);
 
-// Build system prompt for narrative seeding
+    // Build system prompt for narrative seeding
     const systemPrompt = `${ANTI_JARGON_RULES}
 
 TASK: You create a compact narrative scaffold for a 7-day political dilemma game.
@@ -3215,7 +3215,7 @@ OUTPUT FORMAT (STRICT JSON):
     const challengerName = challengerSeat?.name || "Unknown";
     const challengerNote = challengerSeat?.note || "";
 
-// Group compass values by dimension for clarity
+    // Group compass values by dimension for clarity
     const compassByDimension = (topCompassValues || []).reduce((acc, cv) => {
       if (!acc[cv.dimension]) acc[cv.dimension] = [];
       acc[cv.dimension].push(cv.componentName);
@@ -3524,12 +3524,12 @@ function calculateAuthorityLevel(e12, powerHolders, playerIndex, roleScope = nul
   if (roleScope) {
     const scope = roleScope.toLowerCase();
     if (scope.includes('citizen') ||
-        scope.includes('assemblyman') ||
-        scope.includes('equal voting rights') ||
-        scope.includes('you may propose') ||
-        scope.includes('assembly will vote') ||
-        scope.includes('no permanent office') ||
-        scope.includes('cannot enact major changes')) {
+      scope.includes('assemblyman') ||
+      scope.includes('equal voting rights') ||
+      scope.includes('you may propose') ||
+      scope.includes('assembly will vote') ||
+      scope.includes('no permanent office') ||
+      scope.includes('cannot enact major changes')) {
       console.log('[calculateAuthorityLevel] Citizen role detected via roleScope - forcing LOW authority');
       console.log(`[calculateAuthorityLevel] Matched roleScope: "${roleScope.substring(0, 80)}..."`);
       return 'low';
@@ -4490,7 +4490,7 @@ Create the first concrete incident that forces an immediate choice.
 STRICTLY OBEY THE CAMERA TEST: describe a specific event happening RIGHT NOW, not abstract tensions.
 Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
   }
-   else {
+  else {
     // Format current compass values (if provided)
     let compassUpdateText = '';
     if (currentCompassTopValues && Array.isArray(currentCompassTopValues)) {
@@ -4510,8 +4510,8 @@ Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
     // Add mirror mode instruction for Days 2+
     prompt += `MIRROR MODE FOR THIS TURN: "${mirrorMode}"
 ${mirrorMode === 'lastAction'
-  ? `The mirror should reflect on the player's PREVIOUS choice ("${playerChoice.title}") and what it reveals about their values.`
-  : `The mirror should comment on the CURRENT dilemma they're about to face and how it challenges their values.`}
+        ? `The mirror should reflect on the player's PREVIOUS choice ("${playerChoice.title}") and what it reveals about their values.`
+        : `The mirror should comment on the CURRENT dilemma they're about to face and how it challenges their values.`}
 
 `;
 
@@ -6252,7 +6252,8 @@ app.post("/api/highscores/submit", async (req, res) => {
       score,
       politicalSystem,
       period,
-      avatarUrl         // NEW: Optional compressed thumbnail (~5-10KB)
+      avatarUrl,        // NEW: Optional compressed thumbnail (~5-10KB)
+      role              // NEW: Role key for filtering (e.g., "unc_cleopatra")
     } = req.body;
 
     // Validation
@@ -6278,7 +6279,7 @@ app.post("/api/highscores/submit", async (req, res) => {
     }
 
     const collection = await getHighscoresCollection();
-    
+
     // Insert entry
     const entry = {
       userId: userId.trim(),
@@ -6293,6 +6294,7 @@ app.post("/api/highscores/submit", async (req, res) => {
       politicalSystem: politicalSystem?.trim() || "Unknown",
       period: period || undefined,
       avatarUrl: avatarUrl || undefined,  // Compressed 64x64 WebP thumbnail
+      role: role?.trim() || "Unknown",    // Save role key
       createdAt: new Date()
     };
 
@@ -6302,9 +6304,9 @@ app.post("/api/highscores/submit", async (req, res) => {
     const globalRank = await collection.countDocuments({ score: { $gt: score } }) + 1;
 
     // Get user's personal rank (among their own scores)
-    const userRank = await collection.countDocuments({ 
+    const userRank = await collection.countDocuments({
       userId: userId,
-      score: { $gt: score } 
+      score: { $gt: score }
     }) + 1;
 
     // Check if this is user's best score
@@ -6346,14 +6348,22 @@ app.get("/api/highscores/global", async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+    const roleFilter = req.query.role; // Optional role filter
 
     const collection = await getHighscoresCollection();
-    
+
     // MongoDB aggregation to get best score per user
-    const pipeline = [
+    const pipeline = [];
+
+    // Filter by role if specified
+    if (roleFilter) {
+      pipeline.push({ $match: { role: roleFilter } });
+    }
+
+    pipeline.push(
       // Sort by score descending to get best scores first
       { $sort: { score: -1 } },
-      
+
       // Group by userId, take first (highest) score for each user
       {
         $group: {
@@ -6361,17 +6371,17 @@ app.get("/api/highscores/global", async (req, res) => {
           bestEntry: { $first: "$$ROOT" }
         }
       },
-      
+
       // Replace root with the best entry document
       { $replaceRoot: { newRoot: "$bestEntry" } },
-      
+
       // Sort by score again (after grouping)
       { $sort: { score: -1 } },
-      
+
       // Pagination
       { $skip: offset },
       { $limit: limit }
-    ];
+    );
 
     const entries = await collection.aggregate(pipeline).toArray();
 
@@ -6413,6 +6423,7 @@ app.get("/api/highscores/global", async (req, res) => {
  * - limit: number (default: 50, max: 100)
  * - offset: number (default: 0)
  * - sortBy: "score" | "date" (default: "score")
+ * - role: string (optional filter)
  */
 app.get("/api/highscores/user/:userId", async (req, res) => {
   try {
@@ -6420,6 +6431,7 @@ app.get("/api/highscores/user/:userId", async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
     const sortBy = req.query.sortBy === "date" ? "createdAt" : "score";
+    const roleFilter = req.query.role;
 
     if (!userId) {
       return res.status(400).json({
@@ -6429,12 +6441,17 @@ app.get("/api/highscores/user/:userId", async (req, res) => {
     }
 
     const collection = await getHighscoresCollection();
-    
+
     // Get all scores for this user
     const sortOrder = sortBy === "score" ? { score: -1 } : { createdAt: -1 };
-    
+
+    const query = { userId };
+    if (roleFilter) {
+      query.role = roleFilter;
+    }
+
     const entries = await collection
-      .find({ userId })
+      .find(query)
       .sort(sortOrder)
       .skip(offset)
       .limit(limit)
@@ -6452,7 +6469,7 @@ app.get("/api/highscores/user/:userId", async (req, res) => {
     const total = await collection.countDocuments({ userId });
 
     // Get user's best score
-    const bestScore = entries.length > 0 
+    const bestScore = entries.length > 0
       ? Math.max(...entries.map(e => e.score))
       : 0;
 
@@ -6493,7 +6510,7 @@ app.get("/api/highscores", async (req, res) => {
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
 
     const collection = await getHighscoresCollection();
-    
+
     // Get top scores, sorted by score descending
     const entries = await collection
       .find({})
@@ -6529,6 +6546,86 @@ app.get("/api/highscores", async (req, res) => {
       success: false,
       error: "Failed to fetch highscores"
     });
+  }
+});
+
+/**
+ * GET /api/highscores/bests-by-role
+ * Get global best score for each role
+ * Returns a map of role -> score
+ */
+app.get("/api/highscores/bests-by-role", async (req, res) => {
+  try {
+    const collection = await getHighscoresCollection();
+
+    const pipeline = [
+      { $sort: { score: -1 } },
+      {
+        $group: {
+          _id: "$role",
+          bestScore: { $max: "$score" }
+        }
+      }
+    ];
+
+    const results = await collection.aggregate(pipeline).toArray();
+
+    // Convert to map: { "president": 1500, "dictator": 1200 }
+    const roleMap = results.reduce((acc, curr) => {
+      if (curr._id) {
+        acc[curr._id] = curr.bestScore;
+      }
+      return acc;
+    }, {});
+
+    res.json({
+      success: true,
+      bests: roleMap
+    });
+  } catch (error) {
+    console.error("[Highscores] ❌ Error fetching global role bests:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch role bests" });
+  }
+});
+
+/**
+ * GET /api/highscores/user/:userId/bests-by-role
+ * Get user's best score for each role
+ * Returns a map of role -> score
+ */
+app.get("/api/highscores/user/:userId/bests-by-role", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId) return res.status(400).json({ success: false, error: "userId required" });
+
+    const collection = await getHighscoresCollection();
+
+    const pipeline = [
+      { $match: { userId } },
+      {
+        $group: {
+          _id: "$role",
+          bestScore: { $max: "$score" }
+        }
+      }
+    ];
+
+    const results = await collection.aggregate(pipeline).toArray();
+
+    const roleMap = results.reduce((acc, curr) => {
+      if (curr._id) {
+        acc[curr._id] = curr.bestScore;
+      }
+      return acc;
+    }, {});
+
+    res.json({
+      success: true,
+      bests: roleMap
+    });
+  } catch (error) {
+    console.error("[Highscores] ❌ Error fetching user role bests:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch user role bests" });
   }
 });
 

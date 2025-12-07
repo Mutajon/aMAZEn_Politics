@@ -170,7 +170,8 @@ export function buildHighscoreEntry(
   character: { name: string; aboutRole?: string; avatarUrl?: string } | null,
   analysis: { systemName?: string } | null,
   ratings: { liberalism: AftermathRating; autonomy: AftermathRating } | null,
-  top3ByDimension: Record<string, Array<{ short: string }>>
+  top3ByDimension: Record<string, Array<{ short: string }>>,
+  role: string | undefined      // Added role parameter
 ): HighscoreEntry {
   // Map AftermathRating to DemocracyLevel (same type, different name)
   const mapRating = (rating: AftermathRating): HighscoreEntry["democracy"] => {
@@ -193,5 +194,6 @@ export function buildHighscoreEntry(
     score: breakdown.final,
     politicalSystem: analysis?.systemName || "Unknown System",
     avatarUrl: character?.avatarUrl, // Include player's custom avatar (if available)
+    role: role || "Unknown",         // Include role key
   };
 }

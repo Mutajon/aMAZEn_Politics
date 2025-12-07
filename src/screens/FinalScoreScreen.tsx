@@ -289,7 +289,8 @@ export default function FinalScoreScreen({ push }: Props) {
         character,
         analysis,
         ratings,
-        top3ByDimension
+        top3ByDimension,
+        selectedRoleKey ?? undefined
       );
 
       // Add to local store first (for immediate UI feedback)
@@ -330,25 +331,26 @@ export default function FinalScoreScreen({ push }: Props) {
               score: entry.score,
               politicalSystem: entry.politicalSystem,
               period: entry.period,
-              avatarUrl: avatarThumbnail  // Compressed 64x64 WebP thumbnail (~5-10KB)
+              avatarUrl: avatarThumbnail,  // Compressed 64x64 WebP thumbnail (~5-10KB)
+              role: entry.role             // Role key
             })
           });
 
           const data = await response.json();
-          
+
           if (data.success) {
             console.log(`[FinalScore] ✅ Submitted to global leaderboard`);
             console.log(`  - Global Rank: ${data.globalRank}`);
             console.log(`  - User Rank: ${data.userRank}`);
             console.log(`  - Personal Best: ${data.isPersonalBest ? "YES" : "NO"}`);
-            
+
             logger.log(
               "highscore_submitted",
-              { 
-                globalRank: data.globalRank, 
+              {
+                globalRank: data.globalRank,
                 userRank: data.userRank,
                 isPersonalBest: data.isPersonalBest,
-                score: entry.score 
+                score: entry.score
               },
               `Highscore submitted: Global #${data.globalRank}, Personal #${data.userRank}`
             );
@@ -531,9 +533,9 @@ export default function FinalScoreScreen({ push }: Props) {
           <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/15 p-4 text-emerald-100 shadow">
             {isHallOfFame
               ? lang("FINAL_SCORE_HALL_OF_FAME_MESSAGE").replace(
-                  "{rank}",
-                  String(playerRank)
-                )
+                "{rank}",
+                String(playerRank)
+              )
               : lang("FINAL_SCORE_NOT_HALL_OF_FAME_MESSAGE")}
           </div>
         )}

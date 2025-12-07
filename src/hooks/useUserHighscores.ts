@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import type { HighscoreEntry } from "../data/highscores-default";
 import { lang } from "../i18n/lang";
 
-export function useUserHighscores(userId: string, limit = 50) {
+export function useUserHighscores(userId: string, limit = 50, role?: string) {
   const [entries, setEntries] = useState<HighscoreEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,11 +17,14 @@ export function useUserHighscores(userId: string, limit = 50) {
 
     setLoading(true);
     setError(null);
-    
+
     try {
-      const response = await fetch(`/api/highscores/user/${userId}?limit=${limit}`);
+      const url = role
+        ? `/api/highscores/user/${userId}?limit=${limit}&role=${encodeURIComponent(role)}`
+        : `/api/highscores/user/${userId}?limit=${limit}`;
+      const response = await fetch(url);
       const data = await response.json();
-      
+
       if (data.success && data.entries) {
         setEntries(data.entries);
         setBestScore(data.bestScore || 0);
@@ -38,7 +41,7 @@ export function useUserHighscores(userId: string, limit = 50) {
 
   useEffect(() => {
     fetchUser();
-  }, [userId, limit]);
+  }, [userId, limit, role]);
 
   return {
     entries,
