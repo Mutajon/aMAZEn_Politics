@@ -1,4 +1,4 @@
-// server/conversationStore.mjs
+// server/services/conversationStore.mjs
 // In-memory conversation store for OpenAI Responses API
 // Maps gameId → conversation metadata
 //

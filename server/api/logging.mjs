@@ -260,8 +260,8 @@ router.post('/batch', ipRateLimiter, async (req, res) => {
 
       // Check if it's a connection error
       if (insertError.message.includes('connection') ||
-          insertError.message.includes('timeout') ||
-          insertError.message.includes('ECONNREFUSED')) {
+        insertError.message.includes('timeout') ||
+        insertError.message.includes('ECONNREFUSED')) {
         console.log('[Logging] 🔄 Connection error detected - client should retry');
         return res.status(503).json({
           success: false,
@@ -276,6 +276,7 @@ router.post('/batch', ipRateLimiter, async (req, res) => {
 
   } catch (error) {
     console.error('[Logging] ❌ Batch insert failed:', error);
+
     res.status(500).json({
       success: false,
       error: 'Failed to insert logs',
