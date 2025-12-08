@@ -91,6 +91,34 @@ export const POWER_DISTRIBUTION_TRANSLATIONS: Record<string, {
     }
   },
 
+  "railroad_1877": {
+    systemName: "RAILROAD_SYSTEM_NAME",
+    systemDesc: "RAILROAD_SYSTEM_DESC",
+    flavor: "RAILROAD_FLAVOR",
+    holders: {
+      "Railroad Owners": {
+        name: "RAILROAD_HOLDER_OWNERS_NAME",
+        note: "RAILROAD_HOLDER_OWNERS_NOTE"
+      },
+      "State Executives": {
+        name: "RAILROAD_HOLDER_EXECUTIVES_NAME",
+        note: "RAILROAD_HOLDER_EXECUTIVES_NOTE"
+      },
+      "Coercive Force": {
+        name: "RAILROAD_HOLDER_COERCIVE_NAME",
+        note: "RAILROAD_HOLDER_COERCIVE_NOTE"
+      },
+      "Workers & Crowds": {
+        name: "RAILROAD_HOLDER_WORKERS_NAME",
+        note: "RAILROAD_HOLDER_WORKERS_NOTE"
+      },
+      "Local Newspapers": {
+        name: "RAILROAD_HOLDER_NEWSPAPERS_NAME",
+        note: "RAILROAD_HOLDER_NEWSPAPERS_NOTE"
+      }
+    }
+  },
+
   "telaviv_2025": {
     systemName: "TELAVIV_SYSTEM_NAME",
     systemDesc: "TELAVIV_SYSTEM_DESC",
@@ -115,6 +143,34 @@ export const POWER_DISTRIBUTION_TRANSLATIONS: Record<string, {
       "General Population (Israeli Society/Media)": {
         name: "TELAVIV_HOLDER_MEDIA_NAME",
         note: "TELAVIV_HOLDER_MEDIA_NOTE"
+      }
+    }
+  },
+
+  "namek_2099": {
+    systemName: "NAMEK_SYSTEM_NAME",
+    systemDesc: "NAMEK_SYSTEM_DESC",
+    flavor: "NAMEK_FLAVOR",
+    holders: {
+      "Demos (Citizens)": {
+        name: "NAMEK_HOLDER_DEMOS_NAME",
+        note: "NAMEK_HOLDER_DEMOS_NOTE"
+      },
+      "Media (Journalists)": {
+        name: "NAMEK_HOLDER_MEDIA_NAME",
+        note: "NAMEK_HOLDER_MEDIA_NOTE"
+      },
+      "Wealth (Owners)": {
+        name: "NAMEK_HOLDER_WEALTH_NAME",
+        note: "NAMEK_HOLDER_WEALTH_NOTE"
+      },
+      "Ideology (Normative Frames)": {
+        name: "NAMEK_HOLDER_IDEOLOGY_NAME",
+        note: "NAMEK_HOLDER_IDEOLOGY_NOTE"
+      },
+      "Police (Civic Security)": {
+        name: "NAMEK_HOLDER_POLICE_NAME",
+        note: "NAMEK_HOLDER_POLICE_NOTE"
       }
     }
   },

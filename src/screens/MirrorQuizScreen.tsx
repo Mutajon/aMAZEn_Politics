@@ -294,8 +294,8 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ type: "spring", stiffness: 220, damping: 18 }}
-            className="relative self-start"
-            style={{ width: MIRROR_SIZE, height: MIRROR_SIZE }}
+            className="relative self-start overflow-visible"
+            style={{ width: MIRROR_SIZE, minHeight: MIRROR_SIZE }}
           >
             {/* Mirror image (shimmer disabled) */}
             <MirrorImage mirrorSize={MIRROR_SIZE} />
@@ -307,7 +307,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
             />
 
             {/* Compass Pills Overlay - displays pings above mirror image */}
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center" style={{ zIndex: 40 }}>
+            <div className="absolute inset-0 bottom-auto pointer-events-none flex items-center justify-center" style={{ zIndex: 40 }}>
               <AnimatePresence>
                 {pings.map((p, i) => {
                   const color = (PALETTE)[p.prop]?.base ?? "#fff";

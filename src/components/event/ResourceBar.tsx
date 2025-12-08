@@ -9,7 +9,6 @@ import { useSettingsStore } from "../../store/settingsStore";
 import { useRoleStore } from "../../store/roleStore";
 import { useLang } from "../../i18n/lang";
 import type { RoleGoalStatus } from "../../data/predefinedRoles";
-import { AudioButtonsInline } from "../AudioControls";
 
 export type ResourceBarScoreDetails = {
   total: number;
@@ -196,9 +195,6 @@ export default function ResourceBar({
             />
           </div>
         </div>
-
-        {/* Mobile: Audio buttons inline between resources and avatar */}
-        {isMobile && <AudioButtonsInline />}
 
         {/* Player Avatar Section */}
         <button
