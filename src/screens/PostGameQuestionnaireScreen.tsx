@@ -146,19 +146,7 @@ export default function PostGameQuestionnaireScreen({ push }: { push: (route: st
 
   // Tooltip handlers
   const handleTooltipClick = (idx: number) => {
-    setActiveTooltip(activeTooltip === idx ? null : idx);
-  };
-
-  const handleTooltipEnter = (idx: number) => {
-    if (!isMobile) {
-      setActiveTooltip(idx);
-    }
-  };
-
-  const handleTooltipLeave = () => {
-    if (!isMobile) {
-      setActiveTooltip(null);
-    }
+    setActiveTooltip(idx);
   };
 
   // Build reasoning prompt with emphasis on "should"
@@ -228,8 +216,6 @@ export default function PostGameQuestionnaireScreen({ push }: { push: (route: st
                           e.stopPropagation();
                           handleTooltipClick(idx);
                         }}
-                        onMouseEnter={() => handleTooltipEnter(idx)}
-                        onMouseLeave={handleTooltipLeave}
                         className="text-gray-400 hover:text-white transition-colors p-1"
                         aria-label="More info"
                       >

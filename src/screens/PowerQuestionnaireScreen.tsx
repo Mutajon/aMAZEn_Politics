@@ -210,19 +210,7 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
 
   // Tooltip handlers
   const handleTooltipClick = (idx: number) => {
-    setActiveTooltip(activeTooltip === idx ? null : idx);
-  };
-
-  const handleTooltipEnter = (idx: number) => {
-    if (!isMobile) {
-      setActiveTooltip(idx);
-    }
-  };
-
-  const handleTooltipLeave = () => {
-    if (!isMobile) {
-      setActiveTooltip(null);
-    }
+    setActiveTooltip(idx);
   };
 
   // Build Q1 reasoning prompt
@@ -336,8 +324,6 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
                           e.stopPropagation();
                           handleTooltipClick(idx);
                         }}
-                        onMouseEnter={() => handleTooltipEnter(idx)}
-                        onMouseLeave={handleTooltipLeave}
                         className="text-gray-400 hover:text-white transition-colors p-1"
                         aria-label="More info"
                       >
