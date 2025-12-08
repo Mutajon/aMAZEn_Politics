@@ -9,6 +9,7 @@ import { useCompassStore } from "../store/compassStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useMirrorQuizStore } from "../store/mirrorQuizStore";
+import { useQuestionnaireStore } from "../store/questionnaireStore";
 import { clearAllSnapshots } from "../lib/eventScreenSnapshot";
 import { loggingService } from "../lib/loggingService";
 import { useLoggingStore } from "../store/loggingStore";
@@ -181,7 +182,15 @@ export default function SplashScreen({
       narrator.prime();
       playMusic('background', true);
 
-      onStart();
+      // Check if questionnaire needs to be completed (first-time users in experiment mode)
+      const hasCompletedQuestionnaire = useQuestionnaireStore.getState().hasCompleted;
+      if (!hasCompletedQuestionnaire && registerData.isNewUser) {
+        // Redirect to questionnaire for first-time users
+        push('/power-questionnaire');
+      } else {
+        // Proceed to game
+        onStart();
+      }
     } catch (error) {
       console.error('Error in handleIDSubmit:', error);
       setIsLoading(false);
@@ -280,6 +289,15 @@ export default function SplashScreen({
   useEffect(() => {
     logger.logSystem('splash_screen_loaded', true, 'Splash screen loaded');
   }, [logger]);
+
+  // Redirect to thank-you screen if post-game questionnaire was completed
+  useEffect(() => {
+    const hasCompletedPostGame = useQuestionnaireStore.getState().hasCompletedPostGame;
+    if (hasCompletedPostGame) {
+      console.log('[SplashScreen] Post-game questionnaire already completed, redirecting to thank-you');
+      push('/thank-you');
+    }
+  }, [push]);
 
   // Simple subtitle reveal: show title, wait 0.5s, fade in subtitle
   useEffect(() => {

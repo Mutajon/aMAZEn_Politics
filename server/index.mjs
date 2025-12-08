@@ -14,7 +14,7 @@ import {
   deleteConversation,
   startCleanupTask
 } from "./conversationStore.mjs";
-import { getCountersCollection, incrementCounter, getUsersCollection, getScenarioSuggestionsCollection, getHighscoresCollection } from "./db/mongodb.mjs";
+import { getCountersCollection, incrementCounter, getUsersCollection, getScenarioSuggestionsCollection, getHighscoresCollection, getDb } from "./db/mongodb.mjs";
 import { getTheoryPrompt } from "./theory-loader.mjs";
 
 // -------------------- Process Error Handlers ---------------------------
@@ -276,6 +276,79 @@ app.post("/api/users/register", async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to register user',
+      details: error.message
+    });
+  }
+});
+
+// -------------------- Power Distribution Questionnaire --------------------
+/**
+ * POST /api/power-questionnaire
+ * Store power distribution questionnaire responses
+ *
+ * Body for initial questionnaire (type: "initial"):
+ * {
+ *   userId: string,
+ *   timestamp: number,
+ *   type: "initial",
+ *   entities: [{ id: string, name: string, current: number, ideal: number }, ...],
+ *   currentReasoning: string,  // Reasoning for Q1 (current distribution)
+ *   idealReasoning: string     // Reasoning for Q2 (ideal distribution)
+ * }
+ *
+ * Body for post-game questionnaire (type: "post-game"):
+ * {
+ *   userId: string,
+ *   timestamp: number,
+ *   type: "post-game",
+ *   entities: [{ id: string, name: string, ideal: number }, ...],
+ *   idealReasoning: string     // Reasoning for ideal distribution
+ * }
+ */
+app.post("/api/power-questionnaire", async (req, res) => {
+  try {
+    const { userId, timestamp, type, entities, currentReasoning, idealReasoning } = req.body;
+
+    // Validate input
+    if (!userId || !entities || !Array.isArray(entities)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: userId and entities'
+      });
+    }
+
+    // Get or create powerDistribution collection
+    const db = await getDb();
+    const powerDistCollection = db.collection('powerDistribution');
+
+    // Store the questionnaire response with type and reasoning
+    const document = {
+      userId,
+      timestamp: timestamp || Date.now(),
+      type: type || "initial",  // "initial" or "post-game"
+      entities,
+      createdAt: new Date()
+    };
+
+    // Add reasoning fields based on type
+    if (type === "post-game") {
+      document.idealReasoning = idealReasoning || null;
+    } else {
+      // Initial questionnaire has both current and ideal reasoning
+      document.currentReasoning = currentReasoning || null;
+      document.idealReasoning = idealReasoning || null;
+    }
+
+    await powerDistCollection.insertOne(document);
+
+    console.log(`[PowerQuestionnaire] Stored ${type || "initial"} response for user: ${userId}`);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error in /api/power-questionnaire:", error?.message || error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to store questionnaire response',
       details: error.message
     });
   }
@@ -4075,7 +4148,9 @@ function buildGameMasterSystemPromptUnifiedV3(gameContext, languageCode = 'en', 
     challengerName,
     powerHolders,
     authorityLevel,
-    playerCompassTopValues
+    playerCompassTopValues,
+    character,
+    grounding
   } = gameContext;
 
   // Get top 5 power holders only
@@ -4137,6 +4212,77 @@ ${dilemmaEmphasis ? `
 ${dilemmaEmphasis}
 ═══════════════════════════════════════════════════════════════════════════════
 ` : ''}
+
+PLAYER CHARACTER:
+- Name: ${character?.name || "Unknown"}
+- Gender: ${character?.gender || "any"}
+
+CHARACTER NAME USAGE:
+- You may OCCASIONALLY use the player's name in narration (e.g., "${character?.name}, your brother approaches...")
+- Do NOT overuse the name—"you" should still be primary
+- Use the name when it adds dramatic weight or personal directness
+
+${languageCode === 'he' ? `
+═══════════════════════════════════════════════════════════════════════════════
+CRITICAL - HEBREW GENDER CONSISTENCY RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+The player character is ${character?.gender || "any"}.
+
+MANDATORY HEBREW GRAMMAR:
+${character?.gender === 'male' ? `
+- ALWAYS use MASCULINE verb forms and adjectives for the player
+- Second person masculine: "אתה" (you), "הלכת" (you went - masculine)
+- Past tense masculine: "עשית" (you did - masculine)
+- Future tense masculine: "תעשה" (you will do - masculine)
+- NEVER use feminine forms: "את", "הלכת" (feminine), "עשית" (feminine), "תעשי"
+` : character?.gender === 'female' ? `
+- ALWAYS use FEMININE verb forms and adjectives for the player
+- Second person feminine: "את" (you), "הלכת" (you went - feminine)
+- Past tense feminine: "עשית" (you did - feminine)
+- Future tense feminine: "תעשי" (you will do - feminine)
+- NEVER use masculine forms: "אתה", "הלכת" (masculine), "עשית" (masculine), "תעשה"
+` : `
+- Use gender-neutral phrasing when possible
+- If gender-specific language is needed, default to masculine forms (Hebrew convention)
+`}
+
+VERIFICATION CHECKLIST:
+- Every verb referring to the player MUST match ${character?.gender || "any"} gender
+- Every adjective describing the player MUST match ${character?.gender || "any"} gender
+- Every pronoun for the player MUST match ${character?.gender || "any"} gender
+- Check EVERY sentence before finalizing the dilemma
+
+BAD EXAMPLES (Gender Mismatch):
+- "ג'ון, את הולכת..." (John [male name], you go [feminine]) ❌
+- "מרי, אתה הולך..." (Mary [female name], you go [masculine]) ❌
+
+GOOD EXAMPLES (Gender Match):
+- "ג'ון, אתה הולך..." (John [male], you go [masculine]) ✅
+- "מרי, את הולכת..." (Mary [female], you go [feminine]) ✅
+
+═══════════════════════════════════════════════════════════════════════════════
+` : ''}
+
+NPC NAMING RULES (CRITICAL):
+- Cultural Setting: ${grounding?.era || setting}
+- When creating NPCs (brothers, neighbors, officials, guild members, etc.):
+  * Generate names APPROPRIATE to the historical/cultural setting
+  * IGNORE the UI language (${languageName})
+  * Use period-accurate names for the setting
+
+EXAMPLES BY SETTING:
+${grounding?.era?.includes('United States') || grounding?.era?.includes('1877') ? `
+- 1877 United States (Railroad Strike) → American names: Thomas, Sarah, Jacob, William, Emma, Daniel
+  (NOT Hebrew names like תומס, שרה even when UI is in Hebrew)
+` : ''}${grounding?.era?.includes('Tel Aviv') || grounding?.era?.includes('2025') ? `
+- Tel Aviv University, 2025 → Israeli Hebrew names: Yoav, Noa, Ori, Tamar, Eitan, Maya
+  (NOT English names like John, Sarah even when UI is in English)
+` : ''}${grounding?.era?.includes('Namek') || grounding?.era?.includes('2099') ? `
+- Planet Namek, 2099 → Sci-fi names: Kael, Lyra, Nova, Ren, Zara, Orion
+  (Futuristic/invented names appropriate for a space colony setting)
+` : ''}
+- Generic rule: Research typical names from ${grounding?.era || setting} and use those
 
 2. THE THREE-STEP PROCESS
 
@@ -4649,7 +4795,9 @@ app.post("/api/game-turn-v2", async (req, res) => {
         challengerName,
         powerHolders: gameContext.powerHolders,
         authorityLevel,
-        playerCompassTopValues: gameContext.playerCompassTopValues
+        playerCompassTopValues: gameContext.playerCompassTopValues,
+        character: gameContext.character || { name: "Unknown", gender: "any" },
+        grounding: gameContext.grounding || null
       };
 
       // Build unified system prompt (sent ONCE)

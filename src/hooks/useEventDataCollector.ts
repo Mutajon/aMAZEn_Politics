@@ -238,7 +238,12 @@ async function fetchGameTurn(language: string = 'en'): Promise<{
       ],
       confidant: confidant ? { name: confidant.name, description: confidant.description, imageId: confidant.imageId } : null,
       e12: roleState.analysis?.e12 || null,
-      dilemmaEmphasis: roleState.analysis?.dilemmaEmphasis ?? null
+      dilemmaEmphasis: roleState.analysis?.dilemmaEmphasis ?? null,
+      character: {
+        name: roleState.character?.name || "Unknown",
+        gender: roleState.character?.gender || "any"
+      },
+      grounding: roleState.analysis?.grounding || null
     };
 
     // Subject focus (outside gameContext for v2)

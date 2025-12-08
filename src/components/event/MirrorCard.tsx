@@ -138,7 +138,7 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
         <div
           className="absolute"
           style={{
-            left: `calc(${mirrorOffsetX}px - 50px)`,  // Protrudes to the left (responsive)
+            left: isMobile ? '10px' : `calc(${mirrorOffsetX}px - 50px)`,  // No protrusion on mobile, protrudes on desktop
             top: "50%",                  // Center vertically
             transform: "translateY(-50%)", // Adjust for center alignment
             zIndex: 10,                  // In front like speaker avatar

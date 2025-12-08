@@ -2,7 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root { height: 100%; }
+html, body, #root {
+  height: 100%;
+  overflow-x: hidden;
+}
 body {
   background-color: #000000;
   -webkit-font-smoothing: antialiased;

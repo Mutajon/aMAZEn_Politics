@@ -40,6 +40,9 @@ import MirrorScreen from "./screens/MirrorScreen";
 import AftermathScreen from "./screens/AftermathScreen";
 import FinalScoreScreen from "./screens/FinalScoreScreen";
 import DownfallScreen from "./screens/DownfallScreen";
+import PowerQuestionnaireScreen from "./screens/PowerQuestionnaireScreen";
+import PostGameQuestionnaireScreen from "./screens/PostGameQuestionnaireScreen";
+import ThankYouScreen from "./screens/ThankYouScreen";
 import AudioControls from "./components/AudioControls";
 import { useAudioManager } from "./hooks/useAudioManager";
 import { useSettingsStore } from "./store/settingsStore";
@@ -221,6 +224,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
           className="absolute inset-0 min-h-screen bg-black"
           style={{ width: '100%', height: '100%' }}
         >
+          {route === "/power-questionnaire" && <PowerQuestionnaireScreen push={push} />}
           {route === "/dream" && <DreamScreen push={push} />}
           {route === "/role-intro" && <RoleIntroScreen push={push} />}
           {route === "/intro" && <IntroScreen push={push} />}
@@ -254,6 +258,8 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
           {route === "/aftermath" && <AftermathScreen push={push} />}
           {route === "/final-score" && <FinalScoreScreen key={gameId} push={push} />}
           {route === "/capped" && <GameCappedScreen push={push} />}
+          {route === "/post-game-questionnaire" && <PostGameQuestionnaireScreen push={push} />}
+          {route === "/thank-you" && <ThankYouScreen />}
 
           {/* Backstage route - Development mode (bypasses experiments) */}
           {route === "/backstage" && (
