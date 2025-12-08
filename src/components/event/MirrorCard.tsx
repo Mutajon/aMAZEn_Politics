@@ -29,6 +29,13 @@ const RADIUS_BR       = T.cornerBR;
 const IMG_WIDTH_PX    = 110;  // Doubled from 55 for better visibility
 const IMG_OPACITY     = 0.95;
 
+// Mirror protrusion (negative = outside card boundary)
+const IMG_OFFSET_DESKTOP = -55; // Protrude 55px outside card on desktop
+const IMG_OFFSET_MOBILE  = -40; // Protrude 40px outside card on mobile
+
+// Card padding to accommodate protruding mirror
+const CARD_PAD_MIRROR_SIDE = 60; // 60px accommodates 110px mirror with spacing
+
 // Keep text away from the image
 const TEXT_INSET_LEFT_PX  = 0;  // No longer needed, card padding handles spacing
 const TEXT_INSET_RIGHT_PX = 12;
@@ -65,7 +72,9 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
 
   // Responsive mirror offset and padding (RTL-aware)
   // Hebrew (RTL): Mirror on left | English (LTR): Mirror on right
-  const mirrorOffset = isMobile ? 10 : 60; // Mobile: 10px inset, Desktop: 60px padding
+  // Strategy: Mirror protrudes OUTSIDE card boundary on both mobile and desktop
+  // This maximizes text space by not consuming card width
+  const mirrorOffset = isMobile ? IMG_OFFSET_MOBILE : IMG_OFFSET_DESKTOP; // Negative = outside card
 
   // Use word-level splitting to prevent mid-word line breaks while maintaining shimmer effect
   const segments = useMemo(() => splitWords(text), [text]);
@@ -106,8 +115,8 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
           fontSize: `${CARD_FONT_PX}px`,
           paddingTop: CARD_PAD_Y,
           paddingBottom: CARD_PAD_Y,
-          paddingLeft: isRTL ? mirrorOffset : CARD_PAD_X,
-          paddingRight: isRTL ? CARD_PAD_X : mirrorOffset,
+          paddingLeft: isRTL ? CARD_PAD_MIRROR_SIDE : CARD_PAD_X,
+          paddingRight: isRTL ? CARD_PAD_X : CARD_PAD_MIRROR_SIDE,
           boxShadow: CARD_SHADOW,
           borderTopLeftRadius: RADIUS_TL,
           borderTopRightRadius: RADIUS_TR,
@@ -120,7 +129,8 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
         <div
           className={["relative whitespace-pre-wrap", italic ? "italic" : ""].join(" ")}
           style={{
-            direction: 'ltr', // Ensure text coordinate system is LTR for consistent padding
+            direction: isRTL ? 'rtl' : 'ltr', // RTL for Hebrew text alignment, LTR for English
+            textAlign: isRTL ? 'right' : 'left', // Explicit alignment
             paddingLeft: TEXT_INSET_LEFT_PX,
             paddingRight: TEXT_INSET_RIGHT_PX,
             wordBreak: "break-word",
@@ -144,10 +154,11 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
           className="absolute"
           style={{
             // RTL (Hebrew): Mirror on left edge | LTR (English): Mirror on right edge
+            // Negative offset = protrudes OUTSIDE card boundary
             ...(isRTL ? {
-              left: isMobile ? '10px' : '-55px'
+              left: `${mirrorOffset}px`  // Hebrew: mirror on left
             } : {
-              right: isMobile ? '10px' : '-55px'
+              right: `${mirrorOffset}px` // English: mirror on right
             }),
             top: "50%",
             transform: "translateY(-50%)",
