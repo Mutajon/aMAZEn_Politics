@@ -483,7 +483,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
     )}
 
     {epilogueShown && (
-      <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
+      <div className="pt-2 flex justify-center">
         <button
           onClick={async () => {
             if (sleepPending) return;
@@ -511,17 +511,6 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
           ) : (
             lang(getGenderKey("BUTTON_GO_TO_SLEEP"))
           )}
-        </button>
-        <button
-          onClick={() => {
-            logger.log('button_click_examine_mirror', 'Examine mirror', 'User clicked Examine mirror button');
-            // Save current route so MirrorScreen knows where to return
-            saveMirrorReturnRoute("/compass-quiz");
-            push("/mirror");
-          }}
-          className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/15 text-white hover:bg-white/25 border border-white/30"
-        >
-          {lang(getGenderKey("BUTTON_EXAMINE_MIRROR"))}
         </button>
       </div>
     )}

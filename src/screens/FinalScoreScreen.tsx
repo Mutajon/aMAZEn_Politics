@@ -537,19 +537,13 @@ export default function FinalScoreScreen({ push }: Props) {
               : lang("FINAL_SCORE_NOT_HALL_OF_FAME_MESSAGE")}
           </div>
         )}
-        <div className="flex flex-wrap gap-3">
+        <div className="flex justify-end">
           <button
             onClick={handlePlayAgain}
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-400 px-4 py-2 font-semibold text-white shadow-lg hover:from-amber-400 hover:to-orange-300 transition"
           >
+            {lang("CONTINUE")}
             <ArrowRight className="h-4 w-4" />
-            {lang("FINAL_SCORE_PLAY_AGAIN")}
-          </button>
-          <button
-            onClick={handleVisitHallOfFame}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/25 px-4 py-2 text-white/80 hover:bg-white/15 transition"
-          >
-            {lang("FINAL_SCORE_VISIT_HALL_OF_FAME")}
           </button>
         </div>
       </div>

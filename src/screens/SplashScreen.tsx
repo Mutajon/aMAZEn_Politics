@@ -686,13 +686,16 @@ export default function SplashScreen({
     {lang("START_BUTTON")}
   </motion.button>
 
-  {/* Secondary: High Scores (subtle/glass) - TEMPORARILY HIDDEN */}
+  {/* Secondary: High Scores (subtle/glass) */}
   <motion.button
     initial={{ opacity: 0 }}
-    animate={{ opacity: 0 }}
+    animate={{ opacity: showButton ? 1 : 0 }}
     transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
-    style={{ visibility: "hidden", pointerEvents: "none" }}
+    style={{ visibility: showButton ? "visible" : "hidden" }}
     onClick={() => {
+      // Play click sound
+      audioManager.playSfx('click-soft');
+
       // Start music on any user interaction
       playMusic('background', true);
 

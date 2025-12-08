@@ -9,6 +9,7 @@ import { HelpCircle } from "lucide-react";
 import { mirrorBubbleTheme as T } from "../../theme/mirrorBubbleTheme";
 import { MirrorImage, MirrorReflection } from "../MirrorWithReflection";
 import { useSettingsStore } from "../../store/settingsStore";
+import { getCurrentLanguage } from "../../i18n/lang";
 
 /* ====================== TUNABLES (EDIT HERE) ====================== */
 // Card visuals
@@ -27,10 +28,6 @@ const RADIUS_BR       = T.cornerBR;
 // Mirror art (served from /public) - Responsive sizing for mobile
 const IMG_WIDTH_PX    = 110;  // Doubled from 55 for better visibility
 const IMG_OPACITY     = 0.95;
-const IMG_OFFSET_X    = -40;  // Increased protrusion for larger mirror
-
-// Card left padding to compensate for protruding mirror
-const CARD_PAD_LEFT   = 80;   // Increased for larger mirror (was 40)
 
 // Keep text away from the image
 const TEXT_INSET_LEFT_PX  = 0;  // No longer needed, card padding handles spacing
@@ -60,12 +57,15 @@ export type MirrorCardProps = {
 };
 
 export default function MirrorCard({ text, italic = true, className, onExploreClick, avatarUrl }: MirrorCardProps) {
+  // RTL detection (Hebrew = RTL = mirror on left, English = LTR = mirror on right)
+  const isRTL = getCurrentLanguage() === 'he';
+
   // Mobile detection for responsive mirror positioning
   const isMobile = useSettingsStore((s) => s.isMobileDevice);
 
-  // Responsive mirror offset (reduce protrusion on mobile to prevent horizontal scroll)
-  const mirrorOffsetX = isMobile ? 0 : IMG_OFFSET_X; // 0 on mobile (no protrusion), -40 on desktop
-  const cardPadLeft = isMobile ? 50 : CARD_PAD_LEFT;   // Adjust padding accordingly
+  // Responsive mirror offset and padding (RTL-aware)
+  // Hebrew (RTL): Mirror on left | English (LTR): Mirror on right
+  const mirrorOffset = isMobile ? 10 : 60; // Mobile: 10px inset, Desktop: 60px padding
 
   // Use word-level splitting to prevent mid-word line breaks while maintaining shimmer effect
   const segments = useMemo(() => splitWords(text), [text]);
@@ -89,7 +89,7 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
 
   return (
     <motion.div
-      className={["w-full flex justify-start", OUTER_MARGIN_Y, className || ""].join(" ")}
+      className={["w-full", OUTER_MARGIN_Y, className || ""].join(" ")}
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 260, damping: 20 }}
@@ -99,11 +99,15 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
       <div
         className="relative w-full"
         style={{
+          direction: 'ltr', // Explicit LTR to prevent RTL document direction from affecting positioning
           background: CARD_BG,
           color: CARD_TEXT_COLOR,
           fontFamily: CARD_FONT_FF,
           fontSize: `${CARD_FONT_PX}px`,
-          padding: `${CARD_PAD_Y}px ${CARD_PAD_X}px ${CARD_PAD_Y}px ${cardPadLeft}px`,
+          paddingTop: CARD_PAD_Y,
+          paddingBottom: CARD_PAD_Y,
+          paddingLeft: isRTL ? mirrorOffset : CARD_PAD_X,
+          paddingRight: isRTL ? CARD_PAD_X : mirrorOffset,
           boxShadow: CARD_SHADOW,
           borderTopLeftRadius: RADIUS_TL,
           borderTopRightRadius: RADIUS_TR,
@@ -116,6 +120,7 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
         <div
           className={["relative whitespace-pre-wrap", italic ? "italic" : ""].join(" ")}
           style={{
+            direction: 'ltr', // Ensure text coordinate system is LTR for consistent padding
             paddingLeft: TEXT_INSET_LEFT_PX,
             paddingRight: TEXT_INSET_RIGHT_PX,
             wordBreak: "break-word",
@@ -134,16 +139,21 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
           )}
         </div>
 
-        {/* Mirror image protruding from left side, vertically centered */}
+        {/* Mirror image positioned based on language direction, vertically centered */}
         <div
           className="absolute"
           style={{
-            left: isMobile ? '10px' : `calc(${mirrorOffsetX}px - 30px)`,  // No protrusion on mobile, protrudes on desktop
-            top: "50%",                  // Center vertically
-            transform: "translateY(-50%)", // Adjust for center alignment
-            zIndex: 10,                  // In front like speaker avatar
-            width: IMG_WIDTH_PX,
-            height: IMG_WIDTH_PX,
+            // RTL (Hebrew): Mirror on left edge | LTR (English): Mirror on right edge
+            ...(isRTL ? {
+              left: isMobile ? '10px' : '-55px'
+            } : {
+              right: isMobile ? '10px' : '-55px'
+            }),
+            top: "50%",
+            transform: "translateY(-50%)",
+            zIndex: 10,
+            width: `${IMG_WIDTH_PX}px`,
+            height: `${IMG_WIDTH_PX}px`,
           }}
         >
           {/* Mirror image (shimmer disabled) */}
@@ -165,18 +175,18 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
           />
         </div>
 
-        {/* Explore button - top-right corner */}
+        {/* Explore button - positioned opposite to mirror (RTL-aware) */}
         {onExploreClick && (
           <motion.button
             onClick={onExploreClick}
-            className="
-              absolute top-2 right-2 z-20
+            className={`
+              absolute top-2 ${isRTL ? 'left-2' : 'right-2'} z-20
               w-8 h-8 rounded-full
               bg-white/20 hover:bg-white/30
               backdrop-blur-sm border border-white/40
               flex items-center justify-center
               transition-colors cursor-pointer
-            "
+            `}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
             title="Explore your compass values"
