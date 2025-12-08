@@ -130,24 +130,14 @@ function logTopicScopeDebug(gameId, day, topic, scope, tensionCluster, title, to
 
 const app = express();
 
-// CORS Configuration - Security for production deployment
-// Restrict API access to allowed domains only (prevents unauthorized data submission)
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-  : ['http://localhost:5173', 'http://localhost:3001']; // Development defaults
+// CORS Configuration - Now allowing all origins for flexible deployment
+// Previous restrictive configuration (commented out for reference):
+// const allowedOrigins = process.env.ALLOWED_ORIGINS
+//   ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+//   : ['http://localhost:5173', 'http://localhost:3001'];
 
 app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, Postman)
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.warn(`[CORS] Rejected request from origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: true, // Allow all origins (changed from restrictive whitelist)
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
