@@ -670,6 +670,11 @@ enceladus, puck, charon, kore, zephyr, fenrir, leda, orus, aoede, callirrhoe, au
 
 **Storage**: MongoDB (if `ENABLE_DATA_COLLECTION=true`)
 
+**Rate Limiting**: Session-based (1,000 logs per session)
+- Server returns 429 error when session limit exceeded
+- Client detects 429 and stops logging gracefully
+- Rate limit resets after 24 hours (MongoDB TTL)
+
 ---
 
 ### POST `/api/log/session/start`
@@ -692,6 +697,42 @@ enceladus, puck, charon, kore, zephyr, fenrir, leda, orus, aoede, callirrhoe, au
   success: boolean;
 }
 ```
+
+---
+
+### POST `/api/log/summary`
+
+**Session summary submission.**
+
+Called when game ends (AftermathScreen) or when user closes tab mid-game.
+
+**Request Body**:
+```typescript
+{
+  userId: string;
+  sessionId: string;
+  gameVersion: string;
+  treatment: string;
+  timestamp: Date;
+  role: string;
+  incomplete: boolean;
+  // ... additional summary fields
+}
+```
+
+**Response**:
+```typescript
+{
+  success: boolean;
+  error?: string;
+}
+```
+
+**Storage**: MongoDB `summary` collection (separate from `gameLogs`)
+
+**Rate Limiting**: Session-based (1,000 logs per session)
+- Same rate limit as `/api/log/batch`
+- Returns 429 if session limit exceeded
 
 ---
 

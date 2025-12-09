@@ -290,7 +290,10 @@ class LoggingService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(`Batch log failed: ${response.status} - ${errorData.error || 'Unknown error'}`);
+        const error: any = new Error(`Batch log failed: ${response.status} - ${errorData.error || 'Unknown error'}`);
+        error.status = response.status;
+        error.errorData = errorData;
+        throw error;
       }
 
       const data = await response.json();
@@ -303,7 +306,7 @@ class LoggingService {
         throw new Error(`Batch log failed: ${data.error || 'Unknown error'}`);
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('[Logging] Flush failed:', error);
 
       // Put logs back at the front of the queue for retry
@@ -311,6 +314,29 @@ class LoggingService {
 
       // Persist queue to localStorage for recovery
       this.persistQueue();
+
+      // Handle 429 rate limit errors specifically
+      if (error.status === 429) {
+        const errorMessage = error.errorData?.error || error.message;
+
+        // Check if it's a session limit error (should stop logging)
+        if (errorMessage.includes('session') || errorMessage.includes('Max logs per session')) {
+          console.warn('[Logging] ⚠️ Session log limit reached (1000 logs) - stopping further logging');
+          this.isFlushing = false;
+          return;  // Stop logging for this session
+        }
+
+        // If it's an IP rate limit error (shouldn't happen after this fix, but handle it)
+        if (errorMessage.includes('IP') || errorMessage.includes('Too many requests')) {
+          console.warn('[Logging] ⚠️ Rate limited by server (IP) - will retry in 1 hour');
+          setTimeout(() => {
+            this.retryCount = 0;  // Reset retry count
+            this.flush(true);
+          }, 60 * 60 * 1000);  // Wait 1 hour before retry
+          this.isFlushing = false;
+          return;
+        }
+      }
 
       // Retry with exponential backoff (unlimited retries with increasing delays)
       if (this.retryCount < RETRY_DELAYS.length) {

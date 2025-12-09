@@ -77,6 +77,36 @@ MONGODB_URI=mongodb://...
 
 ---
 
+### Rate Limiting
+
+**Session-Based Rate Limiting**:
+- **Limit**: 1,000 logs per session (per player)
+- **Purpose**: Prevents individual players from flooding the database
+- **Enforcement**: Server-side check on each batch request
+- **Scope**: Per `sessionId` (generated at game start)
+- **Expiration**: 24 hours after session creation (MongoDB TTL index)
+
+**How It Works**:
+1. Each player gets a unique `sessionId` when starting a game
+2. Server tracks total logs submitted per session in MongoDB `rateLimits` collection
+3. When limit reached (1,000 logs), server returns 429 error
+4. Client detects 429 with "session" in error message and stops logging
+5. Rate limit record automatically expires after 24 hours
+
+**Typical Usage**:
+- Average game: ~500-800 logs (well under limit)
+- 1,000 log limit provides sufficient buffer
+- Only extreme cases (debug mode, rapid testing) hit limit
+
+**Error Handling**:
+- Client-side 429 detection in `loggingService.ts`
+- Session limit: Stops logging gracefully
+- Logs persist in localStorage for manual recovery if needed
+
+**Note**: IP-based rate limiting was removed (Dec 2024) due to false positives on shared networks (universities, offices, Render.com proxy).
+
+---
+
 ## Logging Hooks
 
 ### 1. useLogger
