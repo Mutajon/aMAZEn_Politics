@@ -11,7 +11,6 @@
 // - Respects ENABLE_DATA_COLLECTION environment variable
 
 import express from 'express';
-import rateLimit from 'express-rate-limit';
 import { getLogsCollection, getDb } from '../db/mongodb.mjs';
 
 const router = express.Router();
@@ -20,30 +19,9 @@ const router = express.Router();
 const DATA_COLLECTION_ENABLED = process.env.ENABLE_DATA_COLLECTION === 'true';
 const DEFAULT_TREATMENT = process.env.DEFAULT_TREATMENT || 'control';
 
-// Rate limiting constants
+// Rate limiting constants (session-based only)
 const MAX_LOGS_PER_SESSION = 1000;
 const MAX_BATCH_SIZE = 50;
-const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const RATE_LIMIT_MAX_REQUESTS = 200; // 200 requests per hour per IP
-
-// IP-based rate limiting middleware
-const ipRateLimiter = rateLimit({
-  windowMs: RATE_LIMIT_WINDOW_MS,
-  max: RATE_LIMIT_MAX_REQUESTS,
-  message: {
-    success: false,
-    error: `Too many requests from this IP, please try again after an hour`
-  },
-  standardHeaders: true, // Return rate limit info in headers
-  legacyHeaders: false,  // Disable X-RateLimit-* headers
-  handler: (req, res) => {
-    console.warn(`[Rate Limit] IP ${req.ip} exceeded rate limit`);
-    res.status(429).json({
-      success: false,
-      error: `Rate limit exceeded: max ${RATE_LIMIT_MAX_REQUESTS} requests per hour per IP`
-    });
-  }
-});
 
 /**
  * Get session log count from MongoDB (persistent across server restarts)
@@ -152,7 +130,7 @@ function validateLogEntry(entry) {
  *   errors?: Array<string>
  * }
  */
-router.post('/batch', ipRateLimiter, async (req, res) => {
+router.post('/batch', async (req, res) => {
   try {
     // Check if data collection is enabled
     if (!DATA_COLLECTION_ENABLED) {
@@ -381,7 +359,7 @@ router.post('/session/start', async (req, res) => {
  *   error?: string
  * }
  */
-router.post('/summary', ipRateLimiter, async (req, res) => {
+router.post('/summary', async (req, res) => {
   try {
     // Check if data collection is enabled
     if (!DATA_COLLECTION_ENABLED) {

@@ -146,13 +146,22 @@ export async function gameTurnV2(req, res) {
                 playerCompassTopValues: gameContext.playerCompassTopValues
             };
 
+            // Extract character info (name, gender) for personalization
+            const character = gameContext.character ? {
+                name: gameContext.character.name || gameContext.role || 'Leader',
+                gender: gameContext.character.gender || 'any'
+            } : null;
+
+            // Extract grounding (historical/cultural setting context)
+            const grounding = gameContext.grounding || gameContext.setting || null;
+
             // Build unified system prompt (sent ONCE)
             // Use V3 if feature flag enabled, otherwise use original
             const languageCode = String(language || "en").toLowerCase();
             const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
             const dilemmaEmphasis = gameContext.dilemmaEmphasis || null;
             const systemPrompt = USE_PROMPT_V3
-                ? buildGameMasterSystemPromptUnifiedV3(enrichedContext, languageCode, languageName, dilemmaEmphasis)
+                ? buildGameMasterSystemPromptUnifiedV3(enrichedContext, languageCode, languageName, dilemmaEmphasis, character, grounding)
                 : buildGameMasterSystemPromptUnified(enrichedContext, languageCode, languageName);
 
             // Build minimal Day 1 user prompt

@@ -587,7 +587,7 @@ CRITICAL JSON RULES:
     return prompt;
 }
 
-export function buildGameMasterSystemPromptUnifiedV3(gameContext, languageCode = 'en', languageName = 'English', dilemmaEmphasis = null) {
+export function buildGameMasterSystemPromptUnifiedV3(gameContext, languageCode = 'en', languageName = 'English', dilemmaEmphasis = null, character = null, grounding = null) {
     const {
         role,
         systemName,
@@ -657,6 +657,82 @@ ${dilemmaEmphasis ? `
 ${dilemmaEmphasis}
 ═══════════════════════════════════════════════════════════════════════════════
 ` : ''}
+${character ? `
+
+───────────────────────────────────────────────────────────────────────────────
+PLAYER CHARACTER
+───────────────────────────────────────────────────────────────────────────────
+
+Name: ${character.name}
+Gender: ${character.gender}
+
+Use the character's name occasionally (not every dilemma) for immersion and personalization.
+Example: "As ${character.name} reviews the latest reports..."
+
+This creates a stronger connection between the player and their role without being repetitive.
+` : ''}
+${languageCode === 'he' && character ? `
+
+───────────────────────────────────────────────────────────────────────────────
+CRITICAL - HEBREW GENDER CONSISTENCY RULES
+───────────────────────────────────────────────────────────────────────────────
+
+Hebrew is a gender-inflected language. ALL verbs, adjectives, and pronouns MUST agree with the character's gender.
+
+CHARACTER GENDER: ${character.gender}
+
+${character.gender === 'male' ? `**MALE CHARACTER - Use masculine forms:**
+- Verbs: אתה עומד, אתה צריך, אתה יכול (you stand, you need, you can)
+- Adjectives: אתה חזק, אתה נבון (you are strong, you are wise)
+- Pronouns: שלך (your, masculine)
+- Past tense: עמדת, הצלחת, עשית (you stood, you succeeded, you did)
+
+✅ CORRECT: "אתה עומד בפני דילמה קשה" (You [m] face a difficult dilemma)
+❌ WRONG: "את עומדת בפני דילמה קשה" (You [f] face...)` : character.gender === 'female' ? `**FEMALE CHARACTER - Use feminine forms:**
+- Verbs: את עומדת, את צריכה, את יכולה (you stand, you need, you can)
+- Adjectives: את חזקה, את נבונה (you are strong, you are wise)
+- Pronouns: שלך (your, feminine)
+- Past tense: עמדת, הצלחת, עשית (you stood, you succeeded, you did)
+
+✅ CORRECT: "את עומדת בפני דילמה קשה" (You [f] face a difficult dilemma)
+❌ WRONG: "אתה עומד בפני דילמה קשה" (You [m] face...)` : ''}
+
+**VERIFICATION CHECKLIST:**
+Before submitting your Hebrew dilemma, verify:
+- [ ] All verbs match character gender (past/present/future tenses)
+- [ ] All adjectives match character gender
+- [ ] All pronouns (your/you) match character gender
+- [ ] Consistency across entire dilemma text
+
+**CRITICAL**: This is MANDATORY for Hebrew. Gender mismatch breaks player immersion.
+` : ''}
+
+───────────────────────────────────────────────────────────────────────────────
+NPC NAMING RULES (CRITICAL)
+───────────────────────────────────────────────────────────────────────────────
+
+When generating names for NPCs/characters in dilemmas:
+- Names should match the **historical/cultural setting**, NOT the UI language
+- Example: 1877 US Railroad → English/American names (John, Sarah, William)
+- Example: 2025 Tel Aviv → Hebrew/Israeli names (David, Yael, Moshe)
+- Example: 2099 Namek → Sci-fi/alien names (Zarn, Kira, Vex)
+- Example: Ancient Athens → Greek names (Pericles, Aspasia, Leonidas)
+${grounding ? `
+
+**THIS SCENARIO SETTING: ${grounding}**
+Use period-accurate names appropriate for this specific setting and time period.
+` : ''}
+
+✅ GOOD: "John Smith approaches with a proposal..." (1877 US setting, any UI language)
+✅ GOOD: "ג'ון סמית ניגש עם הצעה..." (1877 US setting, Hebrew UI - transliterated English name)
+❌ BAD: "David Cohen approaches..." (1877 US setting - anachronistic Israeli name)
+
+**EXCEPTION - Immersive Character POV:**
+When writing dilemma descriptions from the character's perspective, use sensory/observational language:
+- Describe what the character can SEE, HEAR, EXPERIENCE (not what they couldn't know)
+- ✅ GOOD: "strange pale-skinned foreigners with fire-weapons" (describes what's observable)
+- ❌ BAD: "English colonists with muskets" (anachronistic knowledge)
+This is NOT jargon - it's immersive storytelling that respects the character's actual knowledge.
 
 2. THE THREE-STEP PROCESS
 
