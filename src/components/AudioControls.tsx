@@ -32,9 +32,6 @@ export default function AudioControls() {
   const narrator = useNarrator();
   const logger = useLogger();
 
-  // Hide on mobile - inline buttons are rendered in ResourceBar instead
-  if (isMobile) return null;
-
   // Close slider when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -95,8 +92,8 @@ export default function AudioControls() {
   };
 
   return (
-    <div className="fixed top-4 ltr:left-4 rtl:right-4 z-50 flex flex-col ltr:items-start rtl:items-end gap-2" ref={sliderRef}>
-      <div className="flex flex-col items-center gap-2">
+    <div className="fixed bottom-4 ltr:left-4 rtl:right-4 z-50 flex flex-col ltr:items-start rtl:items-end gap-2" ref={sliderRef}>
+      <div className="flex flex-row items-center gap-2">
         {/* Music Icon Button */}
         <button
           type="button"
@@ -154,7 +151,7 @@ export default function AudioControls() {
       {showMusicSlider && (
         <div
           className="
-            ltr:ml-12 rtl:mr-12 -mt-12
+            ltr:ml-12 rtl:mr-12 -mb-12
             w-40
             p-3
             rounded-lg
