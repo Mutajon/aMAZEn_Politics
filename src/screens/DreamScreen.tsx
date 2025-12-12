@@ -190,6 +190,7 @@ export default function DreamScreen({ push }: { push: PushFn }) {
   const fragments = useFragmentsStore((s) => s.fragments);
   const firstIntro = useFragmentsStore((s) => s.firstIntro);
   const markIntroCompleted = useFragmentsStore((s) => s.markIntroCompleted);
+  const setPreferredFragment = useFragmentsStore((s) => s.setPreferredFragment);
 
   // Dilemma store - for return visitor detection
   const justFinishedGame = useDilemmaStore((s) => s.justFinishedGame);
@@ -600,10 +601,16 @@ export default function DreamScreen({ push }: { push: PushFn }) {
     const roleTitle = selectedGame?.roleTitle || "unknown";
 
     logger.log("dream_preference_selected", { gameId, roleTitle }, "Player selected preferred game version");
-    // TODO: Store preference in fragmentsStore
+
+    // Store preference in fragmentsStore
+    setPreferredFragment(gameId);
+
     setShowThreeWayComparison(false);
     setShowPreferenceButtons(false);
     clearJustFinishedGame();
+
+    // Navigate to post-game questionnaire
+    push("/post-game-questionnaire");
   };
 
   // Close three-way comparison

@@ -14,7 +14,7 @@ import {
   deleteConversation,
   startCleanupTask
 } from "./services/conversationStore.mjs";
-import { getCountersCollection, incrementCounter, getUsersCollection, getScenarioSuggestionsCollection, getHighscoresCollection } from "./db/mongodb.mjs";
+import { getCountersCollection, incrementCounter, getUsersCollection, getScenarioSuggestionsCollection, getHighscoresCollection, getDb } from "./db/mongodb.mjs";
 import { getTheoryPrompt } from "./theory-loader.mjs";
 import {
   OPENAI_KEY, ANTHROPIC_KEY, XAI_KEY, GEMINI_KEY,
@@ -118,6 +118,79 @@ app.use(bodyParser.json());
 
 // -------------------- User Registration & Treatment Assignment --------------------
 app.post("/api/users/register", registerUser);
+
+// -------------------- Power Distribution Questionnaire --------------------
+/**
+ * POST /api/power-questionnaire
+ * Store power distribution questionnaire responses
+ *
+ * Body for initial questionnaire (type: "initial"):
+ * {
+ *   userId: string,
+ *   timestamp: number,
+ *   type: "initial",
+ *   entities: [{ id: string, name: string, current: number, ideal: number }, ...],
+ *   currentReasoning: string,  // Reasoning for Q1 (current distribution)
+ *   idealReasoning: string     // Reasoning for Q2 (ideal distribution)
+ * }
+ *
+ * Body for post-game questionnaire (type: "post-game"):
+ * {
+ *   userId: string,
+ *   timestamp: number,
+ *   type: "post-game",
+ *   entities: [{ id: string, name: string, ideal: number }, ...],
+ *   idealReasoning: string     // Reasoning for ideal distribution
+ * }
+ */
+app.post("/api/power-questionnaire", async (req, res) => {
+  try {
+    const { userId, timestamp, type, entities, currentReasoning, idealReasoning } = req.body;
+
+    // Validate input
+    if (!userId || !entities || !Array.isArray(entities)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: userId and entities'
+      });
+    }
+
+    // Get or create powerDistribution collection
+    const db = await getDb();
+    const powerDistCollection = db.collection('powerDistribution');
+
+    // Store the questionnaire response with type and reasoning
+    const document = {
+      userId,
+      timestamp: timestamp || Date.now(),
+      type: type || "initial",  // "initial" or "post-game"
+      entities,
+      createdAt: new Date()
+    };
+
+    // Add reasoning fields based on type
+    if (type === "post-game") {
+      document.idealReasoning = idealReasoning || null;
+    } else {
+      // Initial questionnaire has both current and ideal reasoning
+      document.currentReasoning = currentReasoning || null;
+      document.idealReasoning = idealReasoning || null;
+    }
+
+    await powerDistCollection.insertOne(document);
+
+    console.log(`[PowerQuestionnaire] Stored ${type || "initial"} response for user: ${userId}`);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error in /api/power-questionnaire:", error?.message || error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to store questionnaire response',
+      details: error.message
+    });
+  }
+});
 
 // -------------------- Game Slot Reservation --------------------
 app.post("/api/reserve-game-slot", reserveGameSlot);

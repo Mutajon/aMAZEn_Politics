@@ -13,6 +13,7 @@ import { useDilemmaStore } from "./store/dilemmaStore";
 import { useCompassStore } from "./store/compassStore";
 import { useRoleStore } from "./store/roleStore";
 import { useHighscoreStore } from "./store/highscoreStore";
+import { useQuestionnaireStore } from "./store/questionnaireStore";
 import { resetDay2Tutorial } from "./hooks/useDay2Tutorial";
 
 // Disable StrictMode in development to avoid double-invoked effects (which fire duplicate API calls).
@@ -397,6 +398,7 @@ const useStrict = import.meta.env.MODE !== "development";
     useFragmentsStore.getState().resetIntro();
     useMirrorDialogueStore.getState().resetMirrorDialogue();
     useHighscoreStore.getState().reset();
+    useQuestionnaireStore.getState().reset();
 
     // Tutorial systems
     resetDay2Tutorial();

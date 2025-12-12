@@ -51,6 +51,9 @@ import { useStateChangeLogger } from "./hooks/useStateChangeLogger";
 import { useSessionLogger } from "./hooks/useSessionLogger";
 import { usePartialSummaryLogger } from "./hooks/usePartialSummaryLogger";
 import GameCappedScreen from "./screens/GameCappedScreen";
+import PowerQuestionnaireScreen from "./screens/PowerQuestionnaireScreen";
+import PostGameQuestionnaireScreen from "./screens/PostGameQuestionnaireScreen";
+import ThankYouScreen from "./screens/ThankYouScreen";
 import { AnimatePresence, motion } from "framer-motion";
 
 if (import.meta.env.DEV) {
@@ -254,6 +257,9 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
           {route === "/aftermath" && <AftermathScreen push={push} />}
           {route === "/final-score" && <FinalScoreScreen key={gameId} push={push} />}
           {route === "/capped" && <GameCappedScreen push={push} />}
+          {route === "/power-questionnaire" && <PowerQuestionnaireScreen push={push} />}
+          {route === "/post-game-questionnaire" && <PostGameQuestionnaireScreen push={push} />}
+          {route === "/thank-you" && <ThankYouScreen />}
 
           {/* Backstage route - Development mode (bypasses experiments) */}
           {route === "/backstage" && (

@@ -12,6 +12,7 @@ import { useMirrorQuizStore } from "../store/mirrorQuizStore";
 import { clearAllSnapshots } from "../lib/eventScreenSnapshot";
 import { loggingService } from "../lib/loggingService";
 import { useLoggingStore } from "../store/loggingStore";
+import { useQuestionnaireStore } from "../store/questionnaireStore";
 import { useLang } from "../i18n/lang";
 import { useLanguage } from "../i18n/LanguageContext";
 import LanguageSelector from "../components/LanguageSelector";
@@ -127,6 +128,20 @@ export default function SplashScreen({
       setShowIDModal(false);
     }
   }, [experimentMode]);
+
+  // Log splash screen loaded (runs once on mount)
+  useEffect(() => {
+    logger.logSystem('splash_screen_loaded', true, 'Splash screen loaded');
+  }, [logger]);
+
+  // Redirect to thank-you screen if post-game questionnaire was completed
+  useEffect(() => {
+    const hasCompletedPostGame = useQuestionnaireStore.getState().hasCompletedPostGame;
+    if (hasCompletedPostGame) {
+      console.log('[SplashScreen] Post-game questionnaire already completed, redirecting to thank-you');
+      push('/thank-you');
+    }
+  }, [push]);
 
   // Handle ID submission from modal (only called in experiment mode)
   const handleIDSubmit = async (id: string) => {
