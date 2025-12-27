@@ -1,65 +1,99 @@
 // src/i18n/translateSupportStances.ts
-// Helper function to translate support profile stance descriptions
+import type { SupportProfile, IssueKey } from "../data/supportProfiles";
 
-import { useRoleStore } from "../store/roleStore";
-import { getPredefinedRole } from "../data/predefinedRoles";
+// Map role IDs to translation key prefixes
+const ROLE_PREFIX_MAP: Record<string, string> = {
+  railroad_1877: "RAILROAD",
+  telaviv_2025: "TELAVIV",
+  alexandria_48: "ALEXANDRIA",
+  florence_1494: "FLORENCE",
+  north_america_1607: "NORTH_AMERICA",
+  japan_1600: "JAPAN",
+  haiti_1791: "HAITI",
+  russia_1917: "RUSSIA",
+  india_1947: "INDIA",
+  south_africa_1990: "SOUTH_AFRICA",
+  mars_2179: "MARS",
+  namek_2099: "NAMEK",
+};
+
+// Map stance keys to their translation suffixes
+const STANCE_KEY_MAP: Record<IssueKey, string> = {
+  governance: "GOVERNANCE",
+  order: "ORDER",
+  economy: "ECONOMY",
+  justice: "JUSTICE",
+  foreign: "FOREIGN",
+  culture: "CULTURE",
+};
 
 /**
- * Translates a stance description based on the current role and entity type
- * @param stanceValue - The English stance description to translate
- * @param entityType - "people" or "challenger"
- * @param stanceKey - The stance key (governance, order, economy, etc.)
- * @param lang - The translation function
- * @returns Translated stance description or original if translation not found
+ * Translates support profile summary
  */
-export function translateSupportStance(
-  stanceValue: string,
+export function translateSupportSummary(
+  roleId: string,
   entityType: "people" | "challenger",
-  stanceKey: string,
+  summaryValue: string,
   lang: (key: string) => string
 ): string {
-  // Get the current role
-  const selectedRole = useRoleStore.getState().selectedRole;
-  if (!selectedRole) {
-    // Fallback: return original value if no role is selected
-    return stanceValue;
-  }
-
-  // Get the predefined role data to find the role ID
-  const roleData = getPredefinedRole(selectedRole);
-  if (!roleData) {
-    // Fallback: return original value if role not found
-    return stanceValue;
-  }
-
-  // Map role ID to translation key prefix
-  const rolePrefixMap: Record<string, string> = {
-    "athens_431": "ATHENS",
-    "alexandria_48": "ALEXANDRIA",
-    "florence_1494": "FLORENCE",
-    "north_america_1607": "NORTH_AMERICA",
-    "japan_1600": "JAPAN",
-    "haiti_1791": "HAITI",
-    "russia_1917": "RUSSIA",
-    "india_1947": "INDIA",
-    "south_africa_1990": "SOUTH_AFRICA",
-    "mars_2179": "MARS",
-  };
-
-  const rolePrefix = rolePrefixMap[roleData.id];
+  const rolePrefix = ROLE_PREFIX_MAP[roleId];
   if (!rolePrefix) {
-    // Fallback: return original value if role ID not in map
-    return stanceValue;
+    return summaryValue;
   }
 
-  // Build translation key: SUPPORT_{ROLE}_{ENTITY}_STANCE_{STANCE_KEY}
   const entityPrefix = entityType === "people" ? "PEOPLE" : "CHALLENGER";
-  const stanceKeyUpper = stanceKey.toUpperCase();
-  const translationKey = `SUPPORT_${rolePrefix}_${entityPrefix}_STANCE_${stanceKeyUpper}`;
+  const translationKey = `SUPPORT_${rolePrefix}_${entityPrefix}_SUMMARY`;
 
   const translated = lang(translationKey);
-  
-  // If translation returns the key itself (not found), return original value
-  return translated !== translationKey ? translated : stanceValue;
+  return translated !== translationKey ? translated : summaryValue;
 }
 
+/**
+ * Translates all stances in a support profile
+ */
+export function translateSupportStances(
+  roleId: string,
+  entityType: "people" | "challenger",
+  stances: Partial<Record<IssueKey, string>>,
+  lang: (key: string) => string
+): Partial<Record<IssueKey, string>> {
+  const rolePrefix = ROLE_PREFIX_MAP[roleId];
+  if (!rolePrefix) {
+    return stances;
+  }
+
+  const entityPrefix = entityType === "people" ? "PEOPLE" : "CHALLENGER";
+  const translatedStances: Partial<Record<IssueKey, string>> = {};
+
+  for (const [key, value] of Object.entries(stances)) {
+    const issueKey = key as IssueKey;
+    const stanceKey = STANCE_KEY_MAP[issueKey];
+    
+    if (!stanceKey || !value) {
+      translatedStances[issueKey] = value;
+      continue;
+    }
+
+    const translationKey = `SUPPORT_${rolePrefix}_${entityPrefix}_STANCE_${stanceKey}`;
+    const translated = lang(translationKey);
+    translatedStances[issueKey] = translated !== translationKey ? translated : value;
+  }
+
+  return translatedStances;
+}
+
+/**
+ * Translates entire support profile (summary + stances)
+ */
+export function translateSupportProfile(
+  roleId: string,
+  entityType: "people" | "challenger",
+  profile: SupportProfile,
+  lang: (key: string) => string
+): SupportProfile {
+  return {
+    ...profile,
+    summary: translateSupportSummary(roleId, entityType, profile.summary, lang),
+    stances: translateSupportStances(roleId, entityType, profile.stances, lang),
+  };
+}
