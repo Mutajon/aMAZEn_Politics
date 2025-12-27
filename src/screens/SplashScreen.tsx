@@ -232,7 +232,7 @@ export default function SplashScreen({
     }
   };
 
-  // Handle start button click (when not in experiment mode, skip ID modal)
+  // Handle start button click (experiment mode - shows ID modal)
   const handleStartClick = async () => {
     // Play click sound
     audioManager.playSfx('click-soft');
@@ -240,18 +240,27 @@ export default function SplashScreen({
     // Request fullscreen mode
     await requestFullscreen();
 
-    if (experimentMode) {
-      // In experiment mode, show ID modal
-      setShowIDModal(true);
-      return;
-    }
+    // Show ID modal for experiment mode
+    setShowIDModal(true);
+  };
 
-    // Not in experiment mode - start game directly
+  // Handle free play button click (skips ID modal, goes directly to role selection)
+  const handleFreePlayClick = async () => {
+    // Play click sound
+    audioManager.playSfx('click-soft');
+
+    // Request fullscreen mode
+    await requestFullscreen();
+
+    // Disable experiment mode for free play
+    setExperimentMode(false);
+
+    // Start game directly without ID collection
     setIsLoading(true);
     setShowSettings(false);
 
     try {
-      // Set consent to true for non-experiment mode
+      // Set consent to true for free play mode
       useLoggingStore.getState().setConsented(true);
 
       // Start new logging session
@@ -268,9 +277,10 @@ export default function SplashScreen({
       narrator.prime();
       playMusic('background', true);
 
-      onStart();
+      // Navigate to role selection (full carousel) instead of dream
+      push("/role");
     } catch (error) {
-      console.error('Error starting game:', error);
+      console.error('Error starting free play:', error);
       setIsLoading(false);
       alert('An error occurred while starting the game. Please try again.');
     }
@@ -643,7 +653,7 @@ export default function SplashScreen({
         </div>
 
         <div className="mt-8 flex flex-col items-center gap-3 min-h-[52px]">
-  {/* Primary: Start */}
+  {/* Primary: Start (Experiment Mode) */}
   <motion.button
     initial={{ opacity: 0, rotate: 0 }}
     animate={{ opacity: showButton ? 1 : 0, rotate: 0 }}
@@ -666,6 +676,20 @@ export default function SplashScreen({
     className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
   >
     {lang("START_BUTTON")}
+  </motion.button>
+
+  {/* Free Play Button - skips ID collection, goes to full role carousel */}
+  <motion.button
+    initial={{ opacity: 0 }}
+    animate={{ opacity: showButton ? 1 : 0 }}
+    transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
+    style={{ visibility: showButton ? "visible" : "hidden" }}
+    onClick={handleFreePlayClick}
+    className="w-[14rem] rounded-2xl px-4 py-2.5 text-sm font-semibold
+               bg-white/10 hover:bg-white/20 text-white/90 border border-white/20
+               shadow-sm active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-white/30"
+  >
+    {lang("FREE_PLAY_BUTTON")}
   </motion.button>
 
   {/* Secondary: High Scores (subtle/glass) - TEMPORARILY HIDDEN */}
