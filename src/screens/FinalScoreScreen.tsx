@@ -32,6 +32,7 @@ import { useMirrorQuizStore } from "../store/mirrorQuizStore";
 import { useHighscoreStore } from "../store/highscoreStore";
 import { useRoleProgressStore } from "../store/roleProgressStore";
 import { useLoggingStore } from "../store/loggingStore";
+import { useSettingsStore } from "../store/settingsStore";
 import { useMirrorTop3 } from "../hooks/useMirrorTop3";
 import { useAudioManager } from "../hooks/useAudioManager";
 import { useLogger } from "../hooks/useLogger";
@@ -80,6 +81,7 @@ export default function FinalScoreScreen({ push }: Props) {
   const analysis = useRoleStore((s) => s.analysis);
   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
   const selectedRoleKey = useRoleStore((s) => s.selectedRole);
+  const experimentMode = useSettingsStore((s) => s.experimentMode);
   const roleBgStyle = useMemo(
     () => bgStyleWithRoleImage(roleBackgroundImage),
     [roleBackgroundImage]
@@ -440,7 +442,8 @@ export default function FinalScoreScreen({ push }: Props) {
     // Mark that player just finished a game (for grandpa's score-based message)
     useDilemmaStore.getState().setJustFinishedGame(true, finalScore);
 
-    push("/dream"); // Route to dream screen (to show fragments and grandpa dialogue)
+    // Route based on mode: experiment mode goes to dream, free play goes to role selection
+    push(experimentMode ? "/dream" : "/role");
   };
 
   const handleVisitHallOfFame = () => {
