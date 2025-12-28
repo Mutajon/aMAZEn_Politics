@@ -12,7 +12,7 @@ import { useLang } from "../i18n/lang";
 import { PREDEFINED_ROLES_ARRAY, getRoleImagePaths } from "../data/predefinedRoles";
 import { useSettingsStore } from "../store/settingsStore";
 import { useLoggingStore } from "../store/loggingStore";
-import Gatekeeper from "../components/Gatekeeper";
+
 import { useRoleCarousel } from "../hooks/useRoleCarousel";
 import RoleCarouselContent from "../components/roleSelection/RoleCarouselContent";
 import NavigationArrows from "../components/roleSelection/NavigationArrows";
@@ -85,8 +85,6 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const [scenarioSuccess, setScenarioSuccess] = useState(false);
   const [scenarioError, setScenarioError] = useState("");
 
-  // Gatekeeper tutorial state
-  const [showGatekeeper, setShowGatekeeper] = useState(true);
 
   const openSuggest = () => {
     setInput("");
@@ -607,12 +605,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
         )}
       </AnimatePresence>
 
-      {/* Gatekeeper tutorial hint */}
-      <Gatekeeper
-        text={lang("ROLE_SELECTION_GATEKEEPER")}
-        isVisible={showGatekeeper}
-        onDismiss={() => setShowGatekeeper(false)}
-      />
+
     </div>
   );
 }
