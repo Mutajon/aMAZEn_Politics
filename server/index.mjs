@@ -446,7 +446,20 @@ You are a polity analyst for a political simulation. Given ROLE (which may inclu
    - Mental-Might Oligarchy: Doctrinal/epistemic/media Seats author outcomes system-wide (theocracy/technocracy/telecracy).
    - Autocratizing/Monarchy: One Seat accumulates pen+eraser across diverse prioritized domains; personalist/hereditary → Monarchy/Autocracy.
 
-7) Keep labels short and game-friendly. Use PLAIN MODERN ENGLISH.
+9) **Identify the player's seat**: Based on ROLE description, determine which of the Top-5 Seats represents the player's actual position in the power structure. Set \`playerIndex\` to that seat's array index (0-4).
+   - If ROLE describes a leader/ruler (king, president, chief, governor) → player is in Executive/Leadership seat
+   - If ROLE describes a common person (citizen, worker, farmer, shoemaker) → player is in Demos/People/Workers seat
+   - If ROLE describes an official (minister, council member, advisor) → player is in Legislative/Bureaucracy seat
+   - If ROLE describes a military role (general, captain, soldier) → player is in Coercive Force seat
+   - If ROLE is vague or represents no specific seat → set \`playerIndex: null\`
+   
+   Examples:
+   - "Shoemaker in WW2" → player is in "Demos/Workers/People" seat (likely index 1-3)
+   - "Tribal chief in 1607" → player is in "Executive (Chief)" seat (likely index 0)
+   - "Assembly citizen in Athens" → player is in "Assembly (Ekklesia)" seat (likely index 0)
+   - "Scholar-advisor in Alexandria" → player is in "Bureaucracy/Advisors" seat (likely index 2-3)
+
+10) Keep labels short and game-friendly. Use PLAIN MODERN ENGLISH.
 
 Return STRICT JSON only as:
 {
@@ -991,7 +1004,7 @@ app.post("/api/game-turn/cleanup", gameTurnCleanup);
 function parseCompassHintsResponse(content) {
   try {
     // Try to extract JSON from markdown code blocks if present
-    const jsonMatch = content.match(/```json\n ? ([\s\S] *?) \n ? ```/) || content.match(/```\n ? ([\s\S] *?) \n ? ```/);
+    const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || content.match(/```\s*([\s\S]*?)\s*```/);
     const jsonStr = jsonMatch ? jsonMatch[1] : content;
     return JSON.parse(jsonStr);
   } catch (parseError) {
@@ -1149,7 +1162,7 @@ Wait for SCENARIO CONTEXT, PLAYER ROLE, POLITICAL SYSTEM, and ACTION.`;
     ];
 
     // Store conversation (using compass-prefixed key for separate namespace from game-turn)
-    storeConversation(`compass - ${gameId} `, `compass - ${gameId} `, "openai", {
+    storeConversation(`compass-${gameId}`, `compass-${gameId}`, "openai", {
       messages,
       compassDefinitions: true, // Flag that definitions are stored
       gameContext: gameContext || null // Store context for reference
@@ -1233,7 +1246,7 @@ app.post("/api/compass-conversation/analyze", async (req, res) => {
     }
 
     // Get conversation
-    const conversation = getConversation(`compass - ${gameId} `);
+    const conversation = getConversation(`compass-${gameId}`);
     if (!conversation || !conversation.meta.messages) {
       console.warn(`[CompassConversation] ⚠️ No conversation found, falling back to non - stateful analysis`);
 

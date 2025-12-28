@@ -105,11 +105,12 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
           transition={{ duration: 0.28 }}
           // Start the pre-recorded narration exactly with the fade-in
           onAnimationStart={() => {
+            // DISABLED: "drift to sleep" VO as requested by user
             // Only play English voiceover - Hebrew TTS not supported
-            if (narrationEnabled && !defaultPlayedRef.current && getCurrentLanguage() === 'en') {
-              defaultPlayedRef.current = true;
-              audioManager.playVoiceover('drift-to-sleep');
-            }
+            // if (narrationEnabled && !defaultPlayedRef.current && getCurrentLanguage() === 'en') {
+            //   defaultPlayedRef.current = true;
+            //   audioManager.playVoiceover('drift-to-sleep');
+            // }
           }}
         >
           <h1 className="text-3xl sm:text-4xl font-extrabold leading-tight tracking-tight bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]">

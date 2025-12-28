@@ -7,6 +7,7 @@ import { COMPONENTS, PALETTE } from "../../data/compass-data";
 import { useAudioManager } from "../../hooks/useAudioManager";
 import { translateCompassValue } from "../../i18n/translateGameData";
 import { useLang } from "../../i18n/lang";
+import { useLanguage } from "../../i18n/LanguageContext";
 
 type Props = {
   effectPills: CompassEffectPing[];
@@ -35,6 +36,8 @@ export default function CompassPillsOverlay({
 }: Props) {
   const { playSfx } = useAudioManager();
   const lang = useLang();
+  const { language } = useLanguage();
+  const isRTL = language === 'he';
 
   // Track expand/collapse
   const [expanded, setExpanded] = useState<boolean>(true);
@@ -89,9 +92,12 @@ export default function CompassPillsOverlay({
   // Nothing to render?
   const hasPills = effectPills.length > 0;
 
-  // Define button position for animation reference (right edge, vertically centered)
+  // Define button position for animation reference (relative to container center)
   // This is where pills will animate from/to
-  const buttonPosition = { x: 0, y: 0 }; // Relative to container center
+  const buttonPosition = {
+    x: isRTL ? 160 : -160, // Rough estimate of card edge from center (card is ~320-350px wide) 
+    y: 0
+  };
 
   return (
     <div
@@ -202,7 +208,7 @@ export default function CompassPillsOverlay({
               })}
             </motion.div>
           ) : (
-            // Collapsed small "+" button (re-expands) — right edge, centered vertically
+            // Collapsed small "+" button (re-expands) — positioned based on language
             <motion.button
               key="pills-collapsed"
               type="button"
@@ -215,7 +221,7 @@ export default function CompassPillsOverlay({
               }}
               className={`
                 pointer-events-auto
-                absolute top-1/2 -translate-y-1/2 translate-x-1/2
+                absolute top-1/2 -translate-y-1/2
                 inline-flex items-center justify-center
                 w-7 h-7 rounded-full
                 text-white text-sm font-bold
@@ -226,8 +232,11 @@ export default function CompassPillsOverlay({
               aria-label="Show effects"
               title="Show effects"
               style={{
-                // Position at MirrorCard's right edge (centered vertically)
-                right: "0px",
+                // Hebrew: Right edge (+x translation), English: Left edge (-x translation)
+                left: isRTL ? 'auto' : '0px',
+                right: isRTL ? '0px' : 'auto',
+                transform: `translateY(-50%) ${isRTL ? 'translateX(50%)' : 'translateX(-50%)'}`,
+
                 // Fallback gradient (in case conic isn't supported)
                 background: "linear-gradient(135deg, #ef4444, #3b82f6)",
                 // Four quadrants: red, green, blue, yellow
