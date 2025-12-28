@@ -107,7 +107,10 @@ export default function AftermathScreen({ push }: Props) {
   // Detect if this is first visit (no snapshot = first visit, snapshot exists = return visit)
   const isFirstVisit = !initializedFromSnapshot;
 
-  console.log('[AftermathScreen] isFirstVisit:', isFirstVisit, 'initializedFromSnapshot:', initializedFromSnapshot);
+  // Log only on first render
+  useEffect(() => {
+    console.log('[AftermathScreen] isFirstVisit:', isFirstVisit, 'initializedFromSnapshot:', initializedFromSnapshot);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ========================================================================
   // EFFECT: FETCH DATA (only if not restored from snapshot)

@@ -177,7 +177,7 @@ export const useSettingsStore = create<SettingsState>()(
       treatment: "semiAutonomy",
       setTreatment: (v) => set({ treatment: v }),
 
-      // NEW: Experiment mode gate (default ON - for experimental distribution)
+      // NEW: Experiment mode gate (default ON - experiment mode)
       experimentMode: true,
       setExperimentMode: (v) => set({ experimentMode: v }),
       toggleExperimentMode: () => set({ experimentMode: !get().experimentMode }),
@@ -208,7 +208,7 @@ export const useSettingsStore = create<SettingsState>()(
         skipPreviousContext: s.skipPreviousContext,
         // NOTE: backstageMode is NOT persisted - session-only
         treatment: s.treatment,
-        // NOTE: experimentMode is NOT persisted - session-only (always starts true)
+        // NOTE: experimentMode is NOT persisted - session-only (controlled by button choice)
       }),
     }
   )

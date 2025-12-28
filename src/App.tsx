@@ -55,6 +55,7 @@ import PowerQuestionnaireScreen from "./screens/PowerQuestionnaireScreen";
 import PostGameQuestionnaireScreen from "./screens/PostGameQuestionnaireScreen";
 import ThankYouScreen from "./screens/ThankYouScreen";
 import { AnimatePresence, motion } from "framer-motion";
+import { LandscapePrompt } from "./components/LandscapePrompt";
 
 if (import.meta.env.DEV) {
   import("./dev/storesDebug").then(m => m.attachStoresDebug());
@@ -83,10 +84,10 @@ function RTLHandler() {
 
   useEffect(() => {
     const htmlElement = document.documentElement;
-    
+
     // Update lang attribute
     htmlElement.setAttribute('lang', language);
-    
+
     // Update dir attribute for RTL support
     if (language === 'he') {
       htmlElement.setAttribute('dir', 'rtl');
@@ -172,6 +173,8 @@ export default function App() {
         <LanguageProvider>
           {/* RTL direction handler */}
           <RTLHandler />
+          <LandscapePrompt />
+
 
           {/* App content with loading check */}
           <AppContent route={route} push={push} enableModifiers={enableModifiers} />

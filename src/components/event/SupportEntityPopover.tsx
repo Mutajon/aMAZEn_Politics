@@ -8,7 +8,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ChevronUp, X, Users, Landmark, Scale, Shield, TrendingUp, Gavel, Users2, Globe } from "lucide-react";
 import type { SupportProfile } from "../../data/supportProfiles";
 import { useLang } from "../../i18n/lang";
-import { translateSupportStance } from "../../i18n/translateSupportStances";
+import { translateSupportSummary, translateSupportStances } from "../../i18n/translateSupportStances";
+import { useRoleStore } from "../../store/roleStore";
+import { getPredefinedRole } from "../../data/predefinedRoles";
 
 type Props = {
   entityType: "people" | "challenger";
@@ -50,6 +52,15 @@ export default function SupportEntityPopover({
 }: Props) {
   const lang = useLang();
   const [expanded, setExpanded] = useState(false);
+  
+  // Get current role ID for translation
+  const selectedRole = useRoleStore((s) => s.selectedRole);
+  const roleData = selectedRole ? getPredefinedRole(selectedRole) : null;
+  const roleId = roleData?.id || "";
+
+  // Translate the support profile
+  const translatedSummary = translateSupportSummary(roleId, entityType, supportProfile.summary, lang);
+  const translatedStances = translateSupportStances(roleId, entityType, supportProfile.stances, lang);
 
   // Get i18n translations for stance labels
   const stanceLabels = {
@@ -63,7 +74,7 @@ export default function SupportEntityPopover({
 
   // Filter stances that exist in the profile
   const availableStances = STANCE_KEYS.filter(
-    (key) => supportProfile.stances[key] !== undefined
+    (key) => translatedStances[key] !== undefined
   );
 
   // Determine icon and color based on entity type (matching support list)
@@ -132,11 +143,7 @@ export default function SupportEntityPopover({
               </h3>
               <div className="bg-white/5 rounded-xl p-4 border border-white/10">
                 <p className="text-white/90 leading-relaxed">
-                  {supportProfile.summary?.includes("Assembly citizens prize direct democracy")
-                    ? lang("SUPPORT_ATHENS_PEOPLE_SUMMARY")
-                    : supportProfile.summary?.includes("Generals seek strategic flexibility")
-                    ? lang("SUPPORT_ATHENS_CHALLENGER_SUMMARY")
-                    : supportProfile.summary}
+                  {translatedSummary}
                 </p>
               </div>
             </div>
@@ -173,7 +180,7 @@ export default function SupportEntityPopover({
                     >
                       <div className="space-y-3">
                         {availableStances.map((stanceKey) => {
-                          const stanceValue = supportProfile.stances[stanceKey];
+                          const stanceValue = translatedStances[stanceKey];
                           if (!stanceValue) return null;
 
                           const StanceIcon = STANCE_ICONS[stanceKey];
@@ -190,7 +197,7 @@ export default function SupportEntityPopover({
                                 </div>
                               </div>
                               <div className="text-white/75 leading-relaxed">
-                                {translateSupportStance(stanceValue, entityType, stanceKey, lang)}
+                                {stanceValue}
                               </div>
                             </div>
                           );

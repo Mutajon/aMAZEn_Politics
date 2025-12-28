@@ -59,11 +59,12 @@ export const applyGameSettingsToStore = (apiSettings: ApiGameSettings | Record<s
     settingsApplied = true;
   }
 
-  const experimentModeValue = getApiValue('experimentMode', 'ExperimentMode');
-  if (typeof experimentModeValue === 'boolean') {
-    store.setExperimentMode(experimentModeValue);
-    settingsApplied = true;
-  }
+  // NOTE: experimentMode is intentionally NOT loaded from API - controlled by user's button choice (Free Play vs Start)
+  // const experimentModeValue = getApiValue('experimentMode', 'ExperimentMode');
+  // if (typeof experimentModeValue === 'boolean') {
+  //   store.setExperimentMode(experimentModeValue);
+  //   settingsApplied = true;
+  // }
 
   const dilemmasSubjectEnabledValue = getApiValue('dilemmasSubjectEnabled', 'DilemmasSubjectEnabled');
   if (typeof dilemmasSubjectEnabledValue === 'boolean') {
@@ -244,8 +245,9 @@ export const loadGameSettingsFromLocalStorage = () => {
       const enableModifiersValue = getApiValue('enableModifiers', 'EnableModifiers');
       if (typeof enableModifiersValue === 'boolean') persistData.state.enableModifiers = enableModifiersValue;
       
-      const experimentModeValue = getApiValue('experimentMode', 'ExperimentMode');
-      if (typeof experimentModeValue === 'boolean') persistData.state.experimentMode = experimentModeValue;
+      // NOTE: experimentMode is intentionally NOT loaded from localStorage/API - controlled by user's button choice
+      // const experimentModeValue = getApiValue('experimentMode', 'ExperimentMode');
+      // if (typeof experimentModeValue === 'boolean') persistData.state.experimentMode = experimentModeValue;
       
       const dilemmasSubjectEnabledValue = getApiValue('dilemmasSubjectEnabled', 'DilemmasSubjectEnabled');
       if (typeof dilemmasSubjectEnabledValue === 'boolean') persistData.state.dilemmasSubjectEnabled = dilemmasSubjectEnabledValue;
