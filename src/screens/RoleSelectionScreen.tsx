@@ -13,11 +13,8 @@ import { PREDEFINED_ROLES_ARRAY, getRoleImagePaths } from "../data/predefinedRol
 import { useSettingsStore } from "../store/settingsStore";
 import { useLoggingStore } from "../store/loggingStore";
 
-import { useRoleCarousel } from "../hooks/useRoleCarousel";
-import RoleCarouselContent from "../components/roleSelection/RoleCarouselContent";
-import NavigationArrows from "../components/roleSelection/NavigationArrows";
-import PositionIndicator from "../components/roleSelection/PositionIndicator";
-import RoleInfoBox from "../components/roleSelection/RoleInfoBox";
+import { useRoleCarousel, type CarouselItem } from "../hooks/useRoleCarousel";
+import RoleListItem from "../components/roleSelection/RoleListItem";
 import { audioManager } from "../lib/audioManager";
 import { useUserRoleBests } from "../hooks/useUserRoleBests";
 import { useGlobalRoleBests } from "../hooks/useGlobalRoleBests";
@@ -41,7 +38,6 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const setSupportProfiles = useRoleStore(s => s.setSupportProfiles);
   const setRoleScope = useRoleStore(s => s.setRoleScope);
   const setStoryThemes = useRoleStore(s => s.setStoryThemes);
-  const debugMode = useSettingsStore(s => s.debugMode);
   const experimentMode = useSettingsStore(s => s.experimentMode);
   const setExperimentActiveRole = useLoggingStore((s) => s.setExperimentActiveRole);
 
@@ -50,19 +46,12 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const { bests: userBests } = useUserRoleBests(userId);
   const { bests: globalBests } = useGlobalRoleBests();
 
-  // Carousel hook
-  const {
-    currentIndex,
-    currentItem,
-    carouselItems,
-    direction,
-    navigateNext,
-    navigatePrev,
-    navigateToIndex,
-    canNavigateNext,
-    canNavigatePrev,
-    touchHandlers,
-  } = useRoleCarousel();
+  // Data source
+  const { carouselItems } = useRoleCarousel();
+
+  // Expansion state
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
+
 
   // Custom role modal state
   const [showSuggestModal, setShowSuggestModal] = useState(false);
@@ -102,19 +91,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
     setAiError("");
   };
 
-  const openScenarioModal = () => {
-    setShowScenarioModal(true);
-    setScenarioForm({
-      title: "",
-      role: "",
-      settings: "",
-      introParagraph: "",
-      topicsToEmphasis: ""
-    });
-    setScenarioSuccess(false);
-    setScenarioError("");
-    logger.log('button_click', 'Suggest Scenario', 'User clicked Suggest Scenario button from carousel');
-  };
+
 
   const closeScenarioModal = () => {
     setShowScenarioModal(false);
@@ -250,22 +227,9 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
     }
   }
 
-  const handleRoleConfirm = () => {
-    const item = currentItem;
-
+  const handleRoleConfirm = (item: CarouselItem) => {
     // Play click sound
     audioManager.playSfx('click-soft');
-
-    // Handle special carousel items
-    if (item.type === 'customRole') {
-      openSuggest();
-      return;
-    }
-
-    if (item.type === 'scenario') {
-      openScenarioModal();
-      return;
-    }
 
     // Handle locked role attempt
     if (item.isLocked) {
@@ -296,20 +260,6 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
       setSupportProfiles(roleData.powerDistribution.supportProfiles ?? null);
       setRoleScope(roleData.roleScope);
       setStoryThemes(roleData.storyThemes);
-
-      if (debugMode && roleData.powerDistribution.supportProfiles) {
-        console.log("[RoleSelection][Debug] Support baselines for predefined role:", {
-          role: item.roleKey,
-          profiles: roleData.powerDistribution.supportProfiles,
-        });
-      }
-      if (debugMode) {
-        console.log("[RoleSelection][Debug] Scope & themes:", {
-          role: item.roleKey,
-          roleScope: roleData.roleScope,
-          storyThemes: roleData.storyThemes,
-        });
-      }
     }
 
     // Save rich role context for AI
@@ -326,40 +276,49 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   };
 
   return (
-    <div className="min-h-[100dvh] overflow-hidden relative">
-      {/* Carousel Background Content */}
-      <RoleCarouselContent
-        currentItem={currentItem}
-        currentIndex={currentIndex}
-        carouselItems={carouselItems}
-        direction={direction}
-        touchHandlers={touchHandlers}
-      />
+    <div
+      className="min-h-[100dvh] flex flex-col relative bg-[#1c1c1c]"
+      style={{
+        backgroundImage: "url('/assets/images/BKGs/mainBKG.jpg')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundAttachment: "fixed"
+      }}
+    >
+      <div className="absolute inset-0 bg-black/60" />
 
-      {/* Navigation Arrows */}
-      <NavigationArrows
-        onPrev={navigatePrev}
-        onNext={navigateNext}
-        canNavigatePrev={canNavigatePrev}
-        canNavigateNext={canNavigateNext}
-      />
+      <div className="relative z-10 flex-1 overflow-y-auto px-4 py-8 sm:px-6 md:px-8">
+        <div className="max-w-3xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-cinzel font-bold text-white mb-2 drop-shadow-lg">
+              {lang("CHOOSE_YOUR_ROLE")}
+            </h1>
+            <p className="text-white/60 text-sm sm:text-base">
+              Explore your path. Every choice reflects who you are.
+            </p>
+          </div>
 
-      {/* Position Indicator */}
-      <PositionIndicator
-        currentIndex={currentIndex}
-        totalCount={carouselItems.length}
-        onNavigateToIndex={navigateToIndex}
-      />
+          <div className="space-y-4">
+            {carouselItems.map((item: CarouselItem, index: number) => (
+              <RoleListItem
+                key={item.id}
+                item={item}
+                isExpanded={expandedIndex === index}
+                onToggle={() => {
+                  setExpandedIndex(expandedIndex === index ? null : index);
+                  logger.log('role_list_toggle', { id: item.id, expanded: expandedIndex !== index }, `Role ${item.title} toggled`);
+                }}
+                onConfirm={() => handleRoleConfirm(item)}
+                onOpenCustomRole={openSuggest}
+                userBestScore={item.roleKey ? (userBests[item.roleKey] || 0) : 0}
+                globalBestScore={item.roleKey ? (globalBests[item.roleKey] || 0) : 0}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
 
-      {/* Role Info Box (Bottom Panel) */}
-      <RoleInfoBox
-        item={currentItem}
-        onConfirm={handleRoleConfirm}
-        onOpenCustomRole={openSuggest}
-        onOpenScenario={openScenarioModal}
-        userBestScore={currentItem.roleKey ? (userBests[currentItem.roleKey] || 0) : 0}
-        globalBestScore={currentItem.roleKey ? (globalBests[currentItem.roleKey] || 0) : 0}
-      />
 
       {/* Suggest-your-own Modal */}
       <AnimatePresence>
