@@ -50,7 +50,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
   const { carouselItems } = useRoleCarousel();
 
   // Expansion state
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(1);
 
 
   // Custom role modal state

@@ -100,8 +100,25 @@ export const useRoleCarousel = () => {
       return "Locked";
     };
 
+    // Add "Suggest your own role" item (NOT in experiment mode) - MOVE TO TOP
+    if (!experimentMode) {
+      items.push({
+        type: 'customRole',
+        id: 'custom-role',
+        title: '❓',
+        subtitle: undefined,
+        backgroundImage: '/assets/images/BKGs/mainBKG.jpg',
+        isLocked: false,
+      });
+    }
+
     // Add role items
     rolesToShow.forEach((roleData) => {
+      // Filter out Tel Aviv and Planet Namek
+      if (roleData.id === 'telaviv_2025' || roleData.id === 'namek_2099') {
+        return;
+      }
+
       const images = getRoleImagePaths(roleData.imageId);
       const isLocked = !isExperimentRoleUnlocked(roleData.legacyKey);
 
@@ -123,18 +140,6 @@ export const useRoleCarousel = () => {
         goalStatus: roleGoals[roleData.legacyKey]?.status ?? roleData.defaultGoalStatus,
       });
     });
-
-    // Add "Suggest your own role" item (NOT in experiment mode)
-    if (!experimentMode) {
-      items.push({
-        type: 'customRole',
-        id: 'custom-role',
-        title: '❓',
-        subtitle: undefined,
-        backgroundImage: '/assets/images/BKGs/mainBKG.jpg',
-        isLocked: false,
-      });
-    }
 
     return items;
   }, [experimentMode, experimentProgress, roleGoals, lang]);

@@ -73,8 +73,8 @@ export default function RoleListItem({
 
     return (
         <div className={`mb-4 overflow-hidden rounded-2xl border transition-all duration-300 ${isExpanded
-                ? "bg-black/60 border-amber-400/50 shadow-2xl shadow-amber-400/10"
-                : "bg-black/30 border-white/10 hover:border-white/20"
+            ? "bg-black/60 border-amber-400/50 shadow-2xl shadow-amber-400/10"
+            : "bg-black/30 border-white/10 hover:border-white/20"
             }`}>
             {/* Header - Always visible */}
             <button
@@ -91,24 +91,17 @@ export default function RoleListItem({
 
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-lg sm:text-xl font-cinzel font-bold text-white truncate">
+                        <h3 className="text-sm sm:text-base font-cinzel font-bold text-white truncate">
                             {item.title}
                         </h3>
                         {item.year && (
                             <span className="text-[10px] text-amber-300/80 font-light border border-amber-400/20 px-1.5 py-0.5 rounded">
-                                {item.year}
+                                Year {item.year}
                             </span>
                         )}
                     </div>
                     <div className="flex items-center gap-3">
-                        <p className="text-sm text-white/50 truncate">
-                            {item.subtitle}
-                        </p>
-                        {item.goalStatus && !isExpanded && (
-                            <span className={`text-[9px] uppercase tracking-wide px-2 py-0.5 rounded-full font-medium ${statusClasses}`}>
-                                {statusCompleted ? lang("ROLE_GOAL_COMPLETED") : lang("ROLE_GOAL_UNCOMPLETED")}
-                            </span>
-                        )}
+                        {/* Subtitle and status moved to expanded view */}
                     </div>
                 </div>
 
@@ -135,6 +128,18 @@ export default function RoleListItem({
                         <div className="px-5 pb-5 pt-2 border-t border-white/5">
                             <div className="grid md:grid-cols-2 gap-6">
                                 <div>
+                                    {/* Moved from header */}
+                                    <div className="flex flex-wrap items-center gap-3 mb-4">
+                                        <p className="text-sm font-medium text-amber-200/90">
+                                            {item.subtitle}
+                                        </p>
+                                        {item.goalStatus && (
+                                            <span className={`text-[9px] uppercase tracking-wide px-2 py-0.5 rounded-full font-medium ${statusClasses}`}>
+                                                {statusCompleted ? lang("ROLE_GOAL_COMPLETED") : lang("ROLE_GOAL_UNCOMPLETED")}
+                                            </span>
+                                        )}
+                                    </div>
+
                                     <p className="text-sm text-white/90 leading-relaxed mb-4">
                                         {item.intro}
                                     </p>
