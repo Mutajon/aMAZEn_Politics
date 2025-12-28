@@ -52,6 +52,105 @@ export interface PredefinedRoleData {
  */
 export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
   {
+    id: "athens_431",
+    legacyKey: "Athens — Shadows of War (-431)",
+    titleKey: "ATHENS_TITLE",
+    subtitleKey: "ATHENS_SUBTITLE",
+    introKey: "ATHENS_INTRO",
+    youAreKey: "ATHENS_YOU_ARE",
+    year: "-431",
+    imageId: "greece",
+    avatarPrompt: "Ancient Greek citizen in simple chiton tunic, standing in the Athenian assembly",
+    roleScope: "You are a citizen of Athens with full rights in the Assembly. You can vote on war, peace, ostracism, laws, and leadership. You can speak before thousands, propose decrees, and serve on juries—but you are one voice among many.",
+    storyThemes: ["democracy_vs_empire", "glory_vs_pragmatism", "citizen_vs_expert"],
+    scoreGoal: 1000,
+    defaultGoalStatus: "uncompleted",
+    powerDistribution: {
+      systemName: "Democracy",
+      systemDesc: "Direct democracy where citizen Assembly holds decisive authority over war, peace, laws, and leaders through open vote.",
+      flavor: "40,000 citizens shout, vote, and rule themselves—glory or chaos, the demos decides.",
+      holders: [
+        {
+          name: "Assembly (Ekklesia)",
+          percent: 45,
+          icon: "👥",
+          note: "All citizens vote directly on laws, war, exile, and finances",
+          role: { A: true, E: true },
+          stype: { t: "Author", i: "+" }
+        },
+        {
+          name: "Strategos (Generals)",
+          percent: 25,
+          icon: "⚔️",
+          note: "10 elected generals lead military, propose strategy, sway crowds",
+          role: { A: true, E: false },
+          stype: { t: "Author", i: "•" }
+        },
+        {
+          name: "Council of 500 (Boule)",
+          percent: 15,
+          icon: "🏛️",
+          note: "Selected by lot; prepares Assembly agenda, oversees daily affairs",
+          role: { A: true, E: false },
+          stype: { t: "Agent", i: "•" }
+        },
+        {
+          name: "Law Courts (Dikasteria)",
+          percent: 10,
+          icon: "⚖️",
+          note: "Mass citizen juries; can overturn laws, punish officials",
+          role: { A: false, E: true },
+          stype: { t: "Eraser", i: "•" }
+        },
+        {
+          name: "Wealthy Elite (Liturgy Payers)",
+          percent: 5,
+          icon: "💰",
+          note: "Fund triremes, festivals; influence through prestige, not votes",
+          role: { A: false, E: false },
+          stype: { t: "Actor", i: "-" }
+        }
+      ],
+      playerIndex: 0,
+      challengerSeat: {
+        name: "Strategos (Generals)",
+        percent: 25,
+        index: 1
+      },
+      e12: {
+        tierI: ["Security", "CivilLib", "InfoOrder"],
+        tierII: ["Diplomacy", "Justice", "Economy", "Appointments"],
+        tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
+        stopA: false,
+        stopB: false,
+        decisive: ["Assembly (Ekklesia)", "Strategos (Generals)", "Council of 500 (Boule)"]
+      },
+      grounding: {
+        settingType: "real",
+        era: "431 BCE Athens (outbreak of Peloponnesian War)"
+      },
+      supportProfiles: ROLE_SUPPORT_PROFILES["Athens — Shadows of War (-431)"] ?? null,
+      roleScope: "Acts as a citizen-assemblyman with equal voting rights, able to propose decrees and sway crowds but holding no permanent office or command authority.",
+      storyThemes: ["democracy_vs_empire", "glory_vs_pragmatism", "citizen_vs_expert"],
+      authorityLevel: "low"
+    },
+    characters: {
+      male: {
+        nameKey: "ATHENS_CHAR_MALE_NAME",
+        promptKey: "ATHENS_CHAR_MALE_PROMPT"
+      },
+      female: {
+        nameKey: "ATHENS_CHAR_FEMALE_NAME",
+        promptKey: "ATHENS_CHAR_FEMALE_PROMPT"
+      },
+      any: {
+        nameKey: "ATHENS_CHAR_ANY_NAME",
+        promptKey: "ATHENS_CHAR_ANY_PROMPT"
+      }
+    }
+  },
+
+  {
     id: "railroad_1877",
     legacyKey: "Railroad Strike — The Great Upheaval (1877)",
     titleKey: "RAILROAD_TITLE",
@@ -438,7 +537,8 @@ TONE & STYLE
       },
       supportProfiles: ROLE_SUPPORT_PROFILES["Alexandria — Fire over the Nile (-48)"] ?? null,
       roleScope: "Serves as a city scholar-advisor mediating between palace factions and Roman commanders; can sway civic policy, archives, and urban defenses but not direct legions.",
-      storyThemes: ["cultural_survival", "foreign_domination", "knowledge_vs_power"]
+      storyThemes: ["cultural_survival", "foreign_domination", "knowledge_vs_power"],
+      authorityLevel: "medium"
     },
     characters: {
       male: {
@@ -536,7 +636,8 @@ TONE & STYLE
       },
       supportProfiles: ROLE_SUPPORT_PROFILES["Florence — The Fire and the Faith (1494)"] ?? null,
       roleScope: "Sits on Florence's Great Council, balancing guild and patrician interests; can propose civic edicts, policing orders, and cultural protections but cannot command Papal or French armies.",
-      storyThemes: ["faith_vs_freedom", "economic_stability", "civic_identity"]
+      storyThemes: ["faith_vs_freedom", "economic_stability", "civic_identity"],
+      authorityLevel: "medium"
     },
     characters: {
       male: {
@@ -634,7 +735,8 @@ TONE & STYLE
       },
       supportProfiles: ROLE_SUPPORT_PROFILES["North America — The First Encounter (1607)"] ?? null,
       roleScope: "Leads a tribal council overseeing diplomacy, land stewardship, and trade terms; can mobilize scouts and negotiate boundaries but does not unilaterally declare war without consensus.",
-      storyThemes: ["territorial_autonomy", "cultural_preservation", "exchange_vs_exploitation"]
+      storyThemes: ["territorial_autonomy", "cultural_preservation", "exchange_vs_exploitation"],
+      authorityLevel: "high"
     },
     characters: {
       male: {
@@ -732,7 +834,8 @@ TONE & STYLE
       },
       supportProfiles: ROLE_SUPPORT_PROFILES["Japan — The Land at War's End (1600)"] ?? null,
       roleScope: "Heads a mid-level samurai clan caught between warring coalitions; can commit retainers, negotiate allegiances, and manage village protections but cannot dictate national strategy.",
-      storyThemes: ["loyalty_vs_survival", "clan_honor", "centralization"]
+      storyThemes: ["loyalty_vs_survival", "clan_honor", "centralization"],
+      authorityLevel: "medium"
     },
     characters: {
       male: {
@@ -830,7 +933,8 @@ TONE & STYLE
       },
       supportProfiles: ROLE_SUPPORT_PROFILES["Haiti — The Island in Revolt (1791)"] ?? null,
       roleScope: "Acts as a plantation overseer-turned-liaison among rebel factions; can influence local militia deployments, justice for captives, and resource distribution but cannot dictate colony-wide treaties.",
-      storyThemes: ["emancipation", "justice_vs_vengeance", "unity_vs_fragmentation"]
+      storyThemes: ["emancipation", "justice_vs_vengeance", "unity_vs_fragmentation"],
+      authorityLevel: "medium"
     },
     characters: {
       male: {
@@ -928,7 +1032,8 @@ TONE & STYLE
       },
       supportProfiles: ROLE_SUPPORT_PROFILES["Russia — The Throne Crumbles (1917)"] ?? null,
       roleScope: "Embattled Tsar managing imperial decrees, military appointments, and court negotiations; can reshuffle ministers, issue manifestos, or seek truces but cannot personally command every garrison simultaneously.",
-      storyThemes: ["autocracy_vs_revolution", "bread_land_peace", "loyalty_crisis"]
+      storyThemes: ["autocracy_vs_revolution", "bread_land_peace", "loyalty_crisis"],
+      authorityLevel: "high"
     },
     characters: {
       male: {
@@ -1026,7 +1131,8 @@ TONE & STYLE
       },
       supportProfiles: ROLE_SUPPORT_PROFILES["India — The Midnight of Freedom (1947)"] ?? null,
       roleScope: "District officer coordinating police, relief, and political liaisons along the partition line; manages curfews, convoys, and investigations but cannot redraw national borders.",
-      storyThemes: ["communal_trust", "order_vs_liberty", "refugee_protection"]
+      storyThemes: ["communal_trust", "order_vs_liberty", "refugee_protection"],
+      authorityLevel: "high"
     },
     characters: {
       male: {
@@ -1124,7 +1230,8 @@ TONE & STYLE
       },
       supportProfiles: ROLE_SUPPORT_PROFILES["South Africa — The End of Apartheid (1990)"] ?? null,
       roleScope: "Senior police commander overseeing citywide operations during the transition; can set deployment protocols, liaise with reform negotiators, and manage crowd-control policy but cannot pass national laws.",
-      storyThemes: ["justice_vs_amnesty", "public_safety", "institutional_trust"]
+      storyThemes: ["justice_vs_amnesty", "public_safety", "institutional_trust"],
+      authorityLevel: "high"
     },
     characters: {
       male: {
@@ -1222,7 +1329,8 @@ TONE & STYLE
       },
       supportProfiles: ROLE_SUPPORT_PROFILES["Mars Colony — The Red Frontier (2179)"] ?? null,
       roleScope: "Elected Mars colony governor balancing survival systems and autonomy petitions; can adjust habitat policy, rationing, and negotiations with Earth but cannot conjure unlimited supplies.",
-      storyThemes: ["autonomy_vs_dependency", "survival_ethics", "science_vs_populism"]
+      storyThemes: ["autonomy_vs_dependency", "survival_ethics", "science_vs_populism"],
+      authorityLevel: "high"
     },
     characters: {
       male: {

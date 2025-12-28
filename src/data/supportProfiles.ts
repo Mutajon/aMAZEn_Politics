@@ -48,6 +48,32 @@ export const ROLE_SUPPORT_PROFILES: Record<string, RoleSupportProfiles> = {
       origin: "predefined",
     },
   },
+  "Athens — Shadows of War (-431)": {
+    people: {
+      summary: "Assembly citizens prize direct democracy, naval power, and imperial tribute but fear costly wars.",
+      stances: {
+        governance: "Preserve Assembly sovereignty; resist oligarchic plots.",
+        order: "Trust law courts and citizen oversight over military strongmen.",
+        economy: "Secure tribute from allies; fund public works and navy.",
+        justice: "Favor mass juries and ostracism to check elites.",
+        foreign: "Expand Delian League; contain Sparta; avoid land wars.",
+        culture: "Celebrate festivals, drama, philosophy; honor Athena.",
+      },
+      origin: "predefined",
+    },
+    challenger: {
+      summary: "Generals seek strategic flexibility and military prestige, sometimes chafing under popular oversight.",
+      stances: {
+        governance: "Value expert military judgment over crowd emotion.",
+        order: "Enforce discipline in ranks; demand loyalty and obedience.",
+        economy: "Prioritize fleet funding and campaign supplies.",
+        justice: "Prefer commanders' authority over Assembly trials.",
+        foreign: "Pursue bold campaigns and decisive victories for glory.",
+        culture: "Honor martial virtue and strategic excellence.",
+      },
+      origin: "predefined",
+    },
+  },
   "Tel Aviv — The Campus Uprising (2025)": {
     people: {
       summary: "Students demand democratic voice and national relevance for university actions.",

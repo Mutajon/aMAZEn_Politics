@@ -34,7 +34,7 @@ import {
 } from "./utils/ai.mjs";
 
 import {
-  ALLOWED_POLITIES, COMPASS_LABELS, COMPASS_DIMENSION_NAMES, DEFAULT_MIRROR_ADVICE,
+  ALLOWED_POLITIES, ANTI_JARGON_RULES, COMPASS_LABELS, COMPASS_DIMENSION_NAMES, DEFAULT_MIRROR_ADVICE,
   LANGUAGE_NAMES, MIRROR_QUIZ_FALLBACKS, ACTION_ID_ORDER, ACTION_ICON_HINTS,
   COMPASS_DEFINITION_BLOCK, ISSUE_KEYS
 } from "./config/constants.mjs";
@@ -411,7 +411,8 @@ app.post("/api/analyze-role", async (req, res) => {
       grounding: { settingType: "unclear", era: "" },
       supportProfiles: null,
       roleScope: "Regional administrator balancing councils and security forces; can issue directives, bargain, and reassign resources, but cannot unilaterally rewrite the constitution.",
-      storyThemes: ["autonomy_vs_heteronomy", "institutional_balance"]
+      storyThemes: ["autonomy_vs_heteronomy", "institutional_balance"],
+      authorityLevel: "medium"
     };
 
     const system = `${ANTI_JARGON_RULES}
@@ -493,7 +494,8 @@ Return STRICT JSON only as:
     } | null
   },
   "roleScope": "<160 chars max>",
-  "storyThemes": ["snake_case", "keywords", "max_four"]
+  "storyThemes": ["snake_case", "keywords", "max_four"],
+  "authorityLevel": "low|medium|high"
 }
 
 IMPORTANT:
@@ -558,6 +560,7 @@ Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setti
       supportProfiles,
       roleScope,
       storyThemes,
+      authorityLevel: ["low", "medium", "high"].includes(out?.authorityLevel) ? out.authorityLevel : FALLBACK.authorityLevel,
       e12: {
         tierI: Array.isArray(out?.e12?.tierI) ? out.e12.tierI : FALLBACK.e12.tierI,
         tierII: Array.isArray(out?.e12?.tierII) ? out.e12.tierII : FALLBACK.e12.tierII,
