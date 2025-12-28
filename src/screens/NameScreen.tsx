@@ -84,7 +84,7 @@ function extractPhysical(input: string): string {
 
 function suggestBackgroundObject(role = ""): string {
   const r = role.toLowerCase();
-  // Existing mappings
+  // Existing mappings for predefined roles
   if (r.includes("tang") || r.includes("china")) return "red pagoda";
   if (r.includes("rome") || r.includes("roman")) return "colosseum";
   if (r.includes("german") || r.includes("germany") || r.includes("chancellor") || r.includes("kanzler"))
@@ -102,7 +102,22 @@ function suggestBackgroundObject(role = ""): string {
   if (r.includes("india") || r.includes("indian") || r.includes("gandhi") || r.includes("nehru")) return "taj mahal";
   if (r.includes("africa") || r.includes("apartheid") || r.includes("mandela")) return "table mountain";
   if (r.includes("mars") || r.includes("colony") || r.includes("2179")) return "red martian domes";
-  return "ornate palace backdrop";
+  if (r.includes("railroad") || r.includes("strike") || r.includes("1877")) return "industrial railroad yard";
+
+  // Context-aware mappings for custom roles
+  if (r.includes("forest") || r.includes("partisan") || r.includes("guerrilla")) return "dense forest clearing";
+  if (r.includes("war") || r.includes("battle") || r.includes("military")) return "war-torn landscape";
+  if (r.includes("desert") || r.includes("sand")) return "desert dunes";
+  if (r.includes("mountain") || r.includes("highland")) return "mountain peaks";
+  if (r.includes("sea") || r.includes("ocean") || r.includes("sailor") || r.includes("pirate")) return "ocean horizon";
+  if (r.includes("space") || r.includes("astronaut") || r.includes("cosmic")) return "starfield";
+  if (r.includes("medieval") || r.includes("knight") || r.includes("castle")) return "medieval castle";
+  if (r.includes("future") || r.includes("cyber") || r.includes("sci-fi")) return "futuristic cityscape";
+  if (r.includes("farm") || r.includes("rural") || r.includes("peasant")) return "rural farmland";
+  if (r.includes("city") || r.includes("urban")) return "city skyline";
+
+  // Default to neutral background instead of palace
+  return "neutral gradient backdrop";
 }
 
 function buildFullPrompt(
@@ -149,13 +164,33 @@ export default function NameScreen({ push }: { push: PushFn }) {
   const setCharacter = useRoleStore((s) => s.setCharacter);
   const updateCharacter = useRoleStore((s) => s.updateCharacter);
   const generateImages = useSettingsStore((s) => s.generateImages);
+  const experimentMode = useSettingsStore((s) => s.experimentMode);
 
   // Create role-based background style
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
 
   const [gender, setGender] = useState<"male" | "female" | "any">(character?.gender || "any");
-  // Player name comes from DreamScreen and is constant - not changed by gender selection
-  const name = playerName || character?.name || "";
+
+  // Default names for free play mode
+  const getDefaultName = (g: "male" | "female" | "any") => {
+    if (g === "male") return "Bob";
+    if (g === "female") return "Pam";
+    return "Gil";
+  };
+
+  // In free play mode, start with empty name to show placeholder
+  // In experiment mode, use playerName from DreamScreen
+  const [editableName, setEditableName] = useState<string>(() => {
+    if (experimentMode) {
+      return "";
+    }
+    // In free play, only use playerName if it exists (from DreamScreen)
+    // Otherwise start empty to show the placeholder
+    return playerName || "";
+  });
+
+  // Use finalName for actual processing (falls back to default if empty)
+  const name = experimentMode ? (playerName || character?.name || "") : (editableName.trim() || getDefaultName(gender));
   const [physical, setPhysical] = useState<string>(character?.description || "");
   const [trio, setTrio] = useState<Trio | null>(null);
   const [bgObject, setBgObject] = useState<string>(character?.bgObject || "");
@@ -173,11 +208,13 @@ export default function NameScreen({ push }: { push: PushFn }) {
   const MAX_AVATAR_RETRIES = 3;
   const RETRY_DELAY_MS = 2000;
 
-  // Get avatarPrompt from predefined role (null for custom roles)
+  // Get avatarPrompt from predefined role (or use the custom role text itself)
   const avatarPrompt = useMemo(() => {
     if (!selectedRole) return null;
     const roleData = getPredefinedRole(selectedRole);
-    return roleData?.avatarPrompt || null;
+    // If it's a predefined role, use its designated prompt; 
+    // otherwise, the selectedRole string IS the user's custom role description
+    return roleData?.avatarPrompt || selectedRole;
   }, [selectedRole]);
 
   const fullPrompt = useMemo(
@@ -237,9 +274,12 @@ export default function NameScreen({ push }: { push: PushFn }) {
   useEffect(() => {
     if (!trio) return;
     const pick = trio[gender] || trio.any;
-    // Name comes from playerName (DreamScreen), only update physical description on gender change
+    // Name comes from playerName (DreamScreen) in experiment mode, or editable in free play
     setPhysical(extractPhysical(lang(pick?.promptKey || "")));
     setBgObject((prev) => prev || suggestBackgroundObject(selectedRole || ""));
+
+    // Auto-update placeholder logic is handled by setting editableName to empty and 
+    // rendering getDefaultName(gender) in the placeholder attribute.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gender, trio]);
 
@@ -441,11 +481,27 @@ export default function NameScreen({ push }: { push: PushFn }) {
                 </label>
               </div>
 
-              {/* Player name display (entered in DreamScreen) */}
-              {name && (
-                <div className="mt-6 text-center">
-                  <div className="text-white/70 text-sm mb-1">{lang("PLAYER_NAME")}</div>
-                  <div className="text-xl font-semibold text-amber-300">{name}</div>
+              {/* Player name - display only in experiment mode, editable in free play */}
+              {experimentMode ? (
+                name && (
+                  <div className="mt-6 text-center">
+                    <div className="text-white/70 text-sm mb-1">{lang("PLAYER_NAME")}</div>
+                    <div className="text-xl font-semibold text-amber-300">{name}</div>
+                  </div>
+                )
+              ) : (
+                <div className="mt-6">
+                  <div className="text-white/90 mb-2">{lang("PLAYER_NAME")}</div>
+                  <input
+                    type="text"
+                    value={editableName}
+                    onChange={(e) => {
+                      setEditableName(e.target.value);
+                      logger.log('character_name', e.target.value, 'User entered character name');
+                    }}
+                    placeholder={getDefaultName(gender)}
+                    className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-gray-400 placeholder:italic focus:outline-none focus:ring-2 focus:ring-amber-300/60"
+                  />
                 </div>
               )}
 
@@ -467,11 +523,10 @@ export default function NameScreen({ push }: { push: PushFn }) {
                 <button
                   disabled={loading || !physical.trim()}
                   onClick={onContinue}
-                  className={`rounded-2xl px-5 py-3 font-semibold text-lg shadow-lg ${
-                    !loading && physical.trim()
-                      ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] hover:scale-[1.02] active:scale-[0.98]"
-                      : "bg-white/10 text-white/60 cursor-not-allowed"
-                  }`}
+                  className={`rounded-2xl px-5 py-3 font-semibold text-lg shadow-lg ${!loading && physical.trim()
+                    ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] hover:scale-[1.02] active:scale-[0.98]"
+                    : "bg-white/10 text-white/60 cursor-not-allowed"
+                    }`}
                 >
                   {lang("CREATE_CHARACTER")}
                 </button>
@@ -531,15 +586,14 @@ export default function NameScreen({ push }: { push: PushFn }) {
                 <button
                   disabled={avatarLoading}
                   onClick={onContinue}
-                  className={`rounded-2xl px-6 py-3 font-semibold text-lg shadow-lg ${
-                    !avatarLoading
-                      ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] hover:scale-[1.02] active:scale-[0.98]"
-                      : "bg-white/10 text-white/60 cursor-not-allowed"
-                  }`}
+                  className={`rounded-2xl px-6 py-3 font-semibold text-lg shadow-lg ${!avatarLoading
+                    ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] hover:scale-[1.02] active:scale-[0.98]"
+                    : "bg-white/10 text-white/60 cursor-not-allowed"
+                    }`}
                 >
-                  {gender === "female" ? lang("CONTINUE_TO_POWER_FEMALE") : 
-                   gender === "male" ? lang("CONTINUE_TO_POWER_MALE") : 
-                   lang("CONTINUE_TO_POWER")}
+                  {gender === "female" ? lang("CONTINUE_TO_POWER_FEMALE") :
+                    gender === "male" ? lang("CONTINUE_TO_POWER_MALE") :
+                      lang("CONTINUE_TO_POWER")}
                 </button>
               </motion.div>
             </motion.div>

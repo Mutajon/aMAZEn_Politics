@@ -102,7 +102,7 @@ export default function SplashScreen({
 
   const experimentMode = useSettingsStore((s) => s.experimentMode);
   const setExperimentMode = useSettingsStore((s) => s.setExperimentMode);
-  
+
   // Show ID modal only in experiment mode (after user clicks Start)
   const [showIDModal, setShowIDModal] = useState(false);
 
@@ -167,7 +167,7 @@ export default function SplashScreen({
       }
 
       const registerData = await registerResponse.json();
-      
+
       if (!registerData.success) {
         throw new Error(registerData.error || 'Failed to register user');
       }
@@ -216,9 +216,9 @@ export default function SplashScreen({
         webkitRequestFullscreen?: () => Promise<void>;
         msRequestFullscreen?: () => Promise<void>;
       }
-      
+
       const elem = document.documentElement as DocumentElementWithFullscreen;
-      
+
       if (elem.requestFullscreen) {
         await elem.requestFullscreen();
       } else if (elem.webkitRequestFullscreen) {
@@ -228,7 +228,7 @@ export default function SplashScreen({
         // IE11
         await elem.msRequestFullscreen();
       }
-      
+
       logger.log(
         'fullscreen_entered',
         'requested',
@@ -287,6 +287,10 @@ export default function SplashScreen({
       useRoleStore.getState().reset();
       useMirrorQuizStore.getState().resetAll();
       clearAllSnapshots();
+
+      // Clear playerName and character for free play (fresh start)
+      useRoleStore.getState().setPlayerName(null);
+      useRoleStore.getState().setCharacter(null);
 
       // Prime narrator and start music (user interaction unlocks browser autoplay)
       narrator.prime();
@@ -370,244 +374,244 @@ export default function SplashScreen({
         </div>
       )}
 
-{/* Settings panel (fixed, above gear, outside its wrapper) - debug only */}
-{debugMode && showSettings && (
-  <motion.div
-    initial={{ opacity: 0, y: -6, scale: 0.98 }}
-    animate={{ opacity: 1, y: 0, scale: 1 }}
-    transition={{ type: "spring", stiffness: 260, damping: 20 }}
-    // KEY: fixed + higher z + stop propagation so clicks never bubble to the gear
-    className="fixed top-16 right-6 z-[90] w-80 rounded-2xl border border-white/10 bg-neutral-900/90 backdrop-blur p-5 text-white/90 shadow-2xl"
-    role="dialog"
-    aria-label="Settings"
-    onClick={(e) => e.stopPropagation()}
-  >
-    <div className="font-semibold mb-3">{lang("SETTINGS")}</div>
+      {/* Settings panel (fixed, above gear, outside its wrapper) - debug only */}
+      {debugMode && showSettings && (
+        <motion.div
+          initial={{ opacity: 0, y: -6, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: "spring", stiffness: 260, damping: 20 }}
+          // KEY: fixed + higher z + stop propagation so clicks never bubble to the gear
+          className="fixed top-16 right-6 z-[90] w-80 rounded-2xl border border-white/10 bg-neutral-900/90 backdrop-blur p-5 text-white/90 shadow-2xl"
+          role="dialog"
+          aria-label="Settings"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="font-semibold mb-3">{lang("SETTINGS")}</div>
 
-    {/* Language Selection */}
-    <LanguageSelector variant="full" />
+          {/* Language Selection */}
+          <LanguageSelector variant="full" />
 
-    <div className="my-4 border-t border-white/10" />
+          <div className="my-4 border-t border-white/10" />
 
-    {/* --- Budget system toggle (same pattern as others) --- */}
-    <div className="flex items-center justify-between gap-3 py-2">
-      <div>
-        <div className="text-sm font-medium">{lang("BUDGET_SYSTEM")}</div>
-        <div className="text-xs text-white/60">
-          {lang("BUDGET_SYSTEM_DESC")}
-        </div>
-      </div>
-      <button
-        onClick={() => {
-          console.log("[Settings] Budget toggle click, prev =", showBudget);
-          setShowBudget(!showBudget);
-        }}
-        role="switch"
-        aria-checked={showBudget}
-        className={[
-          "w-12 h-7 rounded-full p-1 transition-colors",
-          showBudget ? "bg-emerald-500/70" : "bg-white/20",
-        ].join(" ")}
-      >
-        <span
-          className={[
-            "block w-5 h-5 rounded-full bg-white transition-transform",
-            getToggleTransform(showBudget),
-          ].join(" ")}
-        />
-      </button>
-    </div>
+          {/* --- Budget system toggle (same pattern as others) --- */}
+          <div className="flex items-center justify-between gap-3 py-2">
+            <div>
+              <div className="text-sm font-medium">{lang("BUDGET_SYSTEM")}</div>
+              <div className="text-xs text-white/60">
+                {lang("BUDGET_SYSTEM_DESC")}
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                console.log("[Settings] Budget toggle click, prev =", showBudget);
+                setShowBudget(!showBudget);
+              }}
+              role="switch"
+              aria-checked={showBudget}
+              className={[
+                "w-12 h-7 rounded-full p-1 transition-colors",
+                showBudget ? "bg-emerald-500/70" : "bg-white/20",
+              ].join(" ")}
+            >
+              <span
+                className={[
+                  "block w-5 h-5 rounded-full bg-white transition-transform",
+                  getToggleTransform(showBudget),
+                ].join(" ")}
+              />
+            </button>
+          </div>
 
-    {/* Image generation ----------------------------------------------------- */}
-    <div className="flex items-center justify-between gap-3">
-      <div>
-        <div className="text-sm font-medium">{lang("IMAGE_GENERATION")}</div>
-        <div className="text-xs text-white/60">
-          {lang("IMAGE_GENERATION_DESC")}
-        </div>
-      </div>
-      <button
-        onClick={() => {
-          console.log("[Settings] Images toggle click, prev =", generateImages);
-          setGenerateImages(!generateImages);
-        }}
-        role="switch"
-        aria-checked={generateImages}
-        className={[
-          "w-12 h-7 rounded-full p-1 transition-colors",
-          generateImages ? "bg-emerald-500/70" : "bg-white/20",
-        ].join(" ")}
-      >
-        <span
-          className={[
-            "block w-5 h-5 rounded-full bg-white transition-transform",
-            getToggleTransform(generateImages),
-          ].join(" ")}
-        />
-      </button>
-    </div>
+          {/* Image generation ----------------------------------------------------- */}
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium">{lang("IMAGE_GENERATION")}</div>
+              <div className="text-xs text-white/60">
+                {lang("IMAGE_GENERATION_DESC")}
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                console.log("[Settings] Images toggle click, prev =", generateImages);
+                setGenerateImages(!generateImages);
+              }}
+              role="switch"
+              aria-checked={generateImages}
+              className={[
+                "w-12 h-7 rounded-full p-1 transition-colors",
+                generateImages ? "bg-emerald-500/70" : "bg-white/20",
+              ].join(" ")}
+            >
+              <span
+                className={[
+                  "block w-5 h-5 rounded-full bg-white transition-transform",
+                  getToggleTransform(generateImages),
+                ].join(" ")}
+              />
+            </button>
+          </div>
 
-    <div className="my-4 border-t border-white/10" />
+          <div className="my-4 border-t border-white/10" />
 
-    {/* Narration (voiceover) ----------------------------------------------- */}
-    <div className="flex items-center justify-between gap-3">
-      <div>
-        <div className="text-sm font-medium">{lang("NARRATION_VOICEOVER")}</div>
-        <div className="text-xs text-white/60">
-          {lang("NARRATION_VOICEOVER_DESC")}
-        </div>
-      </div>
-      <button
-        onClick={() => {
-          console.log("[Settings] Narration toggle click, prev =", narrationEnabled);
-          setNarrationEnabled(!narrationEnabled);
-        }}
-        role="switch"
-        aria-checked={narrationEnabled}
-        className={[
-          "w-12 h-7 rounded-full p-1 transition-colors",
-          narrationEnabled ? "bg-emerald-500/70" : "bg-white/20",
-        ].join(" ")}
-      >
-        <span
-          className={[
-            "block w-5 h-5 rounded-full bg-white transition-transform",
-            getToggleTransform(narrationEnabled),
-          ].join(" ")}
-        />
-      </button>
-    </div>
-    {/* Divider */}
-<div className="my-4 border-t border-white/10" />
+          {/* Narration (voiceover) ----------------------------------------------- */}
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium">{lang("NARRATION_VOICEOVER")}</div>
+              <div className="text-xs text-white/60">
+                {lang("NARRATION_VOICEOVER_DESC")}
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                console.log("[Settings] Narration toggle click, prev =", narrationEnabled);
+                setNarrationEnabled(!narrationEnabled);
+              }}
+              role="switch"
+              aria-checked={narrationEnabled}
+              className={[
+                "w-12 h-7 rounded-full p-1 transition-colors",
+                narrationEnabled ? "bg-emerald-500/70" : "bg-white/20",
+              ].join(" ")}
+            >
+              <span
+                className={[
+                  "block w-5 h-5 rounded-full bg-white transition-transform",
+                  getToggleTransform(narrationEnabled),
+                ].join(" ")}
+              />
+            </button>
+          </div>
+          {/* Divider */}
+          <div className="my-4 border-t border-white/10" />
 
-{/* Debug mode ------------------------------------------------------------- */}
-<div className="flex items-center justify-between gap-3">
-  <div>
-    <div className="text-sm font-medium">{lang("DEBUG_MODE")}</div>
-    <div className="text-xs text-white/60">
-      {lang("DEBUG_MODE_DESC")}
-    </div>
-  </div>
-  <button
-    onClick={() => setDebugMode(!debugMode)}
-    role="switch"
-    aria-checked={debugMode}
-    className={[
-      "w-12 h-7 rounded-full p-1 transition-colors",
-      debugMode ? "bg-emerald-500/70" : "bg-white/20",
-    ].join(" ")}
-  >
-      <span
-        className={[
-          "block w-5 h-5 rounded-full bg-white transition-transform",
-          getToggleTransform(debugMode),
-        ].join(" ")}
-      />
-  </button>
-</div>
+          {/* Debug mode ------------------------------------------------------------- */}
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium">{lang("DEBUG_MODE")}</div>
+              <div className="text-xs text-white/60">
+                {lang("DEBUG_MODE_DESC")}
+              </div>
+            </div>
+            <button
+              onClick={() => setDebugMode(!debugMode)}
+              role="switch"
+              aria-checked={debugMode}
+              className={[
+                "w-12 h-7 rounded-full p-1 transition-colors",
+                debugMode ? "bg-emerald-500/70" : "bg-white/20",
+              ].join(" ")}
+            >
+              <span
+                className={[
+                  "block w-5 h-5 rounded-full bg-white transition-transform",
+                  getToggleTransform(debugMode),
+                ].join(" ")}
+              />
+            </button>
+          </div>
 
-{/* Dilemmas subject ------------------------------------------------------- */}
-<div className="mt-3">
-  <div className="flex items-center justify-between gap-3">
-    <div>
-      <div className="text-sm font-medium">{lang("DILEMMAS_SUBJECT")}</div>
-      <div className="text-xs text-white/60">
-        {lang("DILEMMAS_SUBJECT_DESC")}
-      </div>
-    </div>
-    <button
-      onClick={() => setDilemmasSubjectEnabled(!dilemmasSubjectEnabled)}
-      role="switch"
-      aria-checked={dilemmasSubjectEnabled}
-      className={[
-        "w-12 h-7 rounded-full p-1 transition-colors",
-        dilemmasSubjectEnabled ? "bg-emerald-500/70" : "bg-white/20",
-      ].join(" ")}
-    >
-      <span
-        className={[
-          "block w-5 h-5 rounded-full bg-white transition-transform",
-          getToggleTransform(dilemmasSubjectEnabled),
-        ].join(" ")}
-      />
-    </button>
-  </div>
+          {/* Dilemmas subject ------------------------------------------------------- */}
+          <div className="mt-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium">{lang("DILEMMAS_SUBJECT")}</div>
+                <div className="text-xs text-white/60">
+                  {lang("DILEMMAS_SUBJECT_DESC")}
+                </div>
+              </div>
+              <button
+                onClick={() => setDilemmasSubjectEnabled(!dilemmasSubjectEnabled)}
+                role="switch"
+                aria-checked={dilemmasSubjectEnabled}
+                className={[
+                  "w-12 h-7 rounded-full p-1 transition-colors",
+                  dilemmasSubjectEnabled ? "bg-emerald-500/70" : "bg-white/20",
+                ].join(" ")}
+              >
+                <span
+                  className={[
+                    "block w-5 h-5 rounded-full bg-white transition-transform",
+                    getToggleTransform(dilemmasSubjectEnabled),
+                  ].join(" ")}
+                />
+              </button>
+            </div>
 
-  {/* Subject input: enabled only when toggle is on */}
-  <input
-    type="text"
-    value={dilemmasSubject}
-    onChange={(e) => setDilemmasSubject(e.currentTarget.value)}
-    placeholder={lang("SUBJECT_PLACEHOLDER")}
-    className={[
-      "mt-2 w-full rounded-lg px-3 py-2 bg-white/10 text-white/90 placeholder-white/40 outline-none border",
-      dilemmasSubjectEnabled
-        ? "border-white/20"
-        : "border-white/10 opacity-50 pointer-events-none",
-    ].join(" ")}
-  />
-</div>
+            {/* Subject input: enabled only when toggle is on */}
+            <input
+              type="text"
+              value={dilemmasSubject}
+              onChange={(e) => setDilemmasSubject(e.currentTarget.value)}
+              placeholder={lang("SUBJECT_PLACEHOLDER")}
+              className={[
+                "mt-2 w-full rounded-lg px-3 py-2 bg-white/10 text-white/90 placeholder-white/40 outline-none border",
+                dilemmasSubjectEnabled
+                  ? "border-white/20"
+                  : "border-white/10 opacity-50 pointer-events-none",
+              ].join(" ")}
+            />
+          </div>
 
-{/* Divider */}
-<div className="my-4 border-t border-white/10" />
+          {/* Divider */}
+          <div className="my-4 border-t border-white/10" />
 
-{/* Enable modifiers ------------------------------------------------------------- */}
-<div className="flex items-center justify-between gap-3">
-  <div>
-    <div className="text-sm font-medium">{lang("ENABLE_MODIFIERS")}</div>
-    <div className="text-xs text-white/60">
-      {lang("ENABLE_MODIFIERS_DESC")}
-    </div>
-  </div>
-  <button
-    onClick={() => setEnableModifiers(!enableModifiers)}
-    role="switch"
-    aria-checked={enableModifiers}
-    className={[
-      "w-12 h-7 rounded-full p-1 transition-colors",
-      enableModifiers ? "bg-emerald-500/70" : "bg-white/20",
-    ].join(" ")}
-  >
-    <span
-      className={[
-        "block w-5 h-5 rounded-full bg-white transition-transform",
-        getToggleTransform(enableModifiers),
-      ].join(" ")}
-    />
-  </button>
-</div>
+          {/* Enable modifiers ------------------------------------------------------------- */}
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium">{lang("ENABLE_MODIFIERS")}</div>
+              <div className="text-xs text-white/60">
+                {lang("ENABLE_MODIFIERS_DESC")}
+              </div>
+            </div>
+            <button
+              onClick={() => setEnableModifiers(!enableModifiers)}
+              role="switch"
+              aria-checked={enableModifiers}
+              className={[
+                "w-12 h-7 rounded-full p-1 transition-colors",
+                enableModifiers ? "bg-emerald-500/70" : "bg-white/20",
+              ].join(" ")}
+            >
+              <span
+                className={[
+                  "block w-5 h-5 rounded-full bg-white transition-transform",
+                  getToggleTransform(enableModifiers),
+                ].join(" ")}
+              />
+            </button>
+          </div>
 
-{/* Divider */}
-<div className="my-4 border-t border-white/10" />
+          {/* Divider */}
+          <div className="my-4 border-t border-white/10" />
 
-{/* Experiment mode ------------------------------------------------------------- */}
-<div className="mt-3 flex items-center justify-between gap-3">
-  <div>
-    <div className="text-sm font-medium">{lang("EXPERIMENT_MODE")}</div>
-    <div className="text-xs text-white/60">
-      {lang("EXPERIMENT_MODE_DESC")}
-    </div>
-  </div>
-  <button
-    onClick={() => setExperimentMode(!experimentMode)}
-    role="switch"
-    aria-checked={experimentMode}
-    className={[
-      "w-12 h-7 rounded-full p-1 transition-colors",
-      experimentMode ? "bg-emerald-500/70" : "bg-white/20",
-    ].join(" ")}
-  >
-    <span
-      className={[
-        "block w-5 h-5 rounded-full bg-white transition-transform",
-        getToggleTransform(experimentMode),
-      ].join(" ")}
-    />
-  </button>
-</div>
+          {/* Experiment mode ------------------------------------------------------------- */}
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium">{lang("EXPERIMENT_MODE")}</div>
+              <div className="text-xs text-white/60">
+                {lang("EXPERIMENT_MODE_DESC")}
+              </div>
+            </div>
+            <button
+              onClick={() => setExperimentMode(!experimentMode)}
+              role="switch"
+              aria-checked={experimentMode}
+              className={[
+                "w-12 h-7 rounded-full p-1 transition-colors",
+                experimentMode ? "bg-emerald-500/70" : "bg-white/20",
+              ].join(" ")}
+            >
+              <span
+                className={[
+                  "block w-5 h-5 rounded-full bg-white transition-transform",
+                  getToggleTransform(experimentMode),
+                ].join(" ")}
+              />
+            </button>
+          </div>
 
-  </motion.div>
-)}
+        </motion.div>
+      )}
 
 
       {/* Center content */}
@@ -633,120 +637,120 @@ export default function SplashScreen({
               aMAZE'n Politics
             </motion.h1>
 
-        {/* Animated subtitle - simple fade in */}
-        <div className="relative min-h-[80px] flex flex-col items-center justify-start pt-4">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            className="relative"
-          >
-            <motion.div
-              className="flex flex-col items-center"
-              animate={{
-                backgroundPosition: ["0% 100%", "0% 0%"],
-              }}
-              transition={{
-                duration: 1.5,
-                repeat: Infinity,
-                repeatDelay: 1.5,
-                ease: "linear"
-              }}
-              style={{
-                backgroundImage: "linear-gradient(180deg, rgba(199, 210, 254, 1), rgba(221, 214, 254, 1), rgba(253, 230, 138, 1), rgba(221, 214, 254, 1), rgba(199, 210, 254, 1))",
-                backgroundSize: "100% 300%",
-                backgroundClip: "text",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-            >
-              <p className="text-base sm:text-lg font-medium">
-                {lang("GAME_SUBTITLE")}
-              </p>
-            </motion.div>
-          </motion.div>
-        </div>
+            {/* Animated subtitle - simple fade in */}
+            <div className="relative min-h-[80px] flex flex-col items-center justify-start pt-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5 }}
+                className="relative"
+              >
+                <motion.div
+                  className="flex flex-col items-center"
+                  animate={{
+                    backgroundPosition: ["0% 100%", "0% 0%"],
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                    repeatDelay: 1.5,
+                    ease: "linear"
+                  }}
+                  style={{
+                    backgroundImage: "linear-gradient(180deg, rgba(199, 210, 254, 1), rgba(221, 214, 254, 1), rgba(253, 230, 138, 1), rgba(221, 214, 254, 1), rgba(199, 210, 254, 1))",
+                    backgroundSize: "100% 300%",
+                    backgroundClip: "text",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                  }}
+                >
+                  <p className="text-base sm:text-lg font-medium">
+                    {lang("GAME_SUBTITLE")}
+                  </p>
+                </motion.div>
+              </motion.div>
+            </div>
 
-        <div className="mt-8 flex flex-col items-center gap-3 min-h-[52px]">
-  {/* Primary: Start (Experiment Mode) */}
-  <motion.button
-    initial={{ opacity: 0, rotate: 0 }}
-    animate={{ opacity: showButton ? 1 : 0, rotate: 0 }}
-    whileHover={{
-      scale: 1.02,
-      rotate: [0, -2, 2, -2, 2, 0],
-      transition: {
-        rotate: {
-          duration: 0.5,
-          repeat: 0
-        },
-        scale: {
-          duration: 0.2
-        }
-      }
-    }}
-    transition={{ type: "spring", stiffness: 250, damping: 22 }}
-    style={{ visibility: showButton ? "visible" : "hidden" }}
-    onClick={handleStartClick}
-    className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
-  >
-    {lang("START_BUTTON")}
-  </motion.button>
+            <div className="mt-8 flex flex-col items-center gap-3 min-h-[52px]">
+              {/* Primary: Start (Experiment Mode) */}
+              <motion.button
+                initial={{ opacity: 0, rotate: 0 }}
+                animate={{ opacity: showButton ? 1 : 0, rotate: 0 }}
+                whileHover={{
+                  scale: 1.02,
+                  rotate: [0, -2, 2, -2, 2, 0],
+                  transition: {
+                    rotate: {
+                      duration: 0.5,
+                      repeat: 0
+                    },
+                    scale: {
+                      duration: 0.2
+                    }
+                  }
+                }}
+                transition={{ type: "spring", stiffness: 250, damping: 22 }}
+                style={{ visibility: showButton ? "visible" : "hidden" }}
+                onClick={handleStartClick}
+                className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
+              >
+                {lang("START_BUTTON")}
+              </motion.button>
 
-  {/* Free Play Button - skips ID collection, goes to full role carousel */}
-  <motion.button
-    initial={{ opacity: 0 }}
-    animate={{ opacity: showButton ? 1 : 0 }}
-    transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
-    style={{ visibility: showButton ? "visible" : "hidden" }}
-    onClick={handleFreePlayClick}
-    className="w-[14rem] rounded-2xl px-4 py-2.5 text-sm font-semibold
-               bg-white/10 hover:bg-white/20 text-white/90 border border-white/20
-               shadow-sm active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-white/30"
-  >
-    {lang("FREE_PLAY_BUTTON")}
-  </motion.button>
+              {/* Free Play Button - skips ID collection, goes to full role carousel */}
+              <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: showButton ? 1 : 0 }}
+                transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
+                style={{ visibility: showButton ? "visible" : "hidden" }}
+                onClick={handleFreePlayClick}
+                className="w-[14rem] rounded-2xl px-4 py-2.5 text-sm font-semibold
+               bg-gradient-to-r from-purple-600 to-purple-700 text-amber-300 border border-purple-500/30
+               shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-purple-400/60"
+              >
+                {lang("FREE_PLAY_BUTTON")}
+              </motion.button>
 
-  {/* Secondary: High Scores (subtle/glass) - TEMPORARILY HIDDEN */}
-  <motion.button
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 0 }}
-    transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
-    style={{ visibility: "hidden", pointerEvents: "none" }}
-    onClick={() => {
-      // Start music on any user interaction
-      playMusic('background', true);
+              {/* Secondary: High Scores (subtle/glass) - TEMPORARILY HIDDEN */}
+              <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0 }}
+                transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
+                style={{ visibility: "hidden", pointerEvents: "none" }}
+                onClick={() => {
+                  // Start music on any user interaction
+                  playMusic('background', true);
 
-      onHighscores?.(); // no-op if not wired yet
-      setShowSettings(false);
-    }}
-    className="w-[14rem] rounded-2xl px-4 py-2.5 text-sm font-semibold
+                  onHighscores?.(); // no-op if not wired yet
+                  setShowSettings(false);
+                }}
+                className="w-[14rem] rounded-2xl px-4 py-2.5 text-sm font-semibold
                bg-white/10 hover:bg-white/15 text-white/90 border border-white/15
                shadow-sm active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-white/20"
-  >
-    {lang("HALL_OF_FAME")}
-  </motion.button>
+              >
+                {lang("HALL_OF_FAME")}
+              </motion.button>
 
-  {/* Tertiary: Book of Achievements (subtle/glass) - TEMPORARILY HIDDEN */}
-  <motion.button
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 0 }}
-    transition={{ delay: 0.1, type: "spring", stiffness: 250, damping: 22 }}
-    style={{ visibility: "hidden", pointerEvents: "none" }}
-    onClick={() => {
-      // Start music on any user interaction
-      playMusic('background', true);
+              {/* Tertiary: Book of Achievements (subtle/glass) - TEMPORARILY HIDDEN */}
+              <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0 }}
+                transition={{ delay: 0.1, type: "spring", stiffness: 250, damping: 22 }}
+                style={{ visibility: "hidden", pointerEvents: "none" }}
+                onClick={() => {
+                  // Start music on any user interaction
+                  playMusic('background', true);
 
-      onAchievements?.(); // no-op if not wired yet
-      setShowSettings(false);
-    }}
-    className="w-[14rem] rounded-2xl px-4 py-2.5 text-sm font-semibold
+                  onAchievements?.(); // no-op if not wired yet
+                  setShowSettings(false);
+                }}
+                className="w-[14rem] rounded-2xl px-4 py-2.5 text-sm font-semibold
                bg-white/10 hover:bg-white/15 text-white/90 border border-white/15
                shadow-sm active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-white/20"
-  >
-    {lang("BOOK_OF_ACHIEVEMENTS")}
-  </motion.button>
-</div>
+              >
+                {lang("BOOK_OF_ACHIEVEMENTS")}
+              </motion.button>
+            </div>
           </>
         )}
       </div>

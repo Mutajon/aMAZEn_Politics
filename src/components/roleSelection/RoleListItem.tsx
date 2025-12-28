@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Crown, ChevronDown, ChevronUp } from "lucide-react";
+import { Trophy, Crown } from "lucide-react";
 import type { CarouselItem } from "../../hooks/useRoleCarousel";
 import { useLang } from "../../i18n/lang";
 import { useRoleStore } from "../../store/roleStore";
@@ -57,14 +57,11 @@ export default function RoleListItem({
                     <div className="flex items-center gap-4">
                         <span className="text-3xl">❓</span>
                         <div className="text-left">
-                            <h3 className="text-xl font-cinzel font-bold bg-gradient-to-r from-purple-200 via-indigo-200 to-purple-300 bg-clip-text text-transparent">
+                            <h3 className="text-[15px] font-cinzel font-bold bg-gradient-to-r from-purple-200 via-indigo-200 to-purple-300 bg-clip-text text-transparent">
                                 {lang("SUGGEST_YOUR_OWN")}
                             </h3>
-                            <p className="text-sm text-purple-200/60">Create a personalized historical or fictional scenario</p>
+                            <p className="text-[12px] text-purple-200/60">Personalized historical or fictional scenario</p>
                         </div>
-                    </div>
-                    <div className="bg-purple-500/20 p-2 rounded-full">
-                        <ChevronDown className="w-5 h-5 text-purple-300" />
                     </div>
                 </button>
             </div>
@@ -106,13 +103,7 @@ export default function RoleListItem({
                 </div>
 
                 <div className="flex flex-col items-center gap-2">
-                    {item.isLocked ? (
-                        <span className="text-xl">🔒</span>
-                    ) : (
-                        <div className={`p-1.5 rounded-full transition-colors ${isExpanded ? "bg-amber-500/20" : "bg-white/5"}`}>
-                            {isExpanded ? <ChevronUp className="w-5 h-5 text-amber-400" /> : <ChevronDown className="w-5 h-5 text-white/40" />}
-                        </div>
-                    )}
+                    {item.isLocked && <span className="text-xl">🔒</span>}
                 </div>
             </button>
 

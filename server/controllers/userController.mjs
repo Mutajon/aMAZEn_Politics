@@ -247,18 +247,23 @@ export async function validateRole(req, res) {
     const raw = (req.body?.text || req.body?.role || req.body?.input || "").toString().trim();
 
     const system =
-        "You validate a single short line describing a player's ROLE in a political game.\n" +
-        "ACCEPT if the input describes a plausible political/leadership role with enough context to understand the setting. " +
-        "The setting can be EXPLICIT (place/time stated) or IMPLICIT (inferred from the role itself). " +
-        "Be PERMISSIVE: accept roles where context can be reasonably inferred.\n\n" +
+        "You validate a single short line describing a player's ROLE in a game where they'll face political/social dilemmas.\n" +
+        "ACCEPT if the input describes ANY plausible role with enough context to understand the setting.\n" +
+        "The setting can be EXPLICIT (place/time stated) or IMPLICIT (inferred from the role itself).\n" +
+        "Be PERMISSIVE: the role does NOT need to be political or leadership-oriented. " +
+        "Teachers, farmers, shopkeepers, workers - all are valid as long as there's context.\n\n" +
         "Examples that SHOULD PASS:\n" +
-        "- Explicit setting: 'Prime Minister of Israel', 'President of United States', 'Chancellor of Germany 1980s'\n" +
-        "- Implicit setting: 'Mars Colony Leader' (implies future/space), 'Viking Chief' (implies historical Norse), " +
-        "'Galactic Emperor' (implies sci-fi), 'Pharaoh' (implies ancient Egypt)\n" +
-        "- Partial setting: 'Medieval King', 'WWII General', 'Roman Senator'\n\n" +
+        "- 'high school teacher in Haiti' (role + setting)\n" +
+        "- 'farmer in medieval England' (role + setting)\n" +
+        "- 'shopkeeper during WWII' (role + setting)\n" +
+        "- 'partisan leader in WWII' (role + setting)\n" +
+        "- 'Prime Minister of Israel' (role + setting)\n" +
+        "- 'Mars Colony Leader' (role + implicit future setting)\n" +
+        "- 'Viking Chief' (role + implicit historical setting)\n" +
+        "- 'Pharaoh' (role + implicit ancient Egypt setting)\n\n" +
         "Examples that SHOULD FAIL:\n" +
-        "- Too vague: 'a leader', 'someone powerful', 'a person'\n" +
-        "- Not a role: 'in medieval England' (no role), 'freedom' (not a role)\n" +
+        "- Too vague: 'a leader', 'someone powerful', 'a person' (no context)\n" +
+        "- Not a role: 'in medieval England' (setting but no role), 'freedom' (abstract concept)\n" +
         "- Gibberish: 'asdfgh', 'xyz123'\n\n" +
         "Return STRICT JSON only as {\"valid\": true|false, \"reason\": \"short reason if invalid\"}. No extra keys, no prose.";
 
