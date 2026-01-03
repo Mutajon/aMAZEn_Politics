@@ -3,6 +3,7 @@ import type { SupportProfile, IssueKey } from "../data/supportProfiles";
 
 // Map role IDs to translation key prefixes
 const ROLE_PREFIX_MAP: Record<string, string> = {
+  athens_431: "ATHENS",
   railroad_1877: "RAILROAD",
   telaviv_2025: "TELAVIV",
   alexandria_48: "ALEXANDRIA",

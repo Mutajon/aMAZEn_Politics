@@ -131,9 +131,9 @@ export default function EventScreen3({ push }: Props) {
   // Presentation step tracking (controls what's visible)
   const [presentationStep, setPresentationStep] = useState<number>(-1);
 
-  // Initial support values (captured at Step 1 BEFORE Step 2 applies deltas)
-  // Used as animation baseline so counter animates from old→new (e.g., 50→35 on Day 2)
-  const [initialSupportValues, setInitialSupportValues] = useState<{
+  // Previous support values (used as animation baseline)
+  // Tracks the last rendered values so counter animates from old→new
+  const previousSupportRef = useRef<{
     people: number;
     middle: number;
     mom: number;
@@ -373,24 +373,36 @@ export default function EventScreen3({ push }: Props) {
   }, [phase, isCollecting, collectionError, day, collectData, startProgress, resetProgress, restoredFromSnapshot]);
 
   // ========================================================================
-  // EFFECT 2: Capture and clear initial support values for animation
+  // EFFECT 2: Track support changes for animation
   // ========================================================================
   useEffect(() => {
-    // Capture at Step 1 (before Step 2 applies deltas)
-    if (presentationStep === 1 && !initialSupportValues) {
-      const { supportPeople, supportMiddle, supportMom } = useDilemmaStore.getState();
-      setInitialSupportValues({
-        people: supportPeople,
-        middle: supportMiddle,
-        mom: supportMom
+    // Only update previous values if they're actually changing
+    // This prevents unnecessary ref updates
+    const current = previousSupportRef.current;
+    const hasChanged = !current || 
+      current.people !== supportPeople ||
+      current.middle !== supportMiddle ||
+      current.mom !== supportMom;
+    
+    if (hasChanged && presentationStep >= 0) {
+      console.log('[EventScreen3] Support changed - animation will run:', {
+        from: current,
+        to: { people: supportPeople, middle: supportMiddle, mom: supportMom }
       });
+      
+      // Update previous values after animation completes (5000ms animation duration)
+      const timer = setTimeout(() => {
+        previousSupportRef.current = {
+          people: supportPeople,
+          middle: supportMiddle,
+          mom: supportMom
+        };
+        console.log('[EventScreen3] Animation complete - updated previous values');
+      }, 5100); // Slightly longer than animation duration
+      
+      return () => clearTimeout(timer);
     }
-
-    // Clear after Step 2 completes (at Step 3+) so animation doesn't reset
-    if (presentationStep >= 3 && initialSupportValues) {
-      setInitialSupportValues(null);
-    }
-  }, [presentationStep, initialSupportValues]);
+  }, [supportPeople, supportMiddle, supportMom, presentationStep]);
 
   // ========================================================================
   // EFFECT 2A: Log AI outputs when collected data arrives
@@ -775,7 +787,6 @@ export default function EventScreen3({ push }: Props) {
     // After cleaning complete, reset to collecting phase for next day
     setPhase('collecting');
     setPresentationStep(-1);
-    setInitialSupportValues(null); // Clear for next day
     // Collection will be triggered by effect watching phase/day
   };
 
@@ -865,7 +876,6 @@ export default function EventScreen3({ push }: Props) {
     // After cleaning complete, reset to collecting phase for next day
     setPhase('collecting');
     setPresentationStep(-1);
-    setInitialSupportValues(null); // Clear for next day
     // Collection will be triggered by effect watching phase/day
   };
 
@@ -913,7 +923,6 @@ export default function EventScreen3({ push }: Props) {
     // Reset phase to trigger fresh collection for day 7
     setPhase('collecting');
     setPresentationStep(-1);
-    setInitialSupportValues(null);
   };
 
   /**
@@ -981,8 +990,8 @@ export default function EventScreen3({ push }: Props) {
     // Note: Empty actions are normal in fullAutonomy mode, but that doesn't mean game end
     const isGameEnd = collectedData.dilemma.isGameEnd === true;
 
-    // Build support items with deltas and initial values for animation
-    const rawSupportItems = buildSupportItems(presentationStep, collectedData, initialSupportValues);
+    // Build support items with deltas and previous values for animation
+    const rawSupportItems = buildSupportItems(presentationStep, collectedData, previousSupportRef.current);
 
     // Add icons to support items
     const supportItems = rawSupportItems.map(item => ({
@@ -1048,7 +1057,7 @@ export default function EventScreen3({ push }: Props) {
 
           {/* Step 1+: SupportList */}
           {presentationStep >= 1 && (
-            <SupportList items={supportItems} />
+            <SupportList items={supportItems} animateDurationMs={5000} />
           )}
 
           {/* Step 3+: DynamicParameters - Shows 1-3 narrative impacts with emoji (Day 2+ only) */}
@@ -1085,7 +1094,7 @@ export default function EventScreen3({ push }: Props) {
                       }}
                       className="w-full px-6 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-amber-500/50"
                     >
-                      View Aftermath
+                         {lang("VIEW_AFTERMATH")}
                     </button>
                   )}
                 </div>

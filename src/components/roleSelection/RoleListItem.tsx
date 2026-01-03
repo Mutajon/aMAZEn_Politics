@@ -93,7 +93,7 @@ export default function RoleListItem({
                         </h3>
                         {item.year && (
                             <span className="text-[10px] text-amber-300/80 font-light border border-amber-400/20 px-1.5 py-0.5 rounded">
-                                 {lang("YEAR")} {item.year}
+                                {lang("YEAR")} {item.year}
                             </span>
                         )}
                     </div>
