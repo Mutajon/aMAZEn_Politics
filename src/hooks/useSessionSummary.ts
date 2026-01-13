@@ -271,8 +271,8 @@ export function collectSessionSummary(
     const source = loggingStore.initialCompassSnapshot
       ? 'loggingStore (primary)'
       : compassStore.initialCompassSnapshot
-      ? 'compassStore (fallback)'
-      : 'unknown';
+        ? 'compassStore (fallback)'
+        : 'unknown';
     console.log(`[useSessionSummary] ✅ Initial compass loaded from: ${source}`);
   }
 
@@ -296,22 +296,28 @@ export function collectSessionSummary(
   return summary;
 }
 
+import { PendingSummaryManager } from "../lib/pendingSummaryManager";
+
 /**
- * Send session summary to backend
+ * Send session summary to backend with robust backup
  * @param summary - Session summary data
  * @returns Promise that resolves when summary is sent (doesn't throw on error)
  */
 export async function sendSessionSummary(summary: SessionSummary): Promise<void> {
+  // 1. BACKUP: Save to pending queue immediately before attempting send
+  PendingSummaryManager.add(summary);
+
   try {
     const response = await fetch('/api/log/summary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(summary),
+      keepalive: true // CRITICAL: Ensures request survives page unload/navigation
     });
 
     if (!response.ok) {
       console.error('[useSessionSummary] ❌ HTTP error sending summary:', response.status, response.statusText);
-      // Don't throw - we don't want to block the user experience
+      // Keep in pending queue for retry
       return;
     }
 
@@ -324,13 +330,20 @@ export async function sendSessionSummary(summary: SessionSummary): Promise<void>
         sessionId: summary.sessionId,
         gameVersion: summary.gameVersion
       });
-      // Don't throw - we don't want to block the user experience
+      // If validation fails, it might be a bad payload. 
+      // We keep it in pending for now, but in a real refined system we might move it to a "failed" queue.
+      // For now, keep it to be safe.
       return;
     }
 
     console.log('[useSessionSummary] ✅ Session summary sent successfully');
+
+    // 2. CLEANUP: Remove from pending queue and mark as sent
+    PendingSummaryManager.remove(summary.sessionId);
+    PendingSummaryManager.markAsSent(summary.sessionId);
+
   } catch (error) {
     console.error('[useSessionSummary] ❌ Error sending summary:', error);
-    // Don't throw - we don't want to block the user experience
+    // Keep in pending queue for retry
   }
 }

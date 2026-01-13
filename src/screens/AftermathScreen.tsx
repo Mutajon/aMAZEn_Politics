@@ -41,6 +41,7 @@ import { buildPastGameEntry } from "../lib/pastGamesService";
 import { useFragmentsStore } from "../store/fragmentsStore";
 import { audioManager } from "../lib/audioManager";
 import FallbackNotification from "../components/aftermath/FallbackNotification";
+import { PendingSummaryManager } from "../lib/pendingSummaryManager";
 
 type Props = {
   push: PushFn;
@@ -55,6 +56,7 @@ export default function AftermathScreen({ push }: Props) {
   const { progress, start: startProgress, notifyReady } = useLoadingProgress();
   const top3ByDimension = useMirrorTop3();
   const experimentActiveRoleKey = useLoggingStore((s) => s.experimentProgress.activeRoleKey);
+  const sessionId = useLoggingStore((s) => s.sessionId);
   const experimentCompletedRoles = useLoggingStore((s) => s.experimentProgress.completedRoles);
   const markExperimentRoleCompleted = useLoggingStore((s) => s.markExperimentRoleCompleted);
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
@@ -159,18 +161,28 @@ export default function AftermathScreen({ push }: Props) {
   ]);
 
   // ========================================================================
-  // EFFECT: LOG SESSION SUMMARY (only on first visit, not on restoration)
+  // EFFECT: LOG SESSION SUMMARY (Persistent check)
   // ========================================================================
-  // Guard ref to prevent duplicate logging (fixes 81x duplication bug)
-  const hasLoggedAftermathRef = useRef(false);
+  // Guard ref to prevent duplicate logging within the same mount
+  const hasAttemptedLogRef = useRef(false);
 
   useEffect(() => {
-    // Only log on first visit (when data first loads, not when restored from snapshot)
-    // AND only if we haven't already logged (prevent re-fires from dependency changes)
-    if (!data || !isFirstVisit || hasLoggedAftermathRef.current) return;
+    // Only log if data loaded and session ID exists
+    if (!data || !sessionId) return;
 
-    // Mark as logged immediately to prevent any re-fires
-    hasLoggedAftermathRef.current = true;
+    // CRITICAL FIX: Check persistent flag to prevent duplicates across reloads
+    // But allow logging if it wasn't successfully sent yet
+    if (PendingSummaryManager.isSent(sessionId)) {
+      console.log('[AftermathScreen] ⏭️ Summary already sent for this session, skipping');
+      return;
+    }
+
+    // Prevent re-fires within same mount
+    if (hasAttemptedLogRef.current) return;
+    hasAttemptedLogRef.current = true;
+
+    // Mark as logged to prevent other effects
+    // hasLoggedAftermathRef.current = true; // Removed legacy ref
 
     // Calculate total inquiries across all days
     let totalInquiries = 0;
@@ -358,7 +370,7 @@ export default function AftermathScreen({ push }: Props) {
         );
       }
     }
-  }, [data, isFirstVisit, inquiryHistory, customActionCount, selectedRole, day, score, addPastGame, addFragment, logger]);
+  }, [data, sessionId, inquiryHistory, customActionCount, selectedRole, day, score, addPastGame, addFragment, logger, sessionLogger]);
 
   // ========================================================================
   // RENDER: Loading State
@@ -367,8 +379,8 @@ export default function AftermathScreen({ push }: Props) {
     // Build loading message with retry progress if applicable
     const loadingMessage = retryAttempt
       ? lang("AFTERMATH_RETRY_ATTEMPT")
-          .replace("{current}", String(retryAttempt.current))
-          .replace("{max}", String(retryAttempt.max))
+        .replace("{current}", String(retryAttempt.current))
+        .replace("{max}", String(retryAttempt.max))
       : lang("AFTERMATH_PENDING");
 
     return (
