@@ -295,7 +295,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
               {lang("CHOOSE_YOUR_ROLE")}
             </h1>
             <p className="text-white/60 text-sm sm:text-base">
-              Explore your path. Every choice reflects who you are.
+              {lang("ROLE_SELECTION_INTRO")}
             </p>
           </div>
 

@@ -186,7 +186,7 @@ export default function PowerDistributionContent({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-wrap">
                             <input
-                              value={h.name}
+                              value={lang(h.name)}
                               onChange={(e) => {
                                 logger.log('power_holder_name_change', {
                                   holderRank: rank,
@@ -216,8 +216,7 @@ export default function PowerDistributionContent({
                               </span>
                             )}
                           </div>
-                          {h.note && <p className="text-xs sm:text-sm text-white/60 mt-0.5 line-clamp-2">{h.note}</p>}
-                        </div>
+                          {h.note && <p className="text-xs sm:text-sm text-white/60 mt-0.5 line-clamp-2">{lang(h.note)}</p>}                        </div>
 
                         {/* Percentage Badge */}
                         <div className="shrink-0 ml-1 sm:ml-2">
