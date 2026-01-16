@@ -20,8 +20,7 @@ import IDCollectionModal from "../components/IDCollectionModal";
 import { useLogger } from "../hooks/useLogger";
 import { audioManager } from "../lib/audioManager";
 
-// SUBTITLES now uses GAME_SUBTITLE from i18n
-const SUBTITLES: string[] = [];
+
 
 // Module-level flag to persist Hebrew warning across component remounts
 let pendingHebrewWarningFlag = false;
@@ -43,7 +42,6 @@ export default function SplashScreen({
   const { language } = useLanguage();
   const logger = useLogger();
 
-  const [visibleSubtitles, setVisibleSubtitles] = useState(0);
   const [showButton, setShowButton] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -196,7 +194,15 @@ export default function SplashScreen({
       narrator.prime();
       playMusic('background', true);
 
-      onStart();
+      // Reconnect Power Questionnaire:
+      // If the initial questionnaire hasn't been completed yet, push to it.
+      // Otherwise, proceed to the game (onStart usually goes to /dream).
+      const hasCompleted = useQuestionnaireStore.getState().hasCompleted;
+      if (!hasCompleted) {
+        push('/power-questionnaire');
+      } else {
+        onStart();
+      }
     } catch (error) {
       console.error('Error in handleIDSubmit:', error);
       setIsLoading(false);
@@ -312,18 +318,12 @@ export default function SplashScreen({
 
   // Simple subtitle reveal: show title, wait 0.5s, fade in subtitle
   useEffect(() => {
-    // Wait 500ms after title, then show subtitle
-    const subtitleTimer = setTimeout(() => {
-      setVisibleSubtitles(1);
-    }, 500);
-
     // Then show button 500ms after subtitle appears
     const buttonTimer = setTimeout(() => {
       setShowButton(true);
     }, 1000);
 
     return () => {
-      clearTimeout(subtitleTimer);
       clearTimeout(buttonTimer);
     };
   }, []);

@@ -12,7 +12,7 @@ interface TutorialOverlayProps {
 
 export function TutorialOverlay({ step, targetElement, onOverlayClick }: TutorialOverlayProps) {
   const lang = useLang();
-  
+
   // Don't render for inactive/complete steps
   if (step === 'inactive' || step === 'complete') return null;
 
@@ -28,25 +28,100 @@ export function TutorialOverlay({ step, targetElement, onOverlayClick }: Tutoria
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 80 }}>
-        {/* Highlight ring around target element */}
-        {targetElement && <HighlightRing targetElement={targetElement} />}
+      {/* Dark backdrop covering entire screen - blocks clicks */}
+      <motion.div
+        key="tutorial-backdrop"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}
+        className="fixed inset-0 bg-black/60"
+        style={{ zIndex: 80, pointerEvents: 'auto' }}
+        onClick={onOverlayClick}
+        aria-label="Tutorial overlay - click to dismiss"
+      />
 
-        {/* Fixed bottom-center tooltip - clickable */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 20 }}
-          transition={{ duration: 0.3 }}
-          onClick={onOverlayClick}
-          className="fixed left-1/2 -translate-x-1/2 bottom-24 bg-gray-900/95 text-white rounded-xl p-4 ring-2 ring-amber-400/60 shadow-2xl max-w-[300px] pointer-events-auto cursor-pointer hover:bg-gray-800/95 transition-colors"
-          style={{ zIndex: 90 }}
-        >
-          <p className="text-sm text-center leading-relaxed">{message}</p>
-        </motion.div>
-      </div>
+      {/* Spotlight cutout around target element */}
+      {targetElement && (
+        <SpotlightCutout
+          key="tutorial-spotlight"
+          targetElement={targetElement}
+        />
+      )}
+
+      {/* Highlight ring around target element */}
+      {targetElement && (
+        <HighlightRing
+          key="tutorial-highlight"
+          targetElement={targetElement}
+        />
+      )}
+
+      {/* Fixed bottom-center tooltip */}
+      <motion.div
+        key="tutorial-tooltip"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        transition={{ duration: 0.3 }}
+        onClick={onOverlayClick}
+        className="fixed left-1/2 -translate-x-1/2 bottom-24 bg-gray-900/95 text-white rounded-xl p-4 ring-2 ring-amber-400/60 shadow-2xl max-w-[300px] cursor-pointer hover:bg-gray-800/95 transition-colors"
+        style={{ zIndex: 95, pointerEvents: 'auto' }}
+      >
+        <p className="text-sm text-center leading-relaxed">{message}</p>
+        <p className="text-xs text-center text-gray-400 mt-2">{lang("TUTORIAL_CLICK_TO_DISMISS")}</p>
+      </motion.div>
     </AnimatePresence>,
     document.body
+  );
+}
+
+// Spotlight cutout component - creates a "hole" in the dark overlay
+function SpotlightCutout({ targetElement }: { targetElement: HTMLElement }) {
+  const [rect, setRect] = useState<DOMRect | null>(null);
+
+  useLayoutEffect(() => {
+    const updateRect = () => {
+      setRect(targetElement.getBoundingClientRect());
+    };
+
+    // Initial position
+    updateRect();
+
+    // Update position on scroll/resize
+    window.addEventListener('scroll', updateRect, true);
+    window.addEventListener('resize', updateRect);
+
+    return () => {
+      window.removeEventListener('scroll', updateRect, true);
+      window.removeEventListener('resize', updateRect);
+    };
+  }, [targetElement]);
+
+  if (!rect) return null;
+
+  // Add padding around the element for the cutout
+  const padding = 12;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed rounded-xl"
+      style={{
+        left: rect.left - padding,
+        top: rect.top - padding,
+        width: rect.width + padding * 2,
+        height: rect.height + padding * 2,
+        zIndex: 82,
+        pointerEvents: 'none', // Allow clicks through to the target element
+        // Create a "light" area by using a semi-transparent background
+        backgroundColor: 'transparent',
+        // Use box-shadow inset to create a subtle glow effect
+        boxShadow: '0 0 20px 8px rgba(251, 191, 36, 0.15)',
+      }}
+    />
   );
 }
 
@@ -84,13 +159,15 @@ function HighlightRing({ targetElement }: { targetElement: HTMLElement }) {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="absolute pointer-events-none rounded-xl"
+      exit={{ opacity: 0 }}
+      className="fixed rounded-xl"
       style={{
         left: rect.left - padding,
         top: rect.top - padding,
         width: rect.width + padding * 2,
         height: rect.height + padding * 2,
         zIndex: 85,
+        pointerEvents: 'none', // Allow clicks through to the target element
       }}
     >
       {/* Pulsing ring animation */}
