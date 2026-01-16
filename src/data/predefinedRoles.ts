@@ -130,9 +130,63 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
         era: "431 BCE Athens (outbreak of Peloponnesian War)"
       },
       supportProfiles: ROLE_SUPPORT_PROFILES["Athens — Shadows of War (-431)"] ?? null,
-      roleScope: "Acts as a citizen-assemblyman with equal voting rights, able to propose decrees and sway crowds but holding no permanent office or command authority.",
-      storyThemes: ["democracy_vs_empire", "glory_vs_pragmatism", "citizen_vs_expert"],
-      authorityLevel: "low"
+      roleScope: "An influential Citizen-Juror and head of a prominent household. You hold a vote in the Assembly and possess the social capital to influence public opinion, but you are also legally and socially responsible for your family's behavior.",
+      storyThemes: ["free_speech_vs_security", "private_vs_public_duty", "tradition_vs_innovation", "family_vs_ideology"],
+      authorityLevel: "low",
+      dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (Athens -431):
+
+═══════════════════════════════════════════════════════════════════════════════
+CORE TENSION TRIANGLE: FREE SPEECH vs STATE SECURITY vs FAMILY LOYALTY
+═══════════════════════════════════════════════════════════════════════════════
+
+Probe these tensions throughout the game:
+- THE RHETOR CRISIS: A prominent thinker spreads "anti-democratic" rhetoric claiming equality is a myth and only the elite should rule
+- RADICALIZATION: Young aristocrats embrace these ideas while common citizens fear a coup
+- GENDER HIERARCHY: The Rhetor argues for excluding women and laborers from all public life
+- PRIVATE/PUBLIC CLASH: Your brother is the Rhetor's star pupil (finding purpose); your niece is harmed by his teachings (losing social standing)
+
+═══════════════════════════════════════════════════════════════════════════════
+MANDATORY THEMATIC ARCHETYPES — HARD ROTATION REQUIRED
+═══════════════════════════════════════════════════════════════════════════════
+
+You MUST cycle through these 7 archetypes. Do NOT repeat until at least 4 others used.
+
+1. THE PARADOX OF TOLERANCE (tensionCluster: LawJustice or InternalPower)
+   The Rhetor's students demand he speak at the Assembly. Silencing him proves his point about democratic hypocrisy.
+   → Allow the speech and risk coup-planning? Ban him and become the tyrant he describes? Debate him publicly?
+
+2. FAMILY DIVIDED (tensionCluster: FamilyPersonal)
+   Your brother announces his engagement to the Rhetor's daughter. Your household will be publicly tied to the anti-democratic movement.
+   → Forbid the marriage? Accept and lose political standing? Use the connection strategically?
+
+3. THE NIECE'S HUMILIATION (tensionCluster: SocialOrder or ReligionCulture)
+   The Rhetor's followers publicly mock your niece for "acting above her station." She begs you to act.
+   → Seek legal prosecution? Challenge them to a public debate? Arrange private revenge?
+
+4. THE STUDENT CONSPIRACY (tensionCluster: InternalPower or ExternalConflict)
+   Evidence emerges that the Rhetor's inner circle is planning to seize the Acropolis during a festival.
+   → Denounce them publicly (maybe falsely)? Infiltrate the group? Wait for concrete proof?
+
+5. THE BROTHER'S TRANSFORMATION (tensionCluster: FamilyPersonal or ReligionCulture)
+   Your brother delivers a speech declaring democracy "the rule of the unfit." He's found purpose but lost his way.
+   → Denounce your own brother? Try private intervention? Publicly distance your household?
+
+6. THE WOMEN'S PETITION (tensionCluster: SocialOrder or EconomyResources)
+   Women of your household and neighborhood secretly organize resistance to the Rhetor's teachings.
+   → Support them openly and face ridicule? Aid them covertly? Forbid their involvement?
+
+7. THE TRIAL (tensionCluster: LawJustice or DiplomacyTreaty)
+   The Assembly votes to try the Rhetor for corrupting youth. You're selected as a juror.
+   → Vote to condemn (protect democracy)? Vote to acquit (protect free speech)? Abstain (protect family)?
+
+═══════════════════════════════════════════════════════════════════════════════
+TONE & STYLE
+═══════════════════════════════════════════════════════════════════════════════
+
+- INTIMATE POLITICS: Every political act has family consequences
+- IDEOLOGICAL WARFARE: Ideas are as dangerous as swords
+- GENDERED TENSIONS: Social hierarchy is constantly contested
+- NO EASY ANSWERS: Protecting democracy may require undemocratic methods`
     },
     characters: {
       male: {
@@ -665,8 +719,8 @@ TONE & STYLE
     year: "1607",
     imageId: "northAmerica",
     avatarPrompt: "Native American tribal chief when European settlers arrived",
-    roleScope: "You are a tribal indian chief. You lead a council overseeing diplomacy, land stewardship, and trade terms; can mobilize scouts and negotiate boundaries but does not unilaterally declare war without consensus.",
-    storyThemes: ["territorial_autonomy", "cultural_preservation", "exchange_vs_exploitation"],
+    roleScope: "The Successor/Manager of a hereditary family enterprise. You have inherited the 'Trade of the Bound' (slavery). You are responsible for providing the labor force that builds the Great Temple and maintains the village's economic dominance.",
+    storyThemes: ["ancestral_debt_vs_conscience", "sacred_vs_profane", "economic_stability_vs_reform", "human_cost_of_civilization"],
     scoreGoal: 1100,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
@@ -734,9 +788,63 @@ TONE & STYLE
         era: "Tidewater Virginia, 1607–1609"
       },
       supportProfiles: ROLE_SUPPORT_PROFILES["North America — The First Encounter (1607)"] ?? null,
-      roleScope: "Leads a tribal council overseeing diplomacy, land stewardship, and trade terms; can mobilize scouts and negotiate boundaries but does not unilaterally declare war without consensus.",
-      storyThemes: ["territorial_autonomy", "cultural_preservation", "exchange_vs_exploitation"],
-      authorityLevel: "high"
+      roleScope: "The Successor/Manager of a hereditary family enterprise. You have inherited the 'Trade of the Bound' (slavery). You are responsible for providing the labor force that builds the Great Temple and maintains the village's economic dominance.",
+      storyThemes: ["ancestral_debt_vs_conscience", "sacred_vs_profane", "economic_stability_vs_reform", "human_cost_of_civilization"],
+      authorityLevel: "medium",
+      dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (North America 1607):
+
+═══════════════════════════════════════════════════════════════════════════════
+CORE TENSION TRIANGLE: ANCESTRAL DUTY vs INDIVIDUAL CONSCIENCE vs SURVIVAL
+═══════════════════════════════════════════════════════════════════════════════
+
+Probe these tensions throughout the game:
+- THE ENGINE OF CIVILIZATION: The slave trade is the literal foundation of the city's power. Without it, the Sacred Temple stops being built, and priests warn of divine wrath.
+- POLITICAL SURVIVAL: Neighboring tribes are kept in check only by the wealth and labor your trade provides. To stop is to invite invasion.
+- HUMAN COST: You are forced to confront the reality of the people being traded—many have individual stories or connections to your past.
+- INHERITED SIN: You have taken over this system from your parents. Do you honor your lineage or break the cycle?
+
+═══════════════════════════════════════════════════════════════════════════════
+MANDATORY THEMATIC ARCHETYPES — HARD ROTATION REQUIRED
+═══════════════════════════════════════════════════════════════════════════════
+
+You MUST cycle through these 7 archetypes. Do NOT repeat until at least 4 others used.
+
+1. THE FAMILIAR FACE (tensionCluster: FamilyPersonal)
+   Among the new captives is someone you knew as a child—a playmate from a village your family once traded with peacefully.
+   → Free them secretly? Assign them to "easier" labor? Treat them as any other captive?
+
+2. THE TEMPLE DEADLINE (tensionCluster: ReligionCulture or HealthDisaster)
+   Priests demand accelerated construction before the eclipse. More labor means more captives—or working current ones to death.
+   → Raid a peaceful village? Work captives harder (high mortality)? Delay and face the priests' wrath?
+
+3. THE RUNAWAY (tensionCluster: LawJustice or SocialOrder)
+   A bound laborer escapes and reaches a neighboring tribe. They demand you pay ransom—or they'll shelter runaways.
+   → Pay the ransom (weaken your authority)? Launch a punitive raid? Negotiate an extradition treaty?
+
+4. THE SUCCESSOR'S DOUBT (tensionCluster: InternalPower or FamilyPersonal)
+   Your own child asks why the bound ones are treated differently. Your spouse says the child is too soft for this business.
+   → Teach them the "necessity" of the trade? Hide the worst aspects? Begin preparing them to end it?
+
+5. THE PRIEST'S DEMAND (tensionCluster: ReligionCulture or ExternalConflict)
+   A priest claims the gods demand a human sacrifice from among the captives to ensure the harvest.
+   → Comply with tradition? Refuse and face divine blame for any crop failure? Offer an alternative?
+
+6. THE TRADE BOYCOTT (tensionCluster: EconomyResources or DiplomacyTreaty)
+   A coalition of villages refuses to trade with you until you release certain captives—relatives of their chiefs.
+   → Release them (show weakness)? Refuse (face economic isolation)? Negotiate for something in return?
+
+7. THE CONSCIENCE BREAK (tensionCluster: FamilyPersonal or InternalPower)
+   An elder who helped your parents build this trade reveals on their deathbed that they always regretted it.
+   → Take this as permission to reform? Dismiss it as senility? Use it as cover for gradual change?
+
+═══════════════════════════════════════════════════════════════════════════════
+TONE & STYLE
+═══════════════════════════════════════════════════════════════════════════════
+
+- INHERITED BURDEN: You did not create this system but you perpetuate it
+- SACRED ECONOMY: Religion and commerce are inseparable
+- HUMAN FACES: Every captive has a story; some connect to yours
+- SURVIVAL LOGIC: Ending the trade may mean ending your village`
     },
     characters: {
       male: {
@@ -1328,9 +1436,63 @@ TONE & STYLE
         era: "late 22nd century"
       },
       supportProfiles: ROLE_SUPPORT_PROFILES["Mars Colony — The Red Frontier (2179)"] ?? null,
-      roleScope: "Elected Mars colony governor balancing survival systems and autonomy petitions; can adjust habitat policy, rationing, and negotiations with Earth but cannot conjure unlimited supplies.",
-      storyThemes: ["autonomy_vs_dependency", "survival_ethics", "science_vs_populism"],
-      authorityLevel: "high"
+      roleScope: "A citizen-journalist on the Mars Colony; can publish stories, cast votes on the colony’s digital network, and influence public opinion, but you are often caught in the crossfire of worker strikes and Earth’s corporate interests.",
+      storyThemes: ["digital_democracy", "information_ethics", "democratic_fatigue", "survival_vs_truth"],
+      authorityLevel: "low",
+      dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (Mars Colony 2179):
+
+═══════════════════════════════════════════════════════════════════════════════
+CORE TENSION TRIANGLE: DEMOCRACY vs LIBERTY vs AUTONOMY
+═══════════════════════════════════════════════════════════════════════════════
+
+Probe these tensions throughout the game:
+- How do DIGITAL PLATFORMS amplify or distort democratic impulses?
+- Strikes EMPOWER citizens but EXHAUST societies—explore both sides
+- DEMOCRATIC FATIGUE: constant civic participation becomes pressure, burnout, conflict
+- Player must decide: EXPOSE, SHIELD, CRITICIZE, or JOIN movements
+
+═══════════════════════════════════════════════════════════════════════════════
+MANDATORY THEMATIC ARCHETYPES — HARD ROTATION REQUIRED
+═══════════════════════════════════════════════════════════════════════════════
+
+You MUST cycle through these 7 archetypes. Do NOT repeat until at least 4 others used.
+
+1. THE TRUTH DILEMMA (tensionCluster: InfoOrder or LawJustice)
+   You discover damaging truth about strike leaders. Publishing destabilizes the movement.
+   → Publish and risk chaos? Shield and compromise journalistic integrity? Leak selectively?
+
+2. THE AMPLIFICATION TRAP (tensionCluster: InternalPower or SocialOrder)
+   AgoraNet algorithms push your story viral—but distort its meaning into rage.
+   → Retract and lose influence? Ride the wave? Try to correct mid-crisis?
+
+3. THE VOTE FATIGUE (tensionCluster: EconomyResources or HealthDisaster)
+   Citizens are exhausted. A crucial infrastructure vote has 12% turnout. Your story could drive turnout—or deepen cynicism.
+   → Sensationalize to drive turnout? Report honestly and risk infrastructure collapse?
+
+4. THE STRIKE CROSSFIRE (tensionCluster: SocialOrder or ExternalConflict)
+   Workers strike essential services. Hospitals run low. Both sides want you to tell their story.
+   → Cover the strikers' grievances? Document the humanitarian cost? Attempt neutrality?
+
+5. THE PLATFORM SHUTDOWN (tensionCluster: CivilLib or InternalPower)
+   AgoraNet threatens to suspend your credentials for "destabilizing content."
+   → Self-censor to stay online? Go underground? Become a martyr for press freedom?
+
+6. THE JOINING POINT (tensionCluster: FamilyPersonal or ReligionCulture)
+   You're asked to stop reporting and join the strike leadership yourself.
+   → Abandon observer role? Maintain distance? Secretly advise while appearing neutral?
+
+7. THE EXIT QUESTION (tensionCluster: DiplomacyTreaty or SocialOrder)
+   The strike is failing. Movement leaders want you to fabricate a "victory narrative."
+   → Help them save face (lie)? Document the defeat honestly? Propose a negotiated ending?
+
+═══════════════════════════════════════════════════════════════════════════════
+TONE & STYLE
+═══════════════════════════════════════════════════════════════════════════════
+
+- SCI-FI GROUNDED: Technology is pervasive but problems are human
+- INFORMATION WARFARE: Truth is a weapon; platforms shape reality
+- DEMOCRATIC BURNOUT: Everyone is tired of voting, deciding, participating
+- MORAL AMBIGUITY: Strikes are both liberating and destructive`
     },
     characters: {
       male: {
@@ -1503,11 +1665,11 @@ TONE & STYLE
   }
 ];
 
-// Experiment roles: Railroad Strike (index 0), Tel Aviv (index 1), Mars (index 10)
+// Experiment roles: Athens (index 0), North America (index 5), Mars (index 11)
 export const EXPERIMENT_PREDEFINED_ROLE_KEYS = [
-  PREDEFINED_ROLES_ARRAY[0].legacyKey,  // Railroad Strike (1877)
-  PREDEFINED_ROLES_ARRAY[1].legacyKey,  // Tel Aviv (2025)
-  PREDEFINED_ROLES_ARRAY[10].legacyKey  // Mars (2179)
+  PREDEFINED_ROLES_ARRAY[0].legacyKey,  // Athens (-431)
+  PREDEFINED_ROLES_ARRAY[5].legacyKey,  // North America (1607)
+  PREDEFINED_ROLES_ARRAY[11].legacyKey  // Mars (2179)
 ];
 
 /**

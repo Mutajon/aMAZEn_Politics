@@ -697,19 +697,21 @@ export default function SplashScreen({
                 {lang("START_BUTTON")}
               </motion.button>
 
-              {/* Free Play Button - skips ID collection, goes to full role carousel */}
-              <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: showButton ? 1 : 0 }}
-                transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
-                style={{ visibility: showButton ? "visible" : "hidden" }}
-                onClick={handleFreePlayClick}
-                className="w-[14rem] rounded-2xl px-4 py-2.5 text-sm font-semibold
+              {/* Free Play Button - TEMPORARILY HIDDEN FOR EXPERIMENT */}
+              {false && (
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: showButton ? 1 : 0 }}
+                  transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
+                  style={{ visibility: showButton ? "visible" : "hidden" }}
+                  onClick={handleFreePlayClick}
+                  className="w-[14rem] rounded-2xl px-4 py-2.5 text-sm font-semibold
                bg-gradient-to-r from-purple-600 to-purple-700 text-amber-300 border border-purple-500/30
                shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-purple-400/60"
-              >
-                {lang("FREE_PLAY_BUTTON")}
-              </motion.button>
+                >
+                  {lang("FREE_PLAY_BUTTON")}
+                </motion.button>
+              )}
 
               {/* Secondary: High Scores (subtle/glass) - TEMPORARILY HIDDEN */}
               <motion.button
