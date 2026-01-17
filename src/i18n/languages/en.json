@@ -348,7 +348,7 @@
   "TUTORIAL_TIP_AVATAR": "Click on your avatar to see the current top values exhibited by your actions",
   "TUTORIAL_TIP_VALUE": "Click on a value for further details",
   "TUTORIAL_TIP_COMPASS_PILLS": "Click the compass to see the most recent change to your values",
-  "TUTORIAL_CLICK_TO_DISMISS": "Click anywhere to dismiss",
+  "TUTORIAL_REQUIRED_ACTION": "Action Required",
   "FRAGMENT_TAP_TO_LEARN_MORE": "Tap to learn more",
   "COMPASS_VALUE_TRUTH": "Truth",
   "COMPASS_VALUE_LIBERTY_AGENCY": "Liberty/Agency",

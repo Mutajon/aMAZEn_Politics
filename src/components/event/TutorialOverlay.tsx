@@ -7,10 +7,9 @@ import { useLang } from '../../i18n/lang';
 interface TutorialOverlayProps {
   step: TutorialStep;
   targetElement?: HTMLElement | null;
-  onOverlayClick?: () => void;
 }
 
-export function TutorialOverlay({ step, targetElement, onOverlayClick }: TutorialOverlayProps) {
+export function TutorialOverlay({ step, targetElement }: TutorialOverlayProps) {
   const lang = useLang();
 
   // Don't render for inactive/complete steps
@@ -28,24 +27,18 @@ export function TutorialOverlay({ step, targetElement, onOverlayClick }: Tutoria
 
   return createPortal(
     <AnimatePresence>
-      {/* Dark backdrop covering entire screen - blocks clicks */}
-      <motion.div
-        key="tutorial-backdrop"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.3 }}
-        className="fixed inset-0 bg-black/60"
-        style={{ zIndex: 80, pointerEvents: 'auto' }}
-        onClick={onOverlayClick}
-        aria-label="Tutorial overlay - click to dismiss"
-      />
-
-      {/* Spotlight cutout around target element */}
-      {targetElement && (
-        <SpotlightCutout
-          key="tutorial-spotlight"
-          targetElement={targetElement}
+      {/* Target-aware backdrop with 4 pieces creating a click-through hole */}
+      {targetElement ? (
+        <TutorialBackdrop key="tutorial-backdrop" targetElement={targetElement} />
+      ) : (
+        /* Full screen fallback if no target */
+        <motion.div
+          key="tutorial-backdrop-fallback"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/60 z-80"
+          style={{ pointerEvents: 'auto' }}
         />
       )}
 
@@ -57,41 +50,38 @@ export function TutorialOverlay({ step, targetElement, onOverlayClick }: Tutoria
         />
       )}
 
-      {/* Fixed bottom-center tooltip */}
+      {/* Fixed bottom-center tooltip - NON-CLICKABLE now */}
       <motion.div
         key="tutorial-tooltip"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 20 }}
         transition={{ duration: 0.3 }}
-        onClick={onOverlayClick}
-        className="fixed left-1/2 -translate-x-1/2 bottom-24 bg-gray-900/95 text-white rounded-xl p-4 ring-2 ring-amber-400/60 shadow-2xl max-w-[300px] cursor-pointer hover:bg-gray-800/95 transition-colors"
+        className="fixed left-1/2 -translate-x-1/2 bottom-24 bg-gray-900/95 text-white rounded-xl p-4 ring-2 ring-amber-400/60 shadow-2xl max-w-[300px]"
         style={{ zIndex: 95, pointerEvents: 'auto' }}
       >
         <p className="text-sm text-center leading-relaxed">{message}</p>
-        <p className="text-xs text-center text-gray-400 mt-2">{lang("TUTORIAL_CLICK_TO_DISMISS")}</p>
+        <p className="text-xs text-center text-gray-500 mt-2 font-medium uppercase tracking-wider">
+          {lang("TUTORIAL_REQUIRED_ACTION") || "Action Required"}
+        </p>
       </motion.div>
     </AnimatePresence>,
     document.body
   );
 }
 
-// Spotlight cutout component - creates a "hole" in the dark overlay
-function SpotlightCutout({ targetElement }: { targetElement: HTMLElement }) {
+// Target-aware backdrop creating a "hole" around the target element
+function TutorialBackdrop({ targetElement }: { targetElement: HTMLElement }) {
   const [rect, setRect] = useState<DOMRect | null>(null);
+  const padding = 12;
 
   useLayoutEffect(() => {
     const updateRect = () => {
       setRect(targetElement.getBoundingClientRect());
     };
-
-    // Initial position
     updateRect();
-
-    // Update position on scroll/resize
     window.addEventListener('scroll', updateRect, true);
     window.addEventListener('resize', updateRect);
-
     return () => {
       window.removeEventListener('scroll', updateRect, true);
       window.removeEventListener('resize', updateRect);
@@ -100,28 +90,50 @@ function SpotlightCutout({ targetElement }: { targetElement: HTMLElement }) {
 
   if (!rect) return null;
 
-  // Add padding around the element for the cutout
-  const padding = 12;
+  const backdropClass = "fixed bg-black/60 transition-all duration-300";
+  const z = 80;
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed rounded-xl"
-      style={{
-        left: rect.left - padding,
-        top: rect.top - padding,
-        width: rect.width + padding * 2,
-        height: rect.height + padding * 2,
-        zIndex: 82,
-        pointerEvents: 'none', // Allow clicks through to the target element
-        // Create a "light" area by using a semi-transparent background
-        backgroundColor: 'transparent',
-        // Use box-shadow inset to create a subtle glow effect
-        boxShadow: '0 0 20px 8px rgba(251, 191, 36, 0.15)',
-      }}
-    />
+      className="fixed inset-0 pointer-events-none"
+      style={{ zIndex: z }}
+    >
+      {/* Top piece */}
+      <div
+        className={backdropClass}
+        style={{ top: 0, left: 0, right: 0, height: Math.max(0, rect.top - padding), pointerEvents: 'auto' }}
+      />
+      {/* Bottom piece */}
+      <div
+        className={backdropClass}
+        style={{ top: rect.bottom + padding, left: 0, right: 0, bottom: 0, pointerEvents: 'auto' }}
+      />
+      {/* Left piece (spanning between top and bottom pieces) */}
+      <div
+        className={backdropClass}
+        style={{ top: rect.top - padding, height: rect.height + padding * 2, left: 0, width: Math.max(0, rect.left - padding), pointerEvents: 'auto' }}
+      />
+      {/* Right piece (spanning between top and bottom pieces) */}
+      <div
+        className={backdropClass}
+        style={{ top: rect.top - padding, height: rect.height + padding * 2, left: rect.right + padding, right: 0, pointerEvents: 'auto' }}
+      />
+
+      {/* Inner subtle glow for the cutout */}
+      <div
+        className="fixed rounded-xl border border-amber-400/20 shadow-[0_0_20px_rgba(251,191,36,0.1)]"
+        style={{
+          left: rect.left - padding,
+          top: rect.top - padding,
+          width: rect.width + padding * 2,
+          height: rect.height + padding * 2,
+          pointerEvents: 'none'
+        }}
+      />
+    </motion.div>
   );
 }
 

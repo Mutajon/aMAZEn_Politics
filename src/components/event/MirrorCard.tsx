@@ -3,7 +3,7 @@
 // Adds typewriter reveal effect followed by traveling shimmer effect (magical vibe).
 // Text insets ensure it won't overlap the mirror art.
 
-import React, { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { HelpCircle } from "lucide-react";
 import { mirrorBubbleTheme as T } from "../../theme/mirrorBubbleTheme";
@@ -62,8 +62,11 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
   // RTL detection for Hebrew language
   const isRTL = getCurrentLanguage() === 'he';
 
-  // Responsive mirror offset (reduce protrusion on mobile to prevent horizontal scroll)
-  const mirrorOffset = isMobile ? 10 : 60; // 10px on mobile (half cut-off acceptable), 60px on desktop for dramatic effect
+  // Responsive mirror offset (ensure enough padding to clear the protruding mirror)
+  const mirrorOffset = isMobile ? 56 : 60; // Increased mobile padding to match half of mirror width
+
+  // Responsive mirror position (always half-on/half-off for consistent look)
+  const MIRROR_EDGE_POS = "-55px"; // Half of 110px width
 
   // Use word-level splitting to prevent mid-word line breaks while maintaining shimmer effect
   const segments = useMemo(() => splitWords(text), [text]);
@@ -141,8 +144,8 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
           className="absolute"
           style={{
             ...(isRTL
-              ? { left: isMobile ? '10px' : '-55px' }  // Hebrew: mirror on left edge
-              : { right: isMobile ? '10px' : '-55px' } // English: mirror on right edge
+              ? { left: MIRROR_EDGE_POS }  // Hebrew: mirror on left edge
+              : { right: MIRROR_EDGE_POS } // English: mirror on right edge
             ),
             top: "50%",                  // Center vertically
             transform: "translateY(-50%)", // Adjust for center alignment

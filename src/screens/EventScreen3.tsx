@@ -379,17 +379,17 @@ export default function EventScreen3({ push }: Props) {
     // Only update previous values if they're actually changing
     // This prevents unnecessary ref updates
     const current = previousSupportRef.current;
-    const hasChanged = !current || 
+    const hasChanged = !current ||
       current.people !== supportPeople ||
       current.middle !== supportMiddle ||
       current.mom !== supportMom;
-    
+
     if (hasChanged && presentationStep >= 0) {
       console.log('[EventScreen3] Support changed - animation will run:', {
         from: current,
         to: { people: supportPeople, middle: supportMiddle, mom: supportMom }
       });
-      
+
       // Update previous values after animation completes (5000ms animation duration)
       const timer = setTimeout(() => {
         previousSupportRef.current = {
@@ -399,7 +399,7 @@ export default function EventScreen3({ push }: Props) {
         };
         console.log('[EventScreen3] Animation complete - updated previous values');
       }, 5100); // Slightly longer than animation duration
-      
+
       return () => clearTimeout(timer);
     }
   }, [supportPeople, supportMiddle, supportMom, presentationStep]);
@@ -604,9 +604,9 @@ export default function EventScreen3({ push }: Props) {
       // Update compass store with new values
       const compassStore = useCompassStore.getState();
       pills.forEach((pill: any) => {
-        const currentValue = compassStore.values[pill.prop][pill.idx];
+        const currentValue = (compassStore.values as any)[pill.prop][pill.idx];
         const newValue = Math.max(0, Math.min(10, currentValue + pill.delta));
-        compassStore.setValue(pill.prop, pill.idx, newValue);
+        compassStore.setValue(pill.prop as any, pill.idx, newValue);
       });
 
       // Store reasoning entry in dilemmaStore
@@ -713,11 +713,6 @@ export default function EventScreen3({ push }: Props) {
    * Handle action confirmation - delegates ALL logic to EventDataCleaner
    */
   const handleConfirm = async (id: string) => {
-    // Track choice for tutorial (Day 2 only)
-    if (day === 2 && !tutorial.tutorialCompleted) {
-      tutorial.onChoiceMade();
-    }
-
     // Set phase to confirming immediately to show loading overlay
     setPhase('confirming');
     resetProgress(); // Reset from 100% to 0% so we don't show "finished" state during cleanup
@@ -746,9 +741,11 @@ export default function EventScreen3({ push }: Props) {
       });
       console.log(`[EventScreen3] ⏱️ Decision time: ${duration}ms`);
 
-      // Store decision time for session summary
-      const { addDecisionTime } = useDilemmaStore.getState();
-      addDecisionTime(duration);
+      if (duration !== null) {
+        // Store decision time for session summary
+        const { addDecisionTime } = useDilemmaStore.getState();
+        addDecisionTime(duration);
+      }
 
       decisionTimingIdRef.current = null;
     }
@@ -816,9 +813,11 @@ export default function EventScreen3({ push }: Props) {
       });
       console.log(`[EventScreen3] ⏱️ Decision time (custom): ${duration}ms`);
 
-      // Store decision time for session summary
-      const { addDecisionTime } = useDilemmaStore.getState();
-      addDecisionTime(duration);
+      if (duration !== null) {
+        // Store decision time for session summary
+        const { addDecisionTime } = useDilemmaStore.getState();
+        addDecisionTime(duration);
+      }
 
       decisionTimingIdRef.current = null;
     }
@@ -999,8 +998,8 @@ export default function EventScreen3({ push }: Props) {
       icon: item.id === 'people'
         ? <Users className="w-4 h-4" />
         : item.id === 'middle'
-        ? <Building2 className="w-4 h-4" />
-        : <Heart className="w-4 h-4" />
+          ? <Building2 className="w-4 h-4" />
+          : <Heart className="w-4 h-4" />
     }));
 
     // Build action cards
@@ -1094,7 +1093,7 @@ export default function EventScreen3({ push }: Props) {
                       }}
                       className="w-full px-6 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-amber-500/50"
                     >
-                         {lang("VIEW_AFTERMATH")}
+                      {lang("VIEW_AFTERMATH")}
                     </button>
                   )}
                 </div>
@@ -1116,7 +1115,7 @@ export default function EventScreen3({ push }: Props) {
               <MirrorCard
                 text={collectedData.mirrorText}
                 avatarUrl={character?.avatarUrl}
-                // onExploreClick temporarily removed - navigation bugs prevent safe return to EventScreen
+              // onExploreClick temporarily removed - navigation bugs prevent safe return to EventScreen
               />
               {/* Compass Pills Overlay - appears at Step 4A (Day 2+) */}
               {showCompassPills && (
@@ -1199,18 +1198,16 @@ export default function EventScreen3({ push }: Props) {
           }}
         />
 
-        {/* Tutorial Overlay - Day 2 only */}
+        {/* Day 2 Tutorial Overlay */}
         {tutorial.shouldShowOverlay && (
           <TutorialOverlay
             step={tutorial.tutorialStep}
             targetElement={
-              tutorial.tutorialStep === 'awaiting-avatar'
-                ? tutorialAvatarRef
-                : tutorial.tutorialStep === 'awaiting-compass-pills'
-                ? tutorialPillsRef
-                : tutorialValueRef
+              tutorial.tutorialStep === 'awaiting-avatar' ? tutorialAvatarRef :
+                tutorial.tutorialStep === 'awaiting-value' ? tutorialValueRef :
+                  tutorial.tutorialStep === 'awaiting-compass-pills' ? tutorialPillsRef :
+                    null
             }
-            onOverlayClick={tutorial.onTutorialOverlayClick}
           />
         )}
 
