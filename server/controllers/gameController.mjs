@@ -576,10 +576,18 @@ export async function gameTurnV2(req, res) {
                 );
             }
 
+            // Cleanup: remove bridge from description if the AI repeated it
+            let cleanDescription = parsed.dilemma?.description || '';
+            const bridgeText = parsed.bridge || '';
+            if (bridgeText && cleanDescription.startsWith(bridgeText)) {
+                console.log('[GAME-TURN-V2] 🧹 Removing duplicate bridge from description');
+                cleanDescription = cleanDescription.slice(bridgeText.length).trim();
+            }
+
             // Return response (flattened for frontend compatibility)
             const response = {
                 title: parsed.dilemma?.title || '',
-                description: parsed.dilemma?.description || '',
+                description: cleanDescription,
                 bridge: parsed.bridge || '', // Bridge sentence connecting previous action to new dilemma
                 actions: parsed.dilemma?.actions || [],
                 topic: parsed.dilemma?.topic || '',

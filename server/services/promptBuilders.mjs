@@ -625,6 +625,14 @@ LANGUAGE RULES:
   GOOD: "the inspectors found out", "illegal experiments", "people want answers"
 - Use concrete language: "Citizens protest" NOT "tensions rise"
 - If a movie camera cannot record it, DO NOT WRITE IT
+- If a movie camera cannot record it, DO NOT WRITE IT
+
+ANTI-JARGON RULES (CRITICAL):
+- DO NOT use obscure historical terms. Use modern English equivalents.
+  - BAD: "Ekklesia", "Boule", "Strategos", "Ostracism", "Agora"
+  - GOOD: "Assembly", "Council", "General", "Exile", "Market Square"
+- The player should understand every word without a history degree.
+
 ${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.` : ''}
 
 YOUR MISSION:
@@ -909,7 +917,7 @@ BAD EXAMPLES (DO NOT DO THIS):
 
 MANDATORY STRUCTURE:
 - "bridge": ONE sentence showing outcome → connection to new problem
-- "dilemma.description": NEW situation details + direct question (do NOT repeat the bridge here)
+- "dilemma.description": Start DIRECTLY with the new crisis. Do NOT summarize the past. Playful GM comment...
 
 
 3. CONSTRAINTS

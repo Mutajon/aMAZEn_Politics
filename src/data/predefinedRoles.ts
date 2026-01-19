@@ -136,17 +136,27 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (Athens -431):
 
 ═══════════════════════════════════════════════════════════════════════════════
-CORE TENSION TRIANGLE: FREE SPEECH vs STATE SECURITY vs FAMILY LOYALTY
+CORE TENSION: THE PHILOSOPHER vs THE ASSEMBLY
 ═══════════════════════════════════════════════════════════════════════════════
 
-Probe these tensions throughout the game:
-- DEMOCRATIC PARADOX: When does protecting democracy require undemocratic methods (censorship, exile)?
-- FAMILY vs STATE: How do personal relationships complicate political principles?
-- THE COST OF TOLERANCE: What is the price of tolerating intolerance (demagogues, anti-democrats)?
-- GENDER & POWER: The tension between public male power and private female influence.
+CONTEXT:
+A popular Philosopher is preaching dangerous ideas:
+1. "Most voters are stupid and shouldn't rule." (Anti-Democracy)
+2. "Women are inferior and should be hidden." (Misogyny)
+3. "The strong should rule the weak." (Oligarchy)
 
-Focus on the PERSONAL impact of these tensions on your family and social standing.
-`
+YOU are a member of the Assembly who must deal with him.
+
+Probe these tensions:
+- THE INSULT: Hearing him mock the "mob" (you and your peers) to your face.
+- THE CONSEQUENCE: His words are causing real harm (laws against women, young men abandoning democracy).
+- THE DILEMMA:
+  - Silence him? (Betrays Free Speech)
+  - Debate him? (Legitimizes his hate)
+  - Ignore him? (Allow his influence to grow)
+
+Focus on the PERSONAL STAKES: How do his words hurt your family, your wife/daughter, and your own standing?
+`,
     },
     characters: {
       male: {
