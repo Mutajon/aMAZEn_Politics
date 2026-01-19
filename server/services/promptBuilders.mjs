@@ -546,10 +546,9 @@ CRITICAL JSON RULES:
     "holders": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Short political reaction in first person 'we/us' (10-15 words)"},
     "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed|dead", "shortLine": "Warm personal reaction in FIRST PERSON 'I' (e.g., 'I worry about...', 'I'm proud of...', 'I fear that...') (10-15 words)", "momDied": false}
   },
-  "bridge": "One sentence showing outcome of previous action → connection to new problem",
   "dilemma": {
     "title": "Short title (max 120 chars)",
-    "description": "Playful Game Master comment in second person ('you') + new situation + direct question",
+    "description": "Start with ONE sentence bridging from the previous outcome. Then add the new crisis details + direct question.",
     "actions": [
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
@@ -916,8 +915,7 @@ BAD EXAMPLES (DO NOT DO THIS):
 - "The situation evolved." (no specific outcome)
 
 MANDATORY STRUCTURE:
-- "bridge": ONE sentence showing outcome → connection to new problem
-- "dilemma.description": Start DIRECTLY with the new crisis. Do NOT summarize the past. Playful GM comment...
+- "dilemma.description": Start with ONE sentence showing the outcome of the previous choice. Then describe the NEW situation details + direct question.
 
 
 3. CONSTRAINTS
@@ -1030,10 +1028,9 @@ CRITICAL JSON RULES:
     "holders": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Short political reaction in first person 'we/us' (10-15 words)"},
     "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed|dead", "shortLine": "Warm personal reaction in FIRST PERSON 'I' (e.g., 'I worry about...', 'I'm proud of...', 'I fear that...') (10-15 words)", "momDied": false}
   },
-  "bridge": "One sentence showing outcome of previous action → connection to new problem",
   "dilemma": {
     "title": "Short title (max 120 chars)",
-    "description": "Playful Game Master comment in second person ('you') + new situation + direct question",
+    "description": "Start with ONE sentence bridging from the previous outcome. Then add the new crisis details + direct question.",
     "actions": [
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},

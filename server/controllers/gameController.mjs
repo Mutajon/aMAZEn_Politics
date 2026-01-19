@@ -462,14 +462,8 @@ export async function gameTurnV2(req, res) {
                     }
                 }
 
-                // If parsing succeeded, validate bridge field (optional check, no retry)
+                // If parsing succeeded
                 if (parsed) {
-                    // Validate bridge field exists for Day 2+ (mandatory)
-                    if (day > 1 && !parsed.bridge) {
-                        console.warn(`[GAME-TURN-V2] Day ${day} - Missing "bridge" field in AI response. Continuing without it to avoid latency.`);
-                        parsed.bridge = ""; // Default to empty string
-                    }
-
                     if (retryCount > 0) {
                         console.log(`[GAME-TURN-V2] ✅ JSON parsing succeeded on retry attempt ${retryCount + 1}`);
                     }
@@ -576,19 +570,14 @@ export async function gameTurnV2(req, res) {
                 );
             }
 
-            // Cleanup: remove bridge from description if the AI repeated it
+            // Cleanup: ensure description exists
             let cleanDescription = parsed.dilemma?.description || '';
-            const bridgeText = parsed.bridge || '';
-            if (bridgeText && cleanDescription.startsWith(bridgeText)) {
-                console.log('[GAME-TURN-V2] 🧹 Removing duplicate bridge from description');
-                cleanDescription = cleanDescription.slice(bridgeText.length).trim();
-            }
 
             // Return response (flattened for frontend compatibility)
             const response = {
                 title: parsed.dilemma?.title || '',
                 description: cleanDescription,
-                bridge: parsed.bridge || '', // Bridge sentence connecting previous action to new dilemma
+                bridge: '', // Bridge is now integrated into description
                 actions: parsed.dilemma?.actions || [],
                 topic: parsed.dilemma?.topic || '',
                 scope: parsed.dilemma?.scope || '',
