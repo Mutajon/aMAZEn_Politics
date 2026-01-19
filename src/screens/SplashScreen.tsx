@@ -19,6 +19,7 @@ import LanguageSelector from "../components/LanguageSelector";
 import IDCollectionModal from "../components/IDCollectionModal";
 import { useLogger } from "../hooks/useLogger";
 import { audioManager } from "../lib/audioManager";
+import { PREDEFINED_ROLES_MAP } from "../data/predefinedRoles";
 
 
 
@@ -308,6 +309,81 @@ export default function SplashScreen({
       console.error('Error starting free play:', error);
       setIsLoading(false);
       alert('An error occurred while starting the game. Please try again.');
+    }
+  };
+
+  // DEBUG: Quick start specific role with default values
+  const handleDebugRoleStart = async (roleId: string) => {
+    // Robust lookup by ID instead of fragile title string
+    const roleData = Object.values(PREDEFINED_ROLES_MAP).find(r => r.id === roleId);
+
+    if (!roleData) {
+      console.error("Role not found:", roleId);
+      console.log("Available IDs:", Object.values(PREDEFINED_ROLES_MAP).map(r => r.id));
+      alert(`Role not found: ${roleId}\nCheck console for available IDs.`);
+      return;
+    }
+
+    // Play click sound
+    audioManager.playSfx('click-soft');
+
+    // Disable experiment mode
+    setExperimentMode(false);
+    setIsLoading(true);
+    setShowSettings(false);
+
+    try {
+      // Set consent
+      useLoggingStore.getState().setConsented(true);
+
+      // Start session
+      await loggingService.startSession();
+
+      // Reset stores
+      useCompassStore.getState().reset();
+      useDilemmaStore.getState().reset();
+      useRoleStore.getState().reset();
+      useMirrorQuizStore.getState().resetAll();
+      clearAllSnapshots();
+
+      // --- SET ROLE DATA ---
+      const roleStore = useRoleStore.getState();
+
+      // 1. Set Role
+      roleStore.setRole(roleData.legacyKey);
+
+      // 2. Set Analysis/Power Dist
+      // IMPORTANT: The store expects the full analysis object
+      roleStore.setAnalysis(roleData.powerDistribution);
+
+      // 3. Set Default Character (No Avatar)
+      const defaultChar = {
+        name: "DebugTester",
+        gender: "any" as const,
+        age: 30,
+        occupation: "Tester",
+        background: "Created for debugging purposes",
+        description: "A debug tester character.",
+        isCustom: false
+      };
+      roleStore.setCharacter(defaultChar);
+      roleStore.setPlayerName("DebugTester");
+
+      // 4. Prime systems
+      narrator.prime();
+      playMusic('background', true);
+
+      // 5. Force Game Phase to Event
+      useDilemmaStore.getState().setGamePhase?.("event");
+
+      // 6. Navigate directly to event screen
+      // We push to /event directly
+      push("/event");
+
+    } catch (error) {
+      console.error('Error starting debug role:', error);
+      setIsLoading(false);
+      alert('Debug start failed: ' + String(error));
     }
   };
 
@@ -753,6 +829,47 @@ export default function SplashScreen({
                 {lang("BOOK_OF_ACHIEVEMENTS")}
               </motion.button>
             </div>
+
+            {/* DEBUG BUTTONS - Only visible in debug mode */}
+            {debugMode && !isLoading && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="mt-8 flex flex-col gap-2"
+              >
+                <div className="text-white/50 text-xs uppercase tracking-widest mb-1">Debug Quick Start</div>
+
+                <div className="grid grid-cols-2 gap-2 w-[20rem]">
+                  <button
+                    onClick={() => handleDebugRoleStart("railroad_1877")}
+                    className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded border border-white/10"
+                  >
+                    🚂 Railroad (Has Emphasis)
+                  </button>
+
+                  <button
+                    onClick={() => handleDebugRoleStart("russia_1917")}
+                    className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded border border-white/10"
+                  >
+                    🚩 Russia (No Emphasis)
+                  </button>
+
+                  <button
+                    onClick={() => handleDebugRoleStart("athens_431")}
+                    className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded border border-white/10"
+                  >
+                    🏛️ Athens (Has Emphasis)
+                  </button>
+
+                  <button
+                    onClick={() => handleDebugRoleStart("north_america_1607")}
+                    className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded border border-white/10"
+                  >
+                    🦅 N. America (Has Emphasis)
+                  </button>
+                </div>
+              </motion.div>
+            )}
           </>
         )}
       </div>

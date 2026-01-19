@@ -220,7 +220,9 @@ export async function gameTurnV2(req, res) {
                     });
                 }
 
+                const aiStart = Date.now();
                 const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
+                console.log(`[TIMING] Day 1 AI call took ${Date.now() - aiStart}ms`);
 
                 content = aiResponse?.content;
                 if (!content) {
@@ -422,7 +424,9 @@ export async function gameTurnV2(req, res) {
                     });
                 }
 
+                const aiStart = Date.now();
                 const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
+                console.log(`[TIMING] Day ${day} AI call took ${Date.now() - aiStart}ms`);
 
                 content = aiResponse?.content;
                 if (!content) {
@@ -458,17 +462,12 @@ export async function gameTurnV2(req, res) {
                     }
                 }
 
-                // If parsing succeeded, validate bridge field and break out of retry loop
+                // If parsing succeeded, validate bridge field (optional check, no retry)
                 if (parsed) {
                     // Validate bridge field exists for Day 2+ (mandatory)
-                    if (day > 1 && !parsed.bridge && retryCount < maxRetries) {
-                        console.warn(`[GAME-TURN-V2] Day ${day} - Missing "bridge" field, retrying with stronger instruction...`);
-                        messages.push({
-                            role: "user",
-                            content: `Your response is missing the required "bridge" field. Please respond again with valid JSON that includes a "bridge" field containing ONE SENTENCE showing the OUTCOME of the player's previous action "${playerChoice.title}" and how it connects to today's new problem. This field is MANDATORY for Days 2-7.`
-                        });
-                        parsed = null; // Reset parsed to trigger retry
-                        continue;
+                    if (day > 1 && !parsed.bridge) {
+                        console.warn(`[GAME-TURN-V2] Day ${day} - Missing "bridge" field in AI response. Continuing without it to avoid latency.`);
+                        parsed.bridge = ""; // Default to empty string
                     }
 
                     if (retryCount > 0) {

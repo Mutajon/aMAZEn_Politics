@@ -194,132 +194,132 @@ export default function ActionDeckContent({
           animate="show"
           variants={{ hidden: {}, show: { transition: { staggerChildren: ENTER_STAGGER } } }}
         >
-        {/* Cards row (responsive: 1 col mobile, 2 col tablet, 3 col desktop) - TREATMENT: semiAutonomy & noAutonomy show AI options */}
-        {config.showAIOptions && cards.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
-            {cards.map((c) => {
-              const isSelected = selectedCard?.id === c.id;
-              const disabled = Boolean(confirmingId) || !c.affordable;
+          {/* Cards row (responsive: 1 col mobile, 2 col tablet, 3 col desktop) - TREATMENT: semiAutonomy & noAutonomy show AI options */}
+          {config.showAIOptions && cards.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
+              {cards.map((c) => {
+                const isSelected = selectedCard?.id === c.id;
+                const disabled = Boolean(confirmingId) || !c.affordable;
 
-              return (
-              <motion.div
-                key={c.id}
-                layout
-                layoutId={`card-${c.id}`}
-                ref={attachCardRef(c.id)}
-                animate={othersDown && c.id !== confirmingId ? othersCtrl : undefined}
-                transition={springJuice}
-                className={[
-                  CARD_BASE,
-                  CARD_PAD,
-                  c.cardGradientClass,
-                  "text-start relative transition-transform",
-                  disabled ? "opacity-50 saturate-75 cursor-not-allowed" : "cursor-pointer hover:brightness-[1.03]",
-                  isSelected ? "ring-2 ring-white/30" : "",
-                ].join(" ")}
-                variants={{
-                  hidden: { opacity: 0, scale: 0.85 },
-                  show: {
-                    opacity: 1,
-                    scale: 1.0,
-                    transition: {
-                      type: "tween",
-                      duration: ENTER_DURATION,
-                      ease: [0.16, 1, 0.3, 1]
-                    }
-                  },
-                }}
-                onClick={() => !disabled && handleSelectCard(c.id)}
-                onKeyDown={(e) => {
-                  if (!disabled && (e.key === "Enter" || e.key === " ")) {
-                    e.preventDefault();
-                    handleSelectCard(c.id);
-                  }
-                }}
-                role="button"
-                tabIndex={0}
-              >
-                {/* Top row: icon (left), cost (right) */}
-                <div className="flex items-center justify-between">
-                  <div className={`inline-flex items-center justify-center rounded-lg p-1.5 ${c.iconBgClass}`}>
-                    <div className={c.iconTextClass}>{c.icon}</div>
-                  </div>
-                  {showBudget && (
-                    <div className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-black/35 ring-1 ring-white/25">
-                      <Coins className="w-3.5 h-3.5 text-amber-300" />
-                      <span
-                        className={[
-                          "text-[9px] md:text-[11px] font-semibold",
-                          !c.affordable && (c.cost ?? 0) < 0 ? "text-rose-100" : (c.cost ?? 0) >= 0 ? "text-emerald-100" : "text-white",
-                        ].join(" ")}
-                      >
-                        {(c.cost ?? 0) >= 0 ? `+${c.cost}` : `${c.cost}`}
-                      </span>
+                return (
+                  <motion.div
+                    key={c.id}
+                    layout
+                    layoutId={`card-${c.id}`}
+                    ref={attachCardRef(c.id)}
+                    animate={othersDown && c.id !== confirmingId ? othersCtrl : undefined}
+                    transition={springJuice}
+                    className={[
+                      CARD_BASE,
+                      CARD_PAD,
+                      c.cardGradientClass,
+                      "text-start relative transition-transform",
+                      disabled ? "opacity-50 saturate-75 cursor-not-allowed" : "cursor-pointer hover:brightness-[1.03]",
+                      isSelected ? "ring-2 ring-white/30" : "",
+                    ].join(" ")}
+                    variants={{
+                      hidden: { opacity: 0, scale: 0.85 },
+                      show: {
+                        opacity: 1,
+                        scale: 1.0,
+                        transition: {
+                          type: "tween",
+                          duration: ENTER_DURATION,
+                          ease: [0.16, 1, 0.3, 1]
+                        }
+                      },
+                    }}
+                    onClick={() => !disabled && handleSelectCard(c.id)}
+                    onKeyDown={(e) => {
+                      if (!disabled && (e.key === "Enter" || e.key === " ")) {
+                        e.preventDefault();
+                        handleSelectCard(c.id);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    {/* Top row: icon (left), cost (right) */}
+                    <div className="flex items-center justify-between">
+                      <div className={`inline-flex items-center justify-center rounded-lg p-1.5 ${c.iconBgClass}`}>
+                        <div className={c.iconTextClass}>{c.icon}</div>
+                      </div>
+                      {showBudget && (
+                        <div className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-black/35 ring-1 ring-white/25">
+                          <Coins className="w-3.5 h-3.5 text-amber-300" />
+                          <span
+                            className={[
+                              "text-[9px] md:text-[11px] font-semibold",
+                              !c.affordable && (c.cost ?? 0) < 0 ? "text-rose-100" : (c.cost ?? 0) >= 0 ? "text-emerald-100" : "text-white",
+                            ].join(" ")}
+                          >
+                            {(c.cost ?? 0) >= 0 ? `+${c.cost}` : `${c.cost}`}
+                          </span>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Body: title + summary (clamped) */}
+                    <div className="mt-2">
+                      <div className={CARD_TITLE_CLASS}>{c.title}</div>
+                      <div className={`${CARD_DESC_CLASS} mt-0.5 line-clamp-3`}>{c.summary}</div>
+                    </div>
+
+                    {/* Selected check */}
+                    {isSelected && (
+                      <div className="absolute left-2 top-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-200" strokeWidth={2.5} />
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* TREATMENT: fullAutonomy hides AI options - modal opens automatically */}
+          {/* No message needed - modal opens directly */}
+
+          {/* Suggest-your-own pill (part of stagger sequence) - TREATMENT: semiAutonomy shows button, fullAutonomy hides (modal auto-opens) */}
+          {config.showCustomAction && config.showAIOptions && (
+            <motion.div className="mt-3 flex justify-center" layout
+              variants={{
+                hidden: { opacity: 0, scale: 0.85 },
+                show: {
+                  opacity: 1,
+                  scale: 1.0,
+                  transition: {
+                    type: "tween",
+                    duration: ENTER_DURATION,
+                    ease: [0.16, 1, 0.3, 1]
+                  }
+                },
+              }}
+            >
+              <div className="w-full max-w-[calc(33.333%-0.5rem)]">
+                <motion.button
+                  type="button"
+                  layout
+                  ref={suggestRef}
+                  animate={othersDown ? suggestCtrl : undefined}
+                  className={SUGGEST_BTN_CLASS}
+                  onClick={handleOpenSuggest}
+                  disabled={Boolean(confirmingId) || validatingSuggest || !canAffordSuggestion}
+                >
+                  <span className="text-[12.5px] font-semibold">{lang("SUGGEST_YOUR_ACTION")}</span>
+                  {showBudget && (
+                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-black/35 ring-1 ring-white/25">
+                      <span className={`text-[11px] font-semibold ${suggestCost < 0 ? "text-rose-100" : "text-emerald-100"}`}>
+                        {suggestCost >= 0 ? `+${suggestCost}` : `${suggestCost}`}
+                      </span>
+                      <Coins className="w-3.5 h-3.5 text-amber-300" />
+                    </span>
                   )}
-                </div>
-
-                {/* Body: title + summary (clamped) */}
-                <div className="mt-2">
-                  <div className={CARD_TITLE_CLASS}>{c.title}</div>
-                  <div className={`${CARD_DESC_CLASS} mt-0.5 line-clamp-3`}>{c.summary}</div>
-                </div>
-
-                {/* Selected check */}
-                {isSelected && (
-                  <div className="absolute left-2 top-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-200" strokeWidth={2.5} />
-                  </div>
-                )}
-              </motion.div>
-            );
-          })}
-          </div>
-        )}
-
-        {/* TREATMENT: fullAutonomy hides AI options - modal opens automatically */}
-        {/* No message needed - modal opens directly */}
-
-        {/* Suggest-your-own pill (part of stagger sequence) - TREATMENT: semiAutonomy shows button, fullAutonomy hides (modal auto-opens) */}
-        {config.showCustomAction && config.showAIOptions && (
-        <motion.div className="mt-3 flex justify-center" layout
-          variants={{
-            hidden: { opacity: 0, scale: 0.85 },
-            show: {
-              opacity: 1,
-              scale: 1.0,
-              transition: {
-                type: "tween",
-                duration: ENTER_DURATION,
-                ease: [0.16, 1, 0.3, 1]
-              }
-            },
-          }}
-        >
-          <div className="w-full max-w-[calc(33.333%-0.5rem)]">
-          <motion.button
-            type="button"
-            layout
-            ref={suggestRef}
-            animate={othersDown ? suggestCtrl : undefined}
-            className={SUGGEST_BTN_CLASS}
-            onClick={handleOpenSuggest}
-            disabled={Boolean(confirmingId) || validatingSuggest || !canAffordSuggestion}
-          >
-            <span className="text-[12.5px] font-semibold">{lang("SUGGEST_YOUR_OWN")}</span>
-            {showBudget && (
-              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-black/35 ring-1 ring-white/25">
-                <span className={`text-[11px] font-semibold ${suggestCost < 0 ? "text-rose-100" : "text-emerald-100"}`}>
-                  {suggestCost >= 0 ? `+${suggestCost}` : `${suggestCost}`}
-                </span>
-                <Coins className="w-3.5 h-3.5 text-amber-300" />
-              </span>
-            )}
-          </motion.button>
-          </div>
-        </motion.div>
-        )}
-        {/* End of showCustomAction conditional */}
+                </motion.button>
+              </div>
+            </motion.div>
+          )}
+          {/* End of showCustomAction conditional */}
         </motion.div>
 
         {/* Expanded overlay */}
@@ -426,7 +426,7 @@ export default function ActionDeckContent({
                 )}
 
                 <div className="flex items-center justify-between">
-                  <div className="text-[13px] font-semibold text-white">{lang("SUGGEST_YOUR_OWN")}</div>
+                  <div className="text-[13px] font-semibold text-white">{lang("SUGGEST_YOUR_ACTION")}</div>
                   {showBudget && (
                     <div className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-black/35 ring-1 ring-white/25">
                       <span className="text-[12px] font-semibold text-rose-100">{suggestCost}</span>
@@ -452,9 +452,7 @@ export default function ActionDeckContent({
                         e.target.setSelectionRange(pos, pos);
                       });
                     }}
-                    placeholder={!config.showAIOptions
-                      ? "Type in your desired action"
-                      : "Type your suggestion…"}
+                    placeholder={lang(!config.showAIOptions ? "SUGGEST_ACTION_PLACEHOLDER_AUTONOMY" : "SUGGEST_ACTION_PLACEHOLDER")}
                     className="w-full rounded-xl bg-black/35 ring-1 ring-white/25 text-white placeholder-white/70 px-3 py-2 outline-none focus:ring-white/35 resize-none"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {

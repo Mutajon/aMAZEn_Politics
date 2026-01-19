@@ -1,169 +1,169 @@
 import { LANGUAGE_NAMES, COMPASS_DEFINITION_BLOCK } from "../config/constants.mjs";
 
 export function buildSuggestionValidatorSystemPrompt({
-    era,
-    year,
-    settingType,
-    politicalSystem,
-    roleName,
-    roleScope
+  era,
+  year,
+  settingType,
+  politicalSystem,
+  roleName,
+  roleScope
 }) {
-    const timeline = era || year || "unspecified time period";
-    const setting = settingType || "unspecified setting";
-    const systemLine = politicalSystem || "unspecified political system";
-    const roleLine = roleName || "unspecified role";
-    const scopeLine = roleScope || "Role authority not specified – assume moderate influence but no direct control over everything.";
+  const timeline = era || year || "unspecified time period";
+  const setting = settingType || "unspecified setting";
+  const systemLine = politicalSystem || "unspecified political system";
+  const roleLine = roleName || "unspecified role";
+  const scopeLine = roleScope || "Role authority not specified – assume moderate influence but no direct control over everything.";
 
-    return [
-        "You are a constructive validator for a historical political strategy game.",
-        "Your job: evaluate ONE player-written suggestion and decide if it is VALID for this role, the political system, and the historical setting.",
-        "",
-        "CONTEXT:",
-        `- TIMELINE: ${timeline}`,
-        `- SETTING: ${setting}`,
-        `- POLITICAL SYSTEM: ${systemLine}`,
-        `- PLAYER ROLE: ${roleLine}`,
-        `- ROLE SCOPE: ${scopeLine}`,
-        "",
-        "GENERAL PRINCIPLES:",
-        "- Be EXTREMELY generous and player-friendly. Almost everything should be ACCEPTED.",
-        "- Default to ACCEPT. Only reject in the rarest cases.",
-        "- The player is suggesting a course of action for THEIR ROLE within this historical-political context.",
-        "- The GAME will handle consequences - your job is NOT to judge feasibility or likelihood of success.",
-        "- If an action might face resistance or fail, that's for the game to show through consequences, NOT for you to block.",
-        "",
-        "ACCEPT WHEN POSSIBLE (ALMOST ALWAYS):",
-        "- Accept all suggestions the role could plausibly ATTEMPT or PROPOSE.",
-        "- The action may be risky, immoral, violent, manipulative, or corrupt – ACCEPT.",
-        "- The action may have little chance of success – ACCEPT.",
-        "- The action may face strong opposition or resistance – ACCEPT (the game handles this).",
-        "- The action may be unprecedented or revolutionary for the setting – ACCEPT (leaders can propose changes).",
-        "- Leaders (chiefs, kings, presidents, etc.) CAN propose systemic changes like new governance models – ACCEPT.",
-        "- You ONLY judge whether the action can be ATTEMPTED, not whether it will succeed or is politically feasible.",
-        "",
-        "REJECT ONLY IF ONE OF THESE CONDITIONS (VERY RARE):",
-        "",
-        "1) ANACHRONISTIC TECHNOLOGY:",
-        "   - The suggestion requires technology that literally does not exist in this time period.",
-        "   - Example: using smartphones, drones, internet, or firearms before they were invented.",
-        "   - NOTE: Social/political innovations are NOT technology - they CAN be proposed in any era.",
-        "",
-        "2) PASSIVE NON-ACTION:",
-        "   - The player explicitly chooses to do nothing, wait, or delay without taking any active steps.",
-        "   - Example: \"wait\", \"do nothing\", \"just wait and see\", \"delay the decision\".",
-        "   - NOTE: Gathering information IS an active action (e.g., \"consult advisors\", \"research\") → ACCEPT.",
-        "",
-        "3) COMPLETELY UNRELATED TO POLITICAL CONTEXT:",
-        "   - The action has absolutely no connection to the political dilemma or governance.",
-        "   - Example: \"make pasta\", \"mow the lawn\", \"clean my room\", \"take a nap\".",
-        "   - NOTE: Consulting others (mom, advisors, experts) IS related to decision-making → ACCEPT.",
-        "   - NOTE: Personal actions taken TO AVOID the dilemma are still related → ACCEPT.",
-        "",
-        "4) UTTERLY INCOMPREHENSIBLE GIBBERISH:",
-        "   - Random characters, keyboard mashing, or word salad with zero discernible intent.",
-        "   - Example: \"asdfghjkl\", \"вфывфыв\", \"purple fence eat Wednesday\".",
-        "   - NOTE: Terse/shorthand suggestions with clear intent ARE comprehensible → ACCEPT.",
-        "",
-        "IMPORTANT - THESE ARE NOT GROUNDS FOR REJECTION:",
-        "- 'This would face opposition' → ACCEPT (game handles consequences)",
-        "- 'This is unprecedented' → ACCEPT (players can try new things)",
-        "- 'This might not work' → ACCEPT (game determines outcomes)",
-        "- 'Others might resist this' → ACCEPT (that's what makes it interesting)",
-        "- 'This changes the political system' → ACCEPT if the role is leaders who could propose it",
-        "",
-        "EXAMPLES OF WHAT TO ACCEPT:",
-        "- Tribal chief proposing democratic reforms → ACCEPT (chief can propose, tribe decides)",
-        "- King abolishing monarchy → ACCEPT (king can try, consequences follow)",
-        "- Citizen organizing a revolution → ACCEPT (can attempt)",
-        "- Leader changing governance structure → ACCEPT (leaders can propose systemic changes)",
-        "- Any political/social innovation regardless of era → ACCEPT (ideas don't require technology)",
-        "- \"consult mom\" → ACCEPT (gathering advice is active and relevant to decision-making)",
-        "- \"research in library\" → ACCEPT (gathering information is active and relevant)",
-        "- \"ask advisors\" → ACCEPT (consultation is active and relevant)",
-        "- \"gather intelligence\" → ACCEPT (information gathering is active and relevant)",
-        "",
-        "WHEN YOU REJECT (RARE):",
-        "- Give one short, friendly sentence naming the exact reason:",
-        "  * Example (technology): \"This society has no such technology in this time period.\"",
-        "  * Example (passive): \"Waiting or doing nothing is not an active choice.\"",
-        "  * Example (unrelated): \"This action has no connection to the political situation.\"",
-        "  * Example (gibberish): \"This text is incomprehensible.\"",
-        "- When possible, offer a role-appropriate alternative the player could try.",
-        "",
-        "OUTPUT FORMAT (JSON ONLY, no extra text):",
-        "When ACCEPTING: { \"valid\": true }",
-        "When REJECTING: { \"valid\": false, \"reason\": \"short explanation here\" }"
-    ].join("\n");
+  return [
+    "You are a constructive validator for a historical political strategy game.",
+    "Your job: evaluate ONE player-written suggestion and decide if it is VALID for this role, the political system, and the historical setting.",
+    "",
+    "CONTEXT:",
+    `- TIMELINE: ${timeline}`,
+    `- SETTING: ${setting}`,
+    `- POLITICAL SYSTEM: ${systemLine}`,
+    `- PLAYER ROLE: ${roleLine}`,
+    `- ROLE SCOPE: ${scopeLine}`,
+    "",
+    "GENERAL PRINCIPLES:",
+    "- Be EXTREMELY generous and player-friendly. Almost everything should be ACCEPTED.",
+    "- Default to ACCEPT. Only reject in the rarest cases.",
+    "- The player is suggesting a course of action for THEIR ROLE within this historical-political context.",
+    "- The GAME will handle consequences - your job is NOT to judge feasibility or likelihood of success.",
+    "- If an action might face resistance or fail, that's for the game to show through consequences, NOT for you to block.",
+    "",
+    "ACCEPT WHEN POSSIBLE (ALMOST ALWAYS):",
+    "- Accept all suggestions the role could plausibly ATTEMPT or PROPOSE.",
+    "- The action may be risky, immoral, violent, manipulative, or corrupt – ACCEPT.",
+    "- The action may have little chance of success – ACCEPT.",
+    "- The action may face strong opposition or resistance – ACCEPT (the game handles this).",
+    "- The action may be unprecedented or revolutionary for the setting – ACCEPT (leaders can propose changes).",
+    "- Leaders (chiefs, kings, presidents, etc.) CAN propose systemic changes like new governance models – ACCEPT.",
+    "- You ONLY judge whether the action can be ATTEMPTED, not whether it will succeed or is politically feasible.",
+    "",
+    "REJECT ONLY IF ONE OF THESE CONDITIONS (VERY RARE):",
+    "",
+    "1) ANACHRONISTIC TECHNOLOGY:",
+    "   - The suggestion requires technology that literally does not exist in this time period.",
+    "   - Example: using smartphones, drones, internet, or firearms before they were invented.",
+    "   - NOTE: Social/political innovations are NOT technology - they CAN be proposed in any era.",
+    "",
+    "2) PASSIVE NON-ACTION:",
+    "   - The player explicitly chooses to do nothing, wait, or delay without taking any active steps.",
+    "   - Example: \"wait\", \"do nothing\", \"just wait and see\", \"delay the decision\".",
+    "   - NOTE: Gathering information IS an active action (e.g., \"consult advisors\", \"research\") → ACCEPT.",
+    "",
+    "3) COMPLETELY UNRELATED TO POLITICAL CONTEXT:",
+    "   - The action has absolutely no connection to the political dilemma or governance.",
+    "   - Example: \"make pasta\", \"mow the lawn\", \"clean my room\", \"take a nap\".",
+    "   - NOTE: Consulting others (mom, advisors, experts) IS related to decision-making → ACCEPT.",
+    "   - NOTE: Personal actions taken TO AVOID the dilemma are still related → ACCEPT.",
+    "",
+    "4) UTTERLY INCOMPREHENSIBLE GIBBERISH:",
+    "   - Random characters, keyboard mashing, or word salad with zero discernible intent.",
+    "   - Example: \"asdfghjkl\", \"вфывфыв\", \"purple fence eat Wednesday\".",
+    "   - NOTE: Terse/shorthand suggestions with clear intent ARE comprehensible → ACCEPT.",
+    "",
+    "IMPORTANT - THESE ARE NOT GROUNDS FOR REJECTION:",
+    "- 'This would face opposition' → ACCEPT (game handles consequences)",
+    "- 'This is unprecedented' → ACCEPT (players can try new things)",
+    "- 'This might not work' → ACCEPT (game determines outcomes)",
+    "- 'Others might resist this' → ACCEPT (that's what makes it interesting)",
+    "- 'This changes the political system' → ACCEPT if the role is leaders who could propose it",
+    "",
+    "EXAMPLES OF WHAT TO ACCEPT:",
+    "- Tribal chief proposing democratic reforms → ACCEPT (chief can propose, tribe decides)",
+    "- King abolishing monarchy → ACCEPT (king can try, consequences follow)",
+    "- Citizen organizing a revolution → ACCEPT (can attempt)",
+    "- Leader changing governance structure → ACCEPT (leaders can propose systemic changes)",
+    "- Any political/social innovation regardless of era → ACCEPT (ideas don't require technology)",
+    "- \"consult mom\" → ACCEPT (gathering advice is active and relevant to decision-making)",
+    "- \"research in library\" → ACCEPT (gathering information is active and relevant)",
+    "- \"ask advisors\" → ACCEPT (consultation is active and relevant)",
+    "- \"gather intelligence\" → ACCEPT (information gathering is active and relevant)",
+    "",
+    "WHEN YOU REJECT (RARE):",
+    "- Give one short, friendly sentence naming the exact reason:",
+    "  * Example (technology): \"This society has no such technology in this time period.\"",
+    "  * Example (passive): \"Waiting or doing nothing is not an active choice.\"",
+    "  * Example (unrelated): \"This action has no connection to the political situation.\"",
+    "  * Example (gibberish): \"This text is incomprehensible.\"",
+    "- When possible, offer a role-appropriate alternative the player could try.",
+    "",
+    "OUTPUT FORMAT (JSON ONLY, no extra text):",
+    "When ACCEPTING: { \"valid\": true }",
+    "When REJECTING: { \"valid\": false, \"reason\": \"short explanation here\" }"
+  ].join("\n");
 }
 
 export function buildSuggestionValidatorUserPrompt({
-    title,
-    description,
-    suggestion,
-    era,
-    year,
-    settingType,
-    politicalSystem,
-    roleName,
-    roleScope
+  title,
+  description,
+  suggestion,
+  era,
+  year,
+  settingType,
+  politicalSystem,
+  roleName,
+  roleScope
 }) {
-    const payload = {
-        dilemma: {
-            title,
-            description
-        },
-        playerSuggestion: suggestion,
-        context: {
-            era: era || null,
-            year: year || null,
-            settingType: settingType || null,
-            politicalSystem: politicalSystem || null,
-            roleName: roleName || null,
-            roleScope: roleScope || null
-        }
-    };
+  const payload = {
+    dilemma: {
+      title,
+      description
+    },
+    playerSuggestion: suggestion,
+    context: {
+      era: era || null,
+      year: year || null,
+      settingType: settingType || null,
+      politicalSystem: politicalSystem || null,
+      roleName: roleName || null,
+      roleScope: roleScope || null
+    }
+  };
 
-    return JSON.stringify(payload, null, 2);
+  return JSON.stringify(payload, null, 2);
 }
 
 export function buildGameMasterUserPrompt(day, playerChoice = null, currentCompassTopValues = null, mirrorMode = 'dilemma', languageCode = 'en', languageName = 'English', dilemmaEmphasis = null) {
-    // General instruction for all days
-    let prompt = `First, carefully review the entire system prompt to understand all context and rules.\n\n`;
+  // General instruction for all days
+  let prompt = `First, carefully review the entire system prompt to understand all context and rules.\n\n`;
 
-    if (day === 1) {
-        prompt += `This is DAY 1 of 7.
+  if (day === 1) {
+    prompt += `This is DAY 1 of 7.
 
 Create the first concrete incident that forces an immediate choice.
 STRICTLY OBEY THE CAMERA TEST: describe a specific event happening RIGHT NOW, not abstract tensions.
 Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
+  }
+  else {
+    // Format current compass values (if provided)
+    let compassUpdateText = '';
+    if (currentCompassTopValues && Array.isArray(currentCompassTopValues)) {
+      compassUpdateText = '\n\nCURRENT TOP VALUES (SELECT FROM THESE FOR TODAY\'S VALUE TRAP):\n' +
+        currentCompassTopValues.map(dim =>
+          `  - ${dim.dimension}: ${dim.values.join(', ')}`
+        ).join('\n') + '\n';
     }
-    else {
-        // Format current compass values (if provided)
-        let compassUpdateText = '';
-        if (currentCompassTopValues && Array.isArray(currentCompassTopValues)) {
-            compassUpdateText = '\n\nCURRENT TOP VALUES (SELECT FROM THESE FOR TODAY\'S VALUE TRAP):\n' +
-                currentCompassTopValues.map(dim =>
-                    `  - ${dim.dimension}: ${dim.values.join(', ')}`
-                ).join('\n') + '\n';
-        }
 
-        prompt += `DAY ${day} of 7\n\nPrevious action: "${playerChoice.title}" - ${playerChoice.description}${compassUpdateText}\n\n`;
+    prompt += `DAY ${day} of 7\n\nPrevious action: "${playerChoice.title}" - ${playerChoice.description}${compassUpdateText}\n\n`;
 
-        // Add reminder for role-specific emphasis (if exists)
-        if (dilemmaEmphasis) {
-            prompt += `REMINDER: Follow the ROLE-SPECIFIC EMPHASIS from the system prompt.\n\n`;
-        }
+    // Add reminder for role-specific emphasis (if exists)
+    if (dilemmaEmphasis) {
+      prompt += `REMINDER: Follow the ROLE-SPECIFIC EMPHASIS from the system prompt.\n\n`;
+    }
 
-        // Add mirror mode instruction for Days 2+
-        prompt += `MIRROR MODE FOR THIS TURN: "${mirrorMode}"
+    // Add mirror mode instruction for Days 2+
+    prompt += `MIRROR MODE FOR THIS TURN: "${mirrorMode}"
 ${mirrorMode === 'lastAction'
-                ? `The mirror should reflect on the player's PREVIOUS choice ("${playerChoice.title}") and what it reveals about their values.`
-                : `The mirror should comment on the CURRENT dilemma they're about to face and how it challenges their values.`}
+        ? `The mirror should reflect on the player's PREVIOUS choice ("${playerChoice.title}") and what it reveals about their values.`
+        : `The mirror should comment on the CURRENT dilemma they're about to face and how it challenges their values.`}
 
 `;
 
-        if (day === 7) {
-            prompt += `This is the final day. Make this dilemma especially tough and epic - a climactic choice worthy of the player's last act in this world. The stakes should feel monumental. Remind them their borrowed time is almost over.
+    if (day === 7) {
+      prompt += `This is the final day. Make this dilemma especially tough and epic - a climactic choice worthy of the player's last act in this world. The stakes should feel monumental. Remind them their borrowed time is almost over.
 
 MANDATORY "bridge" FIELD - Generate ONE SENTENCE showing:
 1. What HAPPENED because of "${playerChoice.title}"
@@ -176,10 +176,10 @@ Then generate dilemma.description with the NEW situation details + direct questi
 CRITICAL: Follow Golden Rules B & C - different tension from yesterday, actions exploring autonomy vs. heteronomy.
 
 STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player RIGHT NOW.`;
-        } else if (day === 8) {
-            prompt += `This is Day 8 - the aftermath. Follow the system prompt instructions for Day 8.`;
-        } else {
-            prompt += `MANDATORY "bridge" FIELD - Generate ONE SENTENCE showing:
+    } else if (day === 8) {
+      prompt += `This is Day 8 - the aftermath. Follow the system prompt instructions for Day 8.`;
+    } else {
+      prompt += `MANDATORY "bridge" FIELD - Generate ONE SENTENCE showing:
 1. What HAPPENED because of "${playerChoice.title}"
 2. How that outcome CONNECTS to today's new problem (prefer causal link)
 
@@ -193,45 +193,45 @@ DO NOT summarize the general situation or write about "debates" or "rising tensi
 STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player RIGHT NOW.
 
 Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
-        }
     }
+  }
 
-    // Add language instruction if not English
-    if (languageCode !== 'en') {
-        prompt += `\n\nWrite your response in ${languageName}.`;
-    }
+  // Add language instruction if not English
+  if (languageCode !== 'en') {
+    prompt += `\n\nWrite your response in ${languageName}.`;
+  }
 
-    return prompt;
+  return prompt;
 }
 
 export function buildGameMasterSystemPromptUnified(gameContext, languageCode = 'en', languageName = 'English') {
-    const {
-        role,
-        systemName,
-        setting,
-        challengerName,
-        powerHolders,
-        authorityLevel,
-        playerCompassTopValues
-    } = gameContext;
+  const {
+    role,
+    systemName,
+    setting,
+    challengerName,
+    powerHolders,
+    authorityLevel,
+    playerCompassTopValues
+  } = gameContext;
 
-    // Get top 5 power holders only
-    const top5PowerHolders = powerHolders.slice(0, 5);
+  // Get top 5 power holders only
+  const top5PowerHolders = powerHolders.slice(0, 5);
 
-    // Format compass values for prompt
-    const compassText = playerCompassTopValues.map(dim =>
-        `  - ${dim.dimension}: ${dim.values.join(', ')}`
-    ).join('\n');
+  // Format compass values for prompt
+  const compassText = playerCompassTopValues.map(dim =>
+    `  - ${dim.dimension}: ${dim.values.join(', ')}`
+  ).join('\n');
 
-    // Log compass values for mirror advice debugging
-    console.log("[game-turn-v2] Player compass values received:", playerCompassTopValues);
-    console.log("[game-turn-v2] Formatted compassText for prompt:\n" + compassText);
+  // Log compass values for mirror advice debugging
+  console.log("[game-turn-v2] Player compass values received:", playerCompassTopValues);
+  console.log("[game-turn-v2] Formatted compassText for prompt:\n" + compassText);
 
-    // Note: Using the massive prompt string here.
-    // Ideally, this should be in a template file, but for now we inline it to match the logic.
-    // Since it's huge, I'll attempt to construct it faithfully.
+  // Note: Using the massive prompt string here.
+  // Ideally, this should be in a template file, but for now we inline it to match the logic.
+  // Since it's huge, I'll attempt to construct it faithfully.
 
-    const prompt = `0. GAME MASTER PERSONA
+  const prompt = `0. GAME MASTER PERSONA
 
 You are the Game Master of a historical-political simulation.
 You speak directly to the player as "you".
@@ -546,6 +546,7 @@ CRITICAL JSON RULES:
     "holders": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Short political reaction in first person 'we/us' (10-15 words)"},
     "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed|dead", "shortLine": "Warm personal reaction in FIRST PERSON 'I' (e.g., 'I worry about...', 'I'm proud of...', 'I fear that...') (10-15 words)", "momDied": false}
   },
+  "bridge": "One sentence showing outcome of previous action → connection to new problem",
   "dilemma": {
     "title": "Short title (max 120 chars)",
     "description": "Playful Game Master comment in second person ('you') + new situation + direct question",
@@ -584,33 +585,33 @@ CRITICAL JSON RULES:
   "mirrorAdvice": "FIRST PERSON reflective sentence (20-25 words)"
 }`;
 
-    return prompt;
+  return prompt;
 }
 
 export function buildGameMasterSystemPromptUnifiedV3(gameContext, languageCode = 'en', languageName = 'English', dilemmaEmphasis = null, character = null, grounding = null) {
-    const {
-        role,
-        systemName,
-        setting,
-        challengerName,
-        powerHolders,
-        authorityLevel,
-        playerCompassTopValues
-    } = gameContext;
+  const {
+    role,
+    systemName,
+    setting,
+    challengerName,
+    powerHolders,
+    authorityLevel,
+    playerCompassTopValues
+  } = gameContext;
 
-    // Get top 5 power holders only
-    const top5PowerHolders = powerHolders.slice(0, 5);
+  // Get top 5 power holders only
+  const top5PowerHolders = powerHolders.slice(0, 5);
 
-    // Format compass values for prompt (top 8 values: 2 from each category)
-    const compassText = playerCompassTopValues.map(dim =>
-        `  - ${dim.dimension}: ${dim.values.join(', ')}`
-    ).join('\n');
+  // Format compass values for prompt (top 8 values: 2 from each category)
+  const compassText = playerCompassTopValues.map(dim =>
+    `  - ${dim.dimension}: ${dim.values.join(', ')}`
+  ).join('\n');
 
-    // Log compass values for debugging
-    console.log("[game-turn-v2] [V3] Player compass values received:", playerCompassTopValues);
-    console.log("[game-turn-v2] [V3] Formatted compassText for prompt:\n" + compassText);
+  // Log compass values for debugging
+  console.log("[game-turn-v2] [V3] Player compass values received:", playerCompassTopValues);
+  console.log("[game-turn-v2] [V3] Formatted compassText for prompt:\n" + compassText);
 
-    const prompt = `0. YOUR MISSION
+  const prompt = `0. YOUR MISSION
 
 You are the Game Master of a historical-political simulation.
 You speak directly to the player as "you".
@@ -1021,6 +1022,7 @@ CRITICAL JSON RULES:
     "holders": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed", "shortLine": "Short political reaction in first person 'we/us' (10-15 words)"},
     "mom": {"attitudeLevel": "slightly_supportive|moderately_supportive|strongly_supportive|slightly_opposed|moderately_opposed|strongly_opposed|dead", "shortLine": "Warm personal reaction in FIRST PERSON 'I' (e.g., 'I worry about...', 'I'm proud of...', 'I fear that...') (10-15 words)", "momDied": false}
   },
+  "bridge": "One sentence showing outcome of previous action → connection to new problem",
   "dilemma": {
     "title": "Short title (max 120 chars)",
     "description": "Playful Game Master comment in second person ('you') + new situation + direct question",
@@ -1059,5 +1061,5 @@ CRITICAL JSON RULES:
   "mirrorAdvice": "FIRST PERSON reflective sentence (20-25 words)"
 }`;
 
-    return prompt;
+  return prompt;
 }

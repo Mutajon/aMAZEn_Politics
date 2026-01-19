@@ -142,6 +142,10 @@ type DilemmaState = {
   // Crisis state tracking (NEW)
   crisisMode: "people" | "challenger" | "caring" | "downfall" | null;
   crisisEntity: string | null; // Name of the entity in crisis
+
+  // Game Phase management
+  gamePhase?: "intro" | "event" | "outro"; // Optional phase tracking
+  setGamePhase?: (phase: "intro" | "event" | "outro") => void; // Optional setter
   previousSupportValues: {
     people: number;
     middle: number;
@@ -205,7 +209,7 @@ type DilemmaState = {
   // Inquiry system methods (Treatment-based feature)
   resetInquiryCredits: () => void;                             // Reset credits for new dilemma
   addInquiry: (question: string, answer: string) => void;      // Store Q&A pair
-  getInquiriesForCurrentDay: () => Array<{question: string, answer: string, timestamp: number}>;  // Retrieve current day inquiries
+  getInquiriesForCurrentDay: () => Array<{ question: string, answer: string, timestamp: number }>;  // Retrieve current day inquiries
   canInquire: () => boolean;                                   // Check if inquiries are available
 
   // Reasoning system methods (Treatment-based feature)
@@ -251,159 +255,54 @@ export type GoalStatusChange = {
 export const useDilemmaStore = create<DilemmaState>()(
   persist(
     (set, get) => ({
-  day: 1,
-  totalDays: 7,
-
-  // Hosted state conversation
-  gameId: null,
-  conversationActive: false,
-  narrativeMemory: null, // Will be populated during BackgroundIntroScreen
-
-  // Inquiry system (initialized with 0 credits, reset per dilemma based on treatment)
-  inquiryHistory: new Map(),
-  inquiryCreditsRemaining: 0,
-
-  // Reasoning system (initialized empty, populated as player provides reasoning)
-  reasoningHistory: [],
-  reasoningSubmissionCount: 0,
-
-  // Decision timing (initialized empty, populated as player makes decisions)
-  decisionTimes: [],
-
-  // Reasoning timing (initialized empty, populated as player provides reasoning)
-  reasoningTimes: [],
-
-  // Custom action texts (initialized empty, populated as player submits custom actions)
-  customActionTexts: [],
-
-  // Self-judgment (null until day 8 aftermath questionnaire)
-  selfJudgment: null,
-
-  // Return-to-dream tracking (for grandpa dialogue)
-  justFinishedGame: false,
-  lastGameScore: null,
-
-  current: null,
-  history: [],
-  loading: false,
-  error: null,
-  lastChoice: null,
-
-  // Dilemma history for AI context
-  dilemmaHistory: [],
-
-  // Day progression state
-  dayProgression: {
-    isProgressing: false,
-    progressingToDay: 1,
-    analysisComplete: {
-      support: false,
-      compass: false,
-      dynamic: false,
-      mirror: false,
-      news: false,
-      contextualDilemma: false,
-    },
-  },
-
-  // Topic tracking
-  recentTopics: [],
-  topicCounts: {},
-
-  // Subject streak tracking (Light API)
-  subjectStreak: null,
-
-  // Recent dilemma titles tracking (Light API)
-  recentDilemmaTitles: [],
-
-  // Scope streak tracking (Light API)
-  scopeStreak: null,
-  recentScopes: [],
-
-  // Final score persistence
-  finalScoreCalculated: false,
-  finalScoreBreakdown: null,
-  finalScoreSubmitted: false,
-
-  // Game resources and support
-  budget: 1500,
-  supportPeople: 50,
-  supportMiddle: 50,
-  supportMom: 50,
-  momAlive: true,  // Session-only: not persisted in localStorage
-  score: 0,
-
-  // Difficulty level
-  difficulty: null,
-
-  // Goals system
-  selectedGoals: [],
-  customActionCount: 0,
-  minBudget: 1500,
-  minSupportPeople: 50,
-  minSupportMiddle: 50,
-  minSupportMom: 50,
-
-  // Crisis state tracking (NEW)
-  crisisMode: null,
-  crisisEntity: null,
-  previousSupportValues: null,
-  pendingCompassPills: null,
-
-
-
-  nextDay() {
-    const { day } = get();
-    // Remove Math.min cap - allow day to exceed totalDays for conclusion screen (day 8)
-    // This enables daysLeft to reach 0, triggering game conclusion mode
-    const v = day + 1;
-    dlog("nextDay ->", v);
-    // Note: Keep lastChoice intact so EventScreen3 collector can analyze it on the next day
-    // lastChoice will be naturally overwritten when the player makes their next choice
-    set({ day: v });
-  },
-
-  setTotalDays(n) {
-    const v = Math.max(1, Math.round(Number(n) || 1));
-    dlog("setTotalDays ->", v);
-    set({ totalDays: v });
-  },
-
-  applyChoice(id) {
-    const { current } = get();
-    if (!current) {
-      dlog("applyChoice: no current dilemma");
-      return;
-    }
-
-    const choice = current.actions.find(action => action.id === id);
-    if (!choice) {
-      dlog("applyChoice: choice not found ->", id);
-      return;
-    }
-
-    dlog("applyChoice ->", id, choice.title);
-    set({ lastChoice: choice });
-  },
-
-  setLastChoice(action) {
-    dlog("setLastChoice ->", action.id, action.title);
-    set({ lastChoice: action });
-  },
-
-  reset() {
-    dlog("reset dilemmas");
-    set({
+      // Default game phase
+      gamePhase: "intro",
+      setGamePhase: (phase) => {
+        dlog("setGamePhase ->", phase);
+        set({ gamePhase: phase });
+      },
       day: 1,
+      totalDays: 7,
+
+      // Hosted state conversation
       gameId: null,
       conversationActive: false,
+      narrativeMemory: null, // Will be populated during BackgroundIntroScreen
+
+      // Inquiry system (initialized with 0 credits, reset per dilemma based on treatment)
+      inquiryHistory: new Map(),
+      inquiryCreditsRemaining: 0,
+
+      // Reasoning system (initialized empty, populated as player provides reasoning)
+      reasoningHistory: [],
+      reasoningSubmissionCount: 0,
+
+      // Decision timing (initialized empty, populated as player makes decisions)
+      decisionTimes: [],
+
+      // Reasoning timing (initialized empty, populated as player provides reasoning)
+      reasoningTimes: [],
+
+      // Custom action texts (initialized empty, populated as player submits custom actions)
+      customActionTexts: [],
+
+      // Self-judgment (null until day 8 aftermath questionnaire)
+      selfJudgment: null,
+
+      // Return-to-dream tracking (for grandpa dialogue)
+      justFinishedGame: false,
+      lastGameScore: null,
+
       current: null,
       history: [],
       loading: false,
       error: null,
       lastChoice: null,
+
+      // Dilemma history for AI context
       dilemmaHistory: [],
-      reasoningHistory: [],
+
+      // Day progression state
       dayProgression: {
         isProgressing: false,
         progressingToDay: 1,
@@ -416,601 +315,712 @@ export const useDilemmaStore = create<DilemmaState>()(
           contextualDilemma: false,
         },
       },
+
+      // Topic tracking
       recentTopics: [],
       topicCounts: {},
+
+      // Subject streak tracking (Light API)
       subjectStreak: null,
+
+      // Recent dilemma titles tracking (Light API)
       recentDilemmaTitles: [],
+
+      // Scope streak tracking (Light API)
       scopeStreak: null,
       recentScopes: [],
+
+      // Final score persistence
       finalScoreCalculated: false,
       finalScoreBreakdown: null,
       finalScoreSubmitted: false,
+
+      // Game resources and support
       budget: 1500,
       supportPeople: 50,
       supportMiddle: 50,
       supportMom: 50,
-      momAlive: true,
+      momAlive: true,  // Session-only: not persisted in localStorage
       score: 0,
+
+      // Difficulty level
       difficulty: null,
+
+      // Goals system
       selectedGoals: [],
       customActionCount: 0,
       minBudget: 1500,
       minSupportPeople: 50,
       minSupportMiddle: 50,
       minSupportMom: 50,
+
+      // Crisis state tracking (NEW)
       crisisMode: null,
       crisisEntity: null,
       previousSupportValues: null,
       pendingCompassPills: null,
-      narrativeMemory: null,
-      inquiryHistory: new Map(),
-      inquiryCreditsRemaining: 0,
-      reasoningSubmissionCount: 0,
-      decisionTimes: [],
-      reasoningTimes: [],
-      customActionTexts: [],
-      selfJudgment: null,
-      justFinishedGame: false,
-      lastGameScore: null,
-    });
-  },
 
-  // Resource and support setters
-  setBudget(n) {
-    const v = Math.round(Number(n) || 0);
-    dlog("setBudget ->", v);
-    set({ budget: v });
-  },
 
-  setSupportPeople(n) {
-    const v = Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
-    dlog("setSupportPeople ->", v);
-    set({ supportPeople: v });
-  },
 
-  setSupportMiddle(n) {
-    const v = Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
-    dlog("setSupportMiddle ->", v);
-    set({ supportMiddle: v });
-  },
-
-  setSupportMom(n) {
-    const { momAlive } = get();
-    if (!momAlive) {
-      dlog("setSupportMom -> BLOCKED: Mom is dead");
-      return;
-    }
-    const v = Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
-    dlog("setSupportMom ->", v);
-    set({ supportMom: v });
-  },
-
-  setMomDead() {
-    const { momAlive } = get();
-    if (!momAlive) {
-      dlog("setMomDead -> Already dead");
-      return;
-    }
-    dlog("setMomDead -> Mom has died");
-    set({ momAlive: false, supportMom: 0 });
-  },
-
-  setScore(n) {
-    const v = Math.round(Number(n) || 0);
-    dlog("setScore ->", v);
-    set({ score: v });
-  },
-
-  setDifficulty(level) {
-    dlog("setDifficulty ->", level);
-    set({ difficulty: level });
-
-    // Apply difficulty modifiers (support and budget only - score applied in FinalScoreScreen)
-    const modifiers = {
-      "baby-boss": { supportMod: 10, budgetMod: 250, scoreMod: -200 },
-      "freshman": { supportMod: 0, budgetMod: 0, scoreMod: 0 },
-      "tactician": { supportMod: -10, budgetMod: -250, scoreMod: 200 },
-      "old-fox": { supportMod: -20, budgetMod: -500, scoreMod: 500 },
-    };
-
-    const mod = modifiers[level];
-
-    // Check if budget system is enabled
-    const { showBudget } = useSettingsStore.getState();
-
-    // Apply support modifiers (add percentage points, clamped to 0-100)
-    // Only apply budget modifier if budget system is enabled
-    set({
-      supportPeople: Math.max(0, Math.min(100, 50 + mod.supportMod)),
-      supportMiddle: Math.max(0, Math.min(100, 50 + mod.supportMod)),
-      supportMom: Math.max(0, Math.min(100, 50 + mod.supportMod)),
-      budget: showBudget ? 1500 + mod.budgetMod : 1500, // Default budget if disabled
-      score: mod.scoreMod,
-    });
-  },
-
-  // Day progression methods
-  startDayProgression() {
-    const { day } = get();
-    dlog("startDayProgression ->", day + 1);
-    set({
-      dayProgression: {
-        isProgressing: true,
-        progressingToDay: day + 1,
-        analysisComplete: {
-          support: false,
-          compass: false,
-          dynamic: false,
-          mirror: false,
-          news: false,
-          contextualDilemma: false,
-        },
+      nextDay() {
+        const { day } = get();
+        // Remove Math.min cap - allow day to exceed totalDays for conclusion screen (day 8)
+        // This enables daysLeft to reach 0, triggering game conclusion mode
+        const v = day + 1;
+        dlog("nextDay ->", v);
+        // Note: Keep lastChoice intact so EventScreen3 collector can analyze it on the next day
+        // lastChoice will be naturally overwritten when the player makes their next choice
+        set({ day: v });
       },
-    });
-  },
 
-  setAnalysisComplete(analysis) {
-    const { dayProgression } = get();
-    dlog("setAnalysisComplete ->", analysis);
-    set({
-      dayProgression: {
-        ...dayProgression,
-        analysisComplete: {
-          ...dayProgression.analysisComplete,
-          [analysis]: true,
-        },
+      setTotalDays(n) {
+        const v = Math.max(1, Math.round(Number(n) || 1));
+        dlog("setTotalDays ->", v);
+        set({ totalDays: v });
       },
-    });
-  },
 
-  endDayProgression() {
-    const { dayProgression } = get();
-    dlog("endDayProgression -> day:", dayProgression.progressingToDay);
-    set({
-      day: dayProgression.progressingToDay,
-      lastChoice: null, // Reset for new day
-      dayProgression: {
-        isProgressing: false,
-        progressingToDay: dayProgression.progressingToDay,
-        analysisComplete: {
-          support: false,
-          compass: false,
-          dynamic: false,
-          mirror: false,
-          news: false,
-          contextualDilemma: false,
-        },
+      applyChoice(id) {
+        const { current } = get();
+        if (!current) {
+          dlog("applyChoice: no current dilemma");
+          return;
+        }
+
+        const choice = current.actions.find(action => action.id === id);
+        if (!choice) {
+          dlog("applyChoice: choice not found ->", id);
+          return;
+        }
+
+        dlog("applyChoice ->", id, choice.title);
+        set({ lastChoice: choice });
       },
-    });
-  },
 
-  // Topic tracking methods (Rule #9)
-  addDilemmaTopic(topic) {
-    const { recentTopics, topicCounts } = get();
-    const newRecentTopics = [topic, ...recentTopics.slice(0, 2)]; // Keep last 3
-    const newTopicCounts = {
-      ...topicCounts,
-      [topic]: (topicCounts[topic] || 0) + 1,
-    };
-    dlog("addDilemmaTopic ->", topic, "recent:", newRecentTopics);
-    set({
-      recentTopics: newRecentTopics,
-      topicCounts: newTopicCounts,
-    });
-  },
+      setLastChoice(action) {
+        dlog("setLastChoice ->", action.id, action.title);
+        set({ lastChoice: action });
+      },
 
-  // Subject streak tracking (Light API)
-  updateSubjectStreak(topic) {
-    const { subjectStreak } = get();
-
-    if (!subjectStreak || subjectStreak.subject !== topic) {
-      // New subject - reset streak
-      dlog("updateSubjectStreak -> new subject:", topic);
-      set({ subjectStreak: { subject: topic, count: 1 } });
-    } else {
-      // Same subject - increment count
-      const newCount = subjectStreak.count + 1;
-      dlog("updateSubjectStreak -> increment:", topic, "count:", newCount);
-      set({ subjectStreak: { subject: topic, count: newCount } });
-    }
-  },
-
-  // Recent dilemma titles tracking (Light API)
-  addDilemmaTitle(title) {
-    const { recentDilemmaTitles } = get();
-    const newTitles = [title, ...recentDilemmaTitles.slice(0, 4)]; // Keep last 5
-    dlog("addDilemmaTitle ->", title, "| recent:", newTitles.length);
-    set({ recentDilemmaTitles: newTitles });
-  },
-
-  // Scope streak tracking (Light API)
-  updateScopeStreak(scope) {
-    const { scopeStreak, recentScopes } = get();
-
-    // Update streak
-    if (!scopeStreak || scopeStreak.scope !== scope) {
-      // New scope - reset streak
-      dlog("updateScopeStreak -> new scope:", scope);
-      set({ scopeStreak: { scope, count: 1 } });
-    } else {
-      // Same scope - increment count
-      const newCount = scopeStreak.count + 1;
-      dlog("updateScopeStreak -> increment:", scope, "count:", newCount);
-      set({ scopeStreak: { scope, count: newCount } });
-    }
-
-    // Update recent list (keep last 5)
-    const newRecent = [scope, ...recentScopes.slice(0, 4)];
-    set({ recentScopes: newRecent });
-  },
-
-  // Final score persistence methods
-  saveFinalScore(breakdown) {
-    dlog("saveFinalScore -> saving breakdown with final score:", breakdown.final);
-    set({
-      finalScoreCalculated: true,
-      finalScoreBreakdown: breakdown,
-    });
-  },
-
-  clearFinalScore() {
-    dlog("clearFinalScore -> clearing saved score");
-    set({
-      finalScoreCalculated: false,
-      finalScoreBreakdown: null,
-      finalScoreSubmitted: false,
-    });
-  },
-
-  markScoreSubmitted() {
-    dlog("markScoreSubmitted -> marking score as submitted to highscores");
-    set({
-      finalScoreSubmitted: true,
-    });
-  },
-
-  // Dilemma history methods
-  addHistoryEntry(entry) {
-    const { dilemmaHistory } = get();
-    const newHistory = [...dilemmaHistory, entry];
-    dlog("addHistoryEntry -> Day", entry.day, ":", entry.dilemmaTitle, "→", entry.choiceTitle);
-    set({ dilemmaHistory: newHistory });
-  },
-
-  clearHistory() {
-    dlog("clearHistory -> clearing all dilemma history");
-    set({ dilemmaHistory: [] });
-  },
-
-  // Goals system methods
-  setGoals(goals) {
-    const selectedGoals: SelectedGoal[] = goals.map(g => ({
-      ...g,
-      status: 'unmet' as const,
-      lastEvaluatedDay: 0,
-    }));
-    set({ selectedGoals });
-    dlog("setGoals ->", goals.map(g => g.id));
-  },
-
-  evaluateGoals() {
-    const { selectedGoals } = get();
-    if (selectedGoals.length === 0) {
-      dlog("evaluateGoals -> no goals selected, skipping");
-      return [];
-    }
-
-    const updatedGoals = evaluateAllGoals(selectedGoals);
-
-    // Detect status changes for audio/visual feedback
-    const changes: GoalStatusChange[] = [];
-    selectedGoals.forEach((oldGoal, idx) => {
-      const newGoal = updatedGoals[idx];
-      if (oldGoal.status !== newGoal.status) {
-        changes.push({
-          goalId: newGoal.id,
-          goalTitle: newGoal.title,
-          oldStatus: oldGoal.status,
-          newStatus: newGoal.status
+      reset() {
+        dlog("reset dilemmas");
+        set({
+          day: 1,
+          gameId: null,
+          conversationActive: false,
+          current: null,
+          history: [],
+          loading: false,
+          error: null,
+          lastChoice: null,
+          dilemmaHistory: [],
+          reasoningHistory: [],
+          dayProgression: {
+            isProgressing: false,
+            progressingToDay: 1,
+            analysisComplete: {
+              support: false,
+              compass: false,
+              dynamic: false,
+              mirror: false,
+              news: false,
+              contextualDilemma: false,
+            },
+          },
+          recentTopics: [],
+          topicCounts: {},
+          subjectStreak: null,
+          recentDilemmaTitles: [],
+          scopeStreak: null,
+          recentScopes: [],
+          finalScoreCalculated: false,
+          finalScoreBreakdown: null,
+          finalScoreSubmitted: false,
+          budget: 1500,
+          supportPeople: 50,
+          supportMiddle: 50,
+          supportMom: 50,
+          momAlive: true,
+          score: 0,
+          difficulty: null,
+          selectedGoals: [],
+          customActionCount: 0,
+          minBudget: 1500,
+          minSupportPeople: 50,
+          minSupportMiddle: 50,
+          minSupportMom: 50,
+          crisisMode: null,
+          crisisEntity: null,
+          previousSupportValues: null,
+          pendingCompassPills: null,
+          narrativeMemory: null,
+          inquiryHistory: new Map(),
+          inquiryCreditsRemaining: 0,
+          reasoningSubmissionCount: 0,
+          decisionTimes: [],
+          reasoningTimes: [],
+          customActionTexts: [],
+          selfJudgment: null,
+          justFinishedGame: false,
+          lastGameScore: null,
         });
-      }
-    });
+      },
 
-    set({ selectedGoals: updatedGoals });
-    dlog("evaluateGoals ->", updatedGoals.map(g => `${g.id}: ${g.status}`));
+      // Resource and support setters
+      setBudget(n) {
+        const v = Math.round(Number(n) || 0);
+        dlog("setBudget ->", v);
+        set({ budget: v });
+      },
 
-    if (changes.length > 0) {
-      dlog("evaluateGoals -> status changes detected:", changes.map(c => `${c.goalId}: ${c.oldStatus} → ${c.newStatus}`));
-    }
+      setSupportPeople(n) {
+        const v = Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
+        dlog("setSupportPeople ->", v);
+        set({ supportPeople: v });
+      },
 
-    return changes;
-  },
+      setSupportMiddle(n) {
+        const v = Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
+        dlog("setSupportMiddle ->", v);
+        set({ supportMiddle: v });
+      },
 
-  incrementCustomActions() {
-    const { customActionCount } = get();
-    const newCount = customActionCount + 1;
-    set({ customActionCount: newCount });
-    dlog("incrementCustomActions ->", newCount);
-  },
+      setSupportMom(n) {
+        const { momAlive } = get();
+        if (!momAlive) {
+          dlog("setSupportMom -> BLOCKED: Mom is dead");
+          return;
+        }
+        const v = Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
+        dlog("setSupportMom ->", v);
+        set({ supportMom: v });
+      },
 
-  updateMinimumValues() {
-    const state = get();
-    const newMinBudget = Math.min(state.minBudget, state.budget);
-    const newMinPeople = Math.min(state.minSupportPeople, state.supportPeople);
-    const newMinMiddle = Math.min(state.minSupportMiddle, state.supportMiddle);
-    const newMinMom = Math.min(state.minSupportMom, state.supportMom);
+      setMomDead() {
+        const { momAlive } = get();
+        if (!momAlive) {
+          dlog("setMomDead -> Already dead");
+          return;
+        }
+        dlog("setMomDead -> Mom has died");
+        set({ momAlive: false, supportMom: 0 });
+      },
 
-    set({
-      minBudget: newMinBudget,
-      minSupportPeople: newMinPeople,
-      minSupportMiddle: newMinMiddle,
-      minSupportMom: newMinMom,
-    });
+      setScore(n) {
+        const v = Math.round(Number(n) || 0);
+        dlog("setScore ->", v);
+        set({ score: v });
+      },
 
-    dlog("updateMinimumValues ->", {
-      budget: newMinBudget,
-      people: newMinPeople,
-      middle: newMinMiddle,
-      mom: newMinMom,
-    });
-  },
+      setDifficulty(level) {
+        dlog("setDifficulty ->", level);
+        set({ difficulty: level });
 
-  // ========================================================================
-  // HOSTED STATE CONVERSATION METHODS
-  // ========================================================================
+        // Apply difficulty modifiers (support and budget only - score applied in FinalScoreScreen)
+        const modifiers = {
+          "baby-boss": { supportMod: 10, budgetMod: 250, scoreMod: -200 },
+          "freshman": { supportMod: 0, budgetMod: 0, scoreMod: 0 },
+          "tactician": { supportMod: -10, budgetMod: -250, scoreMod: 200 },
+          "old-fox": { supportMod: -20, budgetMod: -500, scoreMod: 500 },
+        };
 
-  initializeGame() {
-    // Generate unique gameId for this playthrough
-    // Format: timestamp + random string for uniqueness
-    const gameId = `game-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        const mod = modifiers[level];
 
-    dlog("initializeGame -> gameId:", gameId);
+        // Check if budget system is enabled
+        const { showBudget } = useSettingsStore.getState();
 
-    set({
-      gameId,
-      conversationActive: true
-    });
-  },
+        // Apply support modifiers (add percentage points, clamped to 0-100)
+        // Only apply budget modifier if budget system is enabled
+        set({
+          supportPeople: Math.max(0, Math.min(100, 50 + mod.supportMod)),
+          supportMiddle: Math.max(0, Math.min(100, 50 + mod.supportMod)),
+          supportMom: Math.max(0, Math.min(100, 50 + mod.supportMod)),
+          budget: showBudget ? 1500 + mod.budgetMod : 1500, // Default budget if disabled
+          score: mod.scoreMod,
+        });
+      },
 
-  endConversation() {
-    const { gameId } = get();
+      // Day progression methods
+      startDayProgression() {
+        const { day } = get();
+        dlog("startDayProgression ->", day + 1);
+        set({
+          dayProgression: {
+            isProgressing: true,
+            progressingToDay: day + 1,
+            analysisComplete: {
+              support: false,
+              compass: false,
+              dynamic: false,
+              mirror: false,
+              news: false,
+              contextualDilemma: false,
+            },
+          },
+        });
+      },
 
-    if (gameId) {
-      // Call backend to cleanup conversation
-      fetch("/api/game-turn/cleanup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gameId })
-      }).catch(err => {
-        console.warn("[dilemmaStore] Failed to cleanup conversation:", err);
-      });
+      setAnalysisComplete(analysis) {
+        const { dayProgression } = get();
+        dlog("setAnalysisComplete ->", analysis);
+        set({
+          dayProgression: {
+            ...dayProgression,
+            analysisComplete: {
+              ...dayProgression.analysisComplete,
+              [analysis]: true,
+            },
+          },
+        });
+      },
 
-      dlog("endConversation -> gameId:", gameId);
-    }
+      endDayProgression() {
+        const { dayProgression } = get();
+        dlog("endDayProgression -> day:", dayProgression.progressingToDay);
+        set({
+          day: dayProgression.progressingToDay,
+          lastChoice: null, // Reset for new day
+          dayProgression: {
+            isProgressing: false,
+            progressingToDay: dayProgression.progressingToDay,
+            analysisComplete: {
+              support: false,
+              compass: false,
+              dynamic: false,
+              mirror: false,
+              news: false,
+              contextualDilemma: false,
+            },
+          },
+        });
+      },
 
-    set({
-      gameId: null,
-      conversationActive: false
-    });
-  },
+      // Topic tracking methods (Rule #9)
+      addDilemmaTopic(topic) {
+        const { recentTopics, topicCounts } = get();
+        const newRecentTopics = [topic, ...recentTopics.slice(0, 2)]; // Keep last 3
+        const newTopicCounts = {
+          ...topicCounts,
+          [topic]: (topicCounts[topic] || 0) + 1,
+        };
+        dlog("addDilemmaTopic ->", topic, "recent:", newRecentTopics);
+        set({
+          recentTopics: newRecentTopics,
+          topicCounts: newTopicCounts,
+        });
+      },
 
-  setNarrativeMemory(memory) {
-    dlog("setNarrativeMemory ->", memory);
-    set({ narrativeMemory: memory });
-  },
+      // Subject streak tracking (Light API)
+      updateSubjectStreak(topic) {
+        const { subjectStreak } = get();
 
-  // ========================================================================
-  // INQUIRY SYSTEM METHODS
-  // ========================================================================
+        if (!subjectStreak || subjectStreak.subject !== topic) {
+          // New subject - reset streak
+          dlog("updateSubjectStreak -> new subject:", topic);
+          set({ subjectStreak: { subject: topic, count: 1 } });
+        } else {
+          // Same subject - increment count
+          const newCount = subjectStreak.count + 1;
+          dlog("updateSubjectStreak -> increment:", topic, "count:", newCount);
+          set({ subjectStreak: { subject: topic, count: newCount } });
+        }
+      },
 
-  resetInquiryCredits() {
-    // Get treatment config from settings store
-    const treatment = useSettingsStore.getState().treatment as TreatmentType;
-    const config = getTreatmentConfig(treatment);
+      // Recent dilemma titles tracking (Light API)
+      addDilemmaTitle(title) {
+        const { recentDilemmaTitles } = get();
+        const newTitles = [title, ...recentDilemmaTitles.slice(0, 4)]; // Keep last 5
+        dlog("addDilemmaTitle ->", title, "| recent:", newTitles.length);
+        set({ recentDilemmaTitles: newTitles });
+      },
 
-    dlog("resetInquiryCredits ->", config.inquiryTokensPerDilemma);
+      // Scope streak tracking (Light API)
+      updateScopeStreak(scope) {
+        const { scopeStreak, recentScopes } = get();
 
-    set({
-      inquiryCreditsRemaining: config.inquiryTokensPerDilemma
-    });
-  },
+        // Update streak
+        if (!scopeStreak || scopeStreak.scope !== scope) {
+          // New scope - reset streak
+          dlog("updateScopeStreak -> new scope:", scope);
+          set({ scopeStreak: { scope, count: 1 } });
+        } else {
+          // Same scope - increment count
+          const newCount = scopeStreak.count + 1;
+          dlog("updateScopeStreak -> increment:", scope, "count:", newCount);
+          set({ scopeStreak: { scope, count: newCount } });
+        }
 
-  addInquiry(question, answer) {
-    const { day, inquiryHistory, inquiryCreditsRemaining } = get();
+        // Update recent list (keep last 5)
+        const newRecent = [scope, ...recentScopes.slice(0, 4)];
+        set({ recentScopes: newRecent });
+      },
 
-    // Get or create array for current day
-    if (!inquiryHistory.has(day)) {
-      inquiryHistory.set(day, []);
-    }
+      // Final score persistence methods
+      saveFinalScore(breakdown) {
+        dlog("saveFinalScore -> saving breakdown with final score:", breakdown.final);
+        set({
+          finalScoreCalculated: true,
+          finalScoreBreakdown: breakdown,
+        });
+      },
 
-    // Add new inquiry
-    const dayInquiries = inquiryHistory.get(day)!;
-    dayInquiries.push({
-      question,
-      answer,
-      timestamp: Date.now()
-    });
+      clearFinalScore() {
+        dlog("clearFinalScore -> clearing saved score");
+        set({
+          finalScoreCalculated: false,
+          finalScoreBreakdown: null,
+          finalScoreSubmitted: false,
+        });
+      },
 
-    // Decrement credits
-    const newCredits = Math.max(0, inquiryCreditsRemaining - 1);
+      markScoreSubmitted() {
+        dlog("markScoreSubmitted -> marking score as submitted to highscores");
+        set({
+          finalScoreSubmitted: true,
+        });
+      },
 
-    dlog("addInquiry -> day", day, "remaining credits:", newCredits);
+      // Dilemma history methods
+      addHistoryEntry(entry) {
+        const { dilemmaHistory } = get();
+        const newHistory = [...dilemmaHistory, entry];
+        dlog("addHistoryEntry -> Day", entry.day, ":", entry.dilemmaTitle, "→", entry.choiceTitle);
+        set({ dilemmaHistory: newHistory });
+      },
 
-    set({
-      inquiryHistory: new Map(inquiryHistory), // Create new Map to trigger reactivity
-      inquiryCreditsRemaining: newCredits
-    });
-  },
+      clearHistory() {
+        dlog("clearHistory -> clearing all dilemma history");
+        set({ dilemmaHistory: [] });
+      },
 
-  getInquiriesForCurrentDay() {
-    const { day, inquiryHistory } = get();
-    return inquiryHistory.get(day) || [];
-  },
+      // Goals system methods
+      setGoals(goals) {
+        const selectedGoals: SelectedGoal[] = goals.map(g => ({
+          ...g,
+          status: 'unmet' as const,
+          lastEvaluatedDay: 0,
+        }));
+        set({ selectedGoals });
+        dlog("setGoals ->", goals.map(g => g.id));
+      },
 
-  canInquire() {
-    const { inquiryCreditsRemaining } = get();
-    const treatment = useSettingsStore.getState().treatment as TreatmentType;
-    const config = getTreatmentConfig(treatment);
+      evaluateGoals() {
+        const { selectedGoals } = get();
+        if (selectedGoals.length === 0) {
+          dlog("evaluateGoals -> no goals selected, skipping");
+          return [];
+        }
 
-    // Feature available if treatment allows it AND player has credits
-    return config.inquiryTokensPerDilemma > 0 && inquiryCreditsRemaining > 0;
-  },
+        const updatedGoals = evaluateAllGoals(selectedGoals);
 
-  // ========================================================================
-  // REASONING SYSTEM METHODS
-  // ========================================================================
+        // Detect status changes for audio/visual feedback
+        const changes: GoalStatusChange[] = [];
+        selectedGoals.forEach((oldGoal, idx) => {
+          const newGoal = updatedGoals[idx];
+          if (oldGoal.status !== newGoal.status) {
+            changes.push({
+              goalId: newGoal.id,
+              goalTitle: newGoal.title,
+              oldStatus: oldGoal.status,
+              newStatus: newGoal.status
+            });
+          }
+        });
 
-  addReasoningEntry(entry) {
-    const { reasoningHistory } = get();
+        set({ selectedGoals: updatedGoals });
+        dlog("evaluateGoals ->", updatedGoals.map(g => `${g.id}: ${g.status}`));
 
-    // Add timestamp to entry
-    const entryWithTimestamp = {
-      ...entry,
-      timestamp: Date.now()
-    };
+        if (changes.length > 0) {
+          dlog("evaluateGoals -> status changes detected:", changes.map(c => `${c.goalId}: ${c.oldStatus} → ${c.newStatus}`));
+        }
 
-    // Append to history
-    const newHistory = [...reasoningHistory, entryWithTimestamp];
+        return changes;
+      },
 
-    dlog("addReasoningEntry -> day", entry.day, "action:", entry.actionTitle, "length:", entry.reasoningText.length);
+      incrementCustomActions() {
+        const { customActionCount } = get();
+        const newCount = customActionCount + 1;
+        set({ customActionCount: newCount });
+        dlog("incrementCustomActions ->", newCount);
+      },
 
-    set({ reasoningHistory: newHistory });
-  },
+      updateMinimumValues() {
+        const state = get();
+        const newMinBudget = Math.min(state.minBudget, state.budget);
+        const newMinPeople = Math.min(state.minSupportPeople, state.supportPeople);
+        const newMinMiddle = Math.min(state.minSupportMiddle, state.supportMiddle);
+        const newMinMom = Math.min(state.minSupportMom, state.supportMom);
 
-  incrementReasoningCount() {
-    const { reasoningSubmissionCount } = get();
-    const newCount = reasoningSubmissionCount + 1;
-    dlog("incrementReasoningCount ->", newCount);
-    set({ reasoningSubmissionCount: newCount });
-  },
+        set({
+          minBudget: newMinBudget,
+          minSupportPeople: newMinPeople,
+          minSupportMiddle: newMinMiddle,
+          minSupportMom: newMinMom,
+        });
 
-  // ========================================================================
-  // DECISION TIMING METHODS
-  // ========================================================================
+        dlog("updateMinimumValues ->", {
+          budget: newMinBudget,
+          people: newMinPeople,
+          middle: newMinMiddle,
+          mom: newMinMom,
+        });
+      },
 
-  addDecisionTime(duration) {
-    const { decisionTimes } = get();
-    const newTimes = [...decisionTimes, duration];
-    dlog("addDecisionTime ->", duration, "ms | total decisions:", newTimes.length);
-    set({ decisionTimes: newTimes });
-  },
+      // ========================================================================
+      // HOSTED STATE CONVERSATION METHODS
+      // ========================================================================
 
-  // ========================================================================
-  // REASONING TIMING METHODS
-  // ========================================================================
+      initializeGame() {
+        // Generate unique gameId for this playthrough
+        // Format: timestamp + random string for uniqueness
+        const gameId = `game-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-  addReasoningTime(duration) {
-    const { reasoningTimes } = get();
-    const newTimes = [...reasoningTimes, duration];
-    dlog("addReasoningTime ->", duration, "ms | total reasonings:", newTimes.length);
-    set({ reasoningTimes: newTimes });
-  },
+        dlog("initializeGame -> gameId:", gameId);
 
-  // ========================================================================
-  // CUSTOM ACTION TEXT METHODS
-  // ========================================================================
+        set({
+          gameId,
+          conversationActive: true
+        });
+      },
 
-  addCustomActionText(text) {
-    const { customActionTexts } = get();
-    const newTexts = [...customActionTexts, text];
-    dlog("addCustomActionText ->", text.length, "chars | total custom actions:", newTexts.length);
-    set({ customActionTexts: newTexts });
-  },
+      endConversation() {
+        const { gameId } = get();
 
-  // ========================================================================
-  // SELF-JUDGMENT METHODS
-  // ========================================================================
+        if (gameId) {
+          // Call backend to cleanup conversation
+          fetch("/api/game-turn/cleanup", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ gameId })
+          }).catch(err => {
+            console.warn("[dilemmaStore] Failed to cleanup conversation:", err);
+          });
 
-  addSelfJudgment(judgment) {
-    dlog("addSelfJudgment ->", judgment);
-    set({ selfJudgment: judgment });
-  },
+          dlog("endConversation -> gameId:", gameId);
+        }
 
-  // ========================================================================
-  // RETURN-TO-DREAM TRACKING METHODS
-  // ========================================================================
+        set({
+          gameId: null,
+          conversationActive: false
+        });
+      },
 
-  setJustFinishedGame(finished, score = null) {
-    dlog("setJustFinishedGame ->", finished, "score:", score);
-    set({ justFinishedGame: finished, lastGameScore: score ?? null });
-  },
+      setNarrativeMemory(memory) {
+        dlog("setNarrativeMemory ->", memory);
+        set({ narrativeMemory: memory });
+      },
 
-  clearJustFinishedGame() {
-    dlog("clearJustFinishedGame -> clearing return state");
-    set({ justFinishedGame: false, lastGameScore: null });
-  },
+      // ========================================================================
+      // INQUIRY SYSTEM METHODS
+      // ========================================================================
 
-  // ========================================================================
-  // CRISIS DETECTION METHODS
-  // ========================================================================
+      resetInquiryCredits() {
+        // Get treatment config from settings store
+        const treatment = useSettingsStore.getState().treatment as TreatmentType;
+        const config = getTreatmentConfig(treatment);
 
-  savePreviousSupport() {
-    const { supportPeople, supportMiddle, supportMom } = get();
+        dlog("resetInquiryCredits ->", config.inquiryTokensPerDilemma);
 
-    dlog("savePreviousSupport ->", {
-      people: supportPeople,
-      middle: supportMiddle,
-      mom: supportMom
-    });
+        set({
+          inquiryCreditsRemaining: config.inquiryTokensPerDilemma
+        });
+      },
 
-    set({
-      previousSupportValues: {
-        people: supportPeople,
-        middle: supportMiddle,
-        mom: supportMom
-      }
-    });
-  },
+      addInquiry(question, answer) {
+        const { day, inquiryHistory, inquiryCreditsRemaining } = get();
 
-  detectAndSetCrisis() {
-    const { supportPeople, supportMiddle, supportMom } = get();
-    const CRISIS_THRESHOLD = 20;
+        // Get or create array for current day
+        if (!inquiryHistory.has(day)) {
+          inquiryHistory.set(day, []);
+        }
 
-    // Check if any track is below threshold
-    const peopleInCrisis = supportPeople < CRISIS_THRESHOLD;
-    const challengerInCrisis = supportMiddle < CRISIS_THRESHOLD;
-    const caringInCrisis = supportMom < CRISIS_THRESHOLD;
+        // Add new inquiry
+        const dayInquiries = inquiryHistory.get(day)!;
+        dayInquiries.push({
+          question,
+          answer,
+          timestamp: Date.now()
+        });
 
-    // Determine crisis mode (priority: downfall > people > challenger > caring)
-    let crisisMode: typeof get extends () => infer S ? S extends { crisisMode: infer C } ? C : never : never = null;
-    let crisisEntity: string | null = null;
+        // Decrement credits
+        const newCredits = Math.max(0, inquiryCreditsRemaining - 1);
 
-    if (peopleInCrisis && challengerInCrisis && caringInCrisis) {
-      crisisMode = "downfall";
-      crisisEntity = "ALL";
-      dlog(`detectAndSetCrisis -> DOWNFALL: All three tracks below ${CRISIS_THRESHOLD}%`);
-    } else if (peopleInCrisis) {
-      crisisMode = "people";
-      crisisEntity = "The People";
-      dlog(`detectAndSetCrisis -> PEOPLE CRISIS: ${supportPeople}%`);
-    } else if (challengerInCrisis) {
-      crisisMode = "challenger";
+        dlog("addInquiry -> day", day, "remaining credits:", newCredits);
 
-      // Get challenger name from roleStore if available
-      const roleState = useRoleStore.getState();
-      crisisEntity = roleState.analysis?.challengerSeat?.name || "Institutional Opposition";
-      dlog(`detectAndSetCrisis -> CHALLENGER CRISIS: ${supportMiddle}% (${crisisEntity})`);
-    } else if (caringInCrisis) {
-      crisisMode = "caring";
-      crisisEntity = "Personal Anchor";
-      dlog(`detectAndSetCrisis -> CARING CRISIS: ${supportMom}%`);
-    } else {
-      dlog("detectAndSetCrisis -> No crisis detected");
-    }
+        set({
+          inquiryHistory: new Map(inquiryHistory), // Create new Map to trigger reactivity
+          inquiryCreditsRemaining: newCredits
+        });
+      },
 
-    set({ crisisMode, crisisEntity });
+      getInquiriesForCurrentDay() {
+        const { day, inquiryHistory } = get();
+        return inquiryHistory.get(day) || [];
+      },
 
-    return crisisMode;
-  },
+      canInquire() {
+        const { inquiryCreditsRemaining } = get();
+        const treatment = useSettingsStore.getState().treatment as TreatmentType;
+        const config = getTreatmentConfig(treatment);
 
-  clearCrisis() {
-    dlog("clearCrisis -> Clearing crisis state");
-    set({
-      crisisMode: null,
-      crisisEntity: null,
-      previousSupportValues: null
-    });
-  },
+        // Feature available if treatment allows it AND player has credits
+        return config.inquiryTokensPerDilemma > 0 && inquiryCreditsRemaining > 0;
+      },
+
+      // ========================================================================
+      // REASONING SYSTEM METHODS
+      // ========================================================================
+
+      addReasoningEntry(entry) {
+        const { reasoningHistory } = get();
+
+        // Add timestamp to entry
+        const entryWithTimestamp = {
+          ...entry,
+          timestamp: Date.now()
+        };
+
+        // Append to history
+        const newHistory = [...reasoningHistory, entryWithTimestamp];
+
+        dlog("addReasoningEntry -> day", entry.day, "action:", entry.actionTitle, "length:", entry.reasoningText.length);
+
+        set({ reasoningHistory: newHistory });
+      },
+
+      incrementReasoningCount() {
+        const { reasoningSubmissionCount } = get();
+        const newCount = reasoningSubmissionCount + 1;
+        dlog("incrementReasoningCount ->", newCount);
+        set({ reasoningSubmissionCount: newCount });
+      },
+
+      // ========================================================================
+      // DECISION TIMING METHODS
+      // ========================================================================
+
+      addDecisionTime(duration) {
+        const { decisionTimes } = get();
+        const newTimes = [...decisionTimes, duration];
+        dlog("addDecisionTime ->", duration, "ms | total decisions:", newTimes.length);
+        set({ decisionTimes: newTimes });
+      },
+
+      // ========================================================================
+      // REASONING TIMING METHODS
+      // ========================================================================
+
+      addReasoningTime(duration) {
+        const { reasoningTimes } = get();
+        const newTimes = [...reasoningTimes, duration];
+        dlog("addReasoningTime ->", duration, "ms | total reasonings:", newTimes.length);
+        set({ reasoningTimes: newTimes });
+      },
+
+      // ========================================================================
+      // CUSTOM ACTION TEXT METHODS
+      // ========================================================================
+
+      addCustomActionText(text) {
+        const { customActionTexts } = get();
+        const newTexts = [...customActionTexts, text];
+        dlog("addCustomActionText ->", text.length, "chars | total custom actions:", newTexts.length);
+        set({ customActionTexts: newTexts });
+      },
+
+      // ========================================================================
+      // SELF-JUDGMENT METHODS
+      // ========================================================================
+
+      addSelfJudgment(judgment) {
+        dlog("addSelfJudgment ->", judgment);
+        set({ selfJudgment: judgment });
+      },
+
+      // ========================================================================
+      // RETURN-TO-DREAM TRACKING METHODS
+      // ========================================================================
+
+      setJustFinishedGame(finished, score = null) {
+        dlog("setJustFinishedGame ->", finished, "score:", score);
+        set({ justFinishedGame: finished, lastGameScore: score ?? null });
+      },
+
+      clearJustFinishedGame() {
+        dlog("clearJustFinishedGame -> clearing return state");
+        set({ justFinishedGame: false, lastGameScore: null });
+      },
+
+      // ========================================================================
+      // CRISIS DETECTION METHODS
+      // ========================================================================
+
+      savePreviousSupport() {
+        const { supportPeople, supportMiddle, supportMom } = get();
+
+        dlog("savePreviousSupport ->", {
+          people: supportPeople,
+          middle: supportMiddle,
+          mom: supportMom
+        });
+
+        set({
+          previousSupportValues: {
+            people: supportPeople,
+            middle: supportMiddle,
+            mom: supportMom
+          }
+        });
+      },
+
+      detectAndSetCrisis() {
+        const { supportPeople, supportMiddle, supportMom } = get();
+        const CRISIS_THRESHOLD = 20;
+
+        // Check if any track is below threshold
+        const peopleInCrisis = supportPeople < CRISIS_THRESHOLD;
+        const challengerInCrisis = supportMiddle < CRISIS_THRESHOLD;
+        const caringInCrisis = supportMom < CRISIS_THRESHOLD;
+
+        // Determine crisis mode (priority: downfall > people > challenger > caring)
+        let crisisMode: typeof get extends () => infer S ? S extends { crisisMode: infer C } ? C : never : never = null;
+        let crisisEntity: string | null = null;
+
+        if (peopleInCrisis && challengerInCrisis && caringInCrisis) {
+          crisisMode = "downfall";
+          crisisEntity = "ALL";
+          dlog(`detectAndSetCrisis -> DOWNFALL: All three tracks below ${CRISIS_THRESHOLD}%`);
+        } else if (peopleInCrisis) {
+          crisisMode = "people";
+          crisisEntity = "The People";
+          dlog(`detectAndSetCrisis -> PEOPLE CRISIS: ${supportPeople}%`);
+        } else if (challengerInCrisis) {
+          crisisMode = "challenger";
+
+          // Get challenger name from roleStore if available
+          const roleState = useRoleStore.getState();
+          crisisEntity = roleState.analysis?.challengerSeat?.name || "Institutional Opposition";
+          dlog(`detectAndSetCrisis -> CHALLENGER CRISIS: ${supportMiddle}% (${crisisEntity})`);
+        } else if (caringInCrisis) {
+          crisisMode = "caring";
+          crisisEntity = "Personal Anchor";
+          dlog(`detectAndSetCrisis -> CARING CRISIS: ${supportMom}%`);
+        } else {
+          dlog("detectAndSetCrisis -> No crisis detected");
+        }
+
+        set({ crisisMode, crisisEntity });
+
+        return crisisMode;
+      },
+
+      clearCrisis() {
+        dlog("clearCrisis -> Clearing crisis state");
+        set({
+          crisisMode: null,
+          crisisEntity: null,
+          previousSupportValues: null
+        });
+      },
     }),
     {
       name: "amaze-politics-game-state-v2", // Updated version to include gameId

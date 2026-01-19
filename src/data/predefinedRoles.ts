@@ -140,53 +140,13 @@ CORE TENSION TRIANGLE: FREE SPEECH vs STATE SECURITY vs FAMILY LOYALTY
 ═══════════════════════════════════════════════════════════════════════════════
 
 Probe these tensions throughout the game:
-- THE RHETOR CRISIS: A prominent thinker spreads "anti-democratic" rhetoric claiming equality is a myth and only the elite should rule
-- RADICALIZATION: Young aristocrats embrace these ideas while common citizens fear a coup
-- GENDER HIERARCHY: The Rhetor argues for excluding women and laborers from all public life
-- PRIVATE/PUBLIC CLASH: Your brother is the Rhetor's star pupil (finding purpose); your niece is harmed by his teachings (losing social standing)
+- DEMOCRATIC PARADOX: When does protecting democracy require undemocratic methods (censorship, exile)?
+- FAMILY vs STATE: How do personal relationships complicate political principles?
+- THE COST OF TOLERANCE: What is the price of tolerating intolerance (demagogues, anti-democrats)?
+- GENDER & POWER: The tension between public male power and private female influence.
 
-═══════════════════════════════════════════════════════════════════════════════
-MANDATORY THEMATIC ARCHETYPES — HARD ROTATION REQUIRED
-═══════════════════════════════════════════════════════════════════════════════
-
-You MUST cycle through these 7 archetypes. Do NOT repeat until at least 4 others used.
-
-1. THE PARADOX OF TOLERANCE (tensionCluster: LawJustice or InternalPower)
-   The Rhetor's students demand he speak at the Assembly. Silencing him proves his point about democratic hypocrisy.
-   → Allow the speech and risk coup-planning? Ban him and become the tyrant he describes? Debate him publicly?
-
-2. FAMILY DIVIDED (tensionCluster: FamilyPersonal)
-   Your brother announces his engagement to the Rhetor's daughter. Your household will be publicly tied to the anti-democratic movement.
-   → Forbid the marriage? Accept and lose political standing? Use the connection strategically?
-
-3. THE NIECE'S HUMILIATION (tensionCluster: SocialOrder or ReligionCulture)
-   The Rhetor's followers publicly mock your niece for "acting above her station." She begs you to act.
-   → Seek legal prosecution? Challenge them to a public debate? Arrange private revenge?
-
-4. THE STUDENT CONSPIRACY (tensionCluster: InternalPower or ExternalConflict)
-   Evidence emerges that the Rhetor's inner circle is planning to seize the Acropolis during a festival.
-   → Denounce them publicly (maybe falsely)? Infiltrate the group? Wait for concrete proof?
-
-5. THE BROTHER'S TRANSFORMATION (tensionCluster: FamilyPersonal or ReligionCulture)
-   Your brother delivers a speech declaring democracy "the rule of the unfit." He's found purpose but lost his way.
-   → Denounce your own brother? Try private intervention? Publicly distance your household?
-
-6. THE WOMEN'S PETITION (tensionCluster: SocialOrder or EconomyResources)
-   Women of your household and neighborhood secretly organize resistance to the Rhetor's teachings.
-   → Support them openly and face ridicule? Aid them covertly? Forbid their involvement?
-
-7. THE TRIAL (tensionCluster: LawJustice or DiplomacyTreaty)
-   The Assembly votes to try the Rhetor for corrupting youth. You're selected as a juror.
-   → Vote to condemn (protect democracy)? Vote to acquit (protect free speech)? Abstain (protect family)?
-
-═══════════════════════════════════════════════════════════════════════════════
-TONE & STYLE
-═══════════════════════════════════════════════════════════════════════════════
-
-- INTIMATE POLITICS: Every political act has family consequences
-- IDEOLOGICAL WARFARE: Ideas are as dangerous as swords
-- GENDERED TENSIONS: Social hierarchy is constantly contested
-- NO EASY ANSWERS: Protecting democracy may require undemocratic methods`
+Focus on the PERSONAL impact of these tensions on your family and social standing.
+`
     },
     characters: {
       male: {

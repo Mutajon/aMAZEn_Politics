@@ -91,12 +91,12 @@ function CompassBox({
 
             return (
               <button
-                key={idx}
+                key={`${_propKey}-${idx}`}
                 ref={isHighlighted && valueRef ? valueRef : undefined}
                 onClick={() => onValueClick && onValueClick(component, idx)}
                 className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity ${isHighlighted
-                    ? 'ring-2 ring-yellow-400 animate-pulse hover:ring-yellow-300 transition-all transform scale-105 z-[9100] relative'
-                    : ''
+                  ? 'ring-2 ring-yellow-400 animate-pulse hover:ring-yellow-300 transition-all transform scale-105 z-[9100] relative'
+                  : ''
                   }`}
                 style={{ backgroundColor: `${color}10` }}
               >
@@ -208,7 +208,7 @@ export default function PlayerCardModal({
 
   return (
     <AnimatePresence>
-      <div className={`fixed inset-0 flex items-center justify-center pointer-events-auto ${tutorialMode ? 'z-[9100]' : 'z-50'}`}>
+      <div key="modal-root" className={`fixed inset-0 flex items-center justify-center pointer-events-auto ${tutorialMode ? 'z-[9100]' : 'z-50'}`}>
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}

@@ -1153,6 +1153,7 @@ export default function EventScreen3({ push }: Props) {
         <AnimatePresence>
           {flights.length > 0 && (
             <CoinFlightOverlay
+              key="coin-overlay"
               flights={flights}
               onAllDone={clearFlights}
             />
