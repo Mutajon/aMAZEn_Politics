@@ -94,11 +94,10 @@ function CompassBox({
                 key={idx}
                 ref={isHighlighted && valueRef ? valueRef : undefined}
                 onClick={() => onValueClick && onValueClick(component, idx)}
-                className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity ${
-                  isHighlighted
-                    ? 'ring-2 ring-yellow-400 animate-pulse hover:ring-yellow-300 transition-all transform scale-105'
+                className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity ${isHighlighted
+                    ? 'ring-2 ring-yellow-400 animate-pulse hover:ring-yellow-300 transition-all transform scale-105 z-[9100] relative'
                     : ''
-                }`}
+                  }`}
                 style={{ backgroundColor: `${color}10` }}
               >
                 <span className="text-sm text-white/90 font-medium">
@@ -209,7 +208,7 @@ export default function PlayerCardModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">
+      <div className={`fixed inset-0 flex items-center justify-center pointer-events-auto ${tutorialMode ? 'z-[9100]' : 'z-50'}`}>
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -316,19 +315,19 @@ export default function PlayerCardModal({
                       title={dimensionName}
                       subtitle={dimensionSubtitle}
                       color={PALETTE[prop.key].base}
-                    topValues={topValues[prop.key]}
-                    tutorialMode={tutorialMode}
-                    highlightedIndex={
-                      tutorialMode && tutorialTarget?.propKey === prop.key
-                        ? tutorialTarget.index
-                        : -1
-                    }
-                    onValueClick={(value, idx) => handleValueClick(value, prop.key, idx)}
-                    valueRef={
-                      tutorialMode && tutorialTarget?.propKey === prop.key
-                        ? tutorialValueRef
-                        : undefined
-                    }
+                      topValues={topValues[prop.key]}
+                      tutorialMode={tutorialMode}
+                      highlightedIndex={
+                        tutorialMode && tutorialTarget?.propKey === prop.key
+                          ? tutorialTarget.index
+                          : -1
+                      }
+                      onValueClick={(value, idx) => handleValueClick(value, prop.key, idx)}
+                      valueRef={
+                        tutorialMode && tutorialTarget?.propKey === prop.key
+                          ? tutorialValueRef
+                          : undefined
+                      }
                     />
                   );
                 })}

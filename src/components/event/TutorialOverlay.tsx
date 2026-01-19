@@ -37,8 +37,8 @@ export function TutorialOverlay({ step, targetElement }: TutorialOverlayProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/60 z-80"
-          style={{ pointerEvents: 'auto' }}
+          className="fixed inset-0 bg-black/60"
+          style={{ pointerEvents: 'auto', zIndex: 9000 }}
         />
       )}
 
@@ -58,7 +58,7 @@ export function TutorialOverlay({ step, targetElement }: TutorialOverlayProps) {
         exit={{ opacity: 0, y: 20 }}
         transition={{ duration: 0.3 }}
         className="fixed left-1/2 -translate-x-1/2 bottom-24 bg-gray-900/95 text-white rounded-xl p-4 ring-2 ring-amber-400/60 shadow-2xl max-w-[300px]"
-        style={{ zIndex: 95, pointerEvents: 'auto' }}
+        style={{ zIndex: 9050, pointerEvents: 'auto' }}
       >
         <p className="text-sm text-center leading-relaxed">{message}</p>
         <p className="text-xs text-center text-gray-500 mt-2 font-medium uppercase tracking-wider">
@@ -91,7 +91,7 @@ function TutorialBackdrop({ targetElement }: { targetElement: HTMLElement }) {
   if (!rect) return null;
 
   const backdropClass = "fixed bg-black/60 transition-all duration-300";
-  const z = 80;
+  const z = 9000; // Very high z-index, but elements with z-[9100] can be above
 
   return (
     <motion.div
@@ -178,7 +178,7 @@ function HighlightRing({ targetElement }: { targetElement: HTMLElement }) {
         top: rect.top - padding,
         width: rect.width + padding * 2,
         height: rect.height + padding * 2,
-        zIndex: 85,
+        zIndex: 9010, // Just above backdrop, but below highlighted elements (9100)
         pointerEvents: 'none', // Allow clicks through to the target element
       }}
     >

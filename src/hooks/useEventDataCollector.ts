@@ -508,10 +508,10 @@ async function fetchGameTurn(language: string = 'en'): Promise<{
   // Add id field from index (AI returns {icon, text}, we add id for React keys)
   const dynamicParams: DynamicParam[] = Array.isArray(data.dynamicParams)
     ? data.dynamicParams.map((param, index) => ({
-        id: `param-${day}-${index}`,
-        icon: param.icon || '📰',
-        text: param.text || 'Unknown consequence'
-      }))
+      id: `param-${day}-${index}`,
+      icon: param.icon || '📰',
+      text: param.text || 'Unknown consequence'
+    }))
     : [];
 
   // Extract mirror advice
@@ -787,6 +787,21 @@ async function fetchMirrorText(dilemma: Dilemma): Promise<string> {
 */
 
 // ============================================================================
+// RETRY CONFIGURATION
+// ============================================================================
+
+// Retry settings for game turn API calls
+const MAX_RETRY_ATTEMPTS = 8;  // As advertised in error messages
+const RETRY_DELAYS_MS = [1000, 2000, 4000, 6000, 8000, 10000, 12000, 15000]; // Exponential-ish backoff
+
+/**
+ * Helper to wait for a specified duration
+ */
+function wait(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ============================================================================
 // MAIN HOOK
 // ============================================================================
 
@@ -837,90 +852,115 @@ export function useEventDataCollector() {
 
     const { day } = useDilemmaStore.getState();
 
-    try {
-      // ========================================================================
-      // UNIFIED API CALL - Get ALL data in one request using hosted state
-      // ========================================================================
-      console.log(`[Collector] Day ${day}: Fetching unified game turn data... (language: ${language})`);
+    // ========================================================================
+    // RETRY LOOP - Try up to MAX_RETRY_ATTEMPTS times with exponential backoff
+    // ========================================================================
+    let lastError: Error | null = null;
 
-      const turnData = await fetchGameTurn(language);
+    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+      try {
+        // ========================================================================
+        // UNIFIED API CALL - Get ALL data in one request using hosted state
+        // ========================================================================
+        console.log(`[Collector] Day ${day}: Fetching unified game turn data (attempt ${attempt}/${MAX_RETRY_ATTEMPTS}, language: ${language})...`);
 
-      // Extract all data from unified response
-      const {
-        dilemma,
-        supportEffects,
-        dynamicParams,
-        mirrorText,
-      } = turnData;
+        const turnData = await fetchGameTurn(language);
 
-      console.log(`[Collector] ✅ Unified data received for Day ${day}`);
+        // Extract all data from unified response
+        const {
+          dilemma,
+          supportEffects,
+          dynamicParams,
+          mirrorText,
+        } = turnData;
 
-      // ========================================================================
-      // LOG AI OUTPUTS ONCE AT SOURCE (prevents duplication from reactive effects)
-      // ========================================================================
-      const { crisisMode: storedCrisisMode } = useDilemmaStore.getState();
+        console.log(`[Collector] ✅ Unified data received for Day ${day} (attempt ${attempt})`);
 
-      // Log dilemma generation (with deduplication to prevent hot reload duplicates)
-      const dilemmaKey = `${day}-${dilemma.title}`;
-      if (!loggedDilemmasRef.current.has(dilemmaKey)) {
-        loggedDilemmasRef.current.add(dilemmaKey);
-        aiLogger.logDilemma(dilemma, {
-          crisisMode: storedCrisisMode
-        });
+        // ========================================================================
+        // LOG AI OUTPUTS ONCE AT SOURCE (prevents duplication from reactive effects)
+        // ========================================================================
+        const { crisisMode: storedCrisisMode } = useDilemmaStore.getState();
+
+        // Log dilemma generation (with deduplication to prevent hot reload duplicates)
+        const dilemmaKey = `${day}-${dilemma.title}`;
+        if (!loggedDilemmasRef.current.has(dilemmaKey)) {
+          loggedDilemmasRef.current.add(dilemmaKey);
+          aiLogger.logDilemma(dilemma, {
+            crisisMode: storedCrisisMode
+          });
+        }
+
+        console.log(`[Collector] ✅ AI outputs logged for Day ${day}`);
+
+        // Build Phase 1 data (critical path)
+        const p1: Phase1Data = {
+          dilemma,
+          supportEffects,
+          newsItems: [], // Disabled
+        };
+
+        // Set Phase 1 data immediately - triggers UI render!
+        setPhase1Data(p1);
+
+        // Update global dilemma store for narration
+        useDilemmaStore.setState({ current: dilemma });
+
+        // Reset inquiry credits for new dilemma (treatment-based feature)
+        useDilemmaStore.getState().resetInquiryCredits();
+
+        // Mark collecting as done - UI can render!
+        setIsCollecting(false);
+
+        // Notify listeners that data is ready (for loading progress animation)
+        if (onReadyCallbackRef.current) {
+          onReadyCallbackRef.current();
+        }
+
+        // Set Phase 2 data (dynamic params only)
+        // NOTE: Compass pills are NO LONGER fetched here!
+        // They're now fetched and applied in eventDataCleaner.ts (Step 3.5)
+        // IMMEDIATELY after action confirmation, BEFORE day advancement.
+        // This fixes the one-day delay where compass values weren't updated until the next day.
+        setPhase2Data({ compassPills: null, dynamicParams });
+
+        // Set Phase 3 data (mirror advice)
+        setPhase3Data({ mirrorText });
+
+        console.log(`[Collector] ✅ All 3 phases populated from unified response`);
+
+        // SUCCESS! Exit the retry loop
+        return;
+
+      } catch (error: any) {
+        lastError = error;
+        console.error(`[Collector] ❌ Attempt ${attempt}/${MAX_RETRY_ATTEMPTS} failed:`, error.message);
+
+        // Check if we have more attempts remaining
+        if (attempt < MAX_RETRY_ATTEMPTS) {
+          // Calculate delay with exponential backoff
+          const delay = RETRY_DELAYS_MS[attempt - 1] || RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1];
+          console.log(`[Collector] 🔄 Retrying in ${delay / 1000}s...`);
+          await wait(delay);
+          // Continue to next iteration
+        }
       }
-
-      console.log(`[Collector] ✅ AI outputs logged for Day ${day}`);
-
-      // Build Phase 1 data (critical path)
-      const p1: Phase1Data = {
-        dilemma,
-        supportEffects,
-        newsItems: [], // Disabled
-      };
-
-      // Set Phase 1 data immediately - triggers UI render!
-      setPhase1Data(p1);
-
-      // Update global dilemma store for narration
-      useDilemmaStore.setState({ current: dilemma });
-
-      // Reset inquiry credits for new dilemma (treatment-based feature)
-      useDilemmaStore.getState().resetInquiryCredits();
-
-      // Mark collecting as done - UI can render!
-      setIsCollecting(false);
-
-      // Notify listeners that data is ready (for loading progress animation)
-      if (onReadyCallbackRef.current) {
-        onReadyCallbackRef.current();
-      }
-
-      // Set Phase 2 data (dynamic params only)
-      // NOTE: Compass pills are NO LONGER fetched here!
-      // They're now fetched and applied in eventDataCleaner.ts (Step 3.5)
-      // IMMEDIATELY after action confirmation, BEFORE day advancement.
-      // This fixes the one-day delay where compass values weren't updated until the next day.
-      setPhase2Data({ compassPills: null, dynamicParams });
-
-      // Set Phase 3 data (mirror advice)
-      setPhase3Data({ mirrorText });
-
-      console.log(`[Collector] ✅ All 3 phases populated from unified response`)
-
-    } catch (error: any) {
-      console.error('[Collector] ❌ Collection failed:', error);
-      setCollectionError(`Collection failed: ${error.message}`);
-      setIsCollecting(false);
     }
-  }, []);
+
+    // ========================================================================
+    // ALL ATTEMPTS FAILED - Show error to user
+    // ========================================================================
+    console.error(`[Collector] ❌ All ${MAX_RETRY_ATTEMPTS} attempts failed. Last error:`, lastError?.message);
+    setCollectionError(`Collection failed after ${MAX_RETRY_ATTEMPTS} attempts: ${lastError?.message || 'Unknown error'}`);
+    setIsCollecting(false);
+  }, [language, aiLogger]);
 
   // Phase 1 ready check - only needs dilemma to show content!
   const phase1Ready = useCallback(() => {
     return !!phase1Data &&
-           !!phase1Data.dilemma &&
-           !!phase1Data.dilemma.title &&
-           !!phase1Data.dilemma.description &&
-           phase1Data.dilemma.actions?.length === 3;
+      !!phase1Data.dilemma &&
+      !!phase1Data.dilemma.title &&
+      !!phase1Data.dilemma.description &&
+      phase1Data.dilemma.actions?.length === 3;
   }, [phase1Data]);
 
   // Legacy check for backward compatibility (waits for all phases)

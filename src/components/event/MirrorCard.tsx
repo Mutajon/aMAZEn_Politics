@@ -65,8 +65,8 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
   // Responsive mirror offset (ensure enough padding to clear the protruding mirror)
   const mirrorOffset = isMobile ? 56 : 60; // Increased mobile padding to match half of mirror width
 
-  // Responsive mirror position (always half-on/half-off for consistent look)
-  const MIRROR_EDGE_POS = "-55px"; // Half of 110px width
+  // Responsive mirror position (more than half off-screen to reduce text overlap)
+  const MIRROR_EDGE_POS = "-75px"; // ~68% off-screen (75px of 110px)
 
   // Use word-level splitting to prevent mid-word line breaks while maintaining shimmer effect
   const segments = useMemo(() => splitWords(text), [text]);

@@ -101,7 +101,7 @@ export default function CompassPillsOverlay({
 
   return (
     <div
-      className={`pointer-events-none absolute inset-0 flex items-center justify-center ${tutorialMode ? 'z-[90]' : 'z-30'}`}
+      className={`pointer-events-none absolute inset-0 flex items-center justify-center ${tutorialMode ? 'z-[9100]' : 'z-30'}`}
     >
       {loading && (
         <div className="flex items-center justify-center" style={{ color }}>
@@ -227,7 +227,7 @@ export default function CompassPillsOverlay({
                 text-white text-sm font-bold
                 focus:outline-none
                 border border-white/30
-                ${tutorialMode ? 'ring-2 ring-yellow-400 animate-pulse z-50' : ''}
+                ${tutorialMode ? 'ring-2 ring-yellow-400 animate-pulse z-[9100]' : ''}
               `}
               aria-label="Show effects"
               title="Show effects"
