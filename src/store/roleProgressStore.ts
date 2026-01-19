@@ -7,6 +7,13 @@ import {
   PREDEFINED_ROLES_ARRAY,
   type RoleGoalStatus,
 } from "../data/predefinedRoles";
+import { useFragmentsStore } from "./fragmentsStore";
+
+// ============================================================================
+// EXPERIMENT ROUND VERSION
+// Increment this when starting a new experiment round to reset all player progress.
+// ============================================================================
+const CURRENT_EXPERIMENT_ROUND = 2;
 
 type RoleGoal = {
   goal: number;
@@ -16,6 +23,7 @@ type RoleGoal = {
 
 type RoleProgressState = {
   goals: Record<string, RoleGoal>;
+  experimentRound: number; // Tracks which experiment round the player is on
   setRoleGoalStatus: (roleKey: string, status: RoleGoalStatus) => void;
   setRoleBestScore: (roleKey: string, score: number) => void;
   resetRoleGoals: () => void;
@@ -26,7 +34,7 @@ const defaultGoals = (): Record<string, RoleGoal> =>
     acc[role.legacyKey] = {
       goal: role.scoreGoal,
       status: role.defaultGoalStatus,
-      bestScore: role.defaultHighScore,
+      bestScore: (role as { defaultHighScore?: number }).defaultHighScore ?? 0,
     };
     return acc;
   }, {});
@@ -55,6 +63,7 @@ export const useRoleProgressStore = create<RoleProgressState>()(
   persist(
     (set) => ({
       goals: mergeWithDefaults(undefined),
+      experimentRound: CURRENT_EXPERIMENT_ROUND,
       setRoleGoalStatus: (roleKey, status) =>
         set((state) => {
           const current = mergeWithDefaults(state.goals);
@@ -86,6 +95,7 @@ export const useRoleProgressStore = create<RoleProgressState>()(
       name: "role-progress-v2",
       partialize: (state) => ({
         goals: state.goals,
+        experimentRound: state.experimentRound,
       }),
       version: 2,
       migrate: (persistedState, version) => {
@@ -96,10 +106,28 @@ export const useRoleProgressStore = create<RoleProgressState>()(
         };
       },
       // Merge defaults after hydration to ensure new roles are always added
-      // (migrate only runs on version mismatch, not when adding new roles)
+      // Also check for experiment round change and reset if needed
       onRehydrateStorage: () => (state) => {
         if (state) {
-          state.goals = mergeWithDefaults(state.goals, false);
+          // Check for experiment round change
+          const storedRound = state.experimentRound || 1;
+          if (storedRound < CURRENT_EXPERIMENT_ROUND) {
+            console.log(`[RoleProgress] 🔄 Experiment round changed (${storedRound} → ${CURRENT_EXPERIMENT_ROUND}). Resetting progress...`);
+
+            // Reset role goals
+            state.goals = mergeWithDefaults(undefined);
+            state.experimentRound = CURRENT_EXPERIMENT_ROUND;
+
+            // Also reset fragments store (clears shards)
+            const fragmentsStore = useFragmentsStore.getState();
+            fragmentsStore.clearFragments();
+            fragmentsStore.resetIntro();
+
+            console.log(`[RoleProgress] ✅ Progress reset complete for Round ${CURRENT_EXPERIMENT_ROUND}`);
+          } else {
+            // Normal hydration - just merge defaults
+            state.goals = mergeWithDefaults(state.goals, false);
+          }
         }
       },
     }
