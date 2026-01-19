@@ -21,7 +21,7 @@ const DIMENSION_COLORS = {
 
 export function ValueExplanationModal({ value, onClose }: ValueExplanationModalProps) {
   const lang = useLang();
-  
+
   if (!value) return null;
 
   const dimensionLabels = {
@@ -33,7 +33,7 @@ export function ValueExplanationModal({ value, onClose }: ValueExplanationModalP
 
   return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 flex items-center justify-center pointer-events-auto" style={{ zIndex: 70 }}>
+      <div className="fixed inset-0 flex items-center justify-center pointer-events-auto" style={{ zIndex: 9200 }}>
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}

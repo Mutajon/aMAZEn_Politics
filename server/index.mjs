@@ -1202,7 +1202,7 @@ app.post("/api/compass-conversation/analyze", async (req, res) => {
       return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
     }
 
-    const { gameId, action, reasoning, gameContext, trapContext, debugMode = false } = req.body || {};
+    const { gameId, action, reasoning, gameContext, trapContext, debugMode = false, language = 'en' } = req.body || {};
     const actionTitle = typeof action?.title === "string" ? action.title.trim().slice(0, 160) : "";
     const actionSummary = typeof action?.summary === "string" ? action.summary.trim().slice(0, 400) : "";
 
@@ -1245,6 +1245,13 @@ app.post("/api/compass-conversation/analyze", async (req, res) => {
       }
     }
 
+    // Get language name for instruction
+    const languageCode = String(language || "en").toLowerCase();
+    const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
+    const languageInstruction = languageCode !== 'en'
+      ? `\n\nIMPORTANT: Write your mirror reflection message in ${languageName}. Use natural, witty phrasing appropriate for a native speaker.`
+      : '';
+
     // Get conversation
     const conversation = getConversation(`compass-${gameId}`);
     if (!conversation || !conversation.meta.messages) {
@@ -1259,7 +1266,6 @@ ${trapDilemmaTitle ? `The trap setup: "${trapDilemmaTitle}"${trapDilemmaDescript
     MANDATORY: Your analysis MUST include a compass hint for the trapped value(${valueTargeted}).
 - If the action SUPPORTS the trapped value → positive polarity(+1 or + 2)
       - If the action CONTRADICTS / BETRAYS the trapped value → negative polarity(-1 or - 2)
-
 ` : '';
 
       // Fallback: Create one-off analysis without stored state
@@ -1285,6 +1291,7 @@ Analyze the player's reasoning text for political compass values. What values do
     - Address player as "traveler" or "wanderer"
       - First - person("I observe...", "I sense...")
       - Comment on their reasoning reflecting their values
+${languageInstruction}
 
     Return: { "compassHints": [...], "mirrorMessage": "..." } `;
       } else {
@@ -1358,6 +1365,7 @@ Analyze the player's reasoning text for political compass values. What values do
           - Never preach - just highlight the contradiction or irony
             - Do NOT use exact compass value names.Paraphrase: "your sense of truth", "your love of freedom"
               - Dry / mocking tone
+${languageInstruction}
 
     BAD: "I observe how your reasoning reflects your values, traveler."(too wordy, wrong voice)
     GOOD: "Your sense of fairness is charming when it justifies self-interest."
