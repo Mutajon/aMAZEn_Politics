@@ -165,7 +165,7 @@ export async function gameTurnV2(req, res) {
                 : buildGameMasterSystemPromptUnified(enrichedContext, languageCode, languageName);
 
             // Build minimal Day 1 user prompt
-            const userPrompt = buildGameMasterUserPrompt(day, null, null, 'dilemma', languageCode, languageName);
+            const userPrompt = buildGameMasterUserPrompt(day, null, null, 'dilemma', languageCode, languageName, dilemmaEmphasis);
 
             // Debug logging (Day 1 request payload)
             if (debugMode) {

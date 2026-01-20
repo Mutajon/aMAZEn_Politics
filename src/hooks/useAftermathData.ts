@@ -18,9 +18,18 @@ import { calculateOverallRatings } from "../lib/aftermath";
 import { useLanguage } from "../i18n/LanguageContext";
 import { getPrefetchedAftermathData, clearAftermathPrefetch } from "./useAftermathPrefetch";
 
-// Retry configuration
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 1500;
+// Retry configuration - ENHANCED for critical data reliability
+const MAX_RETRIES = 5; // Up from 3 - aftermath is critical
+const INITIAL_RETRY_DELAY_MS = 2000; // Start at 2s
+
+/**
+ * Calculate exponential backoff delay
+ * Returns: 2s, 4s, 8s, 16s for attempts 2-5
+ */
+function getRetryDelay(attempt: number): number {
+  // Exponential backoff: 2s, 4s, 8s, 16s
+  return INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt - 2);
+}
 
 /**
  * Extract top 2 compass values per dimension
@@ -173,9 +182,10 @@ export function useAftermathData() {
 
         // Check if this is fallback data - retry if not the last attempt
         if (apiResult.isFallback && attempt < MAX_RETRIES) {
-          console.log(`[useAftermathData] Attempt ${attempt}/${MAX_RETRIES}: Received fallback, retrying...`);
+          const delay = getRetryDelay(attempt);
+          console.log(`[useAftermathData] Attempt ${attempt}/${MAX_RETRIES}: Received fallback, retrying in ${delay}ms...`);
           lastError = "Received fallback response";
-          await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+          await new Promise(r => setTimeout(r, delay)); // Use exponential backoff
           continue;
         }
 
@@ -201,7 +211,9 @@ export function useAftermathData() {
         console.error(`[useAftermathData] Attempt ${attempt}/${MAX_RETRIES} failed:`, lastError);
 
         if (attempt < MAX_RETRIES) {
-          await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+          const delay = getRetryDelay(attempt);
+          console.log(`[useAftermathData] Retrying in ${delay}ms...`);
+          await new Promise(r => setTimeout(r, delay)); // Use exponential backoff
         }
       }
     }

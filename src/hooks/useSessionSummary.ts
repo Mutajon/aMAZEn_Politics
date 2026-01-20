@@ -301,9 +301,13 @@ import { PendingSummaryManager } from "../lib/pendingSummaryManager";
 /**
  * Send session summary to backend with robust backup
  * @param summary - Session summary data
+ * @param gameId - Optional gameId for unique tracking (falls back to sessionId if not provided)
  * @returns Promise that resolves when summary is sent (doesn't throw on error)
  */
-export async function sendSessionSummary(summary: SessionSummary): Promise<void> {
+export async function sendSessionSummary(summary: SessionSummary, gameId?: string): Promise<void> {
+  // Use gameId for tracking if provided, otherwise fall back to sessionId
+  const trackingId = gameId || summary.sessionId;
+
   // 1. BACKUP: Save to pending queue immediately before attempting send
   PendingSummaryManager.add(summary);
 
@@ -339,8 +343,9 @@ export async function sendSessionSummary(summary: SessionSummary): Promise<void>
     console.log('[useSessionSummary] ✅ Session summary sent successfully');
 
     // 2. CLEANUP: Remove from pending queue and mark as sent
+    // FIX: Use trackingId (gameId preferred) for marking to prevent blocking future games
     PendingSummaryManager.remove(summary.sessionId);
-    PendingSummaryManager.markAsSent(summary.sessionId);
+    PendingSummaryManager.markAsSent(trackingId);
 
   } catch (error) {
     console.error('[useSessionSummary] ❌ Error sending summary:', error);

@@ -77,6 +77,9 @@ export default function AftermathScreen({ push }: Props) {
   const addFragment = useFragmentsStore((s) => s.addFragment);
   const fragmentCount = useFragmentsStore((s) => s.getFragmentCount());
 
+  // Get gameId for unique tracking per game
+  const gameId = useDilemmaStore((s) => s.gameId);
+
   // Retry progress state (for showing "Attempt 2/3" in loading overlay)
   const [retryAttempt, setRetryAttempt] = useState<{ current: number; max: number } | null>(null);
 
@@ -146,15 +149,59 @@ export default function AftermathScreen({ push }: Props) {
     }
   }, [data, notifyReady, initializedFromSnapshot]);
 
+  // ========================================================================
+  // EFFECT: IMMEDIATE ROLE COMPLETION ON MOUNT (Layer 4)
+  // ========================================================================
   useEffect(() => {
-    if (!data) return;
+    // If we reached the aftermath, the game is physically over.
+    // We shouldn't strictly wait for data generation to mark completion.
+    // This runs once on mount as a safety net.
     if (!experimentActiveRoleKey) return;
     if (!EXPERIMENT_ROLE_KEY_SET.has(experimentActiveRoleKey)) return;
     if (experimentCompletedRoles?.[experimentActiveRoleKey]) return;
 
+    logger.logSystem('role_completed_immediate', { role: experimentActiveRoleKey }, 'Marking role done on Aftermath mount');
+    console.log('[AftermathScreen] ✅ Marking role complete on mount (Immediate):', experimentActiveRoleKey);
+    markExperimentRoleCompleted(experimentActiveRoleKey);
+  }, []); // Run once on mount
+
+  // ========================================================================
+  // EFFECT: MARK ROLE AS COMPLETED (Backup / Data-dependent)
+  // ========================================================================
+  useEffect(() => {
+    // DEBUG: Log all conditions to trace why completion might fail
+    console.log('[AftermathScreen] Role completion check (Effect):', {
+      hasData: !!data,
+      hasError: !!error,
+      experimentActiveRoleKey,
+      isInExperimentSet: experimentActiveRoleKey ? EXPERIMENT_ROLE_KEY_SET.has(experimentActiveRoleKey) : false,
+      alreadyCompleted: experimentActiveRoleKey ? !!experimentCompletedRoles?.[experimentActiveRoleKey] : false,
+    });
+
+    // Only run once data is loaded OR error is set (meaning we've finished trying)
+    if (!data && !error) {
+      // console.log('[AftermathScreen] ⏳ Waiting for data or error...');
+      return;
+    }
+    if (!experimentActiveRoleKey) {
+      console.log('[AftermathScreen] ⚠️ No active role key set!');
+      return;
+    }
+    if (!EXPERIMENT_ROLE_KEY_SET.has(experimentActiveRoleKey)) {
+      console.log('[AftermathScreen] ⚠️ Role key not in experiment set:', experimentActiveRoleKey);
+      return;
+    }
+    if (experimentCompletedRoles?.[experimentActiveRoleKey]) {
+      console.log('[AftermathScreen] ⏭️ Role already completed');
+      return;
+    }
+
+    console.log('[AftermathScreen] 🎯 Marking role as completed (Data/Error Trigger):', experimentActiveRoleKey);
+    logger.logSystem('role_completed_data_trigger', { role: experimentActiveRoleKey }, 'Marking role done on data load/error');
     markExperimentRoleCompleted(experimentActiveRoleKey);
   }, [
     data,
+    error,
     experimentActiveRoleKey,
     experimentCompletedRoles,
     markExperimentRoleCompleted
@@ -166,14 +213,21 @@ export default function AftermathScreen({ push }: Props) {
   // Guard ref to prevent duplicate logging within the same mount
   const hasAttemptedLogRef = useRef(false);
 
+  // FIX: Reset refs when gameId changes (new game started)
+  useEffect(() => {
+    hasAttemptedLogRef.current = false;
+    hasAttemptedErrorLogRef.current = false;
+    console.log('[AftermathScreen] 🔄 Reset logging refs for new game:', gameId);
+  }, [gameId]);
+
   useEffect(() => {
     // Only log if data loaded and session ID exists
-    if (!data || !sessionId) return;
+    if (!data || !sessionId || !gameId) return;
 
-    // CRITICAL FIX: Check persistent flag to prevent duplicates across reloads
-    // But allow logging if it wasn't successfully sent yet
-    if (PendingSummaryManager.isSent(sessionId)) {
-      console.log('[AftermathScreen] ⏭️ Summary already sent for this session, skipping');
+    // FIX: Use gameId instead of sessionId for tracking
+    // This ensures each game's summary is tracked independently
+    if (PendingSummaryManager.isSent(gameId)) {
+      console.log('[AftermathScreen] ⏭️ Summary already sent for this game, skipping');
       return;
     }
 
@@ -227,11 +281,14 @@ export default function AftermathScreen({ push }: Props) {
     });
 
     // Collect and send session summary to MongoDB summary collection
+    // Extract gameId early for tracking
+    const currentGameId = useDilemmaStore.getState().gameId || `game-${Date.now()}`;
+
     (async () => {
       try {
         const { collectSessionSummary, sendSessionSummary } = await import('../hooks/useSessionSummary');
         const summary = collectSessionSummary(data, false, sessionDuration); // Pass session duration
-        await sendSessionSummary(summary);
+        await sendSessionSummary(summary, currentGameId); // FIX: Pass gameId for tracking
         console.log('[AftermathScreen] ✅ Session summary sent to MongoDB');
       } catch (error) {
         console.error('[AftermathScreen] ❌ Failed to send session summary:', error);
@@ -239,8 +296,7 @@ export default function AftermathScreen({ push }: Props) {
       }
     })();
 
-    // Extract gameId early - needed even if past game save fails
-    const currentGameId = useDilemmaStore.getState().gameId || `game-${Date.now()}`;
+    // Use currentGameId from above for past game save (already defined at line 285)
 
     // TRY BLOCK 1: Save past game to localStorage (non-critical, allowed to fail)
     try {
@@ -371,6 +427,120 @@ export default function AftermathScreen({ push }: Props) {
       }
     }
   }, [data, sessionId, inquiryHistory, customActionCount, selectedRole, day, score, addPastGame, addFragment, logger, sessionLogger]);
+
+  // ========================================================================
+  // EFFECT: LOG INCOMPLETE SUMMARY (on total failure)
+  // ========================================================================
+  const hasAttemptedErrorLogRef = useRef(false);
+
+  useEffect(() => {
+    if (!error || !sessionId || !gameId) return;
+
+    // FIX: Use gameId for tracking (consistent with success path)
+    if (PendingSummaryManager.isSent(gameId)) {
+      console.log('[AftermathScreen] ⏭️ Incomplete summary already sent, skipping');
+      return;
+    }
+
+    // Prevent re-fires within same mount
+    if (hasAttemptedErrorLogRef.current) return;
+    hasAttemptedErrorLogRef.current = true;
+
+    console.log('[AftermathScreen] ⚠️ Aftermath generation failed - sending incomplete summary');
+
+    // Calculate totals
+    let totalInquiries = 0;
+    inquiryHistory.forEach((dayInquiries) => {
+      totalInquiries += dayInquiries.length;
+    });
+
+    const sessionDuration = sessionLogger.getSessionDuration();
+
+    // Log system event
+    logger.logSystem(
+      'session_aftermath_failed',
+      {
+        totalInquiries,
+        totalCustomActions: customActionCount,
+        totalDays: day,
+        role: selectedRole,
+        finalScore: score,
+        sessionDuration,
+        errorMessage: error
+      },
+      `Session reached aftermath but generation failed: ${error}`
+    );
+
+    // End session with incomplete flag
+    sessionLogger.end({
+      totalInquiries,
+      totalCustomActions: customActionCount,
+      totalDays: day,
+      role: selectedRole,
+      finalScore: score,
+      hasIdeologyRatings: false,
+      completedSuccessfully: false, // Mark as incomplete
+      failureReason: error
+    });
+
+    // Send incomplete summary to MongoDB
+    (async () => {
+      try {
+        const { collectSessionSummary, sendSessionSummary } = await import('../hooks/useSessionSummary');
+        // Pass null for data to create incomplete summary
+        const summary = collectSessionSummary(null, true, sessionDuration); // isIncomplete=true
+        await sendSessionSummary(summary);
+        console.log('[AftermathScreen] ✅ Incomplete summary sent to MongoDB');
+      } catch (logError) {
+        console.error('[AftermathScreen] ❌ Failed to send incomplete summary:', logError);
+      }
+    })();
+
+    // Also collect fragment even on error (CRITICAL for 3-shard progression)
+    const currentGameId = useDilemmaStore.getState().gameId || `game-${Date.now()}`;
+    if (fragmentCount < 3) {
+      try {
+        const pendingThumbnail = useRoleStore.getState().pendingAvatarThumbnail;
+        addFragment(currentGameId, pendingThumbnail);
+
+        // Clear the pending thumbnail after use
+        useRoleStore.getState().setPendingAvatarThumbnail(null);
+
+        // Force immediate localStorage write
+        try {
+          const fragmentsState = useFragmentsStore.getState();
+          const persistData = {
+            state: {
+              firstIntro: fragmentsState.firstIntro,
+              fragments: fragmentsState.fragments.slice(0, 3),
+              hasClickedFragment: fragmentsState.hasClickedFragment,
+              preferredFragmentId: fragmentsState.preferredFragmentId
+            },
+            version: 2
+          };
+          localStorage.setItem('amaze-politics-fragments-v2', JSON.stringify(persistData));
+          console.log('[AftermathScreen] ✅ Fragment manually persisted (despite error)');
+        } catch (persistError) {
+          console.error('[AftermathScreen] ❌ Failed to persist fragment:', persistError);
+        }
+
+        // Log fragment collection with error flag
+        logger.logSystem(
+          'fragment_collected_with_error',
+          {
+            gameId: currentGameId,
+            fragmentIndex: fragmentCount,
+            error
+          },
+          `Fragment collected despite aftermath generation failure`
+        );
+
+        console.log(`[AftermathScreen] 🧩 Fragment ${fragmentCount + 1}/3 collected (despite error)`);
+      } catch (fragmentError) {
+        console.error('[AftermathScreen] ❌ CRITICAL: Failed to collect fragment on error:', fragmentError);
+      }
+    }
+  }, [error, sessionId, inquiryHistory, customActionCount, selectedRole, day, score, logger, sessionLogger, fragmentCount, addFragment]);
 
   // ========================================================================
   // RENDER: Loading State

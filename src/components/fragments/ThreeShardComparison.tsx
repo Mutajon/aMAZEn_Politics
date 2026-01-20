@@ -21,6 +21,32 @@ import { useLang } from "../../i18n/lang";
 import { PROPERTIES, PALETTE, type PropKey } from "../../data/compass-data";
 import { useFragmentsStore, type Fragment } from "../../store/fragmentsStore";
 
+/**
+ * Get short shard label from role image ID or index
+ */
+const getShortShardLabel = (lang: any, roleImageId?: string, index?: number): string => {
+  // Map role image IDs to short labels
+  const IMAGE_ID_TO_LABEL: Record<string, string> = {
+    "greece": "SHARD_LABEL_ATHENS",
+    "northAmerica": "SHARD_LABEL_NORTH_AMERICA",
+    "mars": "SHARD_LABEL_MARS",
+    "1877Strike": "SHARD_LABEL_RAILROAD",
+    "telavivStrike": "SHARD_LABEL_TELAVIV",
+  };
+
+  if (roleImageId && IMAGE_ID_TO_LABEL[roleImageId]) {
+    return lang(IMAGE_ID_TO_LABEL[roleImageId]);
+  }
+
+  // Fallback to index-based mapping if it's one of the experiment shards
+  if (index !== undefined) {
+    const INDEX_LABELS = ["SHARD_LABEL_ATHENS", "SHARD_LABEL_NORTH_AMERICA", "SHARD_LABEL_MARS"];
+    if (INDEX_LABELS[index]) return lang(INDEX_LABELS[index]);
+  }
+
+  return "";
+};
+
 interface ThreeShardComparisonProps {
   /** All 3 completed game entries */
   games: PastGameEntry[];
@@ -137,9 +163,6 @@ function GameCard({
   const matchingFragment = fragments.find(f => f.gameId === game.gameId);
   const avatarToShow = matchingFragment?.avatarThumbnail || game.avatarUrl;
 
-  // Shard labels: Railroad Strike, Tel Aviv, Mars
-  const SHARD_LABELS = ["SHARD_LABEL_RAILROAD", "SHARD_LABEL_TELAVIV", "SHARD_LABEL_MARS"];
-
   return (
     <motion.div
       className="rounded-2xl bg-gradient-to-br from-slate-900/90 via-slate-800/90 to-slate-900/90 border border-white/10 backdrop-blur-md overflow-hidden"
@@ -147,10 +170,10 @@ function GameCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.1 + index * 0.1 }}
     >
-      {/* Header with shard label */}
+      {/* Header with role title */}
       <div className="px-4 py-2 bg-gradient-to-r from-amber-600/30 to-amber-500/20 border-b border-white/10">
         <h3 className="text-amber-200 text-sm font-medium text-center">
-          {lang(SHARD_LABELS[index])}
+          {getShortShardLabel(lang, game.roleImageId, index) || game.roleTitle}
         </h3>
       </div>
 
@@ -223,11 +246,10 @@ function GameCard({
             {game.snapshotHighlights.map((highlight, i) => (
               <span
                 key={i}
-                className={`px-2 py-1 rounded-full text-xs flex items-center gap-1 ${
-                  highlight.type === "positive"
-                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                    : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                }`}
+                className={`px-2 py-1 rounded-full text-xs flex items-center gap-1 ${highlight.type === "positive"
+                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                  : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                  }`}
               >
                 <span className="flex-shrink-0">{highlight.icon}</span>
                 <span>{highlight.text}</span>
@@ -331,7 +353,9 @@ function SupportBar({ icon, value, color }: SupportBarProps) {
 
 function PlaceholderCard({ index }: { index: number }) {
   const lang = useLang();
-  const SHARD_LABELS = ["SHARD_LABEL_RAILROAD", "SHARD_LABEL_TELAVIV", "SHARD_LABEL_MARS"];
+
+  // Map shard index to proper short role title keys
+  const SHARD_LABEL_KEYS = ["SHARD_LABEL_ATHENS", "SHARD_LABEL_NORTH_AMERICA", "SHARD_LABEL_MARS"];
 
   return (
     <motion.div
@@ -340,10 +364,10 @@ function PlaceholderCard({ index }: { index: number }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.1 + index * 0.1 }}
     >
-      {/* Header with shard label */}
+      {/* Header with role title */}
       <div className="px-4 py-2 bg-gradient-to-r from-slate-600/30 to-slate-500/20 border-b border-white/5">
         <h3 className="text-slate-400 text-sm font-medium text-center">
-          {lang(SHARD_LABELS[index])}
+          {lang(SHARD_LABEL_KEYS[index])}
         </h3>
       </div>
 

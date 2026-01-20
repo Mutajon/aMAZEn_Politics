@@ -44,6 +44,7 @@ export interface PredefinedRoleData {
   characters: RoleCharacters;          // Character name options (male/female/any)
   scoreGoal: number;                   // Target score to mark role as completed
   defaultGoalStatus: RoleGoalStatus;   // Initial completion status
+  defaultHighScore?: number;           // Default high score (optional)
 }
 
 /**
@@ -681,22 +682,22 @@ TONE & STYLE
 
   {
     id: "north_america_1607",
-    legacyKey: "North America — The First Encounter (1607)",
+    legacyKey: "Central America — The Triple Alliance (1519)",
     titleKey: "NORTH_AMERICA_TITLE",
     subtitleKey: "NORTH_AMERICA_SUBTITLE",
     introKey: "NORTH_AMERICA_INTRO",
     youAreKey: "NORTH_AMERICA_YOU_ARE",
-    year: "1607",
+    year: "1519",
     imageId: "northAmerica",
-    avatarPrompt: "Native American tribal chief when European settlers arrived",
-    roleScope: "The Successor/Manager of a hereditary family enterprise. You have inherited the 'Trade of the Bound' (slavery). You are responsible for providing the labor force that builds the Great Temple and maintains the village's economic dominance.",
+    avatarPrompt: "Aztec nobleman or Tlatoani in traditional regalia with quetzal feather headdress",
+    roleScope: "The Successor/Manager of a hereditary family enterprise within the Aztec Empire. You have inherited the 'Trade of the Bound' (tlatlacotin). You are responsible for providing the labor force that builds the Great Temple of Tenochtitlan and maintains the city's economic dominance.",
     storyThemes: ["ancestral_debt_vs_conscience", "sacred_vs_profane", "economic_stability_vs_reform", "human_cost_of_civilization"],
     scoreGoal: 1100,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
-      systemName: "Personalist Monarchy / Autocracy",
-      systemDesc: "Single paramount chief directs war, trade, and justice; councils advise, but his word usually decides.",
-      flavor: "Strong chief steering first contact with Jamestown; war or trade by his word.",
+      systemName: "Hereditary Monarchy / Theocracy",
+      systemDesc: "The Huey Tlatoani rules with divine sanction, advised by a council of Four and the high priesthood; tribute and labor sustain the empire.",
+      flavor: "Steering the empire at the height of its power; managing the sacred duty of building the Great Temple.",
       holders: [
         {
           name: "Executive (Paramount Chief)",
@@ -755,21 +756,24 @@ TONE & STYLE
       },
       grounding: {
         settingType: "real",
-        era: "Tidewater Virginia, 1607–1609"
+        era: "Tenochtitlan, Aztec Empire, 1519 (pre-Conquest)"
       },
       supportProfiles: ROLE_SUPPORT_PROFILES["North America — The First Encounter (1607)"] ?? null,
       roleScope: "The Successor/Manager of a hereditary family enterprise. You have inherited the 'Trade of the Bound' (slavery). You are responsible for providing the labor force that builds the Great Temple and maintains the village's economic dominance.",
       storyThemes: ["ancestral_debt_vs_conscience", "sacred_vs_profane", "economic_stability_vs_reform", "human_cost_of_civilization"],
       authorityLevel: "medium",
-      dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (North America 1607):
+      dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (Tenochtitlan 1519):
+
+CONTEXT:
+The harvest season approaches, and the Great Temple is unfinished. The new captives from the trade route have arrived at your city's gates. They are the currency that keeps neighboring tribes at bay and the labor that appeases the gods.
 
 ═══════════════════════════════════════════════════════════════════════════════
 CORE TENSION TRIANGLE: ANCESTRAL DUTY vs INDIVIDUAL CONSCIENCE vs SURVIVAL
 ═══════════════════════════════════════════════════════════════════════════════
 
 Probe these tensions throughout the game:
-- THE ENGINE OF CIVILIZATION: The slave trade is the literal foundation of the city's power. Without it, the Sacred Temple stops being built, and priests warn of divine wrath.
-- POLITICAL SURVIVAL: Neighboring tribes are kept in check only by the wealth and labor your trade provides. To stop is to invite invasion.
+- THE ENGINE OF CIVILIZATION: The tlatlacotin (bound labor) trade is the literal foundation of Tenochtitlan's power. Without it, the Great Temple stops being built, and priests warn of divine wrath.
+- POLITICAL SURVIVAL: Neighboring city-states (like Tlaxcala) are kept in check only by the wealth and labor your trade provides. To stop is to invite invasion.
 - HUMAN COST: You are forced to confront the reality of the people being traded—many have individual stories or connections to your past.
 - INHERITED SIN: You have taken over this system from your parents. Do you honor your lineage or break the cycle?
 
@@ -814,7 +818,7 @@ TONE & STYLE
 - INHERITED BURDEN: You did not create this system but you perpetuate it
 - SACRED ECONOMY: Religion and commerce are inseparable
 - HUMAN FACES: Every captive has a story; some connect to yours
-- SURVIVAL LOGIC: Ending the trade may mean ending your village`
+- SURVIVAL LOGIC: Ending the trade may mean ending your city's dominance`
     },
     characters: {
       male: {
@@ -1410,6 +1414,9 @@ TONE & STYLE
       storyThemes: ["digital_democracy", "information_ethics", "democratic_fatigue", "survival_vs_truth"],
       authorityLevel: "low",
       dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (Mars Colony 2179):
+
+CONTEXT:
+The colony's neuro-link network is overwhelmed. A viral movement demanding total direct democracy has paralyzed the latest safety vote. The life-support engineers warn that constant voting is delaying critical maintenance.
 
 ═══════════════════════════════════════════════════════════════════════════════
 CORE TENSION TRIANGLE: DEMOCRACY vs LIBERTY vs AUTONOMY

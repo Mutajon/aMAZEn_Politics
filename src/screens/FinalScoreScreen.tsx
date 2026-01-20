@@ -419,7 +419,7 @@ export default function FinalScoreScreen({ push }: Props) {
     push("/aftermath");
   };
 
-  const handlePlayAgain = () => {
+  const handlePlayAgain = async () => {
     audioManager.playSfx('click-soft');
     logger.log(
       "button_click_play_again",
@@ -432,6 +432,21 @@ export default function FinalScoreScreen({ push }: Props) {
 
     // Save the score before reset for grandpa dialogue
     const finalScore = breakdown.final;
+
+    // CRITICAL FIX: Mark role complete BEFORE resetting stores (Backup check)
+    // This safeguards against cases where AftermathScreen didn't trigger completion
+    const { experimentProgress, markExperimentRoleCompleted } = useLoggingStore.getState();
+    const activeRoleKey = experimentProgress.activeRoleKey;
+
+    if (activeRoleKey && !experimentProgress.completedRoles[activeRoleKey]) {
+      console.log('[FinalScoreScreen] 🎯 Marking role complete before reset:', activeRoleKey);
+      markExperimentRoleCompleted(activeRoleKey);
+    }
+
+    // FIX: Start fresh logging session for next game
+    // This ensures each game has a unique sessionId for proper tracking
+    await loggingService.startSession();
+    console.log('[FinalScoreScreen] 🔄 Started fresh session for next game');
 
     useDilemmaStore.getState().reset();
     useRoleStore.getState().reset();

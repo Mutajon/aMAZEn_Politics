@@ -5,8 +5,9 @@
 // - Dramatic downfall narrative from API
 // - Final support levels (all < 20%)
 // - One action: View Full Report (forces player through Aftermath screen for logging)
+// - Performance ranking modal (same as normal game flow)
 
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useSettingsStore } from "../store/settingsStore";
@@ -15,6 +16,8 @@ import { AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNarrator } from "../hooks/useNarrator";
 import { TTS_VOICE } from "../lib/ttsConfig";
+import SelfJudgmentModal from "../components/event/SelfJudgmentModal";
+import { useLogger } from "../hooks/useLogger";
 
 type Props = {
   push: (path: string) => void;
@@ -25,6 +28,10 @@ export default function DownfallScreen({ push }: Props) {
   const { character, roleBackgroundImage, analysis } = useRoleStore();
   const narrationEnabled = useSettingsStore((s) => s.narrationEnabled !== false);
   const narrator = useNarrator();
+  const logger = useLogger();
+
+  // State for performance ranking modal
+  const [showSelfJudgmentModal, setShowSelfJudgmentModal] = useState(false);
 
   const roleBgStyle = useMemo(
     () => bgStyleWithRoleImage(roleBackgroundImage),
@@ -113,7 +120,7 @@ export default function DownfallScreen({ push }: Props) {
           {/* Action Buttons */}
           <div className="space-y-3">
             <button
-              onClick={() => push("/aftermath")}
+              onClick={() => setShowSelfJudgmentModal(true)}
               className="w-full px-6 py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-amber-500/50 text-lg"
             >
               View Full Report
@@ -134,6 +141,27 @@ export default function DownfallScreen({ push }: Props) {
           )}
         </div>
       </motion.div>
+
+      {/* Self-Judgment Modal - same as normal game flow */}
+      <SelfJudgmentModal
+        isOpen={showSelfJudgmentModal}
+        onClose={() => setShowSelfJudgmentModal(false)}
+        onSubmit={(judgment) => {
+          // Log judgment with crisis flag
+          logger.log(
+            'self_judgment_selected',
+            {
+              day: 8,
+              judgment,
+              crisisMode: true
+            },
+            `Player selected self-judgment (crisis ending): ${judgment}`
+          );
+
+          // Navigate to aftermath
+          push('/aftermath');
+        }}
+      />
     </div>
   );
 }

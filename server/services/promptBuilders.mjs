@@ -134,6 +134,13 @@ export function buildGameMasterUserPrompt(day, playerChoice = null, currentCompa
     prompt += `This is DAY 1 of 7.
 
 Create the first concrete incident that forces an immediate choice.
+
+CRITICAL INSTRUCTION FOR DAY 1:
+You MUST START the dilemma description with an INTRODUCTORY SENTENCE establishing the specific setting and role described in the system prompt (Role Intro & Dilemma Emphasis).
+Example (Athens): "The philosopher has just stepped down from the podium, his words echoing in the silence."
+Example (Aztec): "The sun rises over the Great Temple as the new tlatlacotin arrive at the city gates."
+Then present the immediate physical dilemma caused by that context.
+
 STRICTLY OBEY THE CAMERA TEST: describe a specific event happening RIGHT NOW, not abstract tensions.
 Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
   }
@@ -720,11 +727,13 @@ NPC NAMING RULES (CRITICAL)
 ───────────────────────────────────────────────────────────────────────────────
 
 When generating names for NPCs/characters in dilemmas:
-- Names should match the **historical/cultural setting**, NOT the UI language
+- Names MUST match the **historical/cultural setting**, NOT the UI language or the player's personal background.
 - Example: 1877 US Railroad → English/American names (John, Sarah, William)
 - Example: 2025 Tel Aviv → Hebrew/Israeli names (David, Yael, Moshe)
 - Example: 2099 Namek → Sci-fi/alien names (Zarn, Kira, Vex)
 - Example: Ancient Athens → Greek names (Pericles, Aspasia, Leonidas)
+- Example: Aztec Empire → Nahuatl/Aztec names (Tlacaelel, Xicotencatl, Anacaona)
+- DO NOT use common modern names (e.g., "Eliezer", "Michael", "Sarah") in ancient or non-Western settings unless historically accurate.
 ${grounding ? `
 
 **THIS SCENARIO SETTING: ${grounding}**
