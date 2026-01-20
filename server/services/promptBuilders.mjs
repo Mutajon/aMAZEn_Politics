@@ -1,169 +1,176 @@
 import { LANGUAGE_NAMES, COMPASS_DEFINITION_BLOCK } from "../config/constants.mjs";
 
 export function buildSuggestionValidatorSystemPrompt({
-    era,
-    year,
-    settingType,
-    politicalSystem,
-    roleName,
-    roleScope
+  era,
+  year,
+  settingType,
+  politicalSystem,
+  roleName,
+  roleScope
 }) {
-    const timeline = era || year || "unspecified time period";
-    const setting = settingType || "unspecified setting";
-    const systemLine = politicalSystem || "unspecified political system";
-    const roleLine = roleName || "unspecified role";
-    const scopeLine = roleScope || "Role authority not specified – assume moderate influence but no direct control over everything.";
+  const timeline = era || year || "unspecified time period";
+  const setting = settingType || "unspecified setting";
+  const systemLine = politicalSystem || "unspecified political system";
+  const roleLine = roleName || "unspecified role";
+  const scopeLine = roleScope || "Role authority not specified – assume moderate influence but no direct control over everything.";
 
-    return [
-        "You are a constructive validator for a historical political strategy game.",
-        "Your job: evaluate ONE player-written suggestion and decide if it is VALID for this role, the political system, and the historical setting.",
-        "",
-        "CONTEXT:",
-        `- TIMELINE: ${timeline}`,
-        `- SETTING: ${setting}`,
-        `- POLITICAL SYSTEM: ${systemLine}`,
-        `- PLAYER ROLE: ${roleLine}`,
-        `- ROLE SCOPE: ${scopeLine}`,
-        "",
-        "GENERAL PRINCIPLES:",
-        "- Be EXTREMELY generous and player-friendly. Almost everything should be ACCEPTED.",
-        "- Default to ACCEPT. Only reject in the rarest cases.",
-        "- The player is suggesting a course of action for THEIR ROLE within this historical-political context.",
-        "- The GAME will handle consequences - your job is NOT to judge feasibility or likelihood of success.",
-        "- If an action might face resistance or fail, that's for the game to show through consequences, NOT for you to block.",
-        "",
-        "ACCEPT WHEN POSSIBLE (ALMOST ALWAYS):",
-        "- Accept all suggestions the role could plausibly ATTEMPT or PROPOSE.",
-        "- The action may be risky, immoral, violent, manipulative, or corrupt – ACCEPT.",
-        "- The action may have little chance of success – ACCEPT.",
-        "- The action may face strong opposition or resistance – ACCEPT (the game handles this).",
-        "- The action may be unprecedented or revolutionary for the setting – ACCEPT (leaders can propose changes).",
-        "- Leaders (chiefs, kings, presidents, etc.) CAN propose systemic changes like new governance models – ACCEPT.",
-        "- You ONLY judge whether the action can be ATTEMPTED, not whether it will succeed or is politically feasible.",
-        "",
-        "REJECT ONLY IF ONE OF THESE CONDITIONS (VERY RARE):",
-        "",
-        "1) ANACHRONISTIC TECHNOLOGY:",
-        "   - The suggestion requires technology that literally does not exist in this time period.",
-        "   - Example: using smartphones, drones, internet, or firearms before they were invented.",
-        "   - NOTE: Social/political innovations are NOT technology - they CAN be proposed in any era.",
-        "",
-        "2) PASSIVE NON-ACTION:",
-        "   - The player explicitly chooses to do nothing, wait, or delay without taking any active steps.",
-        "   - Example: \"wait\", \"do nothing\", \"just wait and see\", \"delay the decision\".",
-        "   - NOTE: Gathering information IS an active action (e.g., \"consult advisors\", \"research\") → ACCEPT.",
-        "",
-        "3) COMPLETELY UNRELATED TO POLITICAL CONTEXT:",
-        "   - The action has absolutely no connection to the political dilemma or governance.",
-        "   - Example: \"make pasta\", \"mow the lawn\", \"clean my room\", \"take a nap\".",
-        "   - NOTE: Consulting others (mom, advisors, experts) IS related to decision-making → ACCEPT.",
-        "   - NOTE: Personal actions taken TO AVOID the dilemma are still related → ACCEPT.",
-        "",
-        "4) UTTERLY INCOMPREHENSIBLE GIBBERISH:",
-        "   - Random characters, keyboard mashing, or word salad with zero discernible intent.",
-        "   - Example: \"asdfghjkl\", \"вфывфыв\", \"purple fence eat Wednesday\".",
-        "   - NOTE: Terse/shorthand suggestions with clear intent ARE comprehensible → ACCEPT.",
-        "",
-        "IMPORTANT - THESE ARE NOT GROUNDS FOR REJECTION:",
-        "- 'This would face opposition' → ACCEPT (game handles consequences)",
-        "- 'This is unprecedented' → ACCEPT (players can try new things)",
-        "- 'This might not work' → ACCEPT (game determines outcomes)",
-        "- 'Others might resist this' → ACCEPT (that's what makes it interesting)",
-        "- 'This changes the political system' → ACCEPT if the role is leaders who could propose it",
-        "",
-        "EXAMPLES OF WHAT TO ACCEPT:",
-        "- Tribal chief proposing democratic reforms → ACCEPT (chief can propose, tribe decides)",
-        "- King abolishing monarchy → ACCEPT (king can try, consequences follow)",
-        "- Citizen organizing a revolution → ACCEPT (can attempt)",
-        "- Leader changing governance structure → ACCEPT (leaders can propose systemic changes)",
-        "- Any political/social innovation regardless of era → ACCEPT (ideas don't require technology)",
-        "- \"consult mom\" → ACCEPT (gathering advice is active and relevant to decision-making)",
-        "- \"research in library\" → ACCEPT (gathering information is active and relevant)",
-        "- \"ask advisors\" → ACCEPT (consultation is active and relevant)",
-        "- \"gather intelligence\" → ACCEPT (information gathering is active and relevant)",
-        "",
-        "WHEN YOU REJECT (RARE):",
-        "- Give one short, friendly sentence naming the exact reason:",
-        "  * Example (technology): \"This society has no such technology in this time period.\"",
-        "  * Example (passive): \"Waiting or doing nothing is not an active choice.\"",
-        "  * Example (unrelated): \"This action has no connection to the political situation.\"",
-        "  * Example (gibberish): \"This text is incomprehensible.\"",
-        "- When possible, offer a role-appropriate alternative the player could try.",
-        "",
-        "OUTPUT FORMAT (JSON ONLY, no extra text):",
-        "When ACCEPTING: { \"valid\": true }",
-        "When REJECTING: { \"valid\": false, \"reason\": \"short explanation here\" }"
-    ].join("\n");
+  return [
+    "You are a constructive validator for a historical political strategy game.",
+    "Your job: evaluate ONE player-written suggestion and decide if it is VALID for this role, the political system, and the historical setting.",
+    "",
+    "CONTEXT:",
+    `- TIMELINE: ${timeline}`,
+    `- SETTING: ${setting}`,
+    `- POLITICAL SYSTEM: ${systemLine}`,
+    `- PLAYER ROLE: ${roleLine}`,
+    `- ROLE SCOPE: ${scopeLine}`,
+    "",
+    "GENERAL PRINCIPLES:",
+    "- Be EXTREMELY generous and player-friendly. Almost everything should be ACCEPTED.",
+    "- Default to ACCEPT. Only reject in the rarest cases.",
+    "- The player is suggesting a course of action for THEIR ROLE within this historical-political context.",
+    "- The GAME will handle consequences - your job is NOT to judge feasibility or likelihood of success.",
+    "- If an action might face resistance or fail, that's for the game to show through consequences, NOT for you to block.",
+    "",
+    "ACCEPT WHEN POSSIBLE (ALMOST ALWAYS):",
+    "- Accept all suggestions the role could plausibly ATTEMPT or PROPOSE.",
+    "- The action may be risky, immoral, violent, manipulative, or corrupt – ACCEPT.",
+    "- The action may have little chance of success – ACCEPT.",
+    "- The action may face strong opposition or resistance – ACCEPT (the game handles this).",
+    "- The action may be unprecedented or revolutionary for the setting – ACCEPT (leaders can propose changes).",
+    "- Leaders (chiefs, kings, presidents, etc.) CAN propose systemic changes like new governance models – ACCEPT.",
+    "- You ONLY judge whether the action can be ATTEMPTED, not whether it will succeed or is politically feasible.",
+    "",
+    "REJECT ONLY IF ONE OF THESE CONDITIONS (VERY RARE):",
+    "",
+    "1) ANACHRONISTIC TECHNOLOGY:",
+    "   - The suggestion requires technology that literally does not exist in this time period.",
+    "   - Example: using smartphones, drones, internet, or firearms before they were invented.",
+    "   - NOTE: Social/political innovations are NOT technology - they CAN be proposed in any era.",
+    "",
+    "2) PASSIVE NON-ACTION:",
+    "   - The player explicitly chooses to do nothing, wait, or delay without taking any active steps.",
+    "   - Example: \"wait\", \"do nothing\", \"just wait and see\", \"delay the decision\".",
+    "   - NOTE: Gathering information IS an active action (e.g., \"consult advisors\", \"research\") → ACCEPT.",
+    "",
+    "3) COMPLETELY UNRELATED TO POLITICAL CONTEXT:",
+    "   - The action has absolutely no connection to the political dilemma or governance.",
+    "   - Example: \"make pasta\", \"mow the lawn\", \"clean my room\", \"take a nap\".",
+    "   - NOTE: Consulting others (mom, advisors, experts) IS related to decision-making → ACCEPT.",
+    "   - NOTE: Personal actions taken TO AVOID the dilemma are still related → ACCEPT.",
+    "",
+    "4) UTTERLY INCOMPREHENSIBLE GIBBERISH:",
+    "   - Random characters, keyboard mashing, or word salad with zero discernible intent.",
+    "   - Example: \"asdfghjkl\", \"вфывфыв\", \"purple fence eat Wednesday\".",
+    "   - NOTE: Terse/shorthand suggestions with clear intent ARE comprehensible → ACCEPT.",
+    "",
+    "IMPORTANT - THESE ARE NOT GROUNDS FOR REJECTION:",
+    "- 'This would face opposition' → ACCEPT (game handles consequences)",
+    "- 'This is unprecedented' → ACCEPT (players can try new things)",
+    "- 'This might not work' → ACCEPT (game determines outcomes)",
+    "- 'Others might resist this' → ACCEPT (that's what makes it interesting)",
+    "- 'This changes the political system' → ACCEPT if the role is leaders who could propose it",
+    "",
+    "EXAMPLES OF WHAT TO ACCEPT:",
+    "- Tribal chief proposing democratic reforms → ACCEPT (chief can propose, tribe decides)",
+    "- King abolishing monarchy → ACCEPT (king can try, consequences follow)",
+    "- Citizen organizing a revolution → ACCEPT (can attempt)",
+    "- Leader changing governance structure → ACCEPT (leaders can propose systemic changes)",
+    "- Any political/social innovation regardless of era → ACCEPT (ideas don't require technology)",
+    "- \"consult mom\" → ACCEPT (gathering advice is active and relevant to decision-making)",
+    "- \"research in library\" → ACCEPT (gathering information is active and relevant)",
+    "- \"ask advisors\" → ACCEPT (consultation is active and relevant)",
+    "- \"gather intelligence\" → ACCEPT (information gathering is active and relevant)",
+    "",
+    "WHEN YOU REJECT (RARE):",
+    "- Give one short, friendly sentence naming the exact reason:",
+    "  * Example (technology): \"This society has no such technology in this time period.\"",
+    "  * Example (passive): \"Waiting or doing nothing is not an active choice.\"",
+    "  * Example (unrelated): \"This action has no connection to the political situation.\"",
+    "  * Example (gibberish): \"This text is incomprehensible.\"",
+    "- When possible, offer a role-appropriate alternative the player could try.",
+    "",
+    "OUTPUT FORMAT (JSON ONLY, no extra text):",
+    "When ACCEPTING: { \"valid\": true }",
+    "When REJECTING: { \"valid\": false, \"reason\": \"short explanation here\" }"
+  ].join("\n");
 }
 
 export function buildSuggestionValidatorUserPrompt({
-    title,
-    description,
-    suggestion,
-    era,
-    year,
-    settingType,
-    politicalSystem,
-    roleName,
-    roleScope
+  title,
+  description,
+  suggestion,
+  era,
+  year,
+  settingType,
+  politicalSystem,
+  roleName,
+  roleScope
 }) {
-    const payload = {
-        dilemma: {
-            title,
-            description
-        },
-        playerSuggestion: suggestion,
-        context: {
-            era: era || null,
-            year: year || null,
-            settingType: settingType || null,
-            politicalSystem: politicalSystem || null,
-            roleName: roleName || null,
-            roleScope: roleScope || null
-        }
-    };
+  const payload = {
+    dilemma: {
+      title,
+      description
+    },
+    playerSuggestion: suggestion,
+    context: {
+      era: era || null,
+      year: year || null,
+      settingType: settingType || null,
+      politicalSystem: politicalSystem || null,
+      roleName: roleName || null,
+      roleScope: roleScope || null
+    }
+  };
 
-    return JSON.stringify(payload, null, 2);
+  return JSON.stringify(payload, null, 2);
 }
 
 export function buildGameMasterUserPrompt(day, playerChoice = null, currentCompassTopValues = null, mirrorMode = 'dilemma', languageCode = 'en', languageName = 'English', dilemmaEmphasis = null) {
-    // General instruction for all days
-    let prompt = `First, carefully review the entire system prompt to understand all context and rules.\n\n`;
+  // General instruction for all days
+  let prompt = `First, carefully review the entire system prompt to understand all context and rules.\n\n`;
 
-    if (day === 1) {
-        prompt += `This is DAY 1 of 7.
+  if (day === 1) {
+    prompt += `This is DAY 1 of 7.
 
 Create the first concrete incident that forces an immediate choice.
+
+CRITICAL INSTRUCTION FOR DAY 1:
+You MUST START the dilemma description with an INTRODUCTORY SENTENCE establishing the specific setting and role described in the system prompt (Role Intro & Dilemma Emphasis).
+Example (Athens): "The philosopher has just stepped down from the podium, his words echoing in the silence."
+Example (Aztec): "The sun rises over the Great Temple as the new tlatlacotin arrive at the city gates."
+Then present the immediate physical dilemma caused by that context.
+
 STRICTLY OBEY THE CAMERA TEST: describe a specific event happening RIGHT NOW, not abstract tensions.
 Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
+  }
+  else {
+    // Format current compass values (if provided)
+    let compassUpdateText = '';
+    if (currentCompassTopValues && Array.isArray(currentCompassTopValues)) {
+      compassUpdateText = '\n\nCURRENT TOP VALUES (SELECT FROM THESE FOR TODAY\'S VALUE TRAP):\n' +
+        currentCompassTopValues.map(dim =>
+          `  - ${dim.dimension}: ${dim.values.join(', ')}`
+        ).join('\n') + '\n';
     }
-    else {
-        // Format current compass values (if provided)
-        let compassUpdateText = '';
-        if (currentCompassTopValues && Array.isArray(currentCompassTopValues)) {
-            compassUpdateText = '\n\nCURRENT TOP VALUES (SELECT FROM THESE FOR TODAY\'S VALUE TRAP):\n' +
-                currentCompassTopValues.map(dim =>
-                    `  - ${dim.dimension}: ${dim.values.join(', ')}`
-                ).join('\n') + '\n';
-        }
 
-        prompt += `DAY ${day} of 7\n\nPrevious action: "${playerChoice.title}" - ${playerChoice.description}${compassUpdateText}\n\n`;
+    prompt += `DAY ${day} of 7\n\nPrevious action: "${playerChoice.title}" - ${playerChoice.description}${compassUpdateText}\n\n`;
 
-        // Add reminder for role-specific emphasis (if exists)
-        if (dilemmaEmphasis) {
-            prompt += `REMINDER: Follow the ROLE-SPECIFIC EMPHASIS from the system prompt.\n\n`;
-        }
+    // Add reminder for role-specific emphasis (if exists)
+    if (dilemmaEmphasis) {
+      prompt += `REMINDER: Follow the ROLE-SPECIFIC EMPHASIS from the system prompt.\n\n`;
+    }
 
-        // Add mirror mode instruction for Days 2+
-        prompt += `MIRROR MODE FOR THIS TURN: "${mirrorMode}"
+    // Add mirror mode instruction for Days 2+
+    prompt += `MIRROR MODE FOR THIS TURN: "${mirrorMode}"
 ${mirrorMode === 'lastAction'
-                ? `The mirror should reflect on the player's PREVIOUS choice ("${playerChoice.title}") and what it reveals about their values.`
-                : `The mirror should comment on the CURRENT dilemma they're about to face and how it challenges their values.`}
+        ? `The mirror should reflect on the player's PREVIOUS choice ("${playerChoice.title}") and what it reveals about their values.`
+        : `The mirror should comment on the CURRENT dilemma they're about to face and how it challenges their values.`}
 
 `;
 
-        if (day === 7) {
-            prompt += `This is the final day. Make this dilemma especially tough and epic - a climactic choice worthy of the player's last act in this world. The stakes should feel monumental. Remind them their borrowed time is almost over.
+    if (day === 7) {
+      prompt += `This is the final day. Make this dilemma especially tough and epic - a climactic choice worthy of the player's last act in this world. The stakes should feel monumental. Remind them their borrowed time is almost over.
 
 MANDATORY "bridge" FIELD - Generate ONE SENTENCE showing:
 1. What HAPPENED because of "${playerChoice.title}"
@@ -176,10 +183,10 @@ Then generate dilemma.description with the NEW situation details + direct questi
 CRITICAL: Follow Golden Rules B & C - different tension from yesterday, actions exploring autonomy vs. heteronomy.
 
 STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player RIGHT NOW.`;
-        } else if (day === 8) {
-            prompt += `This is Day 8 - the aftermath. Follow the system prompt instructions for Day 8.`;
-        } else {
-            prompt += `MANDATORY "bridge" FIELD - Generate ONE SENTENCE showing:
+    } else if (day === 8) {
+      prompt += `This is Day 8 - the aftermath. Follow the system prompt instructions for Day 8.`;
+    } else {
+      prompt += `MANDATORY "bridge" FIELD - Generate ONE SENTENCE showing:
 1. What HAPPENED because of "${playerChoice.title}"
 2. How that outcome CONNECTS to today's new problem (prefer causal link)
 
@@ -193,45 +200,45 @@ DO NOT summarize the general situation or write about "debates" or "rising tensi
 STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player RIGHT NOW.
 
 Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
-        }
     }
+  }
 
-    // Add language instruction if not English
-    if (languageCode !== 'en') {
-        prompt += `\n\nWrite your response in ${languageName}.`;
-    }
+  // Add language instruction if not English
+  if (languageCode !== 'en') {
+    prompt += `\n\nWrite your response in ${languageName}.`;
+  }
 
-    return prompt;
+  return prompt;
 }
 
 export function buildGameMasterSystemPromptUnified(gameContext, languageCode = 'en', languageName = 'English') {
-    const {
-        role,
-        systemName,
-        setting,
-        challengerName,
-        powerHolders,
-        authorityLevel,
-        playerCompassTopValues
-    } = gameContext;
+  const {
+    role,
+    systemName,
+    setting,
+    challengerName,
+    powerHolders,
+    authorityLevel,
+    playerCompassTopValues
+  } = gameContext;
 
-    // Get top 5 power holders only
-    const top5PowerHolders = powerHolders.slice(0, 5);
+  // Get top 5 power holders only
+  const top5PowerHolders = powerHolders.slice(0, 5);
 
-    // Format compass values for prompt
-    const compassText = playerCompassTopValues.map(dim =>
-        `  - ${dim.dimension}: ${dim.values.join(', ')}`
-    ).join('\n');
+  // Format compass values for prompt
+  const compassText = playerCompassTopValues.map(dim =>
+    `  - ${dim.dimension}: ${dim.values.join(', ')}`
+  ).join('\n');
 
-    // Log compass values for mirror advice debugging
-    console.log("[game-turn-v2] Player compass values received:", playerCompassTopValues);
-    console.log("[game-turn-v2] Formatted compassText for prompt:\n" + compassText);
+  // Log compass values for mirror advice debugging
+  console.log("[game-turn-v2] Player compass values received:", playerCompassTopValues);
+  console.log("[game-turn-v2] Formatted compassText for prompt:\n" + compassText);
 
-    // Note: Using the massive prompt string here.
-    // Ideally, this should be in a template file, but for now we inline it to match the logic.
-    // Since it's huge, I'll attempt to construct it faithfully.
+  // Note: Using the massive prompt string here.
+  // Ideally, this should be in a template file, but for now we inline it to match the logic.
+  // Since it's huge, I'll attempt to construct it faithfully.
 
-    const prompt = `0. GAME MASTER PERSONA
+  const prompt = `0. GAME MASTER PERSONA
 
 You are the Game Master of a historical-political simulation.
 You speak directly to the player as "you".
@@ -548,7 +555,7 @@ CRITICAL JSON RULES:
   },
   "dilemma": {
     "title": "Short title (max 120 chars)",
-    "description": "Playful Game Master comment in second person ('you') + new situation + direct question",
+    "description": "Start with ONE sentence bridging from the previous outcome. Then add the new crisis details + direct question.",
     "actions": [
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
@@ -584,33 +591,33 @@ CRITICAL JSON RULES:
   "mirrorAdvice": "FIRST PERSON reflective sentence (20-25 words)"
 }`;
 
-    return prompt;
+  return prompt;
 }
 
 export function buildGameMasterSystemPromptUnifiedV3(gameContext, languageCode = 'en', languageName = 'English', dilemmaEmphasis = null, character = null, grounding = null) {
-    const {
-        role,
-        systemName,
-        setting,
-        challengerName,
-        powerHolders,
-        authorityLevel,
-        playerCompassTopValues
-    } = gameContext;
+  const {
+    role,
+    systemName,
+    setting,
+    challengerName,
+    powerHolders,
+    authorityLevel,
+    playerCompassTopValues
+  } = gameContext;
 
-    // Get top 5 power holders only
-    const top5PowerHolders = powerHolders.slice(0, 5);
+  // Get top 5 power holders only
+  const top5PowerHolders = powerHolders.slice(0, 5);
 
-    // Format compass values for prompt (top 8 values: 2 from each category)
-    const compassText = playerCompassTopValues.map(dim =>
-        `  - ${dim.dimension}: ${dim.values.join(', ')}`
-    ).join('\n');
+  // Format compass values for prompt (top 8 values: 2 from each category)
+  const compassText = playerCompassTopValues.map(dim =>
+    `  - ${dim.dimension}: ${dim.values.join(', ')}`
+  ).join('\n');
 
-    // Log compass values for debugging
-    console.log("[game-turn-v2] [V3] Player compass values received:", playerCompassTopValues);
-    console.log("[game-turn-v2] [V3] Formatted compassText for prompt:\n" + compassText);
+  // Log compass values for debugging
+  console.log("[game-turn-v2] [V3] Player compass values received:", playerCompassTopValues);
+  console.log("[game-turn-v2] [V3] Formatted compassText for prompt:\n" + compassText);
 
-    const prompt = `0. YOUR MISSION
+  const prompt = `0. YOUR MISSION
 
 You are the Game Master of a historical-political simulation.
 You speak directly to the player as "you".
@@ -624,6 +631,14 @@ LANGUAGE RULES:
   GOOD: "the inspectors found out", "illegal experiments", "people want answers"
 - Use concrete language: "Citizens protest" NOT "tensions rise"
 - If a movie camera cannot record it, DO NOT WRITE IT
+- If a movie camera cannot record it, DO NOT WRITE IT
+
+ANTI-JARGON RULES (CRITICAL):
+- DO NOT use obscure historical terms. Use modern English equivalents.
+  - BAD: "Ekklesia", "Boule", "Strategos", "Ostracism", "Agora"
+  - GOOD: "Assembly", "Council", "General", "Exile", "Market Square"
+- The player should understand every word without a history degree.
+
 ${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.` : ''}
 
 YOUR MISSION:
@@ -712,11 +727,13 @@ NPC NAMING RULES (CRITICAL)
 ───────────────────────────────────────────────────────────────────────────────
 
 When generating names for NPCs/characters in dilemmas:
-- Names should match the **historical/cultural setting**, NOT the UI language
+- Names MUST match the **historical/cultural setting**, NOT the UI language or the player's personal background.
 - Example: 1877 US Railroad → English/American names (John, Sarah, William)
 - Example: 2025 Tel Aviv → Hebrew/Israeli names (David, Yael, Moshe)
 - Example: 2099 Namek → Sci-fi/alien names (Zarn, Kira, Vex)
 - Example: Ancient Athens → Greek names (Pericles, Aspasia, Leonidas)
+- Example: Aztec Empire → Nahuatl/Aztec names (Tlacaelel, Xicotencatl, Anacaona)
+- DO NOT use common modern names (e.g., "Eliezer", "Michael", "Sarah") in ancient or non-Western settings unless historically accurate.
 ${grounding ? `
 
 **THIS SCENARIO SETTING: ${grounding}**
@@ -750,6 +767,13 @@ STEP 1: SELECT A VALUE TO TRAP
 
 THE VALUE TRAP FORMULA:
 "If you honor [VALUE], you lose [something vital]. If you protect [something vital], you betray [VALUE]."
+
+CRITICAL MODIFICATION - COMPETENCE CHECK:
+If the player's previous choice was genuinely clever, diplomatic, or well-reasoned:
+- Do NOT simply punish them for it.
+- Acknowledge the success of their specific action (e.g., they avoided the immediate trap).
+- Then, introduce a NEW, UNRELATED dilemma that arises from the changed situation.
+- Do NOT twist a sound decision into an immediate failure just to force a "cost." The cost should come from the *new* situation, not a negation of the past victory.
 
 PRIVATE LIFE FOCUS BY AUTHORITY:
 
@@ -884,31 +908,34 @@ STEP 3: BRIDGE FROM PREVIOUS DAY (MANDATORY "bridge" FIELD)
 ─────────────────────────────────────────
 
 Days 2-7: The "bridge" field must contain EXACTLY ONE SENTENCE that:
-1. Shows the OUTCOME of the player's previous choice (what happened because of it)
-2. When relevant, CONNECTS that outcome to the new dilemma (cause → effect)
+1. Shows the OUTCOME of the player's previous choice.
+2. CONNECTS that outcome to the new dilemma.
+
+COMPETENCE RULE (VERY IMPORTANT):
+- If the player's choice was WEAK or reckless -> Show the negative consequence immediately (causal failure).
+- If the player's choice was SOUND, CLEVER, or COMPETENT -> Show a SUCCESSFUL OUTCOME first.
+  * Let them enjoy the win of that specific battle.
+  * THEN, Pivot to a new, perhaps unrelated, crisis that demands attention.
 
 PRIORITY ORDER:
-- BEST: Previous choice directly caused or triggered today's problem
-- GOOD: Previous choice's outcome creates context for unrelated new problem
-- ACCEPTABLE: Outcome shown, then pivot to new problem
+- BEST (Competent Play): "Your decree worked perfectly and the people cheered; however, this morning a new threat arrived from the north." (Success -> New Problem)
+- BEST (Weak Play/Direct Consequence): "Your refusal to pay triggered a riot immediately." (Direct Consequence)
+- GOOD: Previous choice's outcome creates context for unrelated new problem.
 
-GOOD EXAMPLES (causal connection - PREFERRED):
+GOOD EXAMPLES (Competent/Success):
+- "The trade deal you signed brought wealth to the city; but now the merchant guild demands political power."
+- "Your speech successfully calmed the mob; silence fell. Then, a messenger arrived with news of the plague."
+
+GOOD EXAMPLES (Failure/Consequence):
 - "Your arrest of the priest triggered riots in the temple district—now the high priestess demands an audience."
-- "The grain you distributed bought loyalty, but emptied the reserves; a merchant caravan offers supplies at a steep price."
-- "Your mercy to the rebels emboldened them—their leader now openly defies your decree in the market square."
 
-ACCEPTABLE EXAMPLES (outcome + pivot):
-- "The bridge you ordered is half-built, workers grumbling about pay. Meanwhile, a foreign envoy arrives with urgent news."
-- "Your speech calmed the mob for now. But this morning, a different crisis: plague ships spotted in the harbor."
-
-BAD EXAMPLES (DO NOT DO THIS):
-- "Yesterday you arrested the priest. Today, a plague arrives." (no outcome shown)
-- "Following your decision, things changed." (too vague)
-- "The situation evolved." (no specific outcome)
+BAD EXAMPLES (Do Not Do):
+- "You saved the city, but actually you didn't because the people hate you anyway." (Undermining competence)
+- "Whatever you do, things get worse." (Nihilism)
+- "Yesterday you arrested the priest. Today, a plague arrives." (No connection/outcome shown)
 
 MANDATORY STRUCTURE:
-- "bridge": ONE sentence showing outcome → connection to new problem
-- "dilemma.description": NEW situation details + direct question (do NOT repeat the bridge here)
+- "dilemma.description": Start with ONE sentence showing the outcome of the previous choice. Then describe the NEW situation details + direct question.
 
 
 3. CONSTRAINTS
@@ -958,31 +985,29 @@ DYNAMIC PARAMETERS (Days 2-7):
 
 THE MIRROR'S ROLE (All Days):
 - The Mirror is a light-hearted companion who surfaces value tensions with dry humor
-- MUST reference the player's specific value from their top 8 values, but NEVER use the exact compass nomenclature (e.g., "Truth/Trust", "Care/Solidarity", "Law/Std."). Instead, paraphrase naturally: "your sense of truth", "your care for others", "your faith in the law"
-- Tone: amused, teasing, observant - NOT preachy or judgmental
+- MUST reference the player's specific value from their top 8 values, but NEVER use the exact compass nomenclature.
+- Tone: amused, teasing, observant - NOT preachy or judgmental.
+- RESPECT: If the player made a clever move, the Mirror should acknowledge it with a nod of respect (even if dryly). "Well played," "A sharp move," etc.
 - First person perspective: "I see..." "I wonder..." "I notice..."
 - Length: 20-25 words exactly
 
 MIRROR MODE (specified in user prompt for Days 2+):
-- Mode "lastAction": Reflect on the player's PREVIOUS choice and what it reveals about their values. Comment on the tension between what they chose and what they claim to value.
-- Mode "dilemma": Comment on the CURRENT dilemma they're about to face and how it challenges their values.
+- Mode "lastAction": Reflect on the player's PREVIOUS choice.
+- Mode "dilemma": Comment on the CURRENT dilemma.
 
-GOOD "lastAction" Examples (reflecting on previous choice):
-- "I see you chose the treasury over the temple. Your practicality shows, but I wonder what your ancestors think of such pragmatism."
+GOOD "lastAction" Examples:
+- "I see you chose the treasury over the temple. Your practicality shows, but I wonder what your ancestors think."
+- "A clever feint, avoiding the nobles' trap. Your survival instinct is stronger than your pride, it seems." (Respectful)
 - "You sided with the nobles again. Your loyalty is touching—though I notice the common folk don't share your enthusiasm."
-- "Mercy for the rebels, hm? Your compassion is admirable. I wonder if the families of the slain guards agree."
 
-GOOD "dilemma" Examples (commenting on current situation):
-- "Ah, another test of your famous sense of justice. I wonder if mercy will win today, or if the law will have its way."
+GOOD "dilemma" Examples:
+- "Ah, another test of your famous sense of justice. I wonder if mercy will win today."
 - "The refugees wait at your gates. Your compassion is admirable—let's see if it survives the grain shortage."
-- "Freedom for all, you say. I'm curious how long that lasts when the grain runs out."
 
-BAD Mirror Examples (DO NOT DO THIS):
-- "That was an interesting choice." (too vague, no value reference)
-- "I wonder how this will play out." (no value reference)
+BAD Mirror Examples:
+- "That was an interesting choice." (too vague)
 - "Your commitment to your ideals is admirable." (too generic, preachy)
-- "Your Truth/Trust is in conflict here." (uses exact compass nomenclature - sounds robotic)
-- "Your Liberty/Agency matters to you." (uses slash notation from system - unnatural)
+- "Your Truth/Trust is in conflict here." (robotic)
 
 
 4. OUTPUT FORMAT
@@ -1023,7 +1048,7 @@ CRITICAL JSON RULES:
   },
   "dilemma": {
     "title": "Short title (max 120 chars)",
-    "description": "Playful Game Master comment in second person ('you') + new situation + direct question",
+    "description": "Start with ONE sentence bridging from the previous outcome. Then add the new crisis details + direct question.",
     "actions": [
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
       {"title": "Action title (2-4 words)", "summary": "One complete sentence (8-15 words)", "icon": "..."},
@@ -1059,5 +1084,5 @@ CRITICAL JSON RULES:
   "mirrorAdvice": "FIRST PERSON reflective sentence (20-25 words)"
 }`;
 
-    return prompt;
+  return prompt;
 }

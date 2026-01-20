@@ -258,6 +258,7 @@ export default function ActionDeck({
       <AnimatePresence>
         {flights.length > 0 && (
           <CoinFlightOverlay
+            key="coin-overlay"
             flights={flights}
             onAllDone={clearFlights}
           />

@@ -165,7 +165,7 @@ export async function gameTurnV2(req, res) {
                 : buildGameMasterSystemPromptUnified(enrichedContext, languageCode, languageName);
 
             // Build minimal Day 1 user prompt
-            const userPrompt = buildGameMasterUserPrompt(day, null, null, 'dilemma', languageCode, languageName);
+            const userPrompt = buildGameMasterUserPrompt(day, null, null, 'dilemma', languageCode, languageName, dilemmaEmphasis);
 
             // Debug logging (Day 1 request payload)
             if (debugMode) {
@@ -220,7 +220,9 @@ export async function gameTurnV2(req, res) {
                     });
                 }
 
+                const aiStart = Date.now();
                 const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
+                console.log(`[TIMING] Day 1 AI call took ${Date.now() - aiStart}ms`);
 
                 content = aiResponse?.content;
                 if (!content) {
@@ -422,7 +424,9 @@ export async function gameTurnV2(req, res) {
                     });
                 }
 
+                const aiStart = Date.now();
                 const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
+                console.log(`[TIMING] Day ${day} AI call took ${Date.now() - aiStart}ms`);
 
                 content = aiResponse?.content;
                 if (!content) {
@@ -458,19 +462,8 @@ export async function gameTurnV2(req, res) {
                     }
                 }
 
-                // If parsing succeeded, validate bridge field and break out of retry loop
+                // If parsing succeeded
                 if (parsed) {
-                    // Validate bridge field exists for Day 2+ (mandatory)
-                    if (day > 1 && !parsed.bridge && retryCount < maxRetries) {
-                        console.warn(`[GAME-TURN-V2] Day ${day} - Missing "bridge" field, retrying with stronger instruction...`);
-                        messages.push({
-                            role: "user",
-                            content: `Your response is missing the required "bridge" field. Please respond again with valid JSON that includes a "bridge" field containing ONE SENTENCE showing the OUTCOME of the player's previous action "${playerChoice.title}" and how it connects to today's new problem. This field is MANDATORY for Days 2-7.`
-                        });
-                        parsed = null; // Reset parsed to trigger retry
-                        continue;
-                    }
-
                     if (retryCount > 0) {
                         console.log(`[GAME-TURN-V2] ✅ JSON parsing succeeded on retry attempt ${retryCount + 1}`);
                     }
@@ -577,11 +570,14 @@ export async function gameTurnV2(req, res) {
                 );
             }
 
+            // Cleanup: ensure description exists
+            let cleanDescription = parsed.dilemma?.description || '';
+
             // Return response (flattened for frontend compatibility)
             const response = {
                 title: parsed.dilemma?.title || '',
-                description: parsed.dilemma?.description || '',
-                bridge: parsed.bridge || '', // Bridge sentence connecting previous action to new dilemma
+                description: cleanDescription,
+                bridge: '', // Bridge is now integrated into description
                 actions: parsed.dilemma?.actions || [],
                 topic: parsed.dilemma?.topic || '',
                 scope: parsed.dilemma?.scope || '',

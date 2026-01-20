@@ -6,10 +6,12 @@ import { useLogger } from "../hooks/useLogger";
 import { useLang, getCurrentLanguage } from "../i18n/lang";
 import { useRoleStore } from "../store/roleStore";
 import { useFragmentsStore } from "../store/fragmentsStore";
+import { useLoggingStore } from "../store/loggingStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { usePastGamesStore } from "../store/pastGamesStore";
-import { PREDEFINED_ROLES_ARRAY, getRoleImagePaths } from "../data/predefinedRoles";
+import { PREDEFINED_ROLES_ARRAY, EXPERIMENT_PREDEFINED_ROLE_KEYS, type PredefinedRoleData, getRoleImagePaths } from "../data/predefinedRoles";
 import { audioManager } from "../lib/audioManager";
+import { loggingService } from "../lib/loggingService";
 import { ShardWithAvatar } from "../components/fragments/ShardWithAvatar";
 import { ThreeShardComparison } from "../components/fragments/ThreeShardComparison";
 
@@ -163,11 +165,11 @@ const GRANDPA_DIALOGUES = [
 // Typewriter speed in ms per character
 const TYPEWRITER_SPEED = 25;
 
-// Shard to role mapping: Railroad Strike (index 0), Tel Aviv (index 1), Planet Namek (index 11)
+// Shard to role mapping: Athens, North America, Mars
 const SHARD_ROLES = [
-  PREDEFINED_ROLES_ARRAY[0],   // Shard 0 → Railroad Strike (1877)
-  PREDEFINED_ROLES_ARRAY[1],   // Shard 1 → Tel Aviv (2025)
-  PREDEFINED_ROLES_ARRAY[11],  // Shard 2 → Planet Namek (2099)
+  PREDEFINED_ROLES_ARRAY.find(r => r.id === "athens_431")!,         // Shard 0 → Athens
+  PREDEFINED_ROLES_ARRAY.find(r => r.id === "north_america_1607")!, // Shard 1 → North America
+  PREDEFINED_ROLES_ARRAY.find(r => r.id === "mars_2179")!,          // Shard 2 → Mars
 ];
 
 export default function DreamScreen({ push }: { push: PushFn }) {
@@ -390,7 +392,7 @@ export default function DreamScreen({ push }: { push: PushFn }) {
   const handleMirrorContinue = () => {
     // Play glass break sound
     const audio = new Audio("/assets/sounds/glassBreak.mp3");
-    audio.play().catch(() => {}); // Ignore autoplay errors
+    audio.play().catch(() => { }); // Ignore autoplay errors
     setPhase("mirrorBroken");
     logger.log("dream_mirror_continue", true, "Player continued past mirror");
   };
@@ -527,7 +529,7 @@ export default function DreamScreen({ push }: { push: PushFn }) {
         setShowShards(true);
         // Play fragments appear sound
         const audio = new Audio("/assets/sounds/fragmentsAppear.mp3");
-        audio.play().catch(() => {});
+        audio.play().catch(() => { });
       }
 
       setDialogueStep(dialogueStep + 1);
@@ -540,7 +542,6 @@ export default function DreamScreen({ push }: { push: PushFn }) {
       logger.log("dream_grandpa_dialogue_complete", true, "Grandpa dialogue complete, shards clickable");
     }
   };
-
   // Handler for shard click - behavior depends on shard state
   const handleShardClick = (shardIndex: number) => {
     // Play click sound
@@ -573,9 +574,40 @@ export default function DreamScreen({ push }: { push: PushFn }) {
       // Clear the justFinishedGame flag
       clearJustFinishedGame();
 
+      // FIX: Start fresh logging session for this game
+      // This ensures each game has a unique sessionId for proper tracking
+      loggingService.startSession().then(() => {
+        console.log('[DreamScreen] 🔄 Started fresh session for new game');
+      });
+
+      // CRITICAL FIX: Set active role key for experiment tracking
+      // MODULAR FIX: Use the key from the experiment definition based on shard index
+      // This ensures that Shard 0 always maps to Key 0 in the experiment set
+      // regardless of the underlying PREDEFINED_ROLES_ARRAY order.
+      const experimentRoleKey = EXPERIMENT_PREDEFINED_ROLE_KEYS[shardIndex];
+      const { setExperimentActiveRole } = useLoggingStore.getState();
+
+      if (!experimentRoleKey) {
+        console.error('[DreamScreen] ❌ No experiment role key found for shard index:', shardIndex);
+        // Fallback to roleData.legacyKey but log the error
+        setExperimentActiveRole(roleData.legacyKey);
+      } else {
+        // Primary safe path
+        setExperimentActiveRole(experimentRoleKey);
+        console.log('[DreamScreen] Set active role key (modular):', experimentRoleKey);
+      }
+
       // Set all role data in store (same as RoleSelectionScreen)
       setRole(roleData.legacyKey);
-      setAnalysis(roleData.powerDistribution);
+
+      // CRITICAL FIX: Inject dilemmaEmphasis into analysis object
+      // This ensures the server receives the specific context for Day 1
+      const analysisData = {
+        ...roleData.powerDistribution,
+        dilemmaEmphasis: (roleData as any).dilemmaEmphasis
+      };
+      setAnalysis(analysisData);
+
       setRoleBackgroundImage(getRoleImagePaths(roleData.imageId).full);
       setRoleContext(lang(roleData.titleKey), lang(roleData.introKey), roleData.year);
       setRoleDescription(lang(roleData.youAreKey));

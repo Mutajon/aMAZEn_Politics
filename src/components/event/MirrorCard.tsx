@@ -3,7 +3,7 @@
 // Adds typewriter reveal effect followed by traveling shimmer effect (magical vibe).
 // Text insets ensure it won't overlap the mirror art.
 
-import React, { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { HelpCircle } from "lucide-react";
 import { mirrorBubbleTheme as T } from "../../theme/mirrorBubbleTheme";
@@ -13,38 +13,38 @@ import { getCurrentLanguage } from "../../i18n/lang";
 
 /* ====================== TUNABLES (EDIT HERE) ====================== */
 // Card visuals
-const CARD_BG         = T.bg;
+const CARD_BG = T.bg;
 const CARD_TEXT_COLOR = T.textColor;
-const CARD_FONT_FF    = T.fontFamily;
-const CARD_FONT_PX    = 14; // Enlarged for readability (was 12)
-const CARD_PAD_X      = T.paddingX;
-const CARD_PAD_Y      = T.paddingY;
-const CARD_SHADOW     = T.shadow;
-const RADIUS_TL       = T.cornerTL;
-const RADIUS_TR       = T.cornerTR;
-const RADIUS_BL       = T.cornerBL;
-const RADIUS_BR       = T.cornerBR;
+const CARD_FONT_FF = T.fontFamily;
+const CARD_FONT_PX = 14; // Enlarged for readability (was 12)
+const CARD_PAD_X = T.paddingX;
+const CARD_PAD_Y = T.paddingY;
+const CARD_SHADOW = T.shadow;
+const RADIUS_TL = T.cornerTL;
+const RADIUS_TR = T.cornerTR;
+const RADIUS_BL = T.cornerBL;
+const RADIUS_BR = T.cornerBR;
 
 // Mirror art (served from /public) - Responsive sizing for mobile
-const IMG_WIDTH_PX    = 110;  // Doubled from 55 for better visibility
-const IMG_OPACITY     = 0.95;
+const IMG_WIDTH_PX = 110;  // Doubled from 55 for better visibility
+const IMG_OPACITY = 0.95;
 
 // Keep text away from the image
 const TEXT_INSET_RIGHT_PX = 12;
 
 // Typewriter reveal effect (initial text reveal)
-const TYPEWRITER_ENABLED    = true;
+const TYPEWRITER_ENABLED = true;
 const TYPEWRITER_DURATION_S = 1.0;          // Total time to reveal all characters
 
 // Magical shimmer effect (traveling glow - better readability than wobble)
-const SHIMMER_ENABLED       = true;
-const SHIMMER_DURATION_S    = 2.0;          // Time for shimmer to travel across text
-const SHIMMER_PAUSE_S       = 3.0;          // Pause between shimmer cycles
-const SHIMMER_GLOW_COLOR    = "rgba(255, 255, 255, 0.8)";  // Bright white glow
-const SHIMMER_GLOW_SIZE     = "8px";        // Glow radius
+const SHIMMER_ENABLED = true;
+const SHIMMER_DURATION_S = 2.0;          // Time for shimmer to travel across text
+const SHIMMER_PAUSE_S = 3.0;          // Pause between shimmer cycles
+const SHIMMER_GLOW_COLOR = "rgba(255, 255, 255, 0.8)";  // Bright white glow
+const SHIMMER_GLOW_SIZE = "8px";        // Glow radius
 
 // Spacing around the card
-const OUTER_MARGIN_Y  = "my-2";
+const OUTER_MARGIN_Y = "my-2";
 /* ================================================================= */
 
 export type MirrorCardProps = {
@@ -62,8 +62,11 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
   // RTL detection for Hebrew language
   const isRTL = getCurrentLanguage() === 'he';
 
-  // Responsive mirror offset (reduce protrusion on mobile to prevent horizontal scroll)
-  const mirrorOffset = isMobile ? 10 : 60; // 10px on mobile (half cut-off acceptable), 60px on desktop for dramatic effect
+  // Responsive mirror offset (ensure enough padding to clear the protruding mirror)
+  const mirrorOffset = isMobile ? 56 : 60; // Increased mobile padding to match half of mirror width
+
+  // Responsive mirror position (more than half off-screen to reduce text overlap)
+  const MIRROR_EDGE_POS = "-75px"; // ~68% off-screen (75px of 110px)
 
   // Use word-level splitting to prevent mid-word line breaks while maintaining shimmer effect
   const segments = useMemo(() => splitWords(text), [text]);
@@ -101,25 +104,28 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
           color: CARD_TEXT_COLOR,
           fontFamily: CARD_FONT_FF,
           fontSize: `${CARD_FONT_PX}px`,
-          padding: `${CARD_PAD_Y}px ${isRTL ? mirrorOffset : CARD_PAD_X}px ${CARD_PAD_Y}px ${isRTL ? CARD_PAD_X : mirrorOffset}px`,
+          // Fix padding: If RTL (Hebrew), Mirror is on Left, so we need BIG padding on Left.
+          padding: `${CARD_PAD_Y}px ${isRTL ? CARD_PAD_X : mirrorOffset}px ${CARD_PAD_Y}px ${isRTL ? mirrorOffset : CARD_PAD_X}px`,
           boxShadow: CARD_SHADOW,
           borderTopLeftRadius: RADIUS_TL,
           borderTopRightRadius: RADIUS_TR,
           borderBottomLeftRadius: RADIUS_BL,
           borderBottomRightRadius: RADIUS_BR,
           overflow: 'visible', // Allow mirror to protrude beyond card boundaries
-          direction: 'ltr', // Explicit LTR coordinate system for predictable positioning
+          direction: isRTL ? 'rtl' : 'ltr', // Use correct direction for text alignment
         }}
       >
         {/* Text with safe insets */}
         <div
           className={["relative whitespace-pre-wrap", italic ? "italic" : ""].join(" ")}
           style={{
-            paddingRight: TEXT_INSET_RIGHT_PX,
+            // In RTL, we might need padding on the left (end) instead of right
+            paddingRight: isRTL ? 0 : TEXT_INSET_RIGHT_PX,
+            paddingLeft: isRTL ? TEXT_INSET_RIGHT_PX : 0,
             wordBreak: "break-word",
             hyphens: "auto",
             zIndex: 5,  // Below mirror (10) but above background
-            direction: 'ltr', // Explicit LTR for text container
+            // direction: 'ltr', // REMOVED explicit LTR to inherit from parent (which is now dynamic)
           }}
         >
           {SHIMMER_ENABLED || TYPEWRITER_ENABLED ? (
@@ -138,8 +144,8 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
           className="absolute"
           style={{
             ...(isRTL
-              ? { left: isMobile ? '10px' : '-55px' }  // Hebrew: mirror on left edge
-              : { right: isMobile ? '10px' : '-55px' } // English: mirror on right edge
+              ? { left: MIRROR_EDGE_POS }  // Hebrew: mirror on left edge
+              : { right: MIRROR_EDGE_POS } // English: mirror on right edge
             ),
             top: "50%",                  // Center vertically
             transform: "translateY(-50%)", // Adjust for center alignment
@@ -232,35 +238,35 @@ function MagicShimmer({
             animate={
               typewriterComplete && SHIMMER_ENABLED
                 ? {
-                    // Shimmer animation (after typewriter completes)
-                    opacity: [1, 1.3, 1, 1],
-                    textShadow: [
-                      "0 0 0px transparent",
-                      `0 0 ${SHIMMER_GLOW_SIZE} ${SHIMMER_GLOW_COLOR}`,
-                      "0 0 0px transparent",
-                      "0 0 0px transparent",
-                    ],
-                  }
+                  // Shimmer animation (after typewriter completes)
+                  opacity: [1, 1.3, 1, 1],
+                  textShadow: [
+                    "0 0 0px transparent",
+                    `0 0 ${SHIMMER_GLOW_SIZE} ${SHIMMER_GLOW_COLOR}`,
+                    "0 0 0px transparent",
+                    "0 0 0px transparent",
+                  ],
+                }
                 : {
-                    // Typewriter animation (initial reveal)
-                    opacity: 1,
-                  }
+                  // Typewriter animation (initial reveal)
+                  opacity: 1,
+                }
             }
             transition={
               typewriterComplete && SHIMMER_ENABLED
                 ? {
-                    // Shimmer transition
-                    duration: totalCycle,
-                    repeat: Infinity,
-                    delay: shimmerDelay,
-                    ease: "easeInOut",
-                    times: [0, 0.15, 0.3, 1],
-                  }
+                  // Shimmer transition
+                  duration: totalCycle,
+                  repeat: Infinity,
+                  delay: shimmerDelay,
+                  ease: "easeInOut",
+                  times: [0, 0.15, 0.3, 1],
+                }
                 : {
-                    // Typewriter transition
-                    duration: 0.05,
-                    delay: typewriterDelay,
-                  }
+                  // Typewriter transition
+                  duration: 0.05,
+                  delay: typewriterDelay,
+                }
             }
           >
             {seg}

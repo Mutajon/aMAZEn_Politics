@@ -19,9 +19,9 @@ import LanguageSelector from "../components/LanguageSelector";
 import IDCollectionModal from "../components/IDCollectionModal";
 import { useLogger } from "../hooks/useLogger";
 import { audioManager } from "../lib/audioManager";
+import { PREDEFINED_ROLES_MAP } from "../data/predefinedRoles";
 
-// SUBTITLES now uses GAME_SUBTITLE from i18n
-const SUBTITLES: string[] = [];
+
 
 // Module-level flag to persist Hebrew warning across component remounts
 let pendingHebrewWarningFlag = false;
@@ -43,7 +43,6 @@ export default function SplashScreen({
   const { language } = useLanguage();
   const logger = useLogger();
 
-  const [visibleSubtitles, setVisibleSubtitles] = useState(0);
   const [showButton, setShowButton] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -196,7 +195,15 @@ export default function SplashScreen({
       narrator.prime();
       playMusic('background', true);
 
-      onStart();
+      // Reconnect Power Questionnaire:
+      // If the initial questionnaire hasn't been completed yet, push to it.
+      // Otherwise, proceed to the game (onStart usually goes to /dream).
+      const hasCompleted = useQuestionnaireStore.getState().hasCompleted;
+      if (!hasCompleted) {
+        push('/power-questionnaire');
+      } else {
+        onStart();
+      }
     } catch (error) {
       console.error('Error in handleIDSubmit:', error);
       setIsLoading(false);
@@ -305,6 +312,81 @@ export default function SplashScreen({
     }
   };
 
+  // DEBUG: Quick start specific role with default values
+  const handleDebugRoleStart = async (roleId: string) => {
+    // Robust lookup by ID instead of fragile title string
+    const roleData = Object.values(PREDEFINED_ROLES_MAP).find(r => r.id === roleId);
+
+    if (!roleData) {
+      console.error("Role not found:", roleId);
+      console.log("Available IDs:", Object.values(PREDEFINED_ROLES_MAP).map(r => r.id));
+      alert(`Role not found: ${roleId}\nCheck console for available IDs.`);
+      return;
+    }
+
+    // Play click sound
+    audioManager.playSfx('click-soft');
+
+    // Disable experiment mode
+    setExperimentMode(false);
+    setIsLoading(true);
+    setShowSettings(false);
+
+    try {
+      // Set consent
+      useLoggingStore.getState().setConsented(true);
+
+      // Start session
+      await loggingService.startSession();
+
+      // Reset stores
+      useCompassStore.getState().reset();
+      useDilemmaStore.getState().reset();
+      useRoleStore.getState().reset();
+      useMirrorQuizStore.getState().resetAll();
+      clearAllSnapshots();
+
+      // --- SET ROLE DATA ---
+      const roleStore = useRoleStore.getState();
+
+      // 1. Set Role
+      roleStore.setRole(roleData.legacyKey);
+
+      // 2. Set Analysis/Power Dist
+      // IMPORTANT: The store expects the full analysis object
+      roleStore.setAnalysis(roleData.powerDistribution);
+
+      // 3. Set Default Character (No Avatar)
+      const defaultChar = {
+        name: "DebugTester",
+        gender: "any" as const,
+        age: 30,
+        occupation: "Tester",
+        background: "Created for debugging purposes",
+        description: "A debug tester character.",
+        isCustom: false
+      };
+      roleStore.setCharacter(defaultChar);
+      roleStore.setPlayerName("DebugTester");
+
+      // 4. Prime systems
+      narrator.prime();
+      playMusic('background', true);
+
+      // 5. Force Game Phase to Event
+      useDilemmaStore.getState().setGamePhase?.("event");
+
+      // 6. Navigate directly to event screen
+      // We push to /event directly
+      push("/event");
+
+    } catch (error) {
+      console.error('Error starting debug role:', error);
+      setIsLoading(false);
+      alert('Debug start failed: ' + String(error));
+    }
+  };
+
   // Log splash screen loaded (runs once on mount)
   useEffect(() => {
     logger.logSystem('splash_screen_loaded', true, 'Splash screen loaded');
@@ -312,18 +394,12 @@ export default function SplashScreen({
 
   // Simple subtitle reveal: show title, wait 0.5s, fade in subtitle
   useEffect(() => {
-    // Wait 500ms after title, then show subtitle
-    const subtitleTimer = setTimeout(() => {
-      setVisibleSubtitles(1);
-    }, 500);
-
     // Then show button 500ms after subtitle appears
     const buttonTimer = setTimeout(() => {
       setShowButton(true);
     }, 1000);
 
     return () => {
-      clearTimeout(subtitleTimer);
       clearTimeout(buttonTimer);
     };
   }, []);
@@ -697,19 +773,21 @@ export default function SplashScreen({
                 {lang("START_BUTTON")}
               </motion.button>
 
-              {/* Free Play Button - skips ID collection, goes to full role carousel */}
-              <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: showButton ? 1 : 0 }}
-                transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
-                style={{ visibility: showButton ? "visible" : "hidden" }}
-                onClick={handleFreePlayClick}
-                className="w-[14rem] rounded-2xl px-4 py-2.5 text-sm font-semibold
+              {/* Free Play Button - TEMPORARILY HIDDEN FOR EXPERIMENT */}
+              {false && (
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: showButton ? 1 : 0 }}
+                  transition={{ delay: 0.05, type: "spring", stiffness: 250, damping: 22 }}
+                  style={{ visibility: showButton ? "visible" : "hidden" }}
+                  onClick={handleFreePlayClick}
+                  className="w-[14rem] rounded-2xl px-4 py-2.5 text-sm font-semibold
                bg-gradient-to-r from-purple-600 to-purple-700 text-amber-300 border border-purple-500/30
                shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-purple-400/60"
-              >
-                {lang("FREE_PLAY_BUTTON")}
-              </motion.button>
+                >
+                  {lang("FREE_PLAY_BUTTON")}
+                </motion.button>
+              )}
 
               {/* Secondary: High Scores (subtle/glass) - TEMPORARILY HIDDEN */}
               <motion.button
@@ -751,6 +829,47 @@ export default function SplashScreen({
                 {lang("BOOK_OF_ACHIEVEMENTS")}
               </motion.button>
             </div>
+
+            {/* DEBUG BUTTONS - Only visible in debug mode */}
+            {debugMode && !isLoading && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="mt-8 flex flex-col gap-2"
+              >
+                <div className="text-white/50 text-xs uppercase tracking-widest mb-1">Debug Quick Start</div>
+
+                <div className="grid grid-cols-2 gap-2 w-[20rem]">
+                  <button
+                    onClick={() => handleDebugRoleStart("railroad_1877")}
+                    className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded border border-white/10"
+                  >
+                    🚂 Railroad (Has Emphasis)
+                  </button>
+
+                  <button
+                    onClick={() => handleDebugRoleStart("russia_1917")}
+                    className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded border border-white/10"
+                  >
+                    🚩 Russia (No Emphasis)
+                  </button>
+
+                  <button
+                    onClick={() => handleDebugRoleStart("athens_431")}
+                    className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded border border-white/10"
+                  >
+                    🏛️ Athens (Has Emphasis)
+                  </button>
+
+                  <button
+                    onClick={() => handleDebugRoleStart("north_america_1607")}
+                    className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded border border-white/10"
+                  >
+                    🦅 N. America (Has Emphasis)
+                  </button>
+                </div>
+              </motion.div>
+            )}
           </>
         )}
       </div>

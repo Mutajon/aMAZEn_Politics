@@ -95,13 +95,13 @@ export default function CompassPillsOverlay({
   // Define button position for animation reference (relative to container center)
   // This is where pills will animate from/to
   const buttonPosition = {
-    x: isRTL ? 160 : -160, // Rough estimate of card edge from center (card is ~320-350px wide) 
+    x: isRTL ? 190 : -190, // Positioned outside card edges (~175px from center)
     y: 0
   };
 
   return (
     <div
-      className={`pointer-events-none absolute inset-0 flex items-center justify-center ${tutorialMode ? 'z-[90]' : 'z-30'}`}
+      className={`pointer-events-none absolute inset-0 flex items-center justify-center ${tutorialMode ? 'z-[9100]' : 'z-30'}`}
     >
       {loading && (
         <div className="flex items-center justify-center" style={{ color }}>
@@ -227,7 +227,7 @@ export default function CompassPillsOverlay({
                 text-white text-sm font-bold
                 focus:outline-none
                 border border-white/30
-                ${tutorialMode ? 'ring-2 ring-yellow-400 animate-pulse z-50' : ''}
+                ${tutorialMode ? 'ring-2 ring-yellow-400 animate-pulse z-[9100]' : ''}
               `}
               aria-label="Show effects"
               title="Show effects"
@@ -235,7 +235,7 @@ export default function CompassPillsOverlay({
                 // Hebrew: Right edge (+x translation), English: Left edge (-x translation)
                 left: isRTL ? 'auto' : '0px',
                 right: isRTL ? '0px' : 'auto',
-                transform: `translateY(-50%) ${isRTL ? 'translateX(50%)' : 'translateX(-50%)'}`,
+                transform: `translateY(-50%) ${isRTL ? 'translateX(130%)' : 'translateX(-130%)'}`,
 
                 // Fallback gradient (in case conic isn't supported)
                 background: "linear-gradient(135deg, #ef4444, #3b82f6)",

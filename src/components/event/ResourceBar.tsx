@@ -204,11 +204,10 @@ export default function ResourceBar({
         <button
           ref={avatarButtonRef}
           onClick={handleAvatarClick}
-          className={`shrink-0 rounded-xl overflow-hidden ring-1 transition-all duration-200 ${
-            tutorialMode
-              ? 'ring-yellow-400 ring-2 bg-white/10 z-50 relative'
+          className={`shrink-0 rounded-xl overflow-hidden ring-1 transition-all duration-200 ${tutorialMode
+              ? 'ring-yellow-400 ring-2 bg-white/10 z-[9100] relative'
               : 'ring-white/15 bg-white/5 hover:ring-white/30 hover:bg-white/10'
-          }`}
+            }`}
           style={{ width: 80, height: 80, minWidth: 80 }}
           aria-label={`View ${playerName}'s character information`}
           title={`View ${playerName}'s character card`}

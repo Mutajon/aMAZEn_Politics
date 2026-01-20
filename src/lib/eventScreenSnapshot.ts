@@ -15,7 +15,7 @@
 import type { AftermathResponse } from "./aftermath";
 
 export type EventScreenSnapshot = {
-  phase: 'collecting' | 'presenting' | 'interacting' | 'cleaning';
+  phase: 'collecting' | 'presenting' | 'interacting' | 'reasoning' | 'confirming';
   presentationStep: number;
   collectedData: any; // Full CollectedData object from useEventDataCollector
   timestamp: number;

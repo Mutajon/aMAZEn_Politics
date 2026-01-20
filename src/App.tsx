@@ -50,6 +50,8 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { useStateChangeLogger } from "./hooks/useStateChangeLogger";
 import { useSessionLogger } from "./hooks/useSessionLogger";
 import { usePartialSummaryLogger } from "./hooks/usePartialSummaryLogger";
+import { PendingSummaryManager } from "./lib/pendingSummaryManager";
+import { sendSessionSummary } from "./hooks/useSessionSummary";
 import GameCappedScreen from "./screens/GameCappedScreen";
 import PowerQuestionnaireScreen from "./screens/PowerQuestionnaireScreen";
 import PostGameQuestionnaireScreen from "./screens/PostGameQuestionnaireScreen";
@@ -165,6 +167,17 @@ export default function App() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [debugMode]);
+
+  // Attempt to resend any pending logs from previous sessions
+  useEffect(() => {
+    const pending = PendingSummaryManager.getAll();
+    if (pending.length > 0) {
+      console.log(`[App] 🔄 Found ${pending.length} pending summaries, attempting to resend...`);
+      pending.forEach(summary => {
+        sendSessionSummary(summary);
+      });
+    }
+  }, []);
 
   // Render current screen with global audio controls
   return (
