@@ -84,7 +84,7 @@ export function ThreeShardComparison({
         {/* Backdrop */}
         <motion.div
           className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-          onClick={onClose}
+          onClick={!showPreferenceButtons ? onClose : undefined}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -109,12 +109,14 @@ export function ThreeShardComparison({
             >
               {lang("THREE_SHARD_TITLE")}
             </motion.h2>
-            <button
-              onClick={onClose}
-              className="ml-3 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            {!showPreferenceButtons && (
+              <button
+                onClick={onClose}
+                className="ml-3 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/80 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {/* Three cards side by side - always show all 3 slots */}
