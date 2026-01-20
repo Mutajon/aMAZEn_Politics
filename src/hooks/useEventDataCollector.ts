@@ -147,7 +147,7 @@ async function waitForNarrativeMemory(timeoutMs = 4000, pollIntervalMs = 75) {
  * - Better narrative continuity
  * - ~50% token savings after Day 1
  */
-async function fetchGameTurn(language: string = 'en'): Promise<{
+async function fetchGameTurn(language: string = 'he'): Promise<{
   dilemma: Dilemma;
   supportEffects: SupportEffect[] | null;
   newsItems: TickerItem[];

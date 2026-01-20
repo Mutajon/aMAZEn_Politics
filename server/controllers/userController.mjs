@@ -136,7 +136,7 @@ export async function generateIntroParagraph(req, res) {
         const genderText = ["male", "female", "any"].includes(String(gender || "").toLowerCase())
             ? String(gender).toLowerCase()
             : "any";
-        const languageCode = String(language || "en").toLowerCase();
+        const languageCode = String(language || "he").toLowerCase();
 
         const systemNameText = String(systemName || "").slice(0, 200).trim();
         const settingText = String(setting || "").slice(0, 300).trim();
