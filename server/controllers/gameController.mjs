@@ -84,7 +84,7 @@ export async function gameTurnV2(req, res) {
             useXAI = false,
             useGemini = false,
             debugMode = false,
-            language = 'en' // Get language from client (default: English)
+            language = 'he' // Get language from client (default: Hebrew)
         } = req.body;
 
         // Validation

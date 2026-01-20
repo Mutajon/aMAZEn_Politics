@@ -779,7 +779,7 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
     const useAnthropic = !!req.body?.useAnthropic;
     const topWhat = Array.isArray(req.body?.topWhat) ? req.body.topWhat.slice(0, 2) : [];
     const topWhence = Array.isArray(req.body?.topWhence) ? req.body.topWhence.slice(0, 2) : [];
-    const language = req.body?.language || 'en'; // Get language from client (default: English)
+    const language = req.body?.language || 'he'; // Get language from client (default: Hebrew)
 
     // Log received payload
     console.log("[mirror-quiz-light] Received payload:", {
@@ -1202,7 +1202,7 @@ app.post("/api/compass-conversation/analyze", async (req, res) => {
       return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
     }
 
-    const { gameId, action, reasoning, gameContext, trapContext, debugMode = false, language = 'en' } = req.body || {};
+    const { gameId, action, reasoning, gameContext, trapContext, debugMode = false, language = 'he' } = req.body || {};
     const actionTitle = typeof action?.title === "string" ? action.title.trim().slice(0, 160) : "";
     const actionSummary = typeof action?.summary === "string" ? action.summary.trim().slice(0, 400) : "";
 
@@ -1246,7 +1246,7 @@ app.post("/api/compass-conversation/analyze", async (req, res) => {
     }
 
     // Get language name for instruction
-    const languageCode = String(language || "en").toLowerCase();
+    const languageCode = String(language || "he").toLowerCase();
     const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
     const languageInstruction = languageCode !== 'en'
       ? `\n\nIMPORTANT: Write your mirror reflection message in ${languageName}. Use natural, witty phrasing appropriate for a native speaker.`
