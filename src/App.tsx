@@ -16,6 +16,7 @@ import { LanguageProvider, useLanguage } from "./i18n/LanguageContext";
 import { useHashRoute } from "./lib/router";
 import SplashScreen from "./screens/SplashScreen";
 import BackstageScreen from "./screens/BackstageScreen";
+import LobbyScreen from "./screens/LobbyScreen";
 // import CompassIntro from "./screens/CompassIntro"; // (legacy monolith – no longer used)
 import IntroScreen from "./screens/IntroScreen";
 import DreamScreen from "./screens/DreamScreen";
@@ -285,6 +286,9 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
               onAchievements={() => push("/achievements")}
             />
           )}
+
+          {/* Lobby route - External website flow (limited free play) */}
+          {route === "/lobby" && <LobbyScreen push={push} />}
 
           {/* Default route - SplashScreen */}
           {route === "/" && (

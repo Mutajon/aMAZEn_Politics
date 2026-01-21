@@ -82,6 +82,7 @@ export default function FinalScoreScreen({ push }: Props) {
   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
   const selectedRoleKey = useRoleStore((s) => s.selectedRole);
   const experimentMode = useSettingsStore((s) => s.experimentMode);
+  const lobbyMode = useSettingsStore((s) => s.lobbyMode);
   const roleBgStyle = useMemo(
     () => bgStyleWithRoleImage(roleBackgroundImage),
     [roleBackgroundImage]
@@ -457,8 +458,17 @@ export default function FinalScoreScreen({ push }: Props) {
     // Mark that player just finished a game (for grandpa's score-based message)
     useDilemmaStore.getState().setJustFinishedGame(true, finalScore);
 
-    // Route based on mode: experiment mode goes to dream, free play goes to role selection
-    push(experimentMode ? "/dream" : "/role");
+    // Route based on mode:
+    // - Lobby mode goes back to lobby screen
+    // - Experiment mode goes to dream
+    // - Free play goes to role selection
+    if (lobbyMode) {
+      push("/lobby");
+    } else if (experimentMode) {
+      push("/dream");
+    } else {
+      push("/role");
+    }
   };
 
   const handleVisitHallOfFame = () => {
