@@ -91,6 +91,10 @@ type SettingsState = {
   // --- NEW: Mobile device detection (session-only) ---
   isMobileDevice: boolean;
   setIsMobileDevice: (v: boolean) => void;
+
+  // --- NEW: Lobby mode (session-only, for external website flow) ---
+  lobbyMode: boolean;
+  setLobbyMode: (v: boolean) => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -185,6 +189,11 @@ export const useSettingsStore = create<SettingsState>()(
       // NEW: Mobile device detection (default false, session-only - NOT persisted)
       isMobileDevice: false,
       setIsMobileDevice: (v) => set({ isMobileDevice: v }),
+
+      // NEW: Lobby mode (default false, session-only - NOT persisted)
+      // Used when game is started from external website lobby flow
+      lobbyMode: false,
+      setLobbyMode: (v) => set({ lobbyMode: v }),
     }),
     {
       // Bump key so no stale objects hide the new fields

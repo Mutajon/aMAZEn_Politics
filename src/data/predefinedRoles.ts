@@ -135,29 +135,40 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       storyThemes: ["free_speech_vs_security", "private_vs_public_duty", "tradition_vs_innovation", "family_vs_ideology"],
       authorityLevel: "low",
       dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (Athens -431):
-
+      
 ═══════════════════════════════════════════════════════════════════════════════
-CORE TENSION: THE PHILOSOPHER vs THE ASSEMBLY
+CORE TENSION: THE POET'S POISON (Free Speech vs Dignity)
 ═══════════════════════════════════════════════════════════════════════════════
 
 CONTEXT:
-A popular Philosopher is preaching dangerous ideas:
-1. "Most voters are stupid and shouldn't rule." (Anti-Democracy)
-2. "Women are inferior and should be hidden." (Misogyny)
-3. "The strong should rule the weak." (Oligarchy)
+A famous poet/playwright is filling the Agora with verses that mock Democracy as "Rule of Fools" and Women as "Soulless Imitations."
+His words are not illegal, but they are shaking the city's foundations.
+Sparta is laughing. Young men are listening. Your family is insulted.
 
-YOU are a member of the Assembly who must deal with him.
+═══════════════════════════════════════════════════════════════════════════════
+THE 5-ACT ARC (MANDATORY ROTATION)
+═══════════════════════════════════════════════════════════════════════════════
+Cycle through these specific dilemmas or similar themes:
 
-Probe these tensions:
-- THE INSULT: Hearing him mock the "mob" (you and your peers) to your face.
-- THE CONSEQUENCE: His words are causing real harm (laws against women, young men abandoning democracy).
-- THE DILEMMA:
-  - Silence him? (Betrays Free Speech)
-  - Debate him? (Legitimizes his hate)
-  - Ignore him? (Allow his influence to grow)
+1. THE SILENCING (Free Speech vs Harm)
+   A proposal to ban his performances.
+   → Support the ban (Safety)? Oppose it (Liberty)? Or demand a "public debate" (Risk giving him a platform)?
 
-Focus on the PERSONAL STAKES: How do his words hurt your family, your wife/daughter, and your own standing?
-`,
+2. THE PRIESTHOOD (Tradition vs Misogyny)
+   His followers demand women be stripped of holy priesthood roles. Your sister is a Priestess of Athena.
+   → Support the vote (Democracy/Mob Rule)? Stall the vote (Bureaucracy)? Sabotage it?
+
+3. "MARSIA" (External Respect vs Internal Humiliation)
+   His play renames Athens to "Marsia" (a "masculine" city). Spartans mockingly use the name.
+   → Ban the name (Streisand effect)? Ignore it? Launch a counter-campaign against Sparta?
+
+4. BLOOD IN THE AGORA (Order vs Violence)
+   His words have turned to stones thrown at speakers.
+   → Silence him (Blame the speaker)? Punish the stone-throwers (Ignore the incitement)? Suspend the Assembly (End Democracy to save it)?
+
+5. THE ASSASSINATION (Family vs Law)
+   Your own son led a failed attempt to beat/kill the poet. He is caught.
+   → Let him yield to the law (Sacrifice Son)? Use influence to free him (Corruption)? Blame the Poet for incitement?`,
     },
     characters: {
       male: {
@@ -765,60 +776,35 @@ TONE & STYLE
       dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (Tenochtitlan 1519):
 
 CONTEXT:
-The harvest season approaches, and the Great Temple is unfinished. The new captives from the trade route have arrived at your city's gates. They are the currency that keeps neighboring tribes at bay and the labor that appeases the gods.
+Your village has one purpose: To hunt, sort, and trade SLAVES (tlatlacotin) for the Empire.
+You aren't a king. You are a merchant of human lives. Your village's survival depends on this trade.
+Without it, you have no walls, no army, no protection.
 
 ═══════════════════════════════════════════════════════════════════════════════
-CORE TENSION TRIANGLE: ANCESTRAL DUTY vs INDIVIDUAL CONSCIENCE vs SURVIVAL
+THE 5-ACT ARC (MANDATORY ROTATION)
 ═══════════════════════════════════════════════════════════════════════════════
+Cycle through these specific dilemmas or similar themes:
 
-Probe these tensions throughout the game:
-- THE ENGINE OF CIVILIZATION: The tlatlacotin (bound labor) trade is the literal foundation of Tenochtitlan's power. Without it, the Great Temple stops being built, and priests warn of divine wrath.
-- POLITICAL SURVIVAL: Neighboring city-states (like Tlaxcala) are kept in check only by the wealth and labor your trade provides. To stop is to invite invasion.
-- HUMAN COST: You are forced to confront the reality of the people being traded—many have individual stories or connections to your past.
-- INHERITED SIN: You have taken over this system from your parents. Do you honor your lineage or break the cycle?
+1. THE QUOTA (Survival vs Taboo)
+   An ally demands 10 young girls immediately. You don't have enough from raids.
+   → Hunt your own village's children? Stall and lie (Risk Alliance)? Refuse (Risk War)?
 
-═══════════════════════════════════════════════════════════════════════════════
-MANDATORY THEMATIC ARCHETYPES — HARD ROTATION REQUIRED
-═══════════════════════════════════════════════════════════════════════════════
+2. THE REVOLT (Brutality vs Mercy)
+   Captives plan a revolt.
+   → Execute one slightly innocent leader publicly (Terror)? Sell them apart (Pragmatism)? Aid the revolt (Suicide/Revolution)?
 
-You MUST cycle through these 7 archetypes. Do NOT repeat until at least 4 others used.
+3. THE LOVER (Heart vs Business)
+   You have fallen in love with a capable captive. A rich buyer prompts a huge offer for HIM/HER specifically.
+   → Sell (Duty)? Swap secretly (Fraud)? Free them (Suspicion)?
 
-1. THE FAMILIAR FACE (tensionCluster: FamilyPersonal)
-   Among the new captives is someone you knew as a child—a playmate from a village your family once traded with peacefully.
-   → Free them secretly? Assign them to "easier" labor? Treat them as any other captive?
+4. THE SHAMAN'S WARNING (Soul vs Stomach)
+   Shamans claim the violence is rotting the village's youth. They want to switch to corn/wool.
+   → Ignore (Realism)? Soften methods (Compromise)? Attempt the switch (Economic Collapse)?
 
-2. THE TEMPLE DEADLINE (tensionCluster: ReligionCulture or HealthDisaster)
-   Priests demand accelerated construction before the eclipse. More labor means more captives—or working current ones to death.
-   → Raid a peaceful village? Work captives harder (high mortality)? Delay and face the priests' wrath?
+5. THE RIVAL (Kill or Be Killed)
+   A rival family threatens to expose you or take over. Attempt to purge you.
+   → Assassinate the rival? Bribe them (Weakness)? Use the chaos to force the economic switch?`,
 
-3. THE RUNAWAY (tensionCluster: LawJustice or SocialOrder)
-   A bound laborer escapes and reaches a neighboring tribe. They demand you pay ransom—or they'll shelter runaways.
-   → Pay the ransom (weaken your authority)? Launch a punitive raid? Negotiate an extradition treaty?
-
-4. THE SUCCESSOR'S DOUBT (tensionCluster: InternalPower or FamilyPersonal)
-   Your own child asks why the bound ones are treated differently. Your spouse says the child is too soft for this business.
-   → Teach them the "necessity" of the trade? Hide the worst aspects? Begin preparing them to end it?
-
-5. THE PRIEST'S DEMAND (tensionCluster: ReligionCulture or ExternalConflict)
-   A priest claims the gods demand a human sacrifice from among the captives to ensure the harvest.
-   → Comply with tradition? Refuse and face divine blame for any crop failure? Offer an alternative?
-
-6. THE TRADE BOYCOTT (tensionCluster: EconomyResources or DiplomacyTreaty)
-   A coalition of villages refuses to trade with you until you release certain captives—relatives of their chiefs.
-   → Release them (show weakness)? Refuse (face economic isolation)? Negotiate for something in return?
-
-7. THE CONSCIENCE BREAK (tensionCluster: FamilyPersonal or InternalPower)
-   An elder who helped your parents build this trade reveals on their deathbed that they always regretted it.
-   → Take this as permission to reform? Dismiss it as senility? Use it as cover for gradual change?
-
-═══════════════════════════════════════════════════════════════════════════════
-TONE & STYLE
-═══════════════════════════════════════════════════════════════════════════════
-
-- INHERITED BURDEN: You did not create this system but you perpetuate it
-- SACRED ECONOMY: Religion and commerce are inseparable
-- HUMAN FACES: Every captive has a story; some connect to yours
-- SURVIVAL LOGIC: Ending the trade may mean ending your city's dominance`
     },
     characters: {
       male: {

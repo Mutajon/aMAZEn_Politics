@@ -10,6 +10,7 @@ import {
 } from "../helpers/gameHelpers.mjs";
 import {
     buildGameMasterSystemPromptUnifiedV3,
+    buildGameMasterSystemPromptUnifiedV4,
     buildGameMasterUserPrompt
 } from "../services/promptBuilders.mjs";
 import { getTheoryPrompt } from "../theory-loader.mjs";
@@ -31,28 +32,48 @@ export async function reserveGameSlot(req, res) {
     try {
         const countersCollection = await getCountersCollection();
 
-        // Atomically find and increment the counter, but only if its value is less than the limit.
-        const gameLimit = parseInt(process.env.GAME_LIMIT || '250', 10);
+        // New Logic: "games_remaining" counts DOWN to zero.
+        // We want only 1 variable to manage the limit.
+
+        // 1. Try to decrement the counter if it's > 0
         const result = await countersCollection.findOneAndUpdate(
-            { name: 'total_games', value: { $lt: gameLimit } },
-            { $inc: { value: 1 } },
+            { name: 'games_remaining', value: { $gt: 0 } },
+            { $inc: { value: -1 } },
             { returnDocument: 'after' }
         );
 
-        if (result.value) {
-            // Successfully incremented, meaning we got a slot.
-            console.log(`[Reserve Slot] Slot reserved. New count: ${result.value}`);
-            res.json({ success: true, gameCount: result.value });
+        if (result) {
+            // Successfully reserved a slot
+            console.log(`[Reserve Slot] Slot reserved. Remaining: ${result.value}`);
+            res.json({ success: true, gamesRemaining: result.value });
         } else {
-            // The findOneAndUpdate came back empty, which means the condition value < gameLimit failed.
-            const currentCounter = await countersCollection.findOne({ name: 'total_games' });
-            const currentCount = currentCounter ? currentCounter.value : 'unknown';
-            console.log(`[Reserve Slot] Game limit reached. Current count: ${currentCount}`);
-            res.status(403).json({
-                success: false,
-                message: "The game has reached its player limit.",
-                isCapped: true,
-            });
+            // Failed to decrement. Either capped (<=0) or doesn't exist.
+            const existingCounter = await countersCollection.findOne({ name: 'games_remaining' });
+
+            if (!existingCounter) {
+                // Initialize the counter for the first time
+                // Default to 250 since we aren't using the ENV var anymore
+                const initialLimit = 250;
+
+                // We assume this request consumes one slot, so we set it to (initial - 1)
+                const startValue = Math.max(0, initialLimit - 1);
+
+                await countersCollection.insertOne({
+                    name: 'games_remaining',
+                    value: startValue
+                });
+
+                console.log(`[Reserve Slot] Initialized 'games_remaining' to ${startValue} (default ${initialLimit})`);
+                res.json({ success: true, gamesRemaining: startValue });
+            } else {
+                // Counter exists and is <= 0
+                console.log(`[Reserve Slot] Game limit reached. Remaining: ${existingCounter.value}`);
+                res.status(403).json({
+                    success: false,
+                    message: "The game has reached its player limit.",
+                    isCapped: true,
+                });
+            }
         }
     } catch (error) {
         console.error("Error in /api/reserve-game-slot:", error?.message || error);
@@ -292,7 +313,8 @@ export async function gameTurnV2(req, res) {
                 }],
                 clusterCounts: {
                     [parsed.dilemma?.tensionCluster || 'Unknown']: 1
-                }
+                },
+                previousValueTargeted: parsed.valueTargeted || 'Unknown'
             };
 
             // FIXED: Store messages array properly in conversation.messages field
@@ -367,10 +389,31 @@ export async function gameTurnV2(req, res) {
             console.log(`[GAME-TURN-V2] Day ${day} - Mirror mode: ${mirrorMode}`);
 
             // Build Day 2+ user prompt with current compass values and mirror mode
+            // Calculate consecutive days on topic for V4 logic
+            const historyForCheck = conversation.meta.topicHistory || [];
+            let consecutiveDaysOnTopic = 0;
+            let lastTopic = null;
+
+            if (historyForCheck.length > 0) {
+                lastTopic = historyForCheck[historyForCheck.length - 1].topic;
+                // Count backwards how many consecutive days had this topic
+                for (let i = historyForCheck.length - 1; i >= 0; i--) {
+                    if (historyForCheck[i].topic === lastTopic) {
+                        consecutiveDaysOnTopic++;
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            console.log(`[GAME-TURN-V2] Topic history check: Last topic "${lastTopic}", consecutive days: ${consecutiveDaysOnTopic}`);
+
+            // Build Day 2+ user prompt with current compass values and mirror mode
             const languageCode = String(language || "en").toLowerCase();
             const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
             const dilemmaEmphasis = conversation.meta.dilemmaEmphasis || null;
-            const userPrompt = buildGameMasterUserPrompt(day, playerChoice, currentCompassTopValues, mirrorMode, languageCode, languageName, dilemmaEmphasis);
+            const previousValueTargeted = conversation.meta.previousValueTargeted || null;
+            const userPrompt = buildGameMasterUserPrompt(day, playerChoice, currentCompassTopValues, mirrorMode, languageCode, languageName, dilemmaEmphasis, previousValueTargeted, consecutiveDaysOnTopic, lastTopic);
 
             // Prepare messages array (history + new user message)
             const messages = [
@@ -546,7 +589,8 @@ export async function gameTurnV2(req, res) {
                 ...conversation.meta,
                 messages: updatedMessages,
                 topicHistory,
-                clusterCounts
+                clusterCounts,
+                previousValueTargeted: parsed.valueTargeted || 'Unknown'
             };
 
             // FIXED: Store updated messages properly
