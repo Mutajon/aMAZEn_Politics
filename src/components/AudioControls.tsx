@@ -12,6 +12,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Music, Volume2, VolumeX } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useSettingsStore } from '../store/settingsStore';
 import { useNarrator } from '../hooks/useNarrator';
 import { useLogger } from '../hooks/useLogger';
@@ -92,9 +93,68 @@ export default function AudioControls() {
   };
 
   return (
-    <div className="fixed bottom-4 ltr:left-4 rtl:right-4 z-50 flex flex-col ltr:items-start rtl:items-end gap-2" ref={sliderRef}>
+    <div className="fixed bottom-4 ltr:left-4 rtl:right-4 z-50 flex flex-row items-center gap-2" ref={sliderRef}>
+      {/* Music Volume Slider - positioned to the left of buttons */}
+      <AnimatePresence>
+        {showMusicSlider && (
+          <motion.div
+            initial={{ opacity: 0, x: 20, scale: 0.95 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 20, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="
+              w-40
+              p-3
+              rounded-lg
+              bg-gray-900/90 backdrop-blur-md
+              border border-white/30
+              shadow-2xl
+            "
+          >
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between text-xs text-gray-300">
+                <span className="font-medium">{lang("MUSIC_VOLUME")}</span>
+                <span className="text-amber-400">{Math.round(musicVolume * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={musicVolume}
+                onChange={(e) => handleVolumeChange(Number(e.target.value))}
+                className="
+                  w-full h-2 
+                  rounded-lg 
+                  appearance-none 
+                  bg-gray-700/50
+                  cursor-pointer
+                  [&::-webkit-slider-thumb]:appearance-none
+                  [&::-webkit-slider-thumb]:w-4
+                  [&::-webkit-slider-thumb]:h-4
+                  [&::-webkit-slider-thumb]:rounded-full
+                  [&::-webkit-slider-thumb]:bg-amber-400
+                  [&::-webkit-slider-thumb]:hover:bg-amber-300
+                  [&::-webkit-slider-thumb]:transition-colors
+                  [&::-webkit-slider-thumb]:shadow-lg
+                  [&::-moz-range-thumb]:w-4
+                  [&::-moz-range-thumb]:h-4
+                  [&::-moz-range-thumb]:rounded-full
+                  [&::-moz-range-thumb]:bg-amber-400
+                  [&::-moz-range-thumb]:hover:bg-amber-300
+                  [&::-moz-range-thumb]:transition-colors
+                  [&::-moz-range-thumb]:border-0
+                  [&::-moz-range-thumb]:shadow-lg
+                "
+                aria-label="Music volume"
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="flex flex-row items-center gap-2">
-        {/* Music Icon Button */}
+        {/* Music Icon Button (Now on the Left) */}
         <button
           type="button"
           onClick={handleMusicClick}
@@ -112,16 +172,15 @@ export default function AudioControls() {
           aria-label="Adjust music volume"
           title="Adjust music volume"
         >
-          <Music 
-            className={`w-5 h-5 transition-colors ${
-              musicVolume > 0 
-                ? 'text-amber-400 group-hover:text-amber-300' 
-                : 'text-gray-500 group-hover:text-gray-400 opacity-50'
-            }`} 
+          <Music
+            className={`w-5 h-5 transition-colors ${musicVolume > 0
+              ? 'text-amber-400 group-hover:text-amber-300'
+              : 'text-gray-500 group-hover:text-gray-400 opacity-50'
+              }`}
           />
         </button>
 
-        {/* SFX Toggle Button */}
+        {/* SFX Toggle Button (Now on the Right) */}
         <button
           type="button"
           onClick={handleSfxToggle}
@@ -146,62 +205,6 @@ export default function AudioControls() {
           )}
         </button>
       </div>
-
-      {/* Music Volume Slider Popup */}
-      {showMusicSlider && (
-        <div
-          className="
-            ltr:ml-12 rtl:mr-12 -mb-12
-            w-40
-            p-3
-            rounded-lg
-            bg-gray-900/90 backdrop-blur-md
-            border border-white/30
-            shadow-2xl
-            animate-in fade-in ltr:slide-in-from-left-2 rtl:slide-in-from-right-2
-            duration-200
-          "
-        >
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between text-xs text-gray-300">
-              <span className="font-medium">{lang("MUSIC_VOLUME")}</span>
-              <span className="text-amber-400">{Math.round(musicVolume * 100)}%</span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={musicVolume}
-              onChange={(e) => handleVolumeChange(Number(e.target.value))}
-              className="
-                w-full h-2 
-                rounded-lg 
-                appearance-none 
-                bg-gray-700/50
-                cursor-pointer
-                [&::-webkit-slider-thumb]:appearance-none
-                [&::-webkit-slider-thumb]:w-4
-                [&::-webkit-slider-thumb]:h-4
-                [&::-webkit-slider-thumb]:rounded-full
-                [&::-webkit-slider-thumb]:bg-amber-400
-                [&::-webkit-slider-thumb]:hover:bg-amber-300
-                [&::-webkit-slider-thumb]:transition-colors
-                [&::-webkit-slider-thumb]:shadow-lg
-                [&::-moz-range-thumb]:w-4
-                [&::-moz-range-thumb]:h-4
-                [&::-moz-range-thumb]:rounded-full
-                [&::-moz-range-thumb]:bg-amber-400
-                [&::-moz-range-thumb]:hover:bg-amber-300
-                [&::-moz-range-thumb]:transition-colors
-                [&::-moz-range-thumb]:border-0
-                [&::-moz-range-thumb]:shadow-lg
-              "
-              aria-label="Music volume"
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -298,11 +301,10 @@ export function AudioButtonsInline() {
           title="Adjust music volume"
         >
           <Music
-            className={`w-4 h-4 transition-colors ${
-              musicVolume > 0
-                ? 'text-amber-400 group-hover:text-amber-300'
-                : 'text-gray-500 group-hover:text-gray-400 opacity-50'
-            }`}
+            className={`w-4 h-4 transition-colors ${musicVolume > 0
+              ? 'text-amber-400 group-hover:text-amber-300'
+              : 'text-gray-500 group-hover:text-gray-400 opacity-50'
+              }`}
           />
         </button>
 

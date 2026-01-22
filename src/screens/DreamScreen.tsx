@@ -601,10 +601,12 @@ export default function DreamScreen({ push }: { push: PushFn }) {
       setRole(roleData.legacyKey);
 
       // CRITICAL FIX: Inject dilemmaEmphasis into analysis object
-      // This ensures the server receives the specific context for Day 1
+      // It is located inside powerDistribution in the predefinedRoles data structure
+      const emphasisText = (roleData.powerDistribution as any).dilemmaEmphasis || (roleData as any).dilemmaEmphasis;
+
       const analysisData = {
         ...roleData.powerDistribution,
-        dilemmaEmphasis: (roleData as any).dilemmaEmphasis
+        dilemmaEmphasis: emphasisText
       };
       setAnalysis(analysisData);
 
