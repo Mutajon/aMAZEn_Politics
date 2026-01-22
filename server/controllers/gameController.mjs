@@ -312,7 +312,8 @@ export async function gameTurnV2(req, res) {
                 }],
                 clusterCounts: {
                     [parsed.dilemma?.tensionCluster || 'Unknown']: 1
-                }
+                },
+                previousValueTargeted: parsed.valueTargeted || 'Unknown'
             };
 
             // FIXED: Store messages array properly in conversation.messages field
@@ -390,7 +391,8 @@ export async function gameTurnV2(req, res) {
             const languageCode = String(language || "en").toLowerCase();
             const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
             const dilemmaEmphasis = conversation.meta.dilemmaEmphasis || null;
-            const userPrompt = buildGameMasterUserPrompt(day, playerChoice, currentCompassTopValues, mirrorMode, languageCode, languageName, dilemmaEmphasis);
+            const previousValueTargeted = conversation.meta.previousValueTargeted || null;
+            const userPrompt = buildGameMasterUserPrompt(day, playerChoice, currentCompassTopValues, mirrorMode, languageCode, languageName, dilemmaEmphasis, previousValueTargeted);
 
             // Prepare messages array (history + new user message)
             const messages = [
@@ -566,7 +568,8 @@ export async function gameTurnV2(req, res) {
                 ...conversation.meta,
                 messages: updatedMessages,
                 topicHistory,
-                clusterCounts
+                clusterCounts,
+                previousValueTargeted: parsed.valueTargeted || 'Unknown'
             };
 
             // FIXED: Store updated messages properly
