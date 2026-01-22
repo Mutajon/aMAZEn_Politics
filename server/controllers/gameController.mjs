@@ -10,6 +10,7 @@ import {
 } from "../helpers/gameHelpers.mjs";
 import {
     buildGameMasterSystemPromptUnifiedV3,
+    buildGameMasterSystemPromptUnifiedV4,
     buildGameMasterUserPrompt
 } from "../services/promptBuilders.mjs";
 import { getTheoryPrompt } from "../theory-loader.mjs";
@@ -388,11 +389,31 @@ export async function gameTurnV2(req, res) {
             console.log(`[GAME-TURN-V2] Day ${day} - Mirror mode: ${mirrorMode}`);
 
             // Build Day 2+ user prompt with current compass values and mirror mode
+            // Calculate consecutive days on topic for V4 logic
+            const historyForCheck = conversation.meta.topicHistory || [];
+            let consecutiveDaysOnTopic = 0;
+            let lastTopic = null;
+
+            if (historyForCheck.length > 0) {
+                lastTopic = historyForCheck[historyForCheck.length - 1].topic;
+                // Count backwards how many consecutive days had this topic
+                for (let i = historyForCheck.length - 1; i >= 0; i--) {
+                    if (historyForCheck[i].topic === lastTopic) {
+                        consecutiveDaysOnTopic++;
+                    } else {
+                        break;
+                    }
+                }
+            }
+
+            console.log(`[GAME-TURN-V2] Topic history check: Last topic "${lastTopic}", consecutive days: ${consecutiveDaysOnTopic}`);
+
+            // Build Day 2+ user prompt with current compass values and mirror mode
             const languageCode = String(language || "en").toLowerCase();
             const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
             const dilemmaEmphasis = conversation.meta.dilemmaEmphasis || null;
             const previousValueTargeted = conversation.meta.previousValueTargeted || null;
-            const userPrompt = buildGameMasterUserPrompt(day, playerChoice, currentCompassTopValues, mirrorMode, languageCode, languageName, dilemmaEmphasis, previousValueTargeted);
+            const userPrompt = buildGameMasterUserPrompt(day, playerChoice, currentCompassTopValues, mirrorMode, languageCode, languageName, dilemmaEmphasis, previousValueTargeted, consecutiveDaysOnTopic, lastTopic);
 
             // Prepare messages array (history + new user message)
             const messages = [

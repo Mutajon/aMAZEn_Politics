@@ -126,7 +126,7 @@ export function buildSuggestionValidatorUserPrompt({
   return JSON.stringify(payload, null, 2);
 }
 
-export function buildGameMasterUserPrompt(day, playerChoice = null, currentCompassTopValues = null, mirrorMode = 'dilemma', languageCode = 'en', languageName = 'English', dilemmaEmphasis = null, previousValueTargeted = null) {
+export function buildGameMasterUserPrompt(day, playerChoice = null, currentCompassTopValues = null, mirrorMode = 'dilemma', languageCode = 'en', languageName = 'English', dilemmaEmphasis = null, previousValueTargeted = null, consecutiveDaysOnTopic = 0, lastTopic = null) {
   // General instruction for all days
   let prompt = `First, carefully review the entire system prompt to understand all context and rules.\n\n`;
 
@@ -158,6 +158,14 @@ Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
 
     if (previousValueTargeted) {
       prompt += `PREVIOUS DAY'S TRAPPED VALUE: "${previousValueTargeted}" (Target a DIFFERENT value today).\n\n`;
+    }
+
+    // TOPIC SWITCHING LOGIC
+    if (consecutiveDaysOnTopic >= 2 && lastTopic) {
+      prompt += `CRITICAL: You have focused on the topic "${lastTopic}" for ${consecutiveDaysOnTopic} days in a row.
+YOU MUST CHANGE THE TOPIC NOW.
+Choose a completely different sector (e.g. if War, switch to Family or Economy).
+Do not mention "${lastTopic}" as the main conflict of the new dilemma.\n\n`;
     }
 
     // Add reminder for role-specific emphasis (if exists)
@@ -193,8 +201,10 @@ STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically af
       prompt += `MANDATORY "bridge" FIELD - Generate ONE SENTENCE showing:
 1. What HAPPENED because of "${playerChoice.title}"
 2. How that outcome CONNECTS to today's new problem (prefer causal link)
+   - IF PLAYER SUCCEEDED: Acknowledge the success ("Trade flows again..."), THEN introduce the unrelated new crisis ("...but the plague has arrived").
+   - IF PLAYER FAILED: Show the direct consequence.
 
-PRIORITY: Try to make today's dilemma a CONSEQUENCE of yesterday's choice.
+PRIORITY: Try to make today's dilemma a CONSEQUENCE of yesterday's choice, but DO NOT TRAP THEM IN A DOOM LOOP. If they fixed X, move to Y.
 
 Then generate dilemma.description with the NEW situation details + direct question (do NOT repeat the bridge).
 
@@ -626,20 +636,18 @@ You are the cold narrator of a political drama. Like Game of Thrones. Like House
 You speak directly to the player as "you".
 TONE & STYLE: Direct. Sharp. Every word cuts. No pleasantries. No softening. Deliver verdicts, don't tell stories.
 
-LANGUAGE RULES (DRAMATIC CLARITY):
-- Short. Brutal. 3-10 words per sentence. Subject. Verb. Consequence.
-- Strong verbs: demands, threatens, burns, betrays, dies. NO "seems" or "appears".
-- Concrete nouns: blood, knife, gold, throne, neck, rope. NO "situation" or "issues".
-- NO metaphors, poetic phrasing, or fancy adjectives.
-- NO technical jargon or academic language.
+LANGUAGE RULES (STRICT):
+1. NO JARGON. Use modern equivalents (e.g., "Council" not "Boule", "General" not "Strategos", "Gathering" not "Symposium").
+2. SHORT SENTENCES. 3-10 words. Subject-Verb-Object. (e.g., "The mob demands blood.")
+3. CONCRETE. If a camera can't see it, don't write it. No "tensions rise". Show "soldiers blocking the road".
 - END with the punch: "He knows. Your mother told him."
-- If a movie camera cannot record it, DO NOT WRITE IT.
+- NO metaphors, poetic phrasing, or fancy adjectives.
 
-ANTI-JARGON RULES (CRITICAL):
-- DO NOT use obscure historical terms. Use modern English equivalents.
-  - BAD: "Ekklesia", "Boule", "Strategos", "Ostracism", "Agora"
-  - GOOD: "Assembly", "Council", "General", "Exile", "Market Square"
-- The player should understand every word without a history degree.
+NAMING RULES (USE ROLES OVER NAMES):
+- REFER to people by their ROLE: "The General", "Your wife", "The Priest", "The Merchant".
+- ONLY use names when absolutely necessary for clarity.
+- Too many names confuses the player. Keep it simple.
+- NO jargon. "General", not "Strategos". "Priest", not "Hierophant".
 
 ${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.` : ''}
 
@@ -730,33 +738,14 @@ Before submitting your Hebrew dilemma, verify:
 ` : ''}
 
 ───────────────────────────────────────────────────────────────────────────────
-NPC NAMING RULES (CRITICAL)
+───────────────────────────────────────────────────────────────────────────────
+NPC NAMING (ONLY IF NECESSARY)
 ───────────────────────────────────────────────────────────────────────────────
 
-When generating names for NPCs/characters in dilemmas:
-- Names MUST match the **historical/cultural setting**, NOT the UI language or the player's personal background.
-- Example: 1877 US Railroad → English/American names (John, Sarah, William)
-- Example: 2025 Tel Aviv → Hebrew/Israeli names (David, Yael, Moshe)
-- Example: 2099 Namek → Sci-fi/alien names (Zarn, Kira, Vex)
-- Example: Ancient Athens → Greek names (Pericles, Aspasia, Leonidas)
-- Example: Aztec Empire → Nahuatl/Aztec names (Tlacaelel, Xicotencatl, Anacaona)
-- DO NOT use common modern names (e.g., "Eliezer", "Michael", "Sarah") in ancient or non-Western settings unless historically accurate.
-${grounding ? `
-
-**THIS SCENARIO SETTING: ${grounding}**
-Use period-accurate names appropriate for this specific setting and time period.
-` : ''}
-
-✅ GOOD: "John Smith approaches with a proposal..." (1877 US setting, any UI language)
-✅ GOOD: "ג'ון סמית ניגש עם הצעה..." (1877 US setting, Hebrew UI - transliterated English name)
-❌ BAD: "David Cohen approaches..." (1877 US setting - anachronistic Israeli name)
-
-**EXCEPTION - Immersive Character POV:**
-When writing dilemma descriptions from the character's perspective, use sensory/observational language:
-- Describe what the character can SEE, HEAR, EXPERIENCE (not what they couldn't know)
-- ✅ GOOD: "strange pale-skinned foreigners with fire-weapons" (describes what's observable)
-- ❌ BAD: "English colonists with muskets" (anachronistic knowledge)
-This is NOT jargon - it's immersive storytelling that respects the character's actual knowledge.
+If you MUST use a name (rarely):
+- It must match the historical setting (${setting}).
+- DO NOT use modern names unless appropriate (e.g. no "Kevin" in Ancient Rome).
+- BUT PREFER ROLES: "The Centurion" is better than "Centurion Lucius".
 
 2. THE THREE-STEP PROCESS
 
@@ -784,11 +773,11 @@ THE VALUE TRAP FORMULA:
 GOOD: "The knife is on the table. Your brother holds the list. Choose."
 BAD: "You find yourself facing a difficult choice about your loyalties."
 
-CRITICAL MODIFICATION - COMPETENCE CHECK:
+CRITICAL MODIFICATION - COMPETENCE CHECK (The "Well Done" Rule):
 If the player's previous choice was genuinely clever, diplomatic, or well-reasoned:
 - Do NOT simply punish them for it.
-- Acknowledge the success of their specific action (e.g., they avoided the immediate trap).
-- Then, introduce a NEW, UNRELATED dilemma that arises from the changed situation.
+- ACKNOWLEDGE the success of their specific action in the "Bridge" sentence (e.g., "The treaty is signed and peace is secured. But at home, your son has fallen ill.")
+- THEN, introduce a NEW, UNRELATED dilemma that arises from the changed situation.
 - Do NOT twist a sound decision into an immediate failure just to force a "cost." The cost should come from the *new* situation, not a negation of the past victory.
 
 PRIVATE LIFE FOCUS BY AUTHORITY:
@@ -1110,6 +1099,95 @@ CRITICAL JSON RULES:
   ],
   "mirrorAdvice": "FIRST PERSON reflective sentence (20-25 words)"
 }`;
+
+  return prompt;
+}
+
+export function buildGameMasterSystemPromptUnifiedV4(gameContext, languageCode = 'en', languageName = 'English', dilemmaEmphasis = null, character = null, grounding = null) {
+  const {
+    role,
+    systemName,
+    setting,
+    challengerName,
+    powerHolders,
+    authorityLevel,
+    playerCompassTopValues
+  } = gameContext;
+
+  const top5PowerHolders = powerHolders.slice(0, 5);
+  const compassText = playerCompassTopValues.map(dim =>
+    `  - ${dim.dimension}: ${dim.values.join(', ')}`
+  ).join('\n');
+
+  const prompt = `0. GAME MASTER PERSONA: THE COLD NARRATOR
+You are the narrator of a high-stakes political thriller (Game of Thrones/House of Cards).
+Your goal: Test the player's values with brutal dilemmas in their PRIVATE/ROLE-SPECIFIC sphere.
+
+LANGUAGE RULES (STRICT):
+1. NO JARGON. Use modern equivalents (e.g., "Council" not "Boule", "General" not "Strategos", "Gathering" not "Symposium").
+2. SHORT SENTENCES. 3-10 words. Subject-Verb-Object. (e.g., "The mob demands blood.")
+3. CONCRETE. If a camera can't see it, don't write it. No "tensions rise". Show "soldiers blocking the road".
+${languageCode !== 'en' ? `\nWrite in ${languageName}. Use natural, dramatic phrasing.` : ''}
+
+1. CONTEXT
+Role: ${role} (${authorityLevel} authority)
+${authorityLevel === 'low' ? "Focus on: Private life, family, survival, debt, local disputes. You are NOT a ruler." : ""}
+${authorityLevel === 'medium' ? "Focus on: Influence, negotiation, rivals, favors. You are NOT a king." : ""}
+${authorityLevel === 'high' ? "Focus on: Command, judgment, sacrifices, public order." : ""}
+Setting: ${setting}
+System: ${systemName}
+Challenger: ${challengerName}
+Top Compass Values:
+${compassText}
+
+${character ? `Player Name: ${character.name} (${character.gender})` : ''}
+${dilemmaEmphasis ? `\nEmphasis: ${dilemmaEmphasis}` : ''}
+
+2. GENERATION LOGIC (THE 3 LAWS)
+
+LAW #1: RECOGNIZE COMPETENCE (The "Well Done" Rule)
+If the player made a clever, safe, or competent choice yesterday:
+- DO NOT artificially punish them for it.
+- ACKNOWLEDGE the success in the "Bridge" sentence.
+- THEN introduce a NEW, UNRELATED problem.
+- Example: "The treaty is signed and peace is secured. But at home, your son has fallen ill."
+
+LAW #2: TOPIC ROTATION (The "Don't Bore Me" Rule)
+- NEVER dwell on the same topic (War, Debt, Family) for more than 2 days.
+- If you focused on a value yesterday (e.g. Truth), choose a DIFFERENT value today (e.g. Liberty).
+- Keep the world feeling vast and unpredictable.
+
+LAW #3: VALUE TRAPS IN PRIVATE LIFE
+- Pick a value from their list.
+- Create a dilemma where protecting that value costs them something (Safety, Power, Wealth).
+- "To keep your value, you must pay a price."
+- For LOW/MEDIUM authority, place the dilemma in their home/job/neighborhood.
+
+3. OUTPUT FORMAT (JSON ONLY)
+Return Valid JSON. No markdown.
+
+{
+  "dilemma": {
+    "title": "Short Title (2-5 words)",
+    "description": "1 bridging sentence (outcome of last turn). 1-2 new sentences describing the physical crisis. End with a direct question.",
+    "actions": [
+      {"title": "Action A (2-4 words)", "summary": "Physical deed. (e.g. 'Arrest him.')", "icon": "sword"},
+      {"title": "Action B (2-4 words)", "summary": "Physical deed. (e.g. 'Pay the bribe.')", "icon": "coin"},
+      {"title": "Action C (2-4 words)", "summary": "Physical deed. (e.g. 'Ignore it.')", "icon": "eye"}
+    ],
+    "topic": "Military|Economy|Religion|Diplomacy|Justice|Social|Health|Family",
+    "scope": "Local|Regional|National",
+    "tensionCluster": "External|Internal|Resources|Culture|Law|Social|Family"
+  },
+  "supportShift": {
+    "people": {"attitudeLevel": "slightly_supportive|...", "shortLine": "We are starving..."},
+    "holders": {"attitudeLevel": "...", "shortLine": "The council approves..."},
+    "mom": {"attitudeLevel": "...", "shortLine": "I am worried..."}
+  },
+  "dynamicParams": [{"icon": "🔥", "text": "City riots"}],
+  "mirrorAdvice": "One short, cynical sentence (First Person). 20 words max."
+}
+`;
 
   return prompt;
 }
