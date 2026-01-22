@@ -261,7 +261,7 @@ Use simple ${languageCode === 'en' ? 'English' : languageName} (CEFR B1-B2).
 Short sentences (3-12 words). Subject. Verb. Consequence.
 No "perhaps," "might," or filler. No metaphors, no poetic phrasing, no idioms, no fancy adjectives. 
 Your job is to TEST the player's values by creating brutal moral traps. Make them feel the weight of their neck on the line.
-${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.` : ''}
+${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers. ${languageCode === 'he' ? 'Use common, spoken Hebrew (e.g. "shel" for possession) and AVOID formal literary suffixes (e.g. דמך).' : ''}` : ''}
 
 1. CORE IDENTITY OF THE PLAYER
 
@@ -642,6 +642,13 @@ LANGUAGE RULES (STRICT):
 3. CONCRETE. If a camera can't see it, don't write it. No "tensions rise". Show "soldiers blocking the road".
 - END with the punch: "He knows. Your mother told him."
 - NO metaphors, poetic phrasing, or fancy adjectives.
+${languageCode === 'he' ? `
+4. HEBREW TONE (STRICT):
+   - USE MODERN SPOKEN SYNTAX. Do NOT use Biblical/Literary Hebrew.
+   - FORBIDDEN: Pronominal suffixes (e.g. דמך, ביתך).
+   - MANDATORY: Use "shel" (e.g. הדם שלך, הבית שלך).
+   - Tone: Immediate, rough, direct. "The street" not "The thoroughfare".
+` : ''}
 
 NAMING RULES (USE ROLES OVER NAMES):
 - REFER to people by their ROLE: "The General", "Your wife", "The Priest", "The Merchant".
@@ -735,6 +742,19 @@ Before submitting your Hebrew dilemma, verify:
 - [ ] Consistency across entire dilemma text
 
 **CRITICAL**: This is MANDATORY for Hebrew. Gender mismatch breaks player immersion.
+
+───────────────────────────────────────────────────────────────────────────────
+HEBREW TONE & STYLE (SPOKEN VS LITERARY)
+───────────────────────────────────────────────────────────────────────────────
+
+When writing in Hebrew, use common, spoken-style phrasing. 
+AVOID formal/literary pronominal suffixes for possession (e.g., דמך). 
+Instead, use the "shel" construct (e.g., הדם שלך).
+
+✅ GOOD (Spoken): "הדם שלך" (Your blood), "המשרד שלך" (Your office), "הדלתות שלהם" (Their doors)
+❌ BAD (Literary): "דמך", "משרדך", "דלתותיהם"
+
+This ensures the narrative feels immediate and modern rather than like a dusty textbook.
 ` : ''}
 
 ───────────────────────────────────────────────────────────────────────────────
@@ -1127,6 +1147,12 @@ LANGUAGE RULES (STRICT):
 1. NO JARGON. Use modern equivalents (e.g., "Council" not "Boule", "General" not "Strategos", "Gathering" not "Symposium").
 2. SHORT SENTENCES. 3-10 words. Subject-Verb-Object. (e.g., "The mob demands blood.")
 3. CONCRETE. If a camera can't see it, don't write it. No "tensions rise". Show "soldiers blocking the road".
+${languageCode === 'he' ? `
+4. HEBREW TONE (STRICT):
+   - USE MODERN SPOKEN SYNTAX. Do NOT use Biblical/Literary Hebrew.
+   - FORBIDDEN: Pronominal suffixes (e.g. דמך, ביתך).
+   - MANDATORY: Use "shel" (e.g. הדם שלך, הבית שלך).
+` : ''}
 ${languageCode !== 'en' ? `\nWrite in ${languageName}. Use natural, dramatic phrasing.` : ''}
 
 1. CONTEXT
@@ -1142,6 +1168,16 @@ ${compassText}
 
 ${character ? `Player Name: ${character.name} (${character.gender})` : ''}
 ${dilemmaEmphasis ? `\nEmphasis: ${dilemmaEmphasis}` : ''}
+
+${languageCode === 'he' && character ? `
+───────────────────────────────────────────────────────────────────────────────
+HEBREW RULES (GENDER & TONE)
+───────────────────────────────────────────────────────────────────────────────
+1. GENDER: Use ${character.gender === 'male' ? 'masculine' : 'feminine'} forms (verbs, adjectives, pronouns).
+2. TONE: Use common, spoken-style phrasing. 
+   AVOID literary suffixes (דמך, משרדך). 
+   USE "shel" construct (הדם שלך, המשרד שלך).
+` : ''}
 
 2. GENERATION LOGIC (THE 3 LAWS)
 
