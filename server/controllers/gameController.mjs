@@ -317,8 +317,18 @@ export async function gameTurnV2(req, res) {
                 previousValueTargeted: parsed.valueTargeted || 'Unknown'
             };
 
-            // FIXED: Store messages array properly in conversation.messages field
-            storeConversation(gameId, gameId, useXAI ? "xai" : "openai", { ...conversationMeta, messages });
+            // FIXED: Store system prompt separately from messages history
+            // messages will only contain USER and ASSISTANT turns, not the system prompt
+            const initialMessages = [
+                { role: "user", content: userPrompt },
+                { role: "assistant", content: content }
+            ];
+
+            storeConversation(gameId, gameId, useXAI ? "xai" : "openai", {
+                ...conversationMeta,
+                systemPrompt: systemPrompt, // Store massive prompt once
+                messages: initialMessages   // Only conversation turns
+            });
 
             console.log('[GAME-TURN-V2] Day 1 complete, conversation stored with unified system prompt');
 
@@ -415,9 +425,17 @@ export async function gameTurnV2(req, res) {
             const previousValueTargeted = conversation.meta.previousValueTargeted || null;
             const userPrompt = buildGameMasterUserPrompt(day, playerChoice, currentCompassTopValues, mirrorMode, languageCode, languageName, dilemmaEmphasis, previousValueTargeted, consecutiveDaysOnTopic, lastTopic);
 
-            // Prepare messages array (history + new user message)
+
+            // RECONSTRUCT FULL CONTEXT: System Prompt + History + New User Prompt
+            const storedSystemPrompt = conversation.meta.systemPrompt || "";
+            const storedHistory = conversation.meta.messages || [];
+
+            // If system prompt is missing from meta (legacy games), try to extract it from history or fallback
+            // But for new logic, it should be in meta.systemPrompt
+
             const messages = [
-                ...conversation.meta.messages,
+                { role: "system", content: storedSystemPrompt },
+                ...storedHistory,
                 { role: "user", content: userPrompt }
             ];
 
@@ -566,11 +584,15 @@ export async function gameTurnV2(req, res) {
             // Process dynamic params (no validation, just max 3)
             const dynamicParams = processDynamicParams(parsed.dynamicParams);
 
-            // Update conversation messages
-            const updatedMessages = [
-                ...conversation.meta.messages,
+            // Update conversation messages (only append NEW turns, do not include system prompt)
+            const newTurnMessages = [
                 { role: "user", content: userPrompt },
                 { role: "assistant", content: content }
+            ];
+
+            const updatedMessages = [
+                ...(conversation.meta.messages || []),
+                ...newTurnMessages
             ];
 
             // Get existing topic history and add current day (use currentCluster which may have been updated by re-prompt)
