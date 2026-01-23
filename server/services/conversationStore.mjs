@@ -29,13 +29,15 @@ const CONVERSATION_TTL = 24 * 60 * 60 * 1000; // 24 hours
  * @param {object} customMeta - Optional custom metadata (e.g., challengerSeat info)
  */
 export function storeConversation(gameId, conversationId, provider = 'openai', customMeta = null) {
+  const existing = conversations.get(gameId);
+
   const metadata = {
     conversationId,
     provider,
-    createdAt: Date.now(),
+    createdAt: existing ? existing.createdAt : Date.now(),
     lastUsedAt: Date.now(),
-    turnCount: 0,
-    meta: customMeta || {} // Store custom metadata (e.g., challengerSeat)
+    turnCount: (existing ? existing.turnCount : 0) + 1,
+    meta: customMeta || (existing ? existing.meta : {})
   };
 
   conversations.set(gameId, metadata);
@@ -74,6 +76,21 @@ export function touchConversation(gameId) {
   if (metadata) {
     metadata.lastUsedAt = Date.now();
     metadata.turnCount++;
+  }
+}
+
+/**
+ * Update conversation metadata (partial update)
+ * @param {string} gameId
+ * @param {object} partialMeta 
+ */
+export function updateConversation(gameId, partialMeta) {
+  const metadata = conversations.get(gameId);
+  if (metadata) {
+    metadata.lastUsedAt = Date.now();
+    if (partialMeta) {
+      metadata.meta = { ...metadata.meta, ...partialMeta };
+    }
   }
 }
 

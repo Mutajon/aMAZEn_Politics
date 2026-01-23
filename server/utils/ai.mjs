@@ -316,7 +316,8 @@ export async function aiJSONGemini({ system, user, model = MODEL_VALIDATE_GEMINI
                 messages: messages,
                 temperature: temperature,
                 max_tokens: 1024,
-                stream: false
+                stream: false,
+                response_format: { type: "json_object" }
             })
         });
 
@@ -367,7 +368,8 @@ export async function callGeminiChat(messages, model) {
                 messages: messages,
                 temperature: 1,
                 max_tokens: 6144,
-                stream: false
+                stream: false,
+                response_format: { type: "json_object" }
             })
         });
 
