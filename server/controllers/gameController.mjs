@@ -818,7 +818,41 @@ Write in clear, vivid, reflective language; no jargon or game terms.
 Tone: ironic-cinematic, like a historical epilogue (Reigns, Frostpunk, Democracy 3).
 Accessible for teens; mix wit with weight.
 Use roles/descriptions, not obscure names.
-${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.` : ''}
+${languageCode === 'he' ? `
+───────────────────────────────────────────────────────────────────────────────
+CRITICAL - HEBREW LANGUAGE RULES (PLURAL FORM ONLY)
+───────────────────────────────────────────────────────────────────────────────
+
+You are speaking to the player. In this game version, you MUST address the player in the **PLURAL MASCULINE (Rabbim)** form, regardless of their gender.
+
+This addresses "The Players" or "The Leadership" as a collective entity.
+
+STRICT RULES:
+1. ALWAYS use Plural Masculine for "You":
+   - "אתם" (You, pl) NOT "אתה" or "את"
+   - "שלכם" (Your, pl) NOT "שלך"
+   - "אתם עומדים" (You stand, pl) NOT "אתה עומד"
+   - "החלטתם" (You decided, pl) NOT "החלטת"
+
+2. Verbs & Adjectives must be Plural Masculine:
+   - ✅ "אתם חזקים" (You are strong, pl)
+   - ❌ "אתה חזק" (You are strong, sg)
+   - ✅ "ראיתם" (You saw, pl)
+   - ❌ "ראית" (You saw, sg)
+
+3. Tone & Style:
+   - Use "shel" (e.g., "הבית שלכם") instead of possessive suffixes (e.g., "ביתכם").
+   - Immediate, rough, direct tone.
+
+✅ CORRECT EXAMPLES:
+- "אתם עומדים בפני החלטה גורלית." (You face a fateful decision.)
+- "היועצים שלכם מחכים לתשובה." (Your advisors await an answer.)
+- "התוצאות תלויות בכם." (The results depend on you.)
+
+❌ INCORRECT EXAMPLES:
+- "אתה עומד..." (Singular - DO NOT USE)
+- "את עומדת..." (Singular - DO NOT USE)
+` : (languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.` : '')}
 
 CONTENT
 Generate an in-world epilogue for the leader based on their decisions, outcomes, supports, and values.
@@ -1116,6 +1150,11 @@ export async function answerInquiry(req, res) {
 Your Goal: Clarify the stakes, the risks, or specific details about the setting/factions WITHOUT solving the dilemma for them.
 Voice: Helpful but slightly ominous, observational, grounded in the historical setting.
 Language: ${languageName}
+${languageCode === 'he' ? `
+CRITICAL - HEBREW LANGUAGE RULES (PLURAL FORM ONLY):
+You are speaking to the player. In this game version, you MUST address the player in the **PLURAL MASCULINE (Rabbim)** form ("אתם", "שלכם"), regardless of known gender.
+NEVER isolate singular gender (NO "אתה" or "את").
+Style: Immediate, rough, no formal suffixes.` : ''}
 Length: Keep the answer concise (2-3 sentences max).
 Context:
 - Role: ${role || "Leader"}

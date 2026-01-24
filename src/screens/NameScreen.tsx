@@ -591,9 +591,7 @@ export default function NameScreen({ push }: { push: PushFn }) {
                     : "bg-white/10 text-white/60 cursor-not-allowed"
                     }`}
                 >
-                  {gender === "female" ? lang("CONTINUE_TO_POWER_FEMALE") :
-                    gender === "male" ? lang("CONTINUE_TO_POWER_MALE") :
-                      lang("CONTINUE_TO_POWER")}
+                  {lang("CONTINUE_TO_POWER")}
                 </button>
               </motion.div>
             </motion.div>

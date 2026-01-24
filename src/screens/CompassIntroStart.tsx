@@ -87,17 +87,7 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
     return DEFAULT_AVATAR_DATA_URL;
   }, [character?.avatarUrl, generateImages]);
 
-  // Get gender-aware translation keys
-  const getGenderKey = (baseKey: string): string => {
-    const gender = character?.gender;
-    if (gender === "female") {
-      return `${baseKey}_FEMALE`;
-    } else if (gender === "male") {
-      return `${baseKey}_MALE`;
-    }
-    // For "any" or undefined, use the base key (which defaults to male form)
-    return baseKey;
-  };
+
 
   // Initialize screen and play voiceover
   useEffect(() => {
@@ -167,9 +157,9 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
 
       {/* Gatekeeper with mirror intro text */}
       <Gatekeeper
-        text={lang(getGenderKey("COMPASS_MIRROR_INTRO"))}
+        text={lang("COMPASS_MIRROR_INTRO")}
         isVisible={showGatekeeper}
-        onDismiss={() => {}} // No dismiss behavior - stays visible
+        onDismiss={() => { }} // No dismiss behavior - stays visible
         showHint={false}
       />
 
@@ -182,14 +172,14 @@ export default function CompassIntroStart({ push }: { push: PushFn }) {
             exit={{ opacity: 0, scale: 0.92, y: 8 }}
             transition={{ type: "spring", stiffness: 300, damping: 22 }}
             onClick={() => {
-              logger.log('button_click_look_in_mirror', lang(getGenderKey("COMPASS_INTRO_LOOK_IN_MIRROR")), 'User clicked Look in the mirror button');
+              logger.log('button_click_look_in_mirror', lang("COMPASS_INTRO_LOOK_IN_MIRROR"), 'User clicked Look in the mirror button');
               audioManager.stopVoiceover(); // Stop voiceover when navigating
               push("/compass-mirror");
             }}
             className="fixed bottom-8 left-8 rounded-2xl px-5 py-3 font-semibold text-lg shadow-lg bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] hover:scale-[1.02] active:scale-[0.98]"
             style={{ zIndex: 150 }}
           >
-            {lang(getGenderKey("COMPASS_INTRO_LOOK_IN_MIRROR"))}
+            {lang("COMPASS_INTRO_LOOK_IN_MIRROR")}
           </motion.button>
         )}
       </AnimatePresence>

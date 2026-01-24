@@ -12,7 +12,7 @@ export function translateDemocracyLevel(level: DemocracyLevel, lang: (key: strin
     "High": "DEMOCRACY_LEVEL_HIGH",
     "Very High": "DEMOCRACY_LEVEL_VERY_HIGH",
   };
-  
+
   const key = keyMap[level];
   return key ? lang(key) : level;
 }
@@ -32,7 +32,7 @@ export function translatePoliticalSystem(systemName: string, lang: (key: string)
 
   const key = `POLITICAL_SYSTEM_${normalizedKey}`;
   const translated = lang(key);
-  
+
   // If the translation returns the key itself (not found), return original name
   return translated !== key ? translated : systemName;
 }
@@ -48,10 +48,10 @@ export function translateCompassValue(value: string, lang: (key: string) => stri
     .replace(/\//g, "_")
     .replace(/[()]/g, "")
     .replace(/\./g, "");
-  
+
   const key = `COMPASS_VALUE_${normalizedKey}`;
   const translated = lang(key);
-  
+
   // If the translation returns the key itself (not found), return original value
   return translated !== key ? translated : value;
 }
@@ -67,10 +67,10 @@ export function translateCompassValueFull(value: string, lang: (key: string) => 
     .replace(/\//g, "_")
     .replace(/[()]/g, "")
     .replace(/\./g, "");
-  
+
   const key = `COMPASS_VALUE_${normalizedKey}_FULL`;
   const translated = lang(key);
-  
+
   // If the translation returns the key itself (not found), return original value
   return translated !== key ? translated : value;
 }
@@ -84,62 +84,30 @@ export function translateLeaderDescription(leaderName: string, description: stri
     .toUpperCase()
     .replace(/\s+/g, "_")
     .replace(/[.']/g, "");
-  
+
   const key = `LEADER_DESC_${normalizedKey}`;
   const translated = lang(key);
-  
+
   // If the translation returns the key itself (not found), return original description
   return translated !== key ? translated : description;
 }
 
-/**
- * Translates quiz question based on quiz ID with gender awareness
- */
 export function translateQuizQuestion(
-  quizId: string, 
-  question: string, 
-  lang: (key: string) => string,
-  gender?: "male" | "female" | "any"
+  quizId: string,
+  question: string,
+  lang: (key: string) => string
 ): string {
-  // Try gender-specific key first
-  if (gender === "female") {
-    const femaleKey = `${quizId}_Q_FEMALE`;
-    const femaleTranslated = lang(femaleKey);
-    if (femaleTranslated !== femaleKey) return femaleTranslated;
-  } else if (gender === "male") {
-    const maleKey = `${quizId}_Q_MALE`;
-    const maleTranslated = lang(maleKey);
-    if (maleTranslated !== maleKey) return maleTranslated;
-  }
-  
-  // Fall back to base key
   const key = `${quizId}_Q`;
   const translated = lang(key);
   return translated !== key ? translated : question;
 }
 
-/**
- * Translates quiz answer based on quiz ID and answer index with gender awareness
- */
 export function translateQuizAnswer(
-  quizId: string, 
-  answerIndex: number, 
-  answer: string, 
-  lang: (key: string) => string,
-  gender?: "male" | "female" | "any"
+  quizId: string,
+  answerIndex: number,
+  answer: string,
+  lang: (key: string) => string
 ): string {
-  // Try gender-specific key first
-  if (gender === "female") {
-    const femaleKey = `${quizId}_A${answerIndex + 1}_FEMALE`;
-    const femaleTranslated = lang(femaleKey);
-    if (femaleTranslated !== femaleKey) return femaleTranslated;
-  } else if (gender === "male") {
-    const maleKey = `${quizId}_A${answerIndex + 1}_MALE`;
-    const maleTranslated = lang(maleKey);
-    if (maleTranslated !== maleKey) return maleTranslated;
-  }
-  
-  // Fall back to base key
   const key = `${quizId}_A${answerIndex + 1}`;
   const translated = lang(key);
   return translated !== key ? translated : answer;

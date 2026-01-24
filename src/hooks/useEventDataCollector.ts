@@ -583,7 +583,8 @@ export type TrapContext = {
 export async function fetchCompassHintsForAction(
   gameId: string,
   action: { title: string; summary: string },
-  trapContext?: TrapContext        // NEW: Pass the value trap context for better analysis
+  trapContext?: TrapContext,       // NEW: Pass the value trap context for better analysis
+  language: string = 'he'          // NEW: Language for mirror reflection
 ): Promise<CompassPill[]> {
   try {
     // Get game context and debug mode from stores
@@ -611,7 +612,8 @@ export async function fetchCompassHintsForAction(
         action,
         gameContext,
         debugMode,
-        trapContext  // NEW: Include trap context for value-aware analysis
+        trapContext,  // NEW: Include trap context for value-aware analysis
+        language: language // Pass language to API
       })
     });
 

@@ -56,7 +56,7 @@ function PlayerBubble({ text, onDone }: { text: string; onDone?: () => void }) {
       className="w-full flex justify-end my-2"
     >
       <div className="max-w-[85%] rounded-2xl px-4 py-3 shadow-lg bg-white text-black"
-           style={{ borderTopLeftRadius: 18, borderTopRightRadius: 6 }}>
+        style={{ borderTopLeftRadius: 18, borderTopRightRadius: 6 }}>
         {shown}
       </div>
     </motion.div>
@@ -87,38 +87,28 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
     screenName: "mirror_dialogue_screen"
   });
 
-  // Get gender-aware translation keys
-  const getGenderKey = (baseKey: string): string => {
-    const gender = character?.gender;
-    if (gender === "female") {
-      return `${baseKey}_FEMALE`;
-    } else if (gender === "male") {
-      return `${baseKey}_MALE`;
-    }
-    // For "any" or undefined, use the base key (which defaults to male form)
-    return baseKey;
-  };
 
-  // script - memoized to update when character gender, name, or visit status changes
-  const playerName = character?.name || lang(getGenderKey("PLAYER_DEFAULT_NAME"));
+
+  // script - memoized to update when character name or visit status changes
+  const playerName = character?.name || lang("PLAYER_DEFAULT_NAME");
   const script = useMemo<Array<{ side: "mirror" | "player"; text: string; italic?: boolean }>>(() => {
     // First-time dialogue (full 5-message conversation)
     if (firstMirrorDialogue) {
       return [
-        { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_1")), italic: true },
-        { side: "player", text: lang(getGenderKey("MIRROR_DIALOGUE_2")) },
-        { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_3")).replace("{playerName}", playerName), italic: true },
-        { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_4")), italic: true },
-        { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_5")), italic: true },
+        { side: "mirror", text: lang("MIRROR_DIALOGUE_1"), italic: true },
+        { side: "player", text: lang("MIRROR_DIALOGUE_2") },
+        { side: "mirror", text: lang("MIRROR_DIALOGUE_3").replace("{playerName}", playerName), italic: true },
+        { side: "mirror", text: lang("MIRROR_DIALOGUE_4"), italic: true },
+        { side: "mirror", text: lang("MIRROR_DIALOGUE_5"), italic: true },
       ];
     }
 
     // Returning player dialogue (abbreviated 2-message version)
     return [
-      { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_RETURN_1")), italic: true },
-      { side: "mirror", text: lang(getGenderKey("MIRROR_DIALOGUE_RETURN_2")), italic: true },
+      { side: "mirror", text: lang("MIRROR_DIALOGUE_RETURN_1"), italic: true },
+      { side: "mirror", text: lang("MIRROR_DIALOGUE_RETURN_2"), italic: true },
     ];
-  }, [character?.gender, character?.name, lang, firstMirrorDialogue]);
+  }, [character?.name, lang, firstMirrorDialogue]);
 
   const [chatIndex, setChatIndex] = useState(0);
 
@@ -168,7 +158,7 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
             {displayAvatar ? (
               <img src={displayAvatar} alt="Character avatar" className="w-full h-full object-cover" />
             ) : (
-              <div className="text-white/80">{lang(getGenderKey("PREPARING_AVATAR"))}</div>
+              <div className="text-white/80">{lang("PREPARING_AVATAR")}</div>
             )}
           </motion.div>
         </div>
@@ -223,7 +213,7 @@ export default function MirrorDialogueScreen({ push }: { push: PushFn }) {
                       }}
                       className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/15 text-white hover:bg-white/25 border border-white/30"
                     >
-                      {lang(getGenderKey("MIRROR_DIALOGUE_BUTTON"))}
+                      {lang("MIRROR_DIALOGUE_BUTTON")}
                     </motion.button>
                   </div>
                 )}

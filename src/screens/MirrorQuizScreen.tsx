@@ -64,22 +64,12 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
     return "";
   }, [character?.avatarUrl, generateImages]);
 
-  // Get gender-aware translation keys
-  const getGenderKey = (baseKey: string): string => {
-    const gender = character?.gender;
-    if (gender === "female") {
-      return `${baseKey}_FEMALE`;
-    } else if (gender === "male") {
-      return `${baseKey}_MALE`;
-    }
-    // For "any" or undefined, use the base key (which defaults to male form)
-    return baseKey;
-  };
 
-  // Get gender-aware epilogue text
+
+  // Get epilogue text
   const mirrorEpilogue = useMemo(() => {
-    return lang(getGenderKey("MIRROR_EPILOGUE_TEXT"));
-  }, [lang, character?.gender]);
+    return lang("MIRROR_EPILOGUE_TEXT");
+  }, [lang]);
 
   // Create role-based background style
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
@@ -358,7 +348,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
             {displayAvatar ? (
               <img src={displayAvatar} alt="Character avatar" className="w-full h-full object-cover" />
             ) : (
-              <div className="text-white/80 text-sm">{lang(getGenderKey("PREPARING_AVATAR"))}</div>
+              <div className="text-white/80 text-sm">{lang("PREPARING_AVATAR")}</div>
             )}
           </motion.div>
         </div>
@@ -389,7 +379,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
                       className="text-[19px] font-semibold italic drop-shadow"
                       style={{ color: T.textColor, fontFamily: T.fontFamily }}
                     >
-                      {translateQuizQuestion(quiz[idx].id, quiz[idx].q, lang, character?.gender)}
+                      {translateQuizQuestion(quiz[idx].id, quiz[idx].q, lang)}
                     </div>
 
                     {/* OPTIONS — mirror bubble style buttons */}
@@ -414,16 +404,16 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
                             animate={
                               isSelected
                                 ? {
-                                    backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
-                                  }
+                                  backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"],
+                                }
                                 : {}
                             }
                             transition={
                               isSelected
                                 ? {
-                                    duration: 0.6,
-                                    ease: "linear",
-                                  }
+                                  duration: 0.6,
+                                  ease: "linear",
+                                }
                                 : {}
                             }
                             onMouseEnter={(e) => {
@@ -439,7 +429,7 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
                               }
                             }}
                           >
-                            {translateQuizAnswer(quiz[idx].id, i, opt.a, lang, character?.gender)}
+                            {translateQuizAnswer(quiz[idx].id, i, opt.a, lang)}
                           </motion.button>
                         );
                       })}
@@ -454,79 +444,79 @@ export default function MirrorQuizScreen({ push }: { push: PushFn }) {
         {/* DONE: verdict bubble (type), then after 2s epilogue bubble (type), then buttons.
            Returning from CompassVis renders fully (no typing). */}
         {done && (
-  <div className="mt-12 mx-auto max-w-xl">
-    {/* ⬇️ while AI is working, show animated typing bubble */}
-    {!summary && <MirrorBubbleTyping text={lang(getGenderKey("MIRROR_PEERING_INTO_SOUL"))} />}
+          <div className="mt-12 mx-auto max-w-xl">
+            {/* ⬇️ while AI is working, show animated typing bubble */}
+            {!summary && <MirrorBubbleTyping text={lang("MIRROR_PEERING_INTO_SOUL")} />}
 
-    {/* verdict bubble (types once) */}
-    {summary && (
-      <MirrorBubble
-        text={summary}
-        typing={!epilogueShown}
-        onDone={() => {
-          if (!epilogueShown) {
-            window.setTimeout(() => setShowEpilogue(true), 2000);
-          }
-        }}
-      />
-    )}
-
-    {/* epilogue bubble (appears 2s after verdict finishes) */}
-    {(epilogueShown || showEpilogue) && (
-      <MirrorBubble
-        text={mirrorEpilogue}
-        typing={!epilogueShown}
-        onDone={() => {
-          if (!epilogueShown) markEpilogueShown();
-        }}
-      />
-    )}
-
-    {epilogueShown && (
-      <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
-        <button
-          onClick={async () => {
-            if (sleepPending) return;
-            setSleepPending(true);
-            logger.log('button_click_go_to_sleep', 'Go to sleep', 'User clicked Go to sleep button');
-
-            // Initial compass snapshot was already captured after quiz completion
-            // Wait 150ms to ensure Zustand persist middleware flushes to localStorage
-            // This prevents race condition where navigation happens before async persist completes
-            await new Promise(resolve => setTimeout(resolve, 150));
-
-            push("/background-intro");
-          }}
-          disabled={sleepPending}
-          className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/90 text-[#0b1335] hover:bg-white disabled:opacity-70 disabled:cursor-wait"
-        >
-          {sleepPending ? (
-            <span className="flex items-center justify-center gap-2">
-              <span
-                className="h-4 w-4 rounded-full border-2 border-[#0b1335]/40 border-t-[#0b1335] animate-spin"
-                aria-hidden
+            {/* verdict bubble (types once) */}
+            {summary && (
+              <MirrorBubble
+                text={summary}
+                typing={!epilogueShown}
+                onDone={() => {
+                  if (!epilogueShown) {
+                    window.setTimeout(() => setShowEpilogue(true), 2000);
+                  }
+                }}
               />
-              {lang(getGenderKey("BUTTON_GO_TO_SLEEP"))}
-            </span>
-          ) : (
-            lang(getGenderKey("BUTTON_GO_TO_SLEEP"))
-          )}
-        </button>
-        <button
-          onClick={() => {
-            logger.log('button_click_examine_mirror', 'Examine mirror', 'User clicked Examine mirror button');
-            // Save current route so MirrorScreen knows where to return
-            saveMirrorReturnRoute("/compass-quiz");
-            push("/mirror");
-          }}
-          className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/15 text-white hover:bg-white/25 border border-white/30"
-        >
-          {lang(getGenderKey("BUTTON_EXAMINE_MIRROR"))}
-        </button>
-      </div>
-    )}
-  </div>
-)}
+            )}
+
+            {/* epilogue bubble (appears 2s after verdict finishes) */}
+            {(epilogueShown || showEpilogue) && (
+              <MirrorBubble
+                text={mirrorEpilogue}
+                typing={!epilogueShown}
+                onDone={() => {
+                  if (!epilogueShown) markEpilogueShown();
+                }}
+              />
+            )}
+
+            {epilogueShown && (
+              <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  onClick={async () => {
+                    if (sleepPending) return;
+                    setSleepPending(true);
+                    logger.log('button_click_go_to_sleep', 'Go to sleep', 'User clicked Go to sleep button');
+
+                    // Initial compass snapshot was already captured after quiz completion
+                    // Wait 150ms to ensure Zustand persist middleware flushes to localStorage
+                    // This prevents race condition where navigation happens before async persist completes
+                    await new Promise(resolve => setTimeout(resolve, 150));
+
+                    push("/background-intro");
+                  }}
+                  disabled={sleepPending}
+                  className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/90 text-[#0b1335] hover:bg-white disabled:opacity-70 disabled:cursor-wait"
+                >
+                  {sleepPending ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span
+                        className="h-4 w-4 rounded-full border-2 border-[#0b1335]/40 border-t-[#0b1335] animate-spin"
+                        aria-hidden
+                      />
+                      {lang("BUTTON_GO_TO_SLEEP")}
+                    </span>
+                  ) : (
+                    lang("BUTTON_GO_TO_SLEEP")
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    logger.log('button_click_examine_mirror', 'Examine mirror', 'User clicked Examine mirror button');
+                    // Save current route so MirrorScreen knows where to return
+                    saveMirrorReturnRoute("/compass-quiz");
+                    push("/mirror");
+                  }}
+                  className="rounded-2xl px-5 py-3 font-semibold text-lg bg-white/15 text-white hover:bg-white/25 border border-white/30"
+                >
+                  {lang("BUTTON_EXAMINE_MIRROR")}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
     </div>

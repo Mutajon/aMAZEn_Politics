@@ -796,7 +796,11 @@ app.post("/api/mirror-quiz-light", async (req, res) => {
     const languageName = LANGUAGE_NAMES[language] || LANGUAGE_NAMES.en;
     const system = language === 'en'
       ? MIRROR_QUIZ_BASE_SYSTEM_PROMPT
-      : MIRROR_QUIZ_BASE_SYSTEM_PROMPT + `\n\nWrite your answer to this prompt in ${languageName}.`;
+      : MIRROR_QUIZ_BASE_SYSTEM_PROMPT + (language === 'he'
+        ? `\n\nWrite your answer in Hebrew.
+CRITICAL HEBREW RULE: Address the player in **PLURAL MASCULINE (Rabbim)** form (אתם/שלכם).
+NEVER use singular addressing (NO "אתה" or "את").`
+        : `\n\nWrite your answer to this prompt in ${languageName}.`);
 
     const [what1, what2] = topWhat;
     const [whence1, whence2] = topWhence;
@@ -1249,7 +1253,10 @@ app.post("/api/compass-conversation/analyze", async (req, res) => {
     const languageCode = String(language || "he").toLowerCase();
     const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
     const languageInstruction = languageCode !== 'en'
-      ? `\n\nIMPORTANT: Write your mirror reflection message in ${languageName}. Use natural, witty phrasing appropriate for a native speaker.`
+      ? (languageCode === 'he' ? `\n\nIMPORTANT: Write your mirror reflection message in Hebrew.
+CRITICAL HEBREW RULE: Address the player in **PLURAL MASCULINE (Rabbim)** form (אתם/שלכם).
+NEVER use singular addressing (NO "אתה" or "את").
+Use natural, witty phrasing.` : `\n\nIMPORTANT: Write your mirror reflection message in ${languageName}. Use natural, witty phrasing appropriate for a native speaker.`)
       : '';
 
     // Get conversation
