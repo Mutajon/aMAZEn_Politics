@@ -40,7 +40,7 @@ export const MIRROR_QUIZ_POOL: MirrorQA[] = [
   },
   {
     id: "QUIZ_RED_TRAFFIC_LIGHT",
-    q: "At midnight you see a red traffic light, but not a single soul around. What do you do?",
+    q: "You are a pedestrian, at midnight you see a red traffic light, but not a single soul around. What do you do?",
     options: [
       { a: "Stop. Even rules deserve respect when no one is watching", mappings: ["Security/Safety", "Law"] },
       { a: "Go! Why wait for a robot lamp to tell me how to live?", mappings: ["Liberty/Agency", "Personal"] },

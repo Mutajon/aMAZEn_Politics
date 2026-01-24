@@ -684,15 +684,14 @@ IMPORTANT: For Days 2+, you will receive UPDATED "CURRENT TOP VALUES" in each da
 These values may shift due to the player's actions and their consequences (compass pills).
 ALWAYS use the most recent values provided to ensure maximum personal relevance.
 ${dilemmaEmphasis ? `
-
 ═══════════════════════════════════════════════════════════════════════════════
+NARRATIVE LENS (RECOMMENDED):
 ${dilemmaEmphasis}
 ═══════════════════════════════════════════════════════════════════════════════
 
-EMPHASIS IS A LENS, NOT A CAGE:
-The emphasis above guides your APPROACH, not your topic selection. 
-You MUST STILL follow TOPIC DIVERSITY and VALUE ROTATION rules.
-Frame diverse topics (Economy, Religion, etc.) THROUGH the lens of the emphasis.
+INSTRUCTION: 
+Try to base your dilemmas around the topics and issues raised in this emphasis.
+Use it to ground the conflict in specific setting details, but maintain variety in the daily scenarios.
 ` : ''}
 ${character ? `
 
