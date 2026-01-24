@@ -14,6 +14,7 @@ import {
     buildGameMasterUserPrompt
 } from "../services/promptBuilders.mjs";
 import { getTheoryPrompt } from "../theory-loader.mjs";
+import { sendThresholdAlert } from "../services/emailService.mjs";
 
 /**
  * USE_PROMPT_V3: Toggle between original prompt and V3 (value-driven, private life focus)
@@ -45,6 +46,12 @@ export async function reserveGameSlot(req, res) {
         if (result) {
             // Successfully reserved a slot
             console.log(`[Reserve Slot] Slot reserved. Remaining: ${result.value}`);
+            
+            // Send email alert if threshold reached (234 games remaining for testing)
+            sendThresholdAlert(result.value, 50).catch(err => {
+                console.error('[Reserve Slot] Email notification failed:', err.message);
+            });
+            
             res.json({ success: true, gamesRemaining: result.value });
         } else {
             // Failed to decrement. Either capped (<=0) or doesn't exist.

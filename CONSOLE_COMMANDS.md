@@ -229,6 +229,42 @@ loggingService.flush()        // Force flush logs to backend immediately
 
 ---
 
+## Email Notification Testing
+
+Test email configuration and send test threshold alerts.
+
+```javascript
+testEmailConfig()                  // Test email configuration (SMTP connection)
+testThresholdEmail(gamesRemaining) // Send test threshold email (default: 50)
+resetEmailFlag()                   // Reset email sent flag (allows resending)
+```
+
+**Email System**:
+- Automatically sends email when `games_remaining` counter reaches 50
+- Email sent from `EMAIL_USER` to `EMAIL_TO` (configured in `.env`)
+- Uses Gmail SMTP with credentials from `.env`
+- Threshold email sent only once per server session (flag prevents duplicates)
+
+**Configuration** (in `.env`):
+```bash
+EMAIL_ENABLED=true                          # Enable/disable email notifications
+EMAIL_USER=hujidemocracygame@gmail.com      # Sender email (Gmail)
+EMAIL_PASS=your-app-password                # Gmail app password
+EMAIL_TO=recipient@mail.huji.ac.il          # Recipient email
+```
+
+**Use Cases**:
+- `testEmailConfig()` - Verify SMTP settings are correct
+- `testThresholdEmail(45)` - Send test email for 45 games remaining
+- `resetEmailFlag()` - Reset flag to test threshold logic again
+
+**Important**: 
+- Email failures do NOT break game functionality (fail gracefully)
+- Gmail requires "App Password" if 2FA is enabled
+- Threshold checked every time a game slot is reserved
+
+---
+
 ## Adding New Console Commands
 
 **When adding new console commands**:
