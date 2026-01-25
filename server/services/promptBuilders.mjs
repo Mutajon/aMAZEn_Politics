@@ -684,15 +684,14 @@ IMPORTANT: For Days 2+, you will receive UPDATED "CURRENT TOP VALUES" in each da
 These values may shift due to the player's actions and their consequences (compass pills).
 ALWAYS use the most recent values provided to ensure maximum personal relevance.
 ${dilemmaEmphasis ? `
-
 ═══════════════════════════════════════════════════════════════════════════════
+NARRATIVE LENS (RECOMMENDED):
 ${dilemmaEmphasis}
 ═══════════════════════════════════════════════════════════════════════════════
 
-EMPHASIS IS A LENS, NOT A CAGE:
-The emphasis above guides your APPROACH, not your topic selection. 
-You MUST STILL follow TOPIC DIVERSITY and VALUE ROTATION rules.
-Frame diverse topics (Economy, Religion, etc.) THROUGH the lens of the emphasis.
+INSTRUCTION: 
+Try to base your dilemmas around the topics and issues raised in this emphasis.
+Use it to ground the conflict in specific setting details, but maintain variety in the daily scenarios.
 ` : ''}
 ${character ? `
 
@@ -708,53 +707,40 @@ Example: "As ${character.name} reviews the latest reports..."
 
 This creates a stronger connection between the player and their role without being repetitive.
 ` : ''}
-${languageCode === 'he' && character ? `
-
+${languageCode === 'he' ? `
 ───────────────────────────────────────────────────────────────────────────────
-CRITICAL - HEBREW GENDER CONSISTENCY RULES
-───────────────────────────────────────────────────────────────────────────────
-
-Hebrew is a gender-inflected language. ALL verbs, adjectives, and pronouns MUST agree with the character's gender.
-
-CHARACTER GENDER: ${character.gender}
-
-${character.gender === 'male' ? `**MALE CHARACTER - Use masculine forms:**
-- Verbs: אתה עומד, אתה צריך, אתה יכול (you stand, you need, you can)
-- Adjectives: אתה חזק, אתה נבון (you are strong, you are wise)
-- Pronouns: שלך (your, masculine)
-- Past tense: עמדת, הצלחת, עשית (you stood, you succeeded, you did)
-
-✅ CORRECT: "אתה עומד בפני דילמה קשה" (You [m] face a difficult dilemma)
-❌ WRONG: "את עומדת בפני דילמה קשה" (You [f] face...)` : character.gender === 'female' ? `**FEMALE CHARACTER - Use feminine forms:**
-- Verbs: את עומדת, את צריכה, את יכולה (you stand, you need, you can)
-- Adjectives: את חזקה, את נבונה (you are strong, you are wise)
-- Pronouns: שלך (your, feminine)
-- Past tense: עמדת, הצלחת, עשית (you stood, you succeeded, you did)
-
-✅ CORRECT: "את עומדת בפני דילמה קשה" (You [f] face a difficult dilemma)
-❌ WRONG: "אתה עומד בפני דילמה קשה" (You [m] face...)` : ''}
-
-**VERIFICATION CHECKLIST:**
-Before submitting your Hebrew dilemma, verify:
-- [ ] All verbs match character gender (past/present/future tenses)
-- [ ] All adjectives match character gender
-- [ ] All pronouns (your/you) match character gender
-- [ ] Consistency across entire dilemma text
-
-**CRITICAL**: This is MANDATORY for Hebrew. Gender mismatch breaks player immersion.
-
-───────────────────────────────────────────────────────────────────────────────
-HEBREW TONE & STYLE (SPOKEN VS LITERARY)
+CRITICAL - HEBREW LANGUAGE RULES (PLURAL FORM ONLY)
 ───────────────────────────────────────────────────────────────────────────────
 
-When writing in Hebrew, use common, spoken-style phrasing. 
-AVOID formal/literary pronominal suffixes for possession (e.g., דמך). 
-Instead, use the "shel" construct (e.g., הדם שלך).
+You are speaking to the player. In this game version, you MUST address the player in the **PLURAL MASCULINE (Rabbim)** form, regardless of their gender.
 
-✅ GOOD (Spoken): "הדם שלך" (Your blood), "המשרד שלך" (Your office), "הדלתות שלהם" (Their doors)
-❌ BAD (Literary): "דמך", "משרדך", "דלתותיהם"
+This addresses "The Players" or "The Leadership" as a collective entity.
 
-This ensures the narrative feels immediate and modern rather than like a dusty textbook.
+STRICT RULES:
+1. ALWAYS use Plural Masculine for "You":
+   - "אתם" (You, pl) NOT "אתה" or "את"
+   - "שלכם" (Your, pl) NOT "שלך"
+   - "אתם עומדים" (You stand, pl) NOT "אתה עומד"
+   - "החלטתם" (You decided, pl) NOT "החלטת"
+
+2. Verbs & Adjectives must be Plural Masculine:
+   - ✅ "אתם חזקים" (You are strong, pl)
+   - ❌ "אתה חזק" (You are strong, sg)
+   - ✅ "ראיתם" (You saw, pl)
+   - ❌ "ראית" (You saw, sg)
+
+3. Tone & Style:
+   - Use "shel" (e.g., "הבית שלכם") instead of possessive suffixes (e.g., "ביתכם").
+   - Immediate, rough, direct tone.
+
+✅ CORRECT EXAMPLES:
+- "אתם עומדים בפני החלטה גורלית." (You face a fateful decision.)
+- "היועצים שלכם מחכים לתשובה." (Your advisors await an answer.)
+- "התוצאות תלויות בכם." (The results depend on you.)
+
+❌ INCORRECT EXAMPLES:
+- "אתה עומד..." (Singular - DO NOT USE)
+- "את עומדת..." (Singular - DO NOT USE)
 ` : ''}
 
 ───────────────────────────────────────────────────────────────────────────────
@@ -936,28 +922,36 @@ Days 2-7: The "bridge" field must contain EXACTLY ONE SENTENCE that:
 1. Shows the OUTCOME of the player's previous choice.
 2. CONNECTS that outcome to the new dilemma.
 
-COMPETENCE RULE (VERY IMPORTANT):
-- If the player's choice was WEAK or reckless -> Show the negative consequence immediately (causal failure).
-- If the player's choice was SOUND, CLEVER, or COMPETENT -> Show a SUCCESSFUL OUTCOME first.
-  * Let them enjoy the win of that specific battle.
-  * THEN, Pivot to a new, perhaps unrelated, crisis that demands attention.
+COMPETENCE RULE (VERY IMPORTANT - THE "FLATTERY" PROTOCOL):
+- If the player's choice was SOUND, CLEVER, or COMPETENT (judged by setting/role norms):
+  1. FLATTER THEM: Explicitly acknowledge their skill. "A masterstroke." "The city breathes easier thanks to your wisdom." "Your enemies are silenced by your cunning."
+  2. SHOW THE WIN: Describe the immediate positive outcome clearly.
+  3. THE TWIST: IMMEDIATELY pivot to a COMPLETELY UNRELATED dilemma.
+     - "You have secured the borders... but now the grain silos are burning."
+     - "The mob loves you... but your wife has fallen ill."
+     - DO NOT let them rest. Success buys them a ticket to a new kind of hell.
+
+- If the player's choice was WEAK, RECKLESS, or POOR:
+  1. SHOW THE CONSEQUENCE: Describe the immediate failure or cost.
+  2. THE FOLLOW-UP:
+     - If this is Day 1 of a topic: You can DIG DEEPER into the same issue to twist the knife.
+     - If this is Day 2 of a topic: YOU MUST SWITCH TOPICS. Do not beat a dead horse. Move to a new crisis.
 
 PRIORITY ORDER:
-- BEST (Competent Play): "Your decree worked perfectly and the people cheered; however, this morning a new threat arrived from the north." (Success -> New Problem)
-- BEST (Weak Play/Direct Consequence): "Your refusal to pay triggered a riot immediately." (Direct Consequence)
-- GOOD: Previous choice's outcome creates context for unrelated new problem.
+- BEST (Competent Play): [Flattery/Success] + [New Unrelated Crisis]
+  "Your brilliant negotiation saved the treaty. The Council is in awe. However, while you celebrated, the river flooded the lower districts."
+- BEST (Weak Play): [Direct Consequence] + [Escalation/Switch]
+  "Your refusal to pay insulted the general. He has now seized the city gates."
 
 GOOD EXAMPLES (Competent/Success):
-- "The trade deal you signed brought wealth to the city; but now the merchant guild demands political power."
-- "Your speech successfully calmed the mob; silence fell. Then, a messenger arrived with news of the plague."
-
-GOOD EXAMPLES (Failure/Consequence):
-- "Your arrest of the priest triggered riots in the temple district—now the high priestess demands an audience."
+- "A wise ruling. The merchants praise your fairness and trade resumes. But wealth attracts envy—bandits have kidnapped your brother."
+- "You silenced the demagogue with a single word. Perfect. But in the silence, the cough of the plague is heard."
 
 BAD EXAMPLES (Do Not Do):
-- "You saved the city, but actually you didn't because the people hate you anyway." (Undermining competence)
+- "You did okay." (Boring)
+- "You solved the war, so now let's solve more war." (Failed to switch topics)
+- "You failed, so here is a random new thing." (No consequence for failure)
 - "Whatever you do, things get worse." (Nihilism)
-- "Yesterday you arrested the priest. Today, a plague arrives." (No connection/outcome shown)
 
 MANDATORY STRUCTURE:
 - "dilemma.description": Start with ONE sentence showing the outcome of the previous choice. Then describe the NEW situation details + direct question.

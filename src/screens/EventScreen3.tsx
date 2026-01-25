@@ -583,7 +583,8 @@ export default function EventScreen3({ push }: Props) {
             systemName: useRoleStore.getState().analysis?.systemName || 'Unknown system'
           },
           trapContext,  // NEW: Include trap context for value-aware analysis
-          debugMode
+          debugMode,
+          language: 'he' // Default to Hebrew as per requirement, or extract from context if available
         })
       });
 

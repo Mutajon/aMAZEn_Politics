@@ -8,7 +8,7 @@ import { useRoleStore } from "../store/roleStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useLogger } from "../hooks/useLogger";
 import { useNavigationGuard } from "../hooks/useNavigationGuard";
-import { useLang, getCurrentLanguage } from "../i18n/lang";
+import { useLang } from "../i18n/lang";
 import { useReserveGameSlot } from "../hooks/useReserveGameSlot";
 import { audioManager } from "../lib/audioManager";
 
@@ -20,7 +20,7 @@ import { audioManager } from "../lib/audioManager";
 
 export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
   const lang = useLang();
-  const narrationEnabled = useSettingsStore((s) => s.narrationEnabled);
+
   const experimentMode = useSettingsStore((s) => s.experimentMode);
   const reserveGameSlotMutation = useReserveGameSlot();
 
@@ -34,27 +34,13 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
     screenName: "background_intro_screen"
   });
 
-  // Role data (forgiving shape)
-  const genderRaw = useRoleStore((s: any) => s?.character?.gender);
+  // Role data
   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
-  const gender: "male" | "female" | "any" =
-    genderRaw === "male" || genderRaw === "female" ? genderRaw : "any";
 
   // Create role-based background style
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
 
-  // Get gender-aware translation keys
-  const getGenderKey = (baseKey: string): string => {
-    if (gender === "female") {
-      return `${baseKey}_FEMALE`;
-    } else if (gender === "male") {
-      return `${baseKey}_MALE`;
-    }
-    // For "any" or undefined, use the base key (which defaults to male form)
-    return baseKey;
-  };
-
-  const DEFAULT_LINE = useMemo(() => lang(getGenderKey("BACKGROUND_INTRO_DEFAULT_LINE")), [lang, gender]);
+  const DEFAULT_LINE = useMemo(() => lang("BACKGROUND_INTRO_DEFAULT_LINE"), [lang]);
 
   // Prevent double-play of voiceover
   const defaultPlayedRef = useRef(false);
@@ -124,7 +110,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
               className="w-[14rem] rounded-2xl px-4 py-3 text-base font-semibold bg-gradient-to-r from-amber-300 to-amber-500 text-[#0b1335] shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-amber-300/60"
               onClick={onWake}
             >
-              {lang(getGenderKey("BACKGROUND_INTRO_WAKE_UP"))}
+              {lang("BACKGROUND_INTRO_WAKE_UP")}
             </button>
           </div>
         </motion.div>

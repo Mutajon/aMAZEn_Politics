@@ -55,7 +55,8 @@ function delay(ms: number): Promise<void> {
 export async function cleanAndAdvanceDay(
   selectedAction: ActionCard,
   clearFlights: () => void,
-  trapContext?: TrapContext  // NEW: Pass trap context for value-aware compass analysis
+  trapContext?: TrapContext,  // NEW: Pass trap context for value-aware compass analysis
+  language: string = 'he'     // NEW: Language for mirror reflection
 ): Promise<void> {
   console.log('[Cleaner] Starting cleanup for action:', selectedAction.id, selectedAction.title);
 
@@ -133,7 +134,7 @@ export async function cleanAndAdvanceDay(
       const pills = await fetchCompassHintsForAction(gameId, {
         title: selectedAction.title,
         summary: selectedAction.summary || selectedAction.title
-      }, trapContext);
+      }, trapContext, language);
 
       if (pills.length > 0) {
         console.log(`[Cleaner] Applying ${pills.length} compass deltas immediately`);

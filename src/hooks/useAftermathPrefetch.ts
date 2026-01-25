@@ -137,8 +137,13 @@ export function useAftermathPrefetch() {
         return response.json();
       })
       .then(data => {
-        prefetchResult = data;
-        console.log('[AftermathPrefetch] Prefetch completed', data.isFallback ? '(fallback)' : '(success)');
+        // Attach gameId to the result for validation in useAftermathData
+        // This ensures availability even if API response doesn't include it
+        prefetchResult = {
+          ...data,
+          _validationGameId: request.gameId
+        };
+        console.log('[AftermathPrefetch] Prefetch completed', data.isFallback ? '(fallback)' : '(success)', `for gameId: ${request.gameId}`);
         return data;
       })
       .catch(err => {

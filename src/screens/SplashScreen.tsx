@@ -313,7 +313,7 @@ export default function SplashScreen({
   };
 
   // DEBUG: Quick start specific role with default values
-  const handleDebugRoleStart = async (roleId: string) => {
+  const handleDebugRoleStart = async (roleId: string, disableEmphasis = false) => {
     // Robust lookup by ID instead of fragile title string
     const roleData = Object.values(PREDEFINED_ROLES_MAP).find(r => r.id === roleId);
 
@@ -354,7 +354,13 @@ export default function SplashScreen({
 
       // 2. Set Analysis/Power Dist
       // IMPORTANT: The store expects the full analysis object
-      roleStore.setAnalysis(roleData.powerDistribution);
+      // If disableEmphasis is true, we must clone and remove the emphasis
+      let analysisData = roleData.powerDistribution;
+      if (disableEmphasis) {
+        console.log("[Debug] Starting with emphasis DISABLED");
+        analysisData = { ...roleData.powerDistribution, dilemmaEmphasis: undefined };
+      }
+      roleStore.setAnalysis(analysisData);
 
       // 3. Set Default Character (No Avatar)
       const defaultChar = {
@@ -866,6 +872,14 @@ export default function SplashScreen({
                     className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded border border-white/10"
                   >
                     🦅 N. America (Has Emphasis)
+                  </button>
+
+                  <button
+                    onClick={() => handleDebugRoleStart("athens_431", true)}
+                    className="px-3 py-2 bg-red-700/50 hover:bg-red-600/50 text-white text-xs rounded border border-red-500/30 col-span-2"
+                    title="Start Athens with NO dilemma emphasis (test raw prompt)"
+                  >
+                    🏛️ Athens (No Emphasis)
                   </button>
                 </div>
               </motion.div>

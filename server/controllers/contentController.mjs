@@ -112,6 +112,8 @@ export async function generateNewsTicker(req, res) {
         const systemName = String(req.body?.systemName || "").trim();
         const epochReq = String(req.body?.epoch || "").toLowerCase(); // "modern" | "ancient" | "futuristic" (optional)
         const last = req.body?.last || null; // { title, summary, cost? }
+        const language = String(req.body?.language || "en").toLowerCase();
+        const languageName = LANGUAGE_NAMES[language] || LANGUAGE_NAMES.en;
 
         // Heuristic epoch if caller didn't pass one
         function classifyEpoch(sys = "", r = "") {
@@ -157,6 +159,8 @@ export async function generateNewsTicker(req, res) {
             "- Single sentence, satirical and witty",
             "- Mix of 'news' and 'social' kinds",
             "- JSON ARRAY ONLY; no prose outside the array",
+            language !== 'en' ? `\n- Write the "text" content in ${languageName}.` : '',
+            language === 'he' ? `\n- HEBREW RULE: If referring to the player directly (rare), use PLURAL MASCULINE (אתם/שלכם). Ideally use 3rd person (המנהיגות, הממשלה).` : ''
         ].join("\n");
 
         console.log("[news-ticker] Request params:", { day, role: role.slice(0, 50), systemName, mode, epoch });
@@ -297,8 +301,12 @@ export async function generateDynamicParameters(req, res) {
         const {
             lastChoice, // DilemmaAction: { id, title, summary, cost, iconHint }
             politicalContext, // { role, systemName, day, totalDays, compassValues }
-            debug = false
+            debug = false,
+            language = 'en'
         } = req.body;
+
+        const languageCode = String(language).toLowerCase();
+        const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
 
         if (!lastChoice) {
             return res.json({ parameters: [] });
@@ -360,7 +368,13 @@ CRITICAL RESTRICTIONS (ABSOLUTELY ENFORCED):
 
 Choose appropriate icons from: Users, TrendingUp, TrendingDown, Shield, AlertTriangle, Heart, Building, Globe, Leaf, Zap, Target, Scale, Flag, Crown, Activity, etc.
 
-Set tone as "up" (positive/green), "down" (negative/red), or "neutral" (blue) based on whether this is generally good or bad for the player's position.`;
+Set tone as "up" (positive/green), "down" (negative/red), or "neutral" (blue) based on whether this is generally good or bad for the player's position.
+
+${languageCode !== 'en' ? `LANGUAGE: Write the "text" field in ${languageName}.` : ''}
+${languageCode === 'he' ? `HEBREW RULES:
+- Use PLURAL MASCULINE if addressing the player (Rare).
+- Prefer impersonal/collective descriptions ("The army rebelled", not "Your army rebelled").
+- Use "shel" for possession.` : ''}`;
 
         const user = `Political Context:
 Role: ${politicalContext?.role || "Leader"}

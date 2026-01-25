@@ -137,15 +137,25 @@ export function useAftermathData() {
     const { debugMode } = useSettingsStore.getState();
 
     // Check for prefetched data first
+    // Check for prefetched data first
     const prefetched = getPrefetchedAftermathData();
-    if (prefetched) {
-      console.log('[useAftermathData] Using prefetched data', prefetched.isFallback ? '(fallback)' : '(success)');
-      clearAftermathPrefetch();
+    const currentGameId = useDilemmaStore.getState().gameId;
 
-      const result = processApiResult(prefetched);
-      setData(result);
-      setLoading(false);
-      return;
+    if (prefetched) {
+      // VALIDATE: Only use prefetched data if it matches the current game ID
+      // This prevents stale data from appearing after skipping Screens with debug tools
+      if (prefetched._validationGameId && prefetched._validationGameId !== currentGameId) {
+        console.warn(`[useAftermathData] ⚠️ Stale prefetch detected! (Prefetch: ${prefetched._validationGameId}, Current: ${currentGameId}). Discarding.`);
+        clearAftermathPrefetch();
+      } else {
+        console.log('[useAftermathData] Using prefetched data', prefetched.isFallback ? '(fallback)' : '(success)');
+        clearAftermathPrefetch();
+
+        const result = processApiResult(prefetched);
+        setData(result);
+        setLoading(false);
+        return;
+      }
     }
 
     // Build request

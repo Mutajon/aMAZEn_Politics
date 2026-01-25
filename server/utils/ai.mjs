@@ -349,50 +349,84 @@ export async function aiJSONGemini({ system, user, model = MODEL_VALIDATE_GEMINI
  * Call Gemini (Google) Chat API for game-turn endpoint
  * Uses OpenAI-compatible endpoint format
  */
-export async function callGeminiChat(messages, model) {
+export async function callGeminiChat(messages, model, options = {}) {
+    const { responseType = 'json' } = options;
     const maxRetries = 5;
     const retryDelayMs = 2000;
     const retryableStatuses = [429, 500, 502, 503, 504];
+    const TIMEOUT_MS = 60000; // 60s timeout for each attempt
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        console.log(`[GEMINI] Calling Gemini API (attempt ${attempt}/${maxRetries}) with key: ${GEMINI_KEY ? 'Yes (' + GEMINI_KEY.substring(0, 8) + '...)' : 'NO KEY!'}`);
+        const keyStatus = GEMINI_KEY ? 'Yes (' + GEMINI_KEY.substring(0, 8) + '...)' : 'NO KEY!';
+        console.log(`[GEMINI] Calling Gemini API (attempt ${attempt}/${maxRetries}) with key: ${keyStatus}`);
 
-        const response = await fetch(GEMINI_CHAT_URL, {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${GEMINI_KEY}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                model: model || MODEL_DILEMMA_GEMINI,
-                messages: messages,
-                temperature: 1,
-                max_tokens: 6144,
-                stream: false,
-                response_format: { type: "json_object" }
-            })
-        });
+        const body = {
+            model: model || MODEL_DILEMMA_GEMINI,
+            messages: messages,
+            temperature: 1,
+            max_tokens: 6144,
+            stream: false
+        };
 
-        if (response.ok) {
-            const data = await response.json();
-            return {
-                content: data?.choices?.[0]?.message?.content || "",
-                finishReason: data?.choices?.[0]?.finish_reason
-            };
+        if (responseType === 'json') {
+            body.response_format = { type: "json_object" };
         }
 
-        // Check if we should retry
-        if (retryableStatuses.includes(response.status) && attempt < maxRetries) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+        try {
+            const response = await fetch(GEMINI_CHAT_URL, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${GEMINI_KEY}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(body),
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+                const data = await response.json();
+                return {
+                    content: data?.choices?.[0]?.message?.content || "",
+                    finishReason: data?.choices?.[0]?.finish_reason
+                };
+            }
+
+            // Check if we should retry based on status logic
+            if (retryableStatuses.includes(response.status) && attempt < maxRetries) {
+                const errorText = await response.text();
+                console.log(`[GEMINI] ⚠️ Retryable error ${response.status}, waiting ${retryDelayMs}ms before retry ${attempt + 1}/${maxRetries}...`);
+                await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+                continue;
+            }
+
+            // Non-retryable error or max retries reached
             const errorText = await response.text();
-            console.log(`[GEMINI] ⚠️ Retryable error ${response.status}, waiting ${retryDelayMs}ms before retry ${attempt + 1}/${maxRetries}...`);
-            console.log(`[GEMINI] Error details: ${errorText.substring(0, 200)}`);
-            await new Promise(resolve => setTimeout(resolve, retryDelayMs));
-            continue;
-        }
+            throw new Error(`Gemini API error ${response.status}: ${errorText}`);
 
-        // Non-retryable error or max retries reached
-        const errorText = await response.text();
-        throw new Error(`Gemini API error ${response.status}: ${errorText}`);
+        } catch (error) {
+            clearTimeout(timeoutId);
+
+            // Handle abort error (timeout)
+            if (error.name === 'AbortError') {
+                console.error(`[GEMINI] ❌ Request timed out after ${TIMEOUT_MS}ms`);
+            } else {
+                console.error(`[GEMINI] ❌ Network/Fetch error: ${error.message}`);
+            }
+
+            // Retry on network errors or timeouts if attempts remain
+            if (attempt < maxRetries) {
+                console.log(`[GEMINI] ⚠️ Retrying after error, waiting ${retryDelayMs}ms...`);
+                await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+                continue;
+            }
+
+            throw error;
+        }
     }
 }
 

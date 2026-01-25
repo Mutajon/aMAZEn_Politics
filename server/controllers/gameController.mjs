@@ -825,7 +825,41 @@ Write in clear, vivid, reflective language; no jargon or game terms.
 Tone: ironic-cinematic, like a historical epilogue (Reigns, Frostpunk, Democracy 3).
 Accessible for teens; mix wit with weight.
 Use roles/descriptions, not obscure names.
-${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.` : ''}
+${languageCode === 'he' ? `
+───────────────────────────────────────────────────────────────────────────────
+CRITICAL - HEBREW LANGUAGE RULES (PLURAL FORM ONLY)
+───────────────────────────────────────────────────────────────────────────────
+
+You are speaking to the player. In this game version, you MUST address the player in the **PLURAL MASCULINE (Rabbim)** form, regardless of their gender.
+
+This addresses "The Players" or "The Leadership" as a collective entity.
+
+STRICT RULES:
+1. ALWAYS use Plural Masculine for "You":
+   - "אתם" (You, pl) NOT "אתה" or "את"
+   - "שלכם" (Your, pl) NOT "שלך"
+   - "אתם עומדים" (You stand, pl) NOT "אתה עומד"
+   - "החלטתם" (You decided, pl) NOT "החלטת"
+
+2. Verbs & Adjectives must be Plural Masculine:
+   - ✅ "אתם חזקים" (You are strong, pl)
+   - ❌ "אתה חזק" (You are strong, sg)
+   - ✅ "ראיתם" (You saw, pl)
+   - ❌ "ראית" (You saw, sg)
+
+3. Tone & Style:
+   - Use "shel" (e.g., "הבית שלכם") instead of possessive suffixes (e.g., "ביתכם").
+   - Immediate, rough, direct tone.
+
+✅ CORRECT EXAMPLES:
+- "אתם עומדים בפני החלטה גורלית." (You face a fateful decision.)
+- "היועצים שלכם מחכים לתשובה." (Your advisors await an answer.)
+- "התוצאות תלויות בכם." (The results depend on you.)
+
+❌ INCORRECT EXAMPLES:
+- "אתה עומד..." (Singular - DO NOT USE)
+- "את עומדת..." (Singular - DO NOT USE)
+` : (languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.` : '')}
 
 CONTENT
 Generate an in-world epilogue for the leader based on their decisions, outcomes, supports, and values.
@@ -969,16 +1003,56 @@ ${historySummary || "No decisions recorded"}${conversationContext}
 Generate the aftermath epilogue following the structure above. Return STRICT JSON ONLY.${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}.` : ''}`;
 
         // Call AI with Gemini model
-        // No fallback - let errors propagate so frontend can show retry button
+        // Add retry logic for JSON parsing (similar to gameTurnV2)
         const messages = [
             { role: "system", content: system },
             { role: "user", content: user }
         ];
-        const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
-        const result = aiResponse?.content ? safeParseJSON(aiResponse.content, { debugTag: "aftermath-gemini" }) : null;
+        const maxRetries = 5;
+        let aiResponse;
+        let result = null;
+
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            if (attempt > 0) {
+                // Exponential backoff: 2s, 4s, 8s, 16s, 30s
+                const waitTime = Math.min(2000 * Math.pow(2, attempt - 1), 30000);
+                console.log(`[/api/aftermath] Generation failed, waiting ${waitTime}ms before retry (attempt ${attempt + 1}/${maxRetries + 1})...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+
+                // Add correction prompt for JSON errors
+                // Check if the last message is already a user correction to avoid duplicates (optional, but cleaner)
+                const lastMsg = messages[messages.length - 1];
+                if (!lastMsg.content.includes("response was not valid JSON")) {
+                    messages.push({
+                        role: "user",
+                        content: "Your response was not valid JSON. Please respond ONLY with the raw JSON object, no markdown code blocks (no ```), no explanations - just the JSON starting with { and ending with }."
+                    });
+                }
+            }
+
+            try {
+                aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
+                if (aiResponse?.content) {
+                    // Add debug tag for tracing
+                    result = safeParseJSON(aiResponse.content, { debugTag: `aftermath-gemini-${attempt + 1}` });
+                    if (result) {
+                        if (attempt > 0) console.log(`[/api/aftermath] ✅ JSON parsing succeeded on retry attempt ${attempt + 1}`);
+                        break;
+                    } else {
+                        console.warn(`[/api/aftermath] ⚠️ JSON parse failed (attempt ${attempt + 1})`);
+                    }
+                }
+            } catch (err) {
+                console.error(`[/api/aftermath] AI call failed (attempt ${attempt + 1}):`, err.message);
+                if (attempt === maxRetries) {
+                    console.error("[/api/aftermath] ❌ All retry attempts exhausted.");
+                    // Don't throw here, let it fall through to fallback generation so user gets SOMETHING
+                }
+            }
+        }
 
         if (debug) {
-            console.log("[/api/aftermath] AI response:", result);
+            console.log("[/api/aftermath] Final AI result:", result ? "Parsed Successfully" : "Failed Parsing");
         }
 
         // Normalize and validate response
@@ -1123,6 +1197,11 @@ export async function answerInquiry(req, res) {
 Your Goal: Clarify the stakes, the risks, or specific details about the setting/factions WITHOUT solving the dilemma for them.
 Voice: Helpful but slightly ominous, observational, grounded in the historical setting.
 Language: ${languageName}
+${languageCode === 'he' ? `
+CRITICAL - HEBREW LANGUAGE RULES (PLURAL FORM ONLY):
+You are speaking to the player. In this game version, you MUST address the player in the **PLURAL MASCULINE (Rabbim)** form ("אתם", "שלכם"), regardless of known gender.
+NEVER isolate singular gender (NO "אתה" or "את").
+Style: Immediate, rough, no formal suffixes.` : ''}
 Length: Keep the answer concise (2-3 sentences max).
 Context:
 - Role: ${role || "Leader"}
@@ -1139,7 +1218,7 @@ Directly answer the question based on previous context. Do NOT invent contradict
         ];
 
         // Call AI
-        const response = await callGeminiChat(generationMessages, MODEL_VALIDATE_GEMINI);
+        const response = await callGeminiChat(generationMessages, MODEL_VALIDATE_GEMINI, { responseType: 'text' });
 
         const answer = response?.content || "The Game Master remains silent.";
 

@@ -55,12 +55,12 @@ export default function MirrorScreen({ push }: Props) {
     }
   };
 
-  // Determine back button label
-  const getBackButtonLabel = () => {
-    if (cameFromEvent) return " to Event";
-    if (aftermathReturnRoute) return " to Aftermath";
-    if (returnRoute) return " to Quiz";
-    return "";
+  // Determine back button label key
+  const getBackButtonLabelKey = () => {
+    if (cameFromEvent) return "MIRROR_BACK_TO_EVENT";
+    if (aftermathReturnRoute) return "MIRROR_BACK_TO_AFTERMATH";
+    if (returnRoute) return "MIRROR_BACK_TO_QUIZ";
+    return "MIRROR_BACK"; // Fallback
   };
 
   // Section titles for each dimension
@@ -77,10 +77,11 @@ export default function MirrorScreen({ push }: Props) {
         {/* Back button */}
         <div className="mb-6">
           <button
-            className="rounded-xl px-4 py-2 bg-white/10 hover:bg-white/20 text-white/90 transition-colors"
+            className="rounded-xl px-4 py-2 bg-white/10 hover:bg-white/20 text-white/90 transition-colors flex items-center gap-2"
             onClick={handleBack}
           >
-            {lang("MIRROR_BACK")}{getBackButtonLabel()}
+            <span>←</span>
+            <span>{lang(getBackButtonLabelKey())}</span>
           </button>
         </div>
 

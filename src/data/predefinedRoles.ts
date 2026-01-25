@@ -67,54 +67,54 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     scoreGoal: 1000,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
-      systemName: "Democracy",
-      systemDesc: "Direct democracy where citizen Assembly holds decisive authority over war, peace, laws, and leaders through open vote.",
-      flavor: "40,000 citizens shout, vote, and rule themselves—glory or chaos, the demos decides.",
+      systemName: "ATHENS_SYSTEM_NAME",
+      systemDesc: "ATHENS_SYSTEM_DESC",
+      flavor: "ATHENS_SYSTEM_FLAVOR",
       holders: [
         {
-          name: "Assembly (Ekklesia)",
+          name: "ATHENS_HOLDER_1_NAME",
           percent: 45,
           icon: "👥",
-          note: "All citizens vote directly on laws, war, exile, and finances",
+          note: "ATHENS_HOLDER_1_NOTE",
           role: { A: true, E: true },
           stype: { t: "Author", i: "+" }
         },
         {
-          name: "Strategos (Generals)",
+          name: "ATHENS_HOLDER_2_NAME",
           percent: 25,
           icon: "⚔️",
-          note: "10 elected generals lead military, propose strategy, sway crowds",
+          note: "ATHENS_HOLDER_2_NOTE",
           role: { A: true, E: false },
           stype: { t: "Author", i: "•" }
         },
         {
-          name: "Council of 500 (Boule)",
+          name: "ATHENS_HOLDER_3_NAME",
           percent: 15,
           icon: "🏛️",
-          note: "Selected by lot; prepares Assembly agenda, oversees daily affairs",
+          note: "ATHENS_HOLDER_3_NOTE",
           role: { A: true, E: false },
           stype: { t: "Agent", i: "•" }
         },
         {
-          name: "Law Courts (Dikasteria)",
+          name: "ATHENS_HOLDER_4_NAME",
           percent: 10,
           icon: "⚖️",
-          note: "Mass citizen juries; can overturn laws, punish officials",
+          note: "ATHENS_HOLDER_4_NOTE",
           role: { A: false, E: true },
           stype: { t: "Eraser", i: "•" }
         },
         {
-          name: "Wealthy Elite (Liturgy Payers)",
+          name: "ATHENS_HOLDER_5_NAME",
           percent: 5,
           icon: "💰",
-          note: "Fund triremes, festivals; influence through prestige, not votes",
+          note: "ATHENS_HOLDER_5_NOTE",
           role: { A: false, E: false },
           stype: { t: "Actor", i: "-" }
         }
       ],
       playerIndex: 0,
       challengerSeat: {
-        name: "Strategos (Generals)",
+        name: "ATHENS_HOLDER_2_NAME",
         percent: 25,
         index: 1
       },
@@ -124,7 +124,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
         tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
         stopA: false,
         stopB: false,
-        decisive: ["Assembly (Ekklesia)", "Strategos (Generals)", "Council of 500 (Boule)"]
+        decisive: ["ATHENS_HOLDER_1_NAME", "ATHENS_HOLDER_2_NAME", "ATHENS_HOLDER_3_NAME"]
       },
       grounding: {
         settingType: "real",
@@ -134,41 +134,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       roleScope: "An influential Citizen-Juror and head of a prominent household. You hold a vote in the Assembly and possess the social capital to influence public opinion, but you are also legally and socially responsible for your family's behavior.",
       storyThemes: ["free_speech_vs_security", "private_vs_public_duty", "tradition_vs_innovation", "family_vs_ideology"],
       authorityLevel: "low",
-      dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (Athens -431):
-      
-═══════════════════════════════════════════════════════════════════════════════
-CORE TENSION: THE POET'S POISON (Free Speech vs Dignity)
-═══════════════════════════════════════════════════════════════════════════════
-
-CONTEXT:
-A famous poet/playwright is filling the Agora with verses that mock Democracy as "Rule of Fools" and Women as "Soulless Imitations."
-His words are not illegal, but they are shaking the city's foundations.
-Sparta is laughing. Young men are listening. Your family is insulted.
-
-═══════════════════════════════════════════════════════════════════════════════
-THE 5-ACT ARC (MANDATORY ROTATION)
-═══════════════════════════════════════════════════════════════════════════════
-Cycle through these specific dilemmas or similar themes:
-
-1. THE SILENCING (Free Speech vs Harm)
-   A proposal to ban his performances.
-   → Support the ban (Safety)? Oppose it (Liberty)? Or demand a "public debate" (Risk giving him a platform)?
-
-2. THE PRIESTHOOD (Tradition vs Misogyny)
-   His followers demand women be stripped of holy priesthood roles. Your sister is a Priestess of Athena.
-   → Support the vote (Democracy/Mob Rule)? Stall the vote (Bureaucracy)? Sabotage it?
-
-3. "MARSIA" (External Respect vs Internal Humiliation)
-   His play renames Athens to "Marsia" (a "masculine" city). Spartans mockingly use the name.
-   → Ban the name (Streisand effect)? Ignore it? Launch a counter-campaign against Sparta?
-
-4. BLOOD IN THE AGORA (Order vs Violence)
-   His words have turned to stones thrown at speakers.
-   → Silence him (Blame the speaker)? Punish the stone-throwers (Ignore the incitement)? Suspend the Assembly (End Democracy to save it)?
-
-5. THE ASSASSINATION (Family vs Law)
-   Your own son led a failed attempt to beat/kill the poet. He is caught.
-   → Let him yield to the law (Sacrifice Son)? Use influence to free him (Corruption)? Blame the Poet for incitement?`,
+      dilemmaEmphasis: "NARRATIVE LENS (Athens -431): The city is polarized by a famous poet whose verses mock Democracy and Women. Core tension: Free Speech vs. Dignity. Dilemmas should explore: silencing dangerous art vs. liberty, family honour vs. civic duty, and the creeping threat of Sparta weaponizing internal discord.",
     },
     characters: {
       male: {
@@ -268,59 +234,7 @@ Cycle through these specific dilemmas or similar themes:
       roleScope: "A worker thrust into strike leadership; can rally crowds and negotiate but cannot command troops or enact laws.",
       storyThemes: ["labor_rights", "class_solidarity", "violence_vs_nonviolence", "survival_vs_principle"],
       authorityLevel: "low",
-      dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (1877 Railroad Strike):
-
-═══════════════════════════════════════════════════════════════════════════════
-CORE TENSION TRIANGLE: AUTONOMY vs DEMOCRACY vs LIBERALISM
-═══════════════════════════════════════════════════════════════════════════════
-
-Probe these tensions throughout the game:
-- How do strikes STRAIN democratic life? (collective action vs individual rights)
-- What is the PERSONAL COST of activism? (leadership risks becoming complicity)
-- Every dilemma MUST blur private/public spheres with MATERIAL REALITY: hunger, violence, solidarity, betrayal, fear
-
-═══════════════════════════════════════════════════════════════════════════════
-MANDATORY THEMATIC ARCHETYPES — HARD ROTATION REQUIRED
-═══════════════════════════════════════════════════════════════════════════════
-
-You MUST cycle through these 7 archetypes. Do NOT repeat an archetype until at least 4 others have been used.
-Track usage internally. Each day's dilemma must fit ONE archetype clearly.
-
-1. VIOLENCE ACCOUNTABILITY (tensionCluster: LawJustice or SocialOrder)
-   A striker kills in self-defense. A mob destroys railroad property. A Pinkerton is beaten.
-   → Protect the movement's image? Protect the individual? Sacrifice someone to appease authorities?
-
-2. FAMILY VS CAUSE (tensionCluster: FamilyPersonal)
-   Your child is sick. Your spouse begs you to quit. Your elderly parent needs medicine the company doctor won't give.
-   → Sacrifice your family's immediate survival, or weaken the collective struggle?
-
-3. BRIBERY & CORRUPTION (tensionCluster: EconomyResources or InternalPower)
-   Railroad owners offer you money, a job, or safe passage for your family.
-   → Accept and betray openly? Reject publicly and become a target? Accept secretly and play double agent?
-
-4. MACRO CONSEQUENCES (tensionCluster: HealthDisaster or EconomyResources)
-   The strike causes suffering beyond strikers: hospitals lack coal, food shipments rot, a nearby town goes hungry, mail stops.
-   → Make humanitarian concessions that weaken your leverage, or hold firm and be blamed for civilian suffering?
-
-5. SOLIDARITY VS BETRAYAL (tensionCluster: InternalPower or SocialOrder)
-   A fellow leader is accused of being a company spy. A splinter faction wants dynamite. Ethnic tensions fracture the coalition.
-   → Purge the accused? Let factions splinter? Compromise your principles to maintain unity?
-
-6. STATE VIOLENCE (tensionCluster: ExternalConflict or LawJustice)
-   Militia is mobilizing. Federal troops are coming. You have intelligence on their plans.
-   → Prepare for armed confrontation? Disperse and survive? Negotiate surrender? Leak to newspapers to shame the governor?
-
-7. MORAL COMPROMISE (tensionCluster: ReligionCulture or DiplomacyTreaty)
-   A preacher offers sanctuary but demands you renounce violence. A journalist offers coverage but wants exaggerated atrocities. A politician offers support but wants you to betray another union.
-   → Trade your integrity for tactical advantage?
-
-═══════════════════════════════════════════════════════════════════════════════
-TONE & STYLE
-═══════════════════════════════════════════════════════════════════════════════
-
-- GRITTY: Material hardship, physical threat of violence always present
-- CONCRETE: Ground every choice in physical consequences (hunger, injury, arrest, death, eviction)
-- NO ABSTRACT IDEALISM: "The cause" must always have a body count or a bread line attached`
+      dilemmaEmphasis: "NARRATIVE LENS (Railroad Strike 1877): The Great Upheaval. Core tension: Survival vs. Solidarity. Dilemmas should focus on the gritty physical cost of the strike (starvation, violence, cold), the temptation of bribery from owners/politicians, and the friction between democratic leadership and mob violence. Every choice must have a body count or a bread line attached.",
     },
     characters: {
       male: {
@@ -421,61 +335,7 @@ TONE & STYLE
       roleScope: "A student supervisor selected by lottery to oversee strike referendum procedures; can set ballot language, validate petitions, and announce results but cannot dictate how people vote or override Assembly decisions.",
       storyThemes: ["direct_democracy", "institutional_neutrality", "crisis_definition", "collective_vs_individual"],
       authorityLevel: "low",
-      dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (Tel Aviv University Strike 2025):
-
-═══════════════════════════════════════════════════════════════════════════════
-CORE TENSION TRIANGLE: AUTONOMY vs DEMOCRACY vs LIBERALISM
-═══════════════════════════════════════════════════════════════════════════════
-
-Probe these tensions throughout the game:
-- DELIBERATIVE vs POPULAR authority: When does the informed Assembly override raw Referendum results?
-- THE GREY ZONE: How do you define "crisis" when the threat is bureaucratic defiance, not open rebellion?
-- ETHICS OF ENFORCEMENT: Balance the right to strike against dissenters' rights and harm to vulnerable populations
-- PRIVATE vs CIVIC: When is strict neutrality ethical, and when does it become evasion of responsibility?
-
-═══════════════════════════════════════════════════════════════════════════════
-MANDATORY THEMATIC ARCHETYPES — HARD ROTATION REQUIRED
-═══════════════════════════════════════════════════════════════════════════════
-
-You MUST cycle through these 7 archetypes. Do NOT repeat an archetype until at least 4 others have been used.
-Track usage internally. Each day's dilemma must fit ONE archetype clearly.
-
-1. THE GREY ZONE (tensionCluster: LawJustice or InternalPower)
-   The government uses passive delays rather than open defiance. A petition demands a "preemptive" strike.
-   → Validate the petition (legitimize preemption) or reject it as premature (preserve the "crisis" label for real emergencies)?
-
-2. THE MANDATE MISMATCH (tensionCluster: SocialOrder or InternalPower)
-   The Assembly voted 90% to strike, but mass polls show student apathy. The Referendum may fail.
-   → Use neutral ballot framing (risking failure) or biased urgency language to align the popular vote with the Assembly?
-
-3. THE INVISIBLE COST (tensionCluster: EconomyResources or FamilyPersonal)
-   Unpaid contract workers and first-gen students beg for exemptions—they need wages and grades to survive.
-   → Weaken the strike's signal by granting exemptions, or force the most vulnerable to bear the heaviest cost?
-
-4. THE PICKET LINE (tensionCluster: LawJustice or SocialOrder)
-   A professor defies the strike to teach class. Students want to physically block him.
-   → Authorize the blockade (enforce collective democracy) or clear the way (protect individual dissent)?
-
-5. LEGAL LIABILITY (tensionCluster: DiplomacyTreaty or LawJustice)
-   Counsel warns that an official "Shutdown" invites lawsuits from students who want to study.
-   → Water down language to "Voluntary Absence" (weaker signal, legal cover) or risk institutional liability for a stronger stance?
-
-6. THE EXIT STRATEGY (tensionCluster: InternalPower or SocialOrder)
-   The strike fails to generate reaction after four days. Momentum is dying.
-   → Declare a "symbolic victory" and fold with dignity, or escalate to risky tactics to regain attention?
-
-7. STRIKE INFLATION (tensionCluster: ReligionCulture or SocialOrder)
-   Students cite your precedent to demand a strike over cafeteria prices or parking fees.
-   → Democratize the strike tool for all grievances, or gatekeep it strictly for constitutional crises?
-
-═══════════════════════════════════════════════════════════════════════════════
-TONE & STYLE
-═══════════════════════════════════════════════════════════════════════════════
-
-- PROCEDURAL PRESSURE: Every choice involves forms, votes, quorums, and deadlines
-- MORAL AMBIGUITY: No clear heroes or villains—everyone has legitimate grievances
-- PERSONAL ENTANGLEMENT: Private friendships, grades, and career prospects are always at stake
-- CONCRETE CONSEQUENCES: Lawsuits, expulsions, career damage, broken friendships`
+      dilemmaEmphasis: "NARRATIVE LENS (Tel Aviv 2025): A student strike in a polarized society. Core tension: Procedure vs. Urgency. Dilemmas should explore the gray zone of 'crisis' definition (bureaucratic delay vs. open defiance), the conflict between student majority votes and minority rights (the picket line), and the personal cost of institutional neutrality (grades, friendships, careers).",
     },
     characters: {
       male: {
@@ -706,54 +566,54 @@ TONE & STYLE
     scoreGoal: 1100,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
-      systemName: "Hereditary Monarchy / Theocracy",
-      systemDesc: "The Huey Tlatoani rules with divine sanction, advised by a council of Four and the high priesthood; tribute and labor sustain the empire.",
-      flavor: "Steering the empire at the height of its power; managing the sacred duty of building the Great Temple.",
+      systemName: "NORTH_AMERICA_SYSTEM_NAME",
+      systemDesc: "NORTH_AMERICA_SYSTEM_DESC",
+      flavor: "NORTH_AMERICA_SYSTEM_FLAVOR",
       holders: [
         {
-          name: "Executive (Paramount Chief)",
+          name: "NORTH_AMERICA_HOLDER_1_NAME",
           percent: 42,
           icon: "👑",
-          note: "Commands alliance; sets war, trade, justice.",
+          note: "NORTH_AMERICA_HOLDER_1_NOTE",
           role: { A: true, E: true },
           stype: { t: "Dictator", i: "+" }
         },
         {
-          name: "Coercive Force (War Captains & Warriors)",
+          name: "NORTH_AMERICA_HOLDER_2_NAME",
           percent: 23,
           icon: "⚔️",
-          note: "Raids and blockades can force policy shifts.",
+          note: "NORTH_AMERICA_HOLDER_2_NOTE",
           role: { A: true, E: false },
           stype: { t: "Author", i: "•" }
         },
         {
-          name: "Council of Chiefs/Elders",
+          name: "NORTH_AMERICA_HOLDER_3_NAME",
           percent: 14,
           icon: "👥",
-          note: "Advice and consent; can slow risky moves.",
+          note: "NORTH_AMERICA_HOLDER_3_NOTE",
           role: { A: false, E: true },
           stype: { t: "Eraser", i: "•" }
         },
         {
-          name: "Ideology/Religious (Spiritual Advisers)",
+          name: "NORTH_AMERICA_HOLDER_4_NAME",
           percent: 11,
           icon: "✨",
-          note: "Ritual sanction shapes go/no-go on war/trade.",
+          note: "NORTH_AMERICA_HOLDER_4_NOTE",
           role: { A: false, E: true },
           stype: { t: "Eraser", i: "•" }
         },
         {
-          name: "Wealth (Food/Trade Gatekeepers)",
+          name: "NORTH_AMERICA_HOLDER_5_NAME",
           percent: 10,
           icon: "🌾",
-          note: "Controls corn, tribute, and gifts to outsiders.",
+          note: "NORTH_AMERICA_HOLDER_5_NOTE",
           role: { A: true, E: false },
           stype: { t: "Agent", i: "•" }
         }
       ],
       playerIndex: 0,
       challengerSeat: {
-        name: "Coercive Force (War Captains & Warriors)",
+        name: "NORTH_AMERICA_HOLDER_2_NAME",
         percent: 23,
         index: 1
       },
@@ -763,7 +623,7 @@ TONE & STYLE
         tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
         stopA: false,
         stopB: true,
-        decisive: ["Executive (Paramount Chief)", "Coercive Force (War Captains & Warriors)"]
+        decisive: ["NORTH_AMERICA_HOLDER_1_NAME", "NORTH_AMERICA_HOLDER_2_NAME"]
       },
       grounding: {
         settingType: "real",
@@ -773,37 +633,7 @@ TONE & STYLE
       roleScope: "The Successor/Manager of a hereditary family enterprise. You have inherited the 'Trade of the Bound' (slavery). You are responsible for providing the labor force that builds the Great Temple and maintains the village's economic dominance.",
       storyThemes: ["ancestral_debt_vs_conscience", "sacred_vs_profane", "economic_stability_vs_reform", "human_cost_of_civilization"],
       authorityLevel: "medium",
-      dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (Tenochtitlan 1519):
-
-CONTEXT:
-Your village has one purpose: To hunt, sort, and trade SLAVES (tlatlacotin) for the Empire.
-You aren't a king. You are a merchant of human lives. Your village's survival depends on this trade.
-Without it, you have no walls, no army, no protection.
-
-═══════════════════════════════════════════════════════════════════════════════
-THE 5-ACT ARC (MANDATORY ROTATION)
-═══════════════════════════════════════════════════════════════════════════════
-Cycle through these specific dilemmas or similar themes:
-
-1. THE QUOTA (Survival vs Taboo)
-   An ally demands 10 young girls immediately. You don't have enough from raids.
-   → Hunt your own village's children? Stall and lie (Risk Alliance)? Refuse (Risk War)?
-
-2. THE REVOLT (Brutality vs Mercy)
-   Captives plan a revolt.
-   → Execute one slightly innocent leader publicly (Terror)? Sell them apart (Pragmatism)? Aid the revolt (Suicide/Revolution)?
-
-3. THE LOVER (Heart vs Business)
-   You have fallen in love with a capable captive. A rich buyer prompts a huge offer for HIM/HER specifically.
-   → Sell (Duty)? Swap secretly (Fraud)? Free them (Suspicion)?
-
-4. THE SHAMAN'S WARNING (Soul vs Stomach)
-   Shamans claim the violence is rotting the village's youth. They want to switch to corn/wool.
-   → Ignore (Realism)? Soften methods (Compromise)? Attempt the switch (Economic Collapse)?
-
-5. THE RIVAL (Kill or Be Killed)
-   A rival family threatens to expose you or take over. Attempt to purge you.
-   → Assassinate the rival? Bribe them (Weakness)? Use the chaos to force the economic switch?`,
+      dilemmaEmphasis: "NARRATIVE LENS (Tenochtitlan 1519): You manage the 'Trade of the Bound' (slaves) for the Empire. Core tension: Sacred Duty vs. Human Cost. Dilemmas should focus on the brutal economics of human tribute, the threat of revolt from within, and the ominous pressure from the Alliance to deliver more bodies. Survival depends on satisfying the gods and the market, often at the cost of your conscience.",
 
     },
     characters: {
@@ -1332,54 +1162,54 @@ Cycle through these specific dilemmas or similar themes:
     scoreGoal: 1400,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
-      systemName: "Mental-Might Oligarchy — Technocracy",
-      systemDesc: "Engineers and safety rules steer decisions; an elected governor balances Earth supply leverage and local freedoms.",
-      flavor: "Survival-first Mars town where engineers hold the real brakes.",
+      systemName: "MARS_SYSTEM_NAME",
+      systemDesc: "MARS_SYSTEM_DESC",
+      flavor: "MARS_SYSTEM_FLAVOR",
       holders: [
         {
-          name: "Executive",
+          name: "MARS_HOLDER_1_NAME",
           percent: 28,
           icon: "👤",
-          note: "Elected governor; emergency orders and budgets",
+          note: "MARS_HOLDER_1_NOTE",
           role: { A: true, E: true },
           stype: { t: "Author", i: "+" }
         },
         {
-          name: "Science/Philosophy",
+          name: "MARS_HOLDER_2_NAME",
           percent: 24,
           icon: "🔬",
-          note: "Life-support and safety board; can halt risky plans",
+          note: "MARS_HOLDER_2_NOTE",
           role: { A: true, E: true },
           stype: { t: "Eraser", i: "+" }
         },
         {
-          name: "Wealth",
+          name: "MARS_HOLDER_3_NAME",
           percent: 22,
           icon: "🌐",
-          note: "Earth supply consortium; embargo/price veto power",
+          note: "MARS_HOLDER_3_NOTE",
           role: { A: true, E: true },
           stype: { t: "Eraser", i: "+" }
         },
         {
-          name: "Legislative",
+          name: "MARS_HOLDER_4_NAME",
           percent: 16,
           icon: "🏛",
-          note: "Colony council; charters, audits, recalls",
+          note: "MARS_HOLDER_4_NOTE",
           role: { A: true, E: true },
           stype: { t: "Author", i: "•" }
         },
         {
-          name: "Coercive Force",
+          name: "MARS_HOLDER_5_NAME",
           percent: 10,
           icon: "🛡",
-          note: "Peacekeepers; enforce lockdowns under civilian control",
+          note: "MARS_HOLDER_5_NOTE",
           role: { A: false, E: false },
           stype: { t: "Agent", i: "•" }
         }
       ],
       playerIndex: 0,
       challengerSeat: {
-        name: "Science/Philosophy",
+        name: "MARS_HOLDER_2_NAME",
         percent: 24,
         index: 1
       },
@@ -1389,7 +1219,7 @@ Cycle through these specific dilemmas or similar themes:
         tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
         stopA: false,
         stopB: false,
-        decisive: ["Executive", "Science/Philosophy", "Wealth"]
+        decisive: ["MARS_HOLDER_1_NAME", "MARS_HOLDER_2_NAME", "MARS_HOLDER_3_NAME"]
       },
       grounding: {
         settingType: "fictional",
@@ -1399,63 +1229,7 @@ Cycle through these specific dilemmas or similar themes:
       roleScope: "A citizen-journalist on the Mars Colony; can publish stories, cast votes on the colony’s digital network, and influence public opinion, but you are often caught in the crossfire of worker strikes and Earth’s corporate interests.",
       storyThemes: ["digital_democracy", "information_ethics", "democratic_fatigue", "survival_vs_truth"],
       authorityLevel: "low",
-      dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (Mars Colony 2179):
-
-CONTEXT:
-The colony's neuro-link network is overwhelmed. A viral movement demanding total direct democracy has paralyzed the latest safety vote. The life-support engineers warn that constant voting is delaying critical maintenance.
-
-═══════════════════════════════════════════════════════════════════════════════
-CORE TENSION TRIANGLE: DEMOCRACY vs LIBERTY vs AUTONOMY
-═══════════════════════════════════════════════════════════════════════════════
-
-Probe these tensions throughout the game:
-- How do DIGITAL PLATFORMS amplify or distort democratic impulses?
-- Strikes EMPOWER citizens but EXHAUST societies—explore both sides
-- DEMOCRATIC FATIGUE: constant civic participation becomes pressure, burnout, conflict
-- Player must decide: EXPOSE, SHIELD, CRITICIZE, or JOIN movements
-
-═══════════════════════════════════════════════════════════════════════════════
-MANDATORY THEMATIC ARCHETYPES — HARD ROTATION REQUIRED
-═══════════════════════════════════════════════════════════════════════════════
-
-You MUST cycle through these 7 archetypes. Do NOT repeat until at least 4 others used.
-
-1. THE TRUTH DILEMMA (tensionCluster: InfoOrder or LawJustice)
-   You discover damaging truth about strike leaders. Publishing destabilizes the movement.
-   → Publish and risk chaos? Shield and compromise journalistic integrity? Leak selectively?
-
-2. THE AMPLIFICATION TRAP (tensionCluster: InternalPower or SocialOrder)
-   AgoraNet algorithms push your story viral—but distort its meaning into rage.
-   → Retract and lose influence? Ride the wave? Try to correct mid-crisis?
-
-3. THE VOTE FATIGUE (tensionCluster: EconomyResources or HealthDisaster)
-   Citizens are exhausted. A crucial infrastructure vote has 12% turnout. Your story could drive turnout—or deepen cynicism.
-   → Sensationalize to drive turnout? Report honestly and risk infrastructure collapse?
-
-4. THE STRIKE CROSSFIRE (tensionCluster: SocialOrder or ExternalConflict)
-   Workers strike essential services. Hospitals run low. Both sides want you to tell their story.
-   → Cover the strikers' grievances? Document the humanitarian cost? Attempt neutrality?
-
-5. THE PLATFORM SHUTDOWN (tensionCluster: CivilLib or InternalPower)
-   AgoraNet threatens to suspend your credentials for "destabilizing content."
-   → Self-censor to stay online? Go underground? Become a martyr for press freedom?
-
-6. THE JOINING POINT (tensionCluster: FamilyPersonal or ReligionCulture)
-   You're asked to stop reporting and join the strike leadership yourself.
-   → Abandon observer role? Maintain distance? Secretly advise while appearing neutral?
-
-7. THE EXIT QUESTION (tensionCluster: DiplomacyTreaty or SocialOrder)
-   The strike is failing. Movement leaders want you to fabricate a "victory narrative."
-   → Help them save face (lie)? Document the defeat honestly? Propose a negotiated ending?
-
-═══════════════════════════════════════════════════════════════════════════════
-TONE & STYLE
-═══════════════════════════════════════════════════════════════════════════════
-
-- SCI-FI GROUNDED: Technology is pervasive but problems are human
-- INFORMATION WARFARE: Truth is a weapon; platforms shape reality
-- DEMOCRATIC BURNOUT: Everyone is tired of voting, deciding, participating
-- MORAL AMBIGUITY: Strikes are both liberating and destructive`
+      dilemmaEmphasis: "NARRATIVE LENS (Mars Colony 2179): A viral movement demanding total direct democracy has paralyzed the colony. Core tension: Democracy vs. Survival. Dilemmas should explore the fatigue of constant voting ('Vote Fatigue'), the distortion of truth by algorithms, and the critical delays to life-support caused by endless debate.",
     },
     characters: {
       male: {
@@ -1556,60 +1330,7 @@ TONE & STYLE
       roleScope: "A citizen-journalist; can publish, vote, and influence opinion but not legislate or command forces.",
       storyThemes: ["direct_democracy", "information_ethics", "democratic_fatigue", "truth_vs_responsibility"],
       authorityLevel: "low",
-      dilemmaEmphasis: `ROLE-SPECIFIC EMPHASIS (Planet Namek 2099):
-
-═══════════════════════════════════════════════════════════════════════════════
-CORE TENSION TRIANGLE: DEMOCRACY vs LIBERTY vs AUTONOMY
-═══════════════════════════════════════════════════════════════════════════════
-
-Probe these tensions throughout the game:
-- How do DIGITAL PLATFORMS amplify or distort democratic impulses?
-- Strikes EMPOWER citizens but EXHAUST societies—explore both sides
-- DEMOCRATIC FATIGUE: constant civic participation becomes pressure, burnout, conflict
-- Player must decide: EXPOSE, SHIELD, CRITICIZE, or JOIN movements
-
-═══════════════════════════════════════════════════════════════════════════════
-MANDATORY THEMATIC ARCHETYPES — HARD ROTATION REQUIRED
-═══════════════════════════════════════════════════════════════════════════════
-
-You MUST cycle through these 7 archetypes. Do NOT repeat until at least 4 others used.
-
-1. THE TRUTH DILEMMA (tensionCluster: InfoOrder or LawJustice)
-   You discover damaging truth about strike leaders. Publishing destabilizes the movement.
-   → Publish and risk chaos? Shield and compromise journalistic integrity? Leak selectively?
-
-2. THE AMPLIFICATION TRAP (tensionCluster: InternalPower or SocialOrder)
-   AgoraNet algorithms push your story viral—but distort its meaning into rage.
-   → Retract and lose influence? Ride the wave? Try to correct mid-crisis?
-
-3. THE VOTE FATIGUE (tensionCluster: EconomyResources or HealthDisaster)
-   Citizens are exhausted. A crucial infrastructure vote has 12% turnout. Your story could drive turnout—or deepen cynicism.
-   → Sensationalize to drive turnout? Report honestly and risk infrastructure collapse?
-
-4. THE STRIKE CROSSFIRE (tensionCluster: SocialOrder or ExternalConflict)
-   Workers strike essential services. Hospitals run low. Both sides want you to tell their story.
-   → Cover the strikers' grievances? Document the humanitarian cost? Attempt neutrality?
-
-5. THE PLATFORM SHUTDOWN (tensionCluster: CivilLib or InternalPower)
-   AgoraNet threatens to suspend your credentials for "destabilizing content."
-   → Self-censor to stay online? Go underground? Become a martyr for press freedom?
-
-6. THE JOINING POINT (tensionCluster: FamilyPersonal or ReligionCulture)
-   You're asked to stop reporting and join the strike leadership yourself.
-   → Abandon observer role? Maintain distance? Secretly advise while appearing neutral?
-
-7. THE EXIT QUESTION (tensionCluster: DiplomacyTreaty or SocialOrder)
-   The strike is failing. Movement leaders want you to fabricate a "victory narrative."
-   → Help them save face (lie)? Document the defeat honestly? Propose a negotiated ending?
-
-═══════════════════════════════════════════════════════════════════════════════
-TONE & STYLE
-═══════════════════════════════════════════════════════════════════════════════
-
-- SCI-FI GROUNDED: Technology is pervasive but problems are human
-- INFORMATION WARFARE: Truth is a weapon; platforms shape reality
-- DEMOCRATIC BURNOUT: Everyone is tired of voting, deciding, participating
-- MORAL AMBIGUITY: Strikes are both liberating and destructive`
+      dilemmaEmphasis: "NARRATIVE LENS (Planet Namek 2099): Citizens vote daily via AgoraNet, causing massive decision fatigue. Core tension: Engagement vs. Exhaustion. Dilemmas should focus on the overwhelming noise of constant polling, the temptation to let algorithms decide for you, and the social pressure to 'perform' citizenship online.",
     },
     characters: {
       male: {

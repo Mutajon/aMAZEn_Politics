@@ -193,14 +193,25 @@ export function buildSupportItems(
 
   // Helper function to translate challenger seat name
   const translateChallengerName = (name: string): string => {
-    // Check all predefined role translations for a matching holder name
+    // 1. If name is already a likely translation key (uppercase with underscores), try translating it directly
+    if (/^[A-Z0-9_]+$/.test(name)) {
+      const directTranslation = lang(name);
+      // If lang returns the key itself, it means no translation found - continue to search
+      // But if it returns something else, we found it!
+      if (directTranslation !== name) {
+        return directTranslation;
+      }
+    }
+
+    // 2. Check all predefined role translations for a matching holder name
     for (const roleTranslations of Object.values(POWER_DISTRIBUTION_TRANSLATIONS)) {
       const holderTranslation = roleTranslations.holders[name];
       if (holderTranslation) {
         return lang(holderTranslation.name);
       }
     }
-    // If no translation found, return name as-is (for AI-generated roles)
+
+    // 3. Fallback: return name as-is
     return name;
   };
 
