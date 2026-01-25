@@ -187,7 +187,7 @@ export default function App() {
         <LanguageProvider>
           {/* RTL direction handler */}
           <RTLHandler />
-          <LandscapePrompt />
+          {/* <LandscapePrompt /> */}
 
 
           {/* App content with loading check */}
