@@ -138,7 +138,7 @@ export default function PowerDistributionContent({
                   className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 sm:px-2 sm:py-1 bg-white/5 hover:bg-white/10 border border-white/10 min-h-[44px] sm:min-h-0"
                   aria-label="Show political system details"
                 >
-                  <span className="font-semibold text-sm sm:text-base">{systemName || "—"}</span>
+                  <span className="font-semibold text-sm sm:text-base">{lang(systemName) || "—"}</span>
                   <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300" />
                 </button>
               </div>
@@ -197,9 +197,8 @@ export default function PowerDistributionContent({
                                 onChangeName(h._id, e.target.value);
                               }}
                               disabled={isRealSetting}
-                              className={`bg-transparent text-sm sm:text-base font-semibold outline-none flex-auto min-w-0 ${
-                                isRealSetting ? 'text-white/60 cursor-not-allowed' : 'text-white/95'
-                              }`}
+                              className={`bg-transparent text-sm sm:text-base font-semibold outline-none flex-auto min-w-0 ${isRealSetting ? 'text-white/60 cursor-not-allowed' : 'text-white/95'
+                                }`}
                               placeholder="Enter a name…"
                               aria-label="Power holder name"
                             />
@@ -326,9 +325,9 @@ export default function PowerDistributionContent({
                   Close
                 </button>
               </div>
-              <p className="mt-3 text-white/85 text-sm sm:text-base">{systemDesc}</p>
+              <p className="mt-3 text-white/85 text-sm sm:text-base">{lang(systemDesc)}</p>
               {systemFlavor && (
-                <p className="mt-3 italic text-amber-200/90 text-sm sm:text-base">"{systemFlavor.replace(/^"|"$/g, "")}"</p>
+                <p className="mt-3 italic text-amber-200/90 text-sm sm:text-base">"{lang(systemFlavor).replace(/^"|"$/g, "")}"</p>
               )}
             </motion.div>
           </motion.div>

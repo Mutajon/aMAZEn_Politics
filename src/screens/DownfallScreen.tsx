@@ -18,12 +18,14 @@ import { useNarrator } from "../hooks/useNarrator";
 import { TTS_VOICE } from "../lib/ttsConfig";
 import SelfJudgmentModal from "../components/event/SelfJudgmentModal";
 import { useLogger } from "../hooks/useLogger";
+import { useLang } from "../i18n/lang"; // Import added
 
 type Props = {
   push: (path: string) => void;
 };
 
 export default function DownfallScreen({ push }: Props) {
+  const lang = useLang(); // Hook usage added
   const { current, supportPeople, supportMiddle, supportMom } = useDilemmaStore();
   const { character, roleBackgroundImage, analysis } = useRoleStore();
   const narrationEnabled = useSettingsStore((s) => s.narrationEnabled !== false);
@@ -83,8 +85,8 @@ export default function DownfallScreen({ push }: Props) {
               <AlertTriangle className="w-12 h-12 text-red-300" strokeWidth={2.5} />
             </motion.div>
             <div>
-              <h1 className="text-3xl font-bold text-red-200">TERMINAL CRISIS</h1>
-              <p className="text-red-300 text-sm mt-1">All support has collapsed</p>
+              <h1 className="text-3xl font-bold text-red-200">{lang("TERMINAL_CRISIS_TITLE")}</h1>
+              <p className="text-red-300 text-sm mt-1">{lang("TERMINAL_CRISIS_SUBTITLE")}</p>
             </div>
           </div>
         </div>
@@ -97,7 +99,7 @@ export default function DownfallScreen({ push }: Props) {
 
           {/* Final Support Levels */}
           <div className="bg-red-950/50 border border-red-500/40 rounded-xl p-6 mb-8">
-            <h2 className="text-xl font-semibold text-red-200 mb-4">Final Support Levels</h2>
+            <h2 className="text-xl font-semibold text-red-200 mb-4">{lang("TERMINAL_CRISIS_FINAL_SUPPORT")}</h2>
             <div className="grid grid-cols-3 gap-4">
               <SupportPill
                 label="The People"
@@ -123,7 +125,7 @@ export default function DownfallScreen({ push }: Props) {
               onClick={() => setShowSelfJudgmentModal(true)}
               className="w-full px-6 py-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-amber-500/50 text-lg"
             >
-              View Full Report
+              {lang("TERMINAL_CRISIS_VIEW_REPORT")}
             </button>
           </div>
 

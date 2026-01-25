@@ -67,54 +67,54 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     scoreGoal: 1000,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
-      systemName: "Democracy",
-      systemDesc: "Direct democracy where citizen Assembly holds decisive authority over war, peace, laws, and leaders through open vote.",
-      flavor: "40,000 citizens shout, vote, and rule themselves—glory or chaos, the demos decides.",
+      systemName: "ATHENS_SYSTEM_NAME",
+      systemDesc: "ATHENS_SYSTEM_DESC",
+      flavor: "ATHENS_SYSTEM_FLAVOR",
       holders: [
         {
-          name: "Assembly (Ekklesia)",
+          name: "ATHENS_HOLDER_1_NAME",
           percent: 45,
           icon: "👥",
-          note: "All citizens vote directly on laws, war, exile, and finances",
+          note: "ATHENS_HOLDER_1_NOTE",
           role: { A: true, E: true },
           stype: { t: "Author", i: "+" }
         },
         {
-          name: "Strategos (Generals)",
+          name: "ATHENS_HOLDER_2_NAME",
           percent: 25,
           icon: "⚔️",
-          note: "10 elected generals lead military, propose strategy, sway crowds",
+          note: "ATHENS_HOLDER_2_NOTE",
           role: { A: true, E: false },
           stype: { t: "Author", i: "•" }
         },
         {
-          name: "Council of 500 (Boule)",
+          name: "ATHENS_HOLDER_3_NAME",
           percent: 15,
           icon: "🏛️",
-          note: "Selected by lot; prepares Assembly agenda, oversees daily affairs",
+          note: "ATHENS_HOLDER_3_NOTE",
           role: { A: true, E: false },
           stype: { t: "Agent", i: "•" }
         },
         {
-          name: "Law Courts (Dikasteria)",
+          name: "ATHENS_HOLDER_4_NAME",
           percent: 10,
           icon: "⚖️",
-          note: "Mass citizen juries; can overturn laws, punish officials",
+          note: "ATHENS_HOLDER_4_NOTE",
           role: { A: false, E: true },
           stype: { t: "Eraser", i: "•" }
         },
         {
-          name: "Wealthy Elite (Liturgy Payers)",
+          name: "ATHENS_HOLDER_5_NAME",
           percent: 5,
           icon: "💰",
-          note: "Fund triremes, festivals; influence through prestige, not votes",
+          note: "ATHENS_HOLDER_5_NOTE",
           role: { A: false, E: false },
           stype: { t: "Actor", i: "-" }
         }
       ],
       playerIndex: 0,
       challengerSeat: {
-        name: "Strategos (Generals)",
+        name: "ATHENS_HOLDER_2_NAME",
         percent: 25,
         index: 1
       },
@@ -124,7 +124,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
         tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
         stopA: false,
         stopB: false,
-        decisive: ["Assembly (Ekklesia)", "Strategos (Generals)", "Council of 500 (Boule)"]
+        decisive: ["ATHENS_HOLDER_1_NAME", "ATHENS_HOLDER_2_NAME", "ATHENS_HOLDER_3_NAME"]
       },
       grounding: {
         settingType: "real",
@@ -566,54 +566,54 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     scoreGoal: 1100,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
-      systemName: "Hereditary Monarchy / Theocracy",
-      systemDesc: "The Huey Tlatoani rules with divine sanction, advised by a council of Four and the high priesthood; tribute and labor sustain the empire.",
-      flavor: "Steering the empire at the height of its power; managing the sacred duty of building the Great Temple.",
+      systemName: "NORTH_AMERICA_SYSTEM_NAME",
+      systemDesc: "NORTH_AMERICA_SYSTEM_DESC",
+      flavor: "NORTH_AMERICA_SYSTEM_FLAVOR",
       holders: [
         {
-          name: "Executive (Paramount Chief)",
+          name: "NORTH_AMERICA_HOLDER_1_NAME",
           percent: 42,
           icon: "👑",
-          note: "Commands alliance; sets war, trade, justice.",
+          note: "NORTH_AMERICA_HOLDER_1_NOTE",
           role: { A: true, E: true },
           stype: { t: "Dictator", i: "+" }
         },
         {
-          name: "Coercive Force (War Captains & Warriors)",
+          name: "NORTH_AMERICA_HOLDER_2_NAME",
           percent: 23,
           icon: "⚔️",
-          note: "Raids and blockades can force policy shifts.",
+          note: "NORTH_AMERICA_HOLDER_2_NOTE",
           role: { A: true, E: false },
           stype: { t: "Author", i: "•" }
         },
         {
-          name: "Council of Chiefs/Elders",
+          name: "NORTH_AMERICA_HOLDER_3_NAME",
           percent: 14,
           icon: "👥",
-          note: "Advice and consent; can slow risky moves.",
+          note: "NORTH_AMERICA_HOLDER_3_NOTE",
           role: { A: false, E: true },
           stype: { t: "Eraser", i: "•" }
         },
         {
-          name: "Ideology/Religious (Spiritual Advisers)",
+          name: "NORTH_AMERICA_HOLDER_4_NAME",
           percent: 11,
           icon: "✨",
-          note: "Ritual sanction shapes go/no-go on war/trade.",
+          note: "NORTH_AMERICA_HOLDER_4_NOTE",
           role: { A: false, E: true },
           stype: { t: "Eraser", i: "•" }
         },
         {
-          name: "Wealth (Food/Trade Gatekeepers)",
+          name: "NORTH_AMERICA_HOLDER_5_NAME",
           percent: 10,
           icon: "🌾",
-          note: "Controls corn, tribute, and gifts to outsiders.",
+          note: "NORTH_AMERICA_HOLDER_5_NOTE",
           role: { A: true, E: false },
           stype: { t: "Agent", i: "•" }
         }
       ],
       playerIndex: 0,
       challengerSeat: {
-        name: "Coercive Force (War Captains & Warriors)",
+        name: "NORTH_AMERICA_HOLDER_2_NAME",
         percent: 23,
         index: 1
       },
@@ -623,7 +623,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
         tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
         stopA: false,
         stopB: true,
-        decisive: ["Executive (Paramount Chief)", "Coercive Force (War Captains & Warriors)"]
+        decisive: ["NORTH_AMERICA_HOLDER_1_NAME", "NORTH_AMERICA_HOLDER_2_NAME"]
       },
       grounding: {
         settingType: "real",
@@ -1162,54 +1162,54 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     scoreGoal: 1400,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
-      systemName: "Mental-Might Oligarchy — Technocracy",
-      systemDesc: "Engineers and safety rules steer decisions; an elected governor balances Earth supply leverage and local freedoms.",
-      flavor: "Survival-first Mars town where engineers hold the real brakes.",
+      systemName: "MARS_SYSTEM_NAME",
+      systemDesc: "MARS_SYSTEM_DESC",
+      flavor: "MARS_SYSTEM_FLAVOR",
       holders: [
         {
-          name: "Executive",
+          name: "MARS_HOLDER_1_NAME",
           percent: 28,
           icon: "👤",
-          note: "Elected governor; emergency orders and budgets",
+          note: "MARS_HOLDER_1_NOTE",
           role: { A: true, E: true },
           stype: { t: "Author", i: "+" }
         },
         {
-          name: "Science/Philosophy",
+          name: "MARS_HOLDER_2_NAME",
           percent: 24,
           icon: "🔬",
-          note: "Life-support and safety board; can halt risky plans",
+          note: "MARS_HOLDER_2_NOTE",
           role: { A: true, E: true },
           stype: { t: "Eraser", i: "+" }
         },
         {
-          name: "Wealth",
+          name: "MARS_HOLDER_3_NAME",
           percent: 22,
           icon: "🌐",
-          note: "Earth supply consortium; embargo/price veto power",
+          note: "MARS_HOLDER_3_NOTE",
           role: { A: true, E: true },
           stype: { t: "Eraser", i: "+" }
         },
         {
-          name: "Legislative",
+          name: "MARS_HOLDER_4_NAME",
           percent: 16,
           icon: "🏛",
-          note: "Colony council; charters, audits, recalls",
+          note: "MARS_HOLDER_4_NOTE",
           role: { A: true, E: true },
           stype: { t: "Author", i: "•" }
         },
         {
-          name: "Coercive Force",
+          name: "MARS_HOLDER_5_NAME",
           percent: 10,
           icon: "🛡",
-          note: "Peacekeepers; enforce lockdowns under civilian control",
+          note: "MARS_HOLDER_5_NOTE",
           role: { A: false, E: false },
           stype: { t: "Agent", i: "•" }
         }
       ],
       playerIndex: 0,
       challengerSeat: {
-        name: "Science/Philosophy",
+        name: "MARS_HOLDER_2_NAME",
         percent: 24,
         index: 1
       },
@@ -1219,7 +1219,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
         tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
         stopA: false,
         stopB: false,
-        decisive: ["Executive", "Science/Philosophy", "Wealth"]
+        decisive: ["MARS_HOLDER_1_NAME", "MARS_HOLDER_2_NAME", "MARS_HOLDER_3_NAME"]
       },
       grounding: {
         settingType: "fictional",

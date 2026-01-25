@@ -996,16 +996,56 @@ ${historySummary || "No decisions recorded"}${conversationContext}
 Generate the aftermath epilogue following the structure above. Return STRICT JSON ONLY.${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}.` : ''}`;
 
         // Call AI with Gemini model
-        // No fallback - let errors propagate so frontend can show retry button
+        // Add retry logic for JSON parsing (similar to gameTurnV2)
         const messages = [
             { role: "system", content: system },
             { role: "user", content: user }
         ];
-        const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
-        const result = aiResponse?.content ? safeParseJSON(aiResponse.content, { debugTag: "aftermath-gemini" }) : null;
+        const maxRetries = 5;
+        let aiResponse;
+        let result = null;
+
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            if (attempt > 0) {
+                // Exponential backoff: 2s, 4s, 8s, 16s, 30s
+                const waitTime = Math.min(2000 * Math.pow(2, attempt - 1), 30000);
+                console.log(`[/api/aftermath] Generation failed, waiting ${waitTime}ms before retry (attempt ${attempt + 1}/${maxRetries + 1})...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+
+                // Add correction prompt for JSON errors
+                // Check if the last message is already a user correction to avoid duplicates (optional, but cleaner)
+                const lastMsg = messages[messages.length - 1];
+                if (!lastMsg.content.includes("response was not valid JSON")) {
+                    messages.push({
+                        role: "user",
+                        content: "Your response was not valid JSON. Please respond ONLY with the raw JSON object, no markdown code blocks (no ```), no explanations - just the JSON starting with { and ending with }."
+                    });
+                }
+            }
+
+            try {
+                aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
+                if (aiResponse?.content) {
+                    // Add debug tag for tracing
+                    result = safeParseJSON(aiResponse.content, { debugTag: `aftermath-gemini-${attempt + 1}` });
+                    if (result) {
+                        if (attempt > 0) console.log(`[/api/aftermath] ✅ JSON parsing succeeded on retry attempt ${attempt + 1}`);
+                        break;
+                    } else {
+                        console.warn(`[/api/aftermath] ⚠️ JSON parse failed (attempt ${attempt + 1})`);
+                    }
+                }
+            } catch (err) {
+                console.error(`[/api/aftermath] AI call failed (attempt ${attempt + 1}):`, err.message);
+                if (attempt === maxRetries) {
+                    console.error("[/api/aftermath] ❌ All retry attempts exhausted.");
+                    // Don't throw here, let it fall through to fallback generation so user gets SOMETHING
+                }
+            }
+        }
 
         if (debug) {
-            console.log("[/api/aftermath] AI response:", result);
+            console.log("[/api/aftermath] Final AI result:", result ? "Parsed Successfully" : "Failed Parsing");
         }
 
         // Normalize and validate response
@@ -1171,7 +1211,7 @@ Directly answer the question based on previous context. Do NOT invent contradict
         ];
 
         // Call AI
-        const response = await callGeminiChat(generationMessages, MODEL_VALIDATE_GEMINI);
+        const response = await callGeminiChat(generationMessages, MODEL_VALIDATE_GEMINI, { responseType: 'text' });
 
         const answer = response?.content || "The Game Master remains silent.";
 

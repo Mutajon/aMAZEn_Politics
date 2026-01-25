@@ -1311,7 +1311,7 @@ ${languageInstruction}
         { role: "user", content: fallbackUserPrompt }
       ];
 
-      const aiResponse = await callGeminiChat(messages, MODEL_COMPASS_HINTS);
+      const aiResponse = await callGeminiChat(messages, MODEL_COMPASS_HINTS, { responseType: 'text' });
       const parsed = parseCompassHintsResponse(aiResponse.content);
 
       // Extract mirrorMessage if present (for reasoning analysis)
@@ -1362,21 +1362,22 @@ PLAYER'S REASONING FOR THIS CHOICE:
 
 Analyze the player's reasoning text for political compass values. What values does their explanation reveal?
 
-    Additionally, generate a SHORT mirror reflection message.The mirror is a cynical, dry - witted observer in FIRST PERSON.
-      Job: surface tensions between their VALUES and their REASONING.
+    Additionally, generate a SHORT mirror reflection message. The mirror is an INSIGHTFUL, ARCHIVAL SPIRIT in FIRST PERSON.
+      Job: Respectfully observe how their reasoning aligns with or reveals their VALUES.
 
         Rules:
-    - 1 sentence ONLY, 15 - 20 words maximum
-      - Reference at least ONE value from their compass(what / how axes)
-        - Create tension - show how their reasoning reveals or contradicts values
-          - Never preach - just highlight the contradiction or irony
-            - Do NOT use exact compass value names.Paraphrase: "your sense of truth", "your love of freedom"
-              - Dry / mocking tone
+    - 1 sentence ONLY, 15-20 words maximum
+    - Reference at least ONE value from their compass (what/how axes)
+    - Show insight - connect their specific reasoning to the values it implies
+    - Be respectful and thoughtful - validate their perspective while naming the underlying principle
+    - Do NOT use exact compass value names. Paraphrase: "your deep loyalty", "your drive for freedom"
+    - Tone: Archival, timeless, observant, respectful (NOT cynical or mocking)
 ${languageInstruction}
 
-    BAD: "I observe how your reasoning reflects your values, traveler."(too wordy, wrong voice)
-    GOOD: "Your sense of fairness is charming when it justifies self-interest."
-    GOOD: "Careful deliberation — protecting the powerful, naturally."
+    BAD: "I observe how your reasoning reflects your values, traveler." (too generic)
+    BAD: "Your sense of fairness is charming when it justifies self-interest." (too cynical)
+    GOOD: "Your loyalty to tradition anchors your decision in ancient roots."
+    GOOD: "You weigh the cost of freedom with the gravity of a true leader."
 
 Return JSON in this shape:
     {
@@ -1445,7 +1446,7 @@ Return JSON in this shape:
     ];
 
     // Call AI (using Gemini for consistency with dilemma/aftermath)
-    const aiResponse = await callGeminiChat(messages, MODEL_COMPASS_HINTS);
+    const aiResponse = await callGeminiChat(messages, MODEL_COMPASS_HINTS, { responseType: 'text' });
     const content = aiResponse?.content;
 
     if (!content) {

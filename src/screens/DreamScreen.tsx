@@ -8,6 +8,7 @@ import { useRoleStore } from "../store/roleStore";
 import { useFragmentsStore } from "../store/fragmentsStore";
 import { useLoggingStore } from "../store/loggingStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
+import { useCompassStore } from "../store/compassStore";
 import { usePastGamesStore } from "../store/pastGamesStore";
 import { PREDEFINED_ROLES_ARRAY, EXPERIMENT_PREDEFINED_ROLE_KEYS, type PredefinedRoleData, getRoleImagePaths } from "../data/predefinedRoles";
 import { audioManager } from "../lib/audioManager";
@@ -212,6 +213,15 @@ export default function DreamScreen({ push }: { push: PushFn }) {
     return "intro";
   });
   const [showArrow, setShowArrow] = useState(false);
+
+  // FIX: Watch for experiment round reset (which sets firstIntro = true after hydration)
+  // If this happens while we are in "returnVisitor" mode, force switch to "intro"
+  useEffect(() => {
+    if (firstIntro && phase === "returnVisitor") {
+      console.log("[DreamScreen] 🔄 Detected session reset (firstIntro=true), forcing Intro sequence");
+      setPhase("intro");
+    }
+  }, [firstIntro, phase]);
 
   // Name state
   const [name, setName] = useState("");
@@ -573,6 +583,12 @@ export default function DreamScreen({ push }: { push: PushFn }) {
 
       // Clear the justFinishedGame flag
       clearJustFinishedGame();
+
+      // CRITICAL FIX: Ensure all game state is reset for the new round
+      // This protects against cases where FinalScoreScreen reset was skipped or failed
+      useDilemmaStore.getState().reset();
+      useCompassStore.getState().reset();
+      useRoleStore.getState().reset(); // Resets role-specific data (but we immediately re-populate below)
 
       // FIX: Start fresh logging session for this game
       // This ensures each game has a unique sessionId for proper tracking
