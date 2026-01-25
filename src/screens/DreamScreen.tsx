@@ -9,6 +9,7 @@ import { useFragmentsStore } from "../store/fragmentsStore";
 import { useLoggingStore } from "../store/loggingStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useCompassStore } from "../store/compassStore";
+import { clearAftermathPrefetch } from "../hooks/useAftermathPrefetch";
 import { usePastGamesStore } from "../store/pastGamesStore";
 import { PREDEFINED_ROLES_ARRAY, EXPERIMENT_PREDEFINED_ROLE_KEYS, type PredefinedRoleData, getRoleImagePaths } from "../data/predefinedRoles";
 import { audioManager } from "../lib/audioManager";
@@ -206,6 +207,44 @@ export default function DreamScreen({ push }: { push: PushFn }) {
   // Determine if this is a return visitor
   const isReturnVisitor = !firstIntro || justFinishedGame;
   const fragmentCount = fragments.length;
+
+  // CRITICAL FIX: Hydration-safe fragment count
+  // Zustand persist middleware may not have rehydrated when this component mounts.
+  // Read directly from localStorage to get the true persisted value.
+  const [safeFragmentCount, setSafeFragmentCount] = useState(() => {
+    try {
+      const stored = localStorage.getItem('amaze-politics-fragments-v2');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const storedFragments = parsed.state?.fragments || [];
+        console.log('[DreamScreen] 📦 Direct localStorage read:', storedFragments.length, 'fragments');
+        return storedFragments.length;
+      }
+    } catch (e) {
+      console.warn('[DreamScreen] ⚠️ Failed to read fragments from localStorage:', e);
+    }
+    return fragments.length;
+  });
+
+  // Use the max of both values to ensure we never show fewer unlocked shards than earned
+  const effectiveFragmentCount = Math.max(fragmentCount, safeFragmentCount);
+
+  // Sync safe count when store updates (Zustand hydration may complete later)
+  useEffect(() => {
+    if (fragments.length > safeFragmentCount) {
+      console.log('[DreamScreen] 🔄 Store hydrated with more fragments:', fragments.length);
+      setSafeFragmentCount(fragments.length);
+    }
+  }, [fragments.length, safeFragmentCount]);
+
+  // Debug: Log fragment counts on mount
+  useEffect(() => {
+    console.log('[DreamScreen] 🧩 Fragment counts:', {
+      storeCount: fragmentCount,
+      localStorageCount: safeFragmentCount,
+      effectiveCount: effectiveFragmentCount
+    });
+  }, [fragmentCount, safeFragmentCount, effectiveFragmentCount]);
 
   // Phase state - start with return visitor phase if applicable
   const [phase, setPhase] = useState<Phase>(() => {
@@ -447,7 +486,7 @@ export default function DreamScreen({ push }: { push: PushFn }) {
     // Determine dialogue message based on context
     let dialogueKey: string;
 
-    if (justFinishedGame && fragmentCount === 3) {
+    if (justFinishedGame && effectiveFragmentCount === 3) {
       // Just finished 3rd shard - ask which version they prefer
       dialogueKey = "GRANDPA_ALL_COMPLETE";
       setShowPreferenceButtons(true);
@@ -464,7 +503,7 @@ export default function DreamScreen({ push }: { push: PushFn }) {
       else dialogueKey = "GRANDPA_SCORE_INCREDIBLE";
 
       setShowPreferenceButtons(false);
-    } else if (fragmentCount === 3) {
+    } else if (effectiveFragmentCount === 3) {
       // Returning from splash with all 3 collected
       dialogueKey = "GRANDPA_ALREADY_COLLECTED";
       setShowPreferenceButtons(false);
@@ -482,7 +521,7 @@ export default function DreamScreen({ push }: { push: PushFn }) {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [phase, justFinishedGame, lastGameScore, fragmentCount]);
+  }, [phase, justFinishedGame, lastGameScore, effectiveFragmentCount]);
 
   // Typewriter effect for return visitor dialogue
   useEffect(() => {
@@ -558,21 +597,21 @@ export default function DreamScreen({ push }: { push: PushFn }) {
     audioManager.playSfx("click-soft");
 
     // If all 3 fragments collected, any click opens three-way comparison
-    if (fragmentCount === 3) {
+    if (effectiveFragmentCount === 3) {
       logger.log("dream_shard_clicked_comparison", { shard: shardIndex }, "Player clicked shard, opening three-way comparison");
       setShowThreeWayComparison(true);
       return;
     }
 
-    // Completed shard (shardIndex < fragmentCount) → open three-way comparison showing all earned games
-    if (shardIndex < fragmentCount) {
+    // Completed shard (shardIndex < effectiveFragmentCount) → open three-way comparison showing all earned games
+    if (shardIndex < effectiveFragmentCount) {
       logger.log("dream_shard_clicked_completed", { shard: shardIndex }, "Player clicked completed shard");
       setShowThreeWayComparison(true);
       return;
     }
 
-    // Playable shard (shardIndex === fragmentCount) → start new game with that role
-    if (shardIndex === fragmentCount) {
+    // Playable shard (shardIndex === effectiveFragmentCount) → start new game with that role
+    if (shardIndex === effectiveFragmentCount) {
       const roleData = SHARD_ROLES[shardIndex];
       if (!roleData) return;
 
@@ -589,6 +628,10 @@ export default function DreamScreen({ push }: { push: PushFn }) {
       useDilemmaStore.getState().reset();
       useCompassStore.getState().reset();
       useRoleStore.getState().reset(); // Resets role-specific data (but we immediately re-populate below)
+
+      // CRITICAL FIX: explicit clear of aftermath prefetch to prevent stale data from previous runs
+      // This handles the case where user skipped the Aftermath screen via debug tools
+      clearAftermathPrefetch();
 
       // FIX: Start fresh logging session for this game
       // This ensures each game has a unique sessionId for proper tracking
@@ -1236,9 +1279,9 @@ export default function DreamScreen({ push }: { push: PushFn }) {
                 {[0, 1, 2].map((index) => {
                   const fragment = fragments[index];
                   // Shard states based on fragment count
-                  const isCompleted = index < fragmentCount;
-                  const isPlayable = index === fragmentCount && returnTypingComplete;
-                  const isLocked = index > fragmentCount;
+                  const isCompleted = index < effectiveFragmentCount;
+                  const isPlayable = index === effectiveFragmentCount && returnTypingComplete;
+                  const isLocked = index > effectiveFragmentCount;
                   return (
                     <ShardWithAvatar
                       key={index}

@@ -123,6 +123,7 @@
   "AI_FALLBACK_2": "Close! Give a role **and** a setting. e.g., \"city treasurer in Renaissance Florence\".",
   "AI_FALLBACK_3": "Almost. Add a where/when: \"cybernetics minister on Luna, 2199\".",
   "FORGE_YOUR_CHARACTER": "Forge Your Character",
+  "CREATE_YOUR_CHARACTER": "Create your character",
   "GENERATING_CHARACTER": "Generating a character you can edit…",
   "GENERATING_AVATAR": "Generating your avatar...",
   "ATTEMPT": "attempt",

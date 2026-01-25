@@ -436,6 +436,10 @@ export default function NameScreen({ push }: { push: PushFn }) {
         )}
 
         <div className="mt-2 rounded-3xl p-6 bg-black/60 backdrop-blur-sm border border-slate-700/50 ring-1 ring-amber-400/40 shadow-xl">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
+            {lang("CREATE_YOUR_CHARACTER")}
+          </h2>
+
           {phase === "input" ? (
             // Phase 1: Input form
             <>
