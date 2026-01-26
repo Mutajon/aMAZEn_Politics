@@ -36,7 +36,7 @@ export async function saveMotivations(
 
         // 2. Update compassStore if initial
         if (type === "initial") {
-            const scaledValues = distribution.map(v => Math.floor(v / 10));
+            const scaledValues = distribution.map(v => v / 2);
             useCompassStore.getState().setPropValues("what", scaledValues);
             console.log("[Motivations] Updated compassStore 'what' values:", scaledValues);
         }

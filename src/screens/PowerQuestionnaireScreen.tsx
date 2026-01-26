@@ -11,7 +11,6 @@ import { useLang } from "../i18n/lang";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useQuestionnaireStore } from "../store/questionnaireStore";
 import { useLoggingStore } from "../store/loggingStore";
-import { useSettingsStore } from "../store/settingsStore";
 import { POWER_ENTITIES } from "../data/powerEntities";
 import PowerReasoningModal from "../components/PowerReasoningModal";
 
@@ -26,7 +25,6 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
   const lang = useLang();
   const { language } = useLanguage();
   const isRTL = language === "he";
-  const isMobile = useSettingsStore((s) => s.isMobileDevice);
 
   // Store
   const {
@@ -54,7 +52,6 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
 
   // Store reasoning text locally before sending to backend
   const [q1ReasoningText, setQ1ReasoningText] = useState<string>("");
-  const [q2ReasoningText, setQ2ReasoningText] = useState<string>("");
 
   // Refs for scrolling
   const containerRef = useRef<HTMLDivElement>(null);
@@ -96,10 +93,10 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
   const setHolders = phase === "q1" || phase === "q1_reasoning" ? setQ1Holders : setQ2Holders;
   const total = holders.reduce((s, h) => s + h.percent, 0);
 
-  // Handle slider change - new logic: only adjust others when total > 100
+  // Handle slider change - new logic: only adjust others when total > 20
   const handleSliderChange = useCallback(
     (idx: number, newValue: number) => {
-      const clamped = Math.max(0, Math.min(100, Math.round(newValue)));
+      const clamped = Math.max(0, Math.min(20, Math.round(newValue)));
 
       setHolders((prev) => {
         const newHolders = prev.map((h, i) =>
@@ -108,8 +105,8 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
 
         const newTotal = newHolders.reduce((s, h) => s + h.percent, 0);
 
-        if (newTotal > 100) {
-          const excess = newTotal - 100;
+        if (newTotal > 20) {
+          const excess = newTotal - 20;
           const othersSum = newTotal - clamped;
 
           if (othersSum > 0) {
@@ -124,10 +121,10 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
             }
 
             const finalTotal = newHolders.reduce((s, h) => s + h.percent, 0);
-            if (finalTotal !== 100) {
-              const diff = 100 - finalTotal;
+            if (finalTotal !== 20) {
+              const diff = 20 - finalTotal;
               for (let i = 0; i < newHolders.length; i++) {
-                if (i !== idx && newHolders[i].percent + diff >= 0 && newHolders[i].percent + diff <= 100) {
+                if (i !== idx && newHolders[i].percent + diff >= 0 && newHolders[i].percent + diff <= 20) {
                   newHolders[i] = { ...newHolders[i], percent: newHolders[i].percent + diff };
                   break;
                 }
@@ -144,7 +141,7 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
 
   // Handle next/submit button
   const handleNext = async () => {
-    if (total !== 100) {
+    if (total !== 20) {
       setShowWarning(true);
       return;
     }
@@ -169,7 +166,7 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
 
   // Handle Q2 reasoning submission
   const handleQ2ReasoningSubmit = async (text: string) => {
-    setQ2ReasoningText(text);
+    setCurrentReasoning(text); // Using currentReasoning here if intended or just setIdealReasoning
     setIdealReasoning(text);
 
     // Submit everything to backend
@@ -331,14 +328,14 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
                       </button>
                     </div>
                     <span className="text-white font-bold text-lg min-w-[3rem] text-center">
-                      {holder.percent}%
+                      {holder.percent}
                     </span>
                   </div>
 
                   <input
                     type="range"
                     min={0}
-                    max={100}
+                    max={20}
                     step={1}
                     value={holder.percent}
                     onChange={(e) => handleSliderChange(idx, Number(e.target.value))}
@@ -352,9 +349,9 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
 
           {/* Total display */}
           <div className="text-center mb-4">
-            <span className={`text-sm ${total === 100 ? 'text-green-400' : 'text-gray-400'}`}>
-              {lang("POWER_Q_TOTAL_LABEL")}: <span className="text-white font-bold">{total}%</span>
-              {total !== 100 && <span className="text-yellow-400 ml-2">({100 - total} {lang("POWER_Q_REMAINING")})</span>}
+            <span className={`text-sm ${total === 20 ? 'text-green-400' : 'text-gray-400'}`}>
+              {lang("POWER_Q_TOTAL_LABEL")}: <span className="text-white font-bold">{total}</span>
+              {total !== 20 && <span className="text-yellow-400 ml-2">({20 - total} {lang("POWER_Q_REMAINING")})</span>}
             </span>
           </div>
 
@@ -448,7 +445,7 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
         )}
       </AnimatePresence>
 
-      {/* Warning Modal - Total must equal 100 */}
+      {/* Warning Modal - Total must equal 20 */}
       <AnimatePresence>
         {showWarning && (
           <motion.div
@@ -469,8 +466,8 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
             >
               <p className="text-white text-lg mb-4">
                 {language === "he"
-                  ? `הסכום חייב להיות 100 נקודות (כרגע: ${total})`
-                  : `Total must equal 100 points (currently: ${total})`}
+                  ? `הסכום חייב להיות 20 נקודות (כרגע: ${total})`
+                  : `Total must equal 20 points (currently: ${total})`}
               </p>
               <button
                 onClick={() => setShowWarning(false)}

@@ -23,7 +23,7 @@ export function makeId(): string {
 }
 
 export function clampPct(n: number): number {
-  return Math.max(0, Math.min(100, Math.round(n)));
+  return Math.max(0, Math.min(20, Math.round(n)));
 }
 
 export function rebalance(
@@ -33,7 +33,7 @@ export function rebalance(
 ): EnhancedPowerHolder[] {
   const others = holders.filter((_, i) => i !== idx);
   const othersSum = others.reduce((s, h) => s + h.percent, 0);
-  const remaining = 100 - clampPct(newValue);
+  const remaining = 20 - clampPct(newValue);
 
   if (othersSum <= 0) {
     return holders.map((h, i) => ({ ...h, percent: i === idx ? clampPct(newValue) : 0 }));
@@ -44,7 +44,7 @@ export function rebalance(
     i === idx ? { ...h, percent: clampPct(newValue) } : { ...h, percent: clampPct(h.percent * factor) }
   );
 
-  let diff = 100 - out.reduce((s, h) => s + h.percent, 0);
+  let diff = 20 - out.reduce((s, h) => s + h.percent, 0);
   for (let i = 0; diff !== 0 && i < out.length; i++) {
     if (i === idx) continue;
     out[i].percent += diff > 0 ? 1 : -1;

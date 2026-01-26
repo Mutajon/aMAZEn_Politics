@@ -44,14 +44,14 @@ export default function PersonalMotivationsContent({
 
     const handleSliderChange = useCallback(
         (idx: number, newValue: number) => {
-            const clamped = Math.max(0, Math.min(100, Math.round(newValue)));
+            const clamped = Math.max(0, Math.min(20, Math.round(newValue)));
             const newValues = [...distribution];
             newValues[idx] = clamped;
 
             const newTotal = newValues.reduce((s, v) => s + v, 0);
 
-            if (newTotal > 100) {
-                const excess = newTotal - 100;
+            if (newTotal > 20) {
+                const excess = newTotal - 20;
                 const othersSum = newTotal - clamped;
 
                 if (othersSum > 0) {
@@ -64,10 +64,10 @@ export default function PersonalMotivationsContent({
 
                     // Final adjustment for rounding errors
                     const finalTotal = newValues.reduce((s, v) => s + v, 0);
-                    if (finalTotal !== 100) {
-                        const diff = 100 - finalTotal;
+                    if (finalTotal !== 20) {
+                        const diff = 20 - finalTotal;
                         for (let i = 0; i < newValues.length; i++) {
-                            if (i !== idx && newValues[i] + diff >= 0 && newValues[i] + diff <= 100) {
+                            if (i !== idx && newValues[i] + diff >= 0 && newValues[i] + diff <= 20) {
                                 newValues[i] += diff;
                                 break;
                             }
@@ -117,14 +117,14 @@ export default function PersonalMotivationsContent({
                                 </button>
                             </div>
                             <span className="text-white font-bold text-lg min-w-[3rem] text-center">
-                                {m.percent}%
+                                {m.percent}
                             </span>
                         </div>
 
                         <input
                             type="range"
                             min={0}
-                            max={100}
+                            max={20}
                             step={1}
                             value={m.percent}
                             onChange={(e) => handleSliderChange(idx, Number(e.target.value))}
@@ -139,11 +139,11 @@ export default function PersonalMotivationsContent({
             <div className="mt-auto space-y-4">
                 {/* Total display */}
                 <div className="text-center">
-                    <span className={`text-sm ${total === 100 ? 'text-green-400' : 'text-amber-400'}`}>
-                        {lang("MOTIVATIONS_Q_TOTAL_LABEL")}: <span className="text-white font-bold">{total}%</span>
-                        {total !== 100 && (
+                    <span className={`text-sm ${total === 20 ? 'text-green-400' : 'text-amber-400'}`}>
+                        {lang("MOTIVATIONS_Q_TOTAL_LABEL")}: <span className="text-white font-bold">{total}</span>
+                        {total !== 20 && (
                             <span className="ml-2 font-medium">
-                                ({100 - total} {lang("MOTIVATIONS_Q_REMAINING")})
+                                ({20 - total} {lang("MOTIVATIONS_Q_REMAINING")})
                             </span>
                         )}
                     </span>
@@ -152,15 +152,15 @@ export default function PersonalMotivationsContent({
                 {/* Submit Button */}
                 <motion.button
                     onClick={onSave}
-                    disabled={isSubmitting || total !== 100}
+                    disabled={isSubmitting || total !== 20}
                     className={`
             w-full py-4 rounded-xl font-bold text-lg
-            ${total === 100
+            ${total === 20
                             ? "bg-gradient-to-r from-amber-400 to-amber-600 text-slate-900 shadow-lg shadow-amber-900/20"
                             : "bg-white/10 text-white/30 cursor-not-allowed"}
             transition-all active:scale-[0.98]
           `}
-                    whileHover={total === 100 ? { scale: 1.01 } : {}}
+                    whileHover={total === 20 ? { scale: 1.01 } : {}}
                 >
                     {isSubmitting ? "..." : lang("MOTIVATIONS_Q_BUTTON_SUBMIT")}
                 </motion.button>

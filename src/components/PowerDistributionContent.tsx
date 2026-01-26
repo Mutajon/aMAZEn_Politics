@@ -223,7 +223,7 @@ export default function PowerDistributionContent({
                         {/* Percentage Badge */}
                         <div className="shrink-0 ml-1 sm:ml-2">
                           <div className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg sm:rounded-xl bg-white/8 border border-white/10 text-white/90 text-xs sm:text-sm font-semibold">
-                            {h.percent}%
+                            {h.percent}
                           </div>
                         </div>
                       </div>
@@ -233,7 +233,7 @@ export default function PowerDistributionContent({
                         <input
                           type="range"
                           min={0}
-                          max={100}
+                          max={20}
                           step={1}
                           value={h.percent}
                           onChange={(e) => {
@@ -244,7 +244,7 @@ export default function PowerDistributionContent({
                               isPlayer,
                               oldPercent: h.percent,
                               newPercent: newValue
-                            }, `User adjusted power holder #${rank} (${h.name}) from ${h.percent}% to ${newValue}%`);
+                            }, `User adjusted power holder #${rank} (${h.name}) from ${h.percent} to ${newValue}`);
                             onChangePercent(i, newValue);
                           }}
                           disabled={isRealSetting}

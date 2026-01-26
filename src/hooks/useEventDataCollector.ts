@@ -234,9 +234,12 @@ async function fetchGameTurn(
     payload.gameContext = {
       role: roleState.roleScope,
       roleScope: roleState.roleScope, // Added for backend authority calculation
-      systemName: translatedAnalysis?.systemName || "Divine Right Monarchy",
+      // Revert to English system name for backend logic stability
+      systemName: roleState.analysis?.systemName || "Divine Right Monarchy",
       setting,
-      challengerSeat: translatedAnalysis?.challengerSeat?.name || "Unknown Opposition (Institutional Power)",
+      // Revert to English challenger name for backend logic stability
+      challengerSeat: roleState.analysis?.challengerSeat?.name || "Unknown Opposition (Institutional Power)",
+      // Keep holders translated so narrative uses Hebrew names
       powerHolders: translatedAnalysis?.holders || [],
       playerIndex: translatedAnalysis?.playerIndex ?? null,
       supportProfiles: {
@@ -584,7 +587,7 @@ async function fetchGameTurn(
   // Add id field from index (AI returns {icon, text}, we add id for React keys)
   // Also map text keywords to emojis if needed
   const dynamicParams: DynamicParam[] = Array.isArray(data.dynamicParams)
-    ? data.dynamicParams.map((param, index) => {
+    ? data.dynamicParams.map((param: any, index: number) => {
       // Normalize icon key (strip whitespace, lowercase)
       const rawIcon = String(param.icon || "").trim().toLowerCase();
 
@@ -596,10 +599,21 @@ async function fetchGameTurn(
         ? EMOJI_MAP[rawIcon]
         : (param.icon || '📰');
 
+      // Cleaning function to strip English prefixes (e.g. "reputation מוניטין" -> "מוניטין")
+      const cleanText = (text: string): string => {
+        if (!text) return 'Unknown consequence';
+        // If text contains Hebrew, strip leading English words/punctuation
+        if (/[\u0590-\u05FF]/.test(text)) {
+          // Remove English words at the start
+          return text.replace(/^[A-Za-z\s\(\)\-]+(?=[\u0590-\u05FF])/, '').trim();
+        }
+        return text;
+      };
+
       return {
         id: `param-${day}-${index}`,
         icon: emoji,
-        text: param.text || 'Unknown consequence'
+        text: cleanText(param.text)
       };
     })
     : [];

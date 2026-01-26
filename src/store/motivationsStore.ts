@@ -13,7 +13,7 @@ type MotivationsState = {
     reset: () => void;
 };
 
-// Default: all zeros (player must manually distribute 100 points)
+// Default: all zeros (player must manually distribute 20 points)
 const DEFAULT_DISTRIBUTION = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
 export const useMotivationsStore = create<MotivationsState>()(
