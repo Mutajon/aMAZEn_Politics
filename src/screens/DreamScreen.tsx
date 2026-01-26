@@ -9,6 +9,9 @@ import { useFragmentsStore } from "../store/fragmentsStore";
 import { useLoggingStore } from "../store/loggingStore";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useCompassStore } from "../store/compassStore";
+import { useMotivationsStore } from "../store/motivationsStore";
+import { saveMotivations } from "../lib/motivationsLogic";
+import PersonalMotivationsContent from "../components/PersonalMotivationsContent";
 import { clearAftermathPrefetch } from "../hooks/useAftermathPrefetch";
 import { usePastGamesStore } from "../store/pastGamesStore";
 import { PREDEFINED_ROLES_ARRAY, EXPERIMENT_PREDEFINED_ROLE_KEYS, type PredefinedRoleData, getRoleImagePaths } from "../data/predefinedRoles";
@@ -153,7 +156,7 @@ function validateTrait(text: string): string | null {
   return null;
 }
 
-type Phase = "intro" | "name" | "trait" | "mirror" | "mirrorBroken" | "grandpaDialogue" | "returnVisitor";
+type Phase = "intro" | "name" | "trait" | "motivations" | "mirror" | "mirrorBroken" | "grandpaDialogue" | "returnVisitor";
 
 // Grandpa dialogue lines (5 total - lines 5+6 were combined)
 const GRANDPA_DIALOGUES = [
@@ -429,13 +432,30 @@ export default function DreamScreen({ push }: { push: PushFn }) {
     }
   };
 
-  // Transition to mirror phase when trait is accepted
+  // Transition to motivations phase when trait is accepted
   useEffect(() => {
     if (traitAccepted && shortTrait) {
-      // Small delay for fade out, then transition
-      setTimeout(() => setPhase("mirror"), 500);
+      // Small delay for fade out, then transition to motivations
+      setTimeout(() => setPhase("motivations"), 500);
     }
   }, [traitAccepted, shortTrait]);
+
+  // Motivations phase logic
+  const { distribution: storedMotivations, setDistribution: setStoredMotivations } = useMotivationsStore();
+  const [localMotivations, setLocalMotivations] = useState<number[]>(storedMotivations);
+  const [isSubmittingMotivations, setIsSubmittingMotivations] = useState(false);
+
+  const handleSaveMotivations = async () => {
+    setIsSubmittingMotivations(true);
+    setStoredMotivations(localMotivations);
+
+    // Use logic to log and update store
+    await saveMotivations(localMotivations, "initial", lang);
+
+    setIsSubmittingMotivations(false);
+    setPhase("mirror");
+    logger.log("dream_motivations_saved", { distribution: localMotivations }, "Player saved motivations questionnaire");
+  };
 
   // Handler for mirror continue button
   const handleMirrorContinue = () => {
@@ -1001,6 +1021,25 @@ export default function DreamScreen({ push }: { push: PushFn }) {
                 {lang("DREAM_TRAIT_SUGGEST")}
               </motion.button>
             </motion.div>
+          </motion.div>
+        )}
+
+        {/* Motivations Questionnaire phase */}
+        {phase === "motivations" && (
+          <motion.div
+            key="motivations"
+            className="w-full max-w-4xl mx-auto px-4 overflow-y-auto max-h-[90dvh]"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            transition={{ duration: 0.5 }}
+          >
+            <PersonalMotivationsContent
+              distribution={localMotivations}
+              onChange={setLocalMotivations}
+              onSave={handleSaveMotivations}
+              isSubmitting={isSubmittingMotivations}
+            />
           </motion.div>
         )}
 

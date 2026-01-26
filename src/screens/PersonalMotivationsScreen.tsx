@@ -2,8 +2,7 @@
 import { useState } from "react";
 import { bgStyleSplash } from "../lib/ui";
 import { useMotivationsStore } from "../store/motivationsStore";
-import { ensureUserId } from "../store/loggingStore";
-import { COMPONENTS } from "../data/compass-data";
+import { saveMotivations } from "../lib/motivationsLogic";
 import { useLang } from "../i18n/lang";
 import PersonalMotivationsContent from "../components/PersonalMotivationsContent";
 import type { PushFn } from "../lib/router";
@@ -18,38 +17,21 @@ export default function PersonalMotivationsScreen({ push }: { push: PushFn }) {
         setIsSubmitting(true);
         setDistribution(localDistribution);
 
-        try {
-            const userId = ensureUserId();
+        // Check if this is a post-game submission
+        const isPostGame = window.location.hash.includes("type=post-game");
 
-            // Map distribution to motivations log format
-            const motivationsLog = COMPONENTS.what.map((c, i) => ({
-                id: c.short,
-                name: lang(`COMPASS_VALUE_${c.short.replace("/", "_").replace(".", "").toUpperCase()}`),
-                percent: localDistribution[i] || 0
-            }));
+        await saveMotivations(
+            localDistribution,
+            isPostGame ? "post-game" : "initial",
+            lang
+        );
 
-            const response = await fetch('/api/motivations-questionnaire', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId,
-                    timestamp: Date.now(),
-                    type: "initial",
-                    motivations: motivationsLog
-                })
-            });
+        setIsSubmitting(false);
 
-            if (!response.ok) {
-                console.error("Failed to save motivations to backend");
-            }
-
+        if (isPostGame) {
+            push("/thank-you");
+        } else {
             push("/");
-        } catch (error) {
-            console.error("Error saving motivations:", error);
-            // Fallback: still navigate back
-            push("/");
-        } finally {
-            setIsSubmitting(false);
         }
     };
 

@@ -141,7 +141,7 @@ export default function PostGameQuestionnaireScreen({ push }: { push: (route: st
 
     markPostGameCompleted();
     setIsSubmitting(false);
-    push("/thank-you");
+    push("/personal-motivations?type=post-game");
   };
 
   // Tooltip handlers
@@ -271,7 +271,7 @@ export default function PostGameQuestionnaireScreen({ push }: { push: (route: st
       {/* Reasoning Modal */}
       <PowerReasoningModal
         isOpen={phase === "reasoning"}
-        onClose={() => {}} // Cannot close without submitting
+        onClose={() => { }} // Cannot close without submitting
         onSubmit={handleReasoningSubmit}
         promptText={reasoningPrompt}
         isSubmitting={isSubmitting}

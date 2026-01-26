@@ -34,6 +34,8 @@ type CompassStore = {
   applyEffects: (effects: Effect[]) => Effect[];
   /** Capture initial compass snapshot (called after quiz completion) */
   captureInitialSnapshot: () => void;
+  /** Set all values for a property at once (e.g. from motivations questionnaire) */
+  setPropValues: (prop: PropKey, newValues: number[]) => void;
 };
 
 export const useCompassStore = create<CompassStore>()(
@@ -83,6 +85,14 @@ export const useCompassStore = create<CompassStore>()(
           console.log('[compassStore] Initial snapshot already exists, skipping');
         }
       },
+      setPropValues: (prop, newValues) =>
+        set(state => {
+          const next = {
+            ...state.values,
+            [prop]: newValues.map(v => Math.max(0, Math.min(10, Math.round(v))))
+          };
+          return { values: next };
+        }),
     }),
     {
       name: "amaze-politics-compass-store", // localStorage key
