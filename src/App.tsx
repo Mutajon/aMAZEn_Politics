@@ -39,6 +39,7 @@ import HighscoreScreenV2 from "./screens/HighscoreScreenV2"; // V2: Global/Local
 import AchievementsScreen from "./screens/AchievementsScreen";
 import MirrorScreen from "./screens/MirrorScreen";
 import AftermathScreen from "./screens/AftermathScreen";
+import PersonalMotivationsScreen from "./screens/PersonalMotivationsScreen";
 import FinalScoreScreen from "./screens/FinalScoreScreen";
 import DownfallScreen from "./screens/DownfallScreen";
 import AudioControls from "./components/AudioControls";
@@ -272,6 +273,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
           {route.startsWith("/highscores") && <HighscoreScreenV2 />} {/* V2: Global/Local tabs */}
           {route === "/achievements" && <AchievementsScreen />}
           {route === "/aftermath" && <AftermathScreen push={push} />}
+          {route === "/personal-motivations" && <PersonalMotivationsScreen push={push} />}
           {route === "/final-score" && <FinalScoreScreen key={gameId} push={push} />}
           {route === "/capped" && <GameCappedScreen push={push} />}
           {route === "/power-questionnaire" && <PowerQuestionnaireScreen push={push} />}

@@ -779,6 +779,25 @@ export default function SplashScreen({
                 {lang("START_BUTTON")}
               </motion.button>
 
+              {/* Debug: Personal Motivations (only visible in debugMode) */}
+              {debugMode && (
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: showButton ? 1 : 0 }}
+                  transition={{ delay: 0.1, type: "spring", stiffness: 250, damping: 22 }}
+                  style={{ visibility: showButton ? "visible" : "hidden" }}
+                  onClick={() => {
+                    audioManager.playSfx('click-soft');
+                    push("/personal-motivations");
+                  }}
+                  className="w-[14rem] rounded-2xl px-4 py-2.5 text-sm font-semibold
+               bg-white/10 hover:bg-white/20 text-white/90 border border-white/10
+               shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-white/30 transition-all"
+                >
+                  {lang("MOTIVATIONS_DEBUG_BUTTON")}
+                </motion.button>
+              )}
+
               {/* Free Play Button - TEMPORARILY HIDDEN FOR EXPERIMENT */}
               {false && (
                 <motion.button
