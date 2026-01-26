@@ -329,11 +329,11 @@ export default function DreamScreen({ push }: { push: PushFn }) {
       return;
     }
 
-    // Name is valid - save it and transition to trait phase
+    // Name is valid - save it and transition to motivations questionnaire
     setPlayerName(trimmed);
     setNameError(null);
     logger.log("dream_name_accepted", trimmed, "Player name accepted and saved");
-    setPhase("trait");
+    setPhase("motivations");
   };
 
   // Handle Enter key in name input
@@ -432,11 +432,11 @@ export default function DreamScreen({ push }: { push: PushFn }) {
     }
   };
 
-  // Transition to motivations phase when trait is accepted
+  // Transition to mirror phase when trait is accepted
   useEffect(() => {
     if (traitAccepted && shortTrait) {
-      // Small delay for fade out, then transition to motivations
-      setTimeout(() => setPhase("motivations"), 500);
+      // Small delay for fade out, then transition to mirror
+      setTimeout(() => setPhase("mirror"), 500);
     }
   }, [traitAccepted, shortTrait]);
 
@@ -453,7 +453,7 @@ export default function DreamScreen({ push }: { push: PushFn }) {
     await saveMotivations(localMotivations, "initial", lang);
 
     setIsSubmittingMotivations(false);
-    setPhase("mirror");
+    setPhase("trait");
     logger.log("dream_motivations_saved", { distribution: localMotivations }, "Player saved motivations questionnaire");
   };
 
