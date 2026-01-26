@@ -13,6 +13,7 @@ import { clearAllSnapshots } from "../lib/eventScreenSnapshot";
 import { loggingService } from "../lib/loggingService";
 import { useLoggingStore } from "../store/loggingStore";
 import { useQuestionnaireStore } from "../store/questionnaireStore";
+import { useMotivationsStore } from "../store/motivationsStore";
 import { useLang } from "../i18n/lang";
 import { useLanguage } from "../i18n/LanguageContext";
 import LanguageSelector from "../components/LanguageSelector";
@@ -189,6 +190,7 @@ export default function SplashScreen({
       useDilemmaStore.getState().reset();
       useRoleStore.getState().reset();
       useMirrorQuizStore.getState().resetAll();
+      useMotivationsStore.getState().reset();
       clearAllSnapshots();
 
       // Prime narrator and start music (user interaction unlocks browser autoplay)
@@ -293,6 +295,7 @@ export default function SplashScreen({
       useDilemmaStore.getState().reset();
       useRoleStore.getState().reset();
       useMirrorQuizStore.getState().resetAll();
+      useMotivationsStore.getState().reset();
       clearAllSnapshots();
 
       // Clear playerName and character for free play (fresh start)
@@ -344,6 +347,7 @@ export default function SplashScreen({
       useDilemmaStore.getState().reset();
       useRoleStore.getState().reset();
       useMirrorQuizStore.getState().resetAll();
+      useMotivationsStore.getState().reset();
       clearAllSnapshots();
 
       // --- SET ROLE DATA ---

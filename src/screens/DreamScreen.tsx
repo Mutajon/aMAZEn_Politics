@@ -648,6 +648,8 @@ export default function DreamScreen({ push }: { push: PushFn }) {
       useDilemmaStore.getState().reset();
       useCompassStore.getState().reset();
       useRoleStore.getState().reset(); // Resets role-specific data (but we immediately re-populate below)
+      useMotivationsStore.getState().reset();
+      setLocalMotivations([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
       // CRITICAL FIX: explicit clear of aftermath prefetch to prevent stale data from previous runs
       // This handles the case where user skipped the Aftermath screen via debug tools
