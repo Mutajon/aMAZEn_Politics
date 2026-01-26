@@ -192,6 +192,55 @@ app.post("/api/power-questionnaire", async (req, res) => {
   }
 });
 
+/**
+ * Log Personal Motivations Questionnaire
+ * Save's user distribution of 100 points across 10 core motivations.
+ * 
+ * POST /api/motivations-questionnaire
+ * Body: {
+ *   userId: string,
+ *   timestamp: number,
+ *   type: "initial" | "post-game",
+ *   motivations: [{ id: string, name: string, percent: number }, ...]
+ * }
+ */
+app.post("/api/motivations-questionnaire", async (req, res) => {
+  try {
+    const { userId, timestamp, type, motivations } = req.body;
+
+    if (!userId || !motivations || !Array.isArray(motivations)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: userId and motivations'
+      });
+    }
+
+    const db = await getDb();
+    const motivQCollection = db.collection('MotivQ');
+
+    const document = {
+      userId,
+      timestamp: timestamp || Date.now(),
+      type: type || "initial",
+      motivations,
+      createdAt: new Date()
+    };
+
+    await motivQCollection.insertOne(document);
+
+    console.log(`[MotivationsQuestionnaire] Stored ${type || "initial"} response for user: ${userId}`);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error in /api/motivations-questionnaire:", error?.message || error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to store motivations questionnaire response',
+      details: error.message
+    });
+  }
+});
+
 // -------------------- Game Slot Reservation --------------------
 app.post("/api/reserve-game-slot", reserveGameSlot);
 

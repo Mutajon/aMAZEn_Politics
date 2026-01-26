@@ -548,7 +548,7 @@ GOOD: "I see your careful deliberation — charming, while soldiers bleed."
 
 8. OUTPUT FORMAT
 
-Return ONLY valid JSON. No ```json fences.
+Return ONLY valid JSON. No triple-backtick fences.
 
 CRITICAL JSON RULES:
 - ALWAYS include commas between properties
