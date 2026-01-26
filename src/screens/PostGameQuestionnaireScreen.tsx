@@ -235,7 +235,7 @@ export default function PostGameQuestionnaireScreen({ push }: { push: (route: st
                     value={holder.percent}
                     onChange={(e) => handleSliderChange(idx, Number(e.target.value))}
                     className="w-full h-2 accent-violet-500 cursor-pointer"
-                    style={{ direction: "ltr" }}
+                    style={{ direction: isRTL ? "rtl" : "ltr" }}
                   />
                 </motion.div>
               );

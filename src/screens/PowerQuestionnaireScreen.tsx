@@ -343,7 +343,7 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
                     value={holder.percent}
                     onChange={(e) => handleSliderChange(idx, Number(e.target.value))}
                     className="w-full h-2 accent-violet-500 cursor-pointer"
-                    style={{ direction: "ltr" }}
+                    style={{ direction: isRTL ? "rtl" : "ltr" }}
                   />
                 </motion.div>
               );
@@ -374,21 +374,19 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
             {isSubmitting
               ? "..."
               : phase === "q1"
-              ? lang("POWER_Q_BUTTON_NEXT")
-              : lang("POWER_Q_BUTTON_SUBMIT")}
+                ? lang("POWER_Q_BUTTON_NEXT")
+                : lang("POWER_Q_BUTTON_SUBMIT")}
           </motion.button>
 
           {/* Progress indicator */}
           <div className="flex justify-center gap-2 mt-4">
             <div
-              className={`w-3 h-3 rounded-full transition-colors ${
-                phase === "q1" ? "bg-violet-500" : "bg-gray-600"
-              }`}
+              className={`w-3 h-3 rounded-full transition-colors ${phase === "q1" ? "bg-violet-500" : "bg-gray-600"
+                }`}
             />
             <div
-              className={`w-3 h-3 rounded-full transition-colors ${
-                phase === "q2" ? "bg-violet-500" : "bg-gray-600"
-              }`}
+              className={`w-3 h-3 rounded-full transition-colors ${phase === "q2" ? "bg-violet-500" : "bg-gray-600"
+                }`}
             />
           </div>
         </div>
@@ -397,7 +395,7 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
       {/* Q1 Reasoning Modal */}
       <PowerReasoningModal
         isOpen={phase === "q1_reasoning"}
-        onClose={() => {}} // Cannot close without submitting
+        onClose={() => { }} // Cannot close without submitting
         onSubmit={handleQ1ReasoningSubmit}
         promptText={q1ReasoningPrompt}
         isSubmitting={false}
@@ -406,7 +404,7 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
       {/* Q2 Reasoning Modal */}
       <PowerReasoningModal
         isOpen={phase === "q2_reasoning"}
-        onClose={() => {}} // Cannot close without submitting
+        onClose={() => { }} // Cannot close without submitting
         onSubmit={handleQ2ReasoningSubmit}
         promptText={q2ReasoningPrompt}
         isSubmitting={isSubmitting}
