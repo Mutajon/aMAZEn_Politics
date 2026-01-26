@@ -129,7 +129,7 @@ export default function PersonalMotivationsContent({
                             value={m.percent}
                             onChange={(e) => handleSliderChange(idx, Number(e.target.value))}
                             className="w-full h-2 accent-amber-400 cursor-pointer"
-                            style={{ direction: "ltr" }}
+                            style={{ direction: isRTL ? "rtl" : "ltr" }}
                         />
                     </motion.div>
                 ))}

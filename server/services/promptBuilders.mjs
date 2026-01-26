@@ -277,7 +277,7 @@ Use simple ${languageCode === 'en' ? 'English' : languageName} (CEFR B1-B2).
 Short sentences (3-12 words). Subject. Verb. Consequence.
 No "perhaps," "might," or filler. No metaphors, no poetic phrasing, no idioms, no fancy adjectives. 
 Your job is to TEST the player's values by creating brutal moral traps. Make them feel the weight of their neck on the line.
-${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use natural, clean, and smooth phrasing appropriate for ${languageName} speakers. ${languageCode === 'he' ? 'Use plain, spoken Hebrew (Safa Pshuta). AVOID literary suffixes (e.g. דמך) and melodrama. Use "shel" for possession.' : ''}` : ''}
+${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use natural, clean, and smooth phrasing appropriate for ${languageName} speakers. ${languageCode === 'he' ? 'Use plain, spoken Hebrew (Safa Pshuta). AVOID literary suffixes (e.g. דמך) and melodrama. Use "shel" for possession. FORBIDDEN: Do not use Nikud (vowel points/dots) in any Hebrew word.' : ''}` : ''}
 
 1. CORE IDENTITY OF THE PLAYER
 
@@ -548,7 +548,7 @@ GOOD: "I see your careful deliberation — charming, while soldiers bleed."
 
 8. OUTPUT FORMAT
 
-Return ONLY valid JSON. No \`\`\`json fences.
+Return ONLY valid JSON. No ```json fences.
 
 CRITICAL JSON RULES:
 - ALWAYS include commas between properties
@@ -656,9 +656,11 @@ ${languageCode === 'he' ? `
 4. HEBREW TONE (STRICT):
    - USE PLAIN, SPOKEN HEBREW (SAFA PSHUTA). Clean, smooth, and to the point.
    - AVOID literary, poetic, or melodramatic phrasing.
-   - FORBIDDEN: Pronominal suffixes.
-   - MANDATORY: Use "shel".
+   - FORBIDDEN: Do not use Nikud (vowel points/dots) in any Hebrew word.
+   - FORBIDDEN: Pronominal suffixes (e.g., do not use "beit-cha", use "ha-bayit shel-cha").
+   - MANDATORY: Use "shel" for possession.
    - TONE: Immediate, rough, direct. Like a street-level conversation, not a book.
+   - IDIOMS: Do not use literal translations for "expectations". Instead of "יש לו ציפיות שאלכם" (unnatural), use "הוא מצפה מכם" (natural).
 ` : ''}
 
 NAMING RULES (USE ROLES OVER NAMES):
@@ -666,7 +668,7 @@ NAMING RULES (USE ROLES OVER NAMES):
 - ONLY use names when absolutely necessary for clarity.
 - Too many names confuses the player. Keep it simple.
 
-${languageCode !== 'en' ? `\n\nWrite in ${languageName}. Use natural, dramatic phrasing.` : ''}
+${languageCode !== 'en' ? `\n\nWrite in ${languageName}. Use natural, dramatic phrasing. ${languageCode === 'he' ? 'FORBIDDEN: Do not use Nikud in any word.' : ''}` : ''}
 
 YOUR MISSION:
 Create VALUE TRAPS in the player's PRIVATE LIFE that force them to choose between their stated values and their survival.
@@ -706,6 +708,7 @@ HEBREW RULES (PLURAL FORM ONLY)
 1. ALWAYS use Plural Masculine for "You" (Atitem, shelachem).
 2. Use plain, spoken-style phrasing (Safa Pshuta).
 3. AVOID literary suffixes and melodrama. USE "shel" construct.
+4. FORBIDDEN: Never use Nikud.
 ` : ''}
 
 2. THE THREE-STEP PROCESS
@@ -784,9 +787,12 @@ LANGUAGE RULES (STRICT):
   ${languageCode === 'he' ? `
 4. HEBREW TONE (STRICT):
    - USE PLAIN, SPOKEN HEBREW (SAFA PSHUTA).
-   - FORBIDDEN: Pronominal suffixes. MANDATORY: Use "shel".
+   - FORBIDDEN: Do not use Nikud (vowel points/dots) in any word.
+   - FORBIDDEN: Pronominal suffixes (e.g., use "shel").
+   - MANDATORY: Use "shel" for possession.
+   - IDIOMS: Use natural phrasing (e.g., "מצפה מכם" not "יש לו ציפיות שאלכם").
 ` : ''}
-${languageCode !== 'en' ? `\nWrite in ${languageName}.` : ''}
+${languageCode !== 'en' ? `\nWrite in ${languageName}. ${languageCode === 'he' ? 'FORBIDDEN: Do not use Nikud.' : ''}` : ''}
 
 1. CONTEXT
 Role: ${role} (${authorityLevel} authority)
@@ -804,6 +810,7 @@ HEBREW RULES:
 1. GENDER: Use ${character.gender === 'male' ? 'masculine' : 'feminine'} forms.
 2. TONE: Safa Pshuta. Clean/Smooth. 
 3. AVOID suffixes. USE "shel".
+4. FORBIDDEN: Do not use Nikud.
 ` : ''}
 
 2. GENERATION LOGIC

@@ -15,6 +15,7 @@ import type { EnhancedPowerHolder, FetchState } from "../hooks/usePowerDistribut
 import { useRoleStore } from "../store/roleStore";
 import { useLogger } from "../hooks/useLogger";
 import { useLang } from "../i18n/lang";
+import { useLanguage } from "../i18n/LanguageContext";
 import { audioManager } from "../lib/audioManager";
 
 interface PowerDistributionContentProps {
@@ -63,6 +64,8 @@ export default function PowerDistributionContent({
   onHideSystemModal,
 }: PowerDistributionContentProps) {
   const lang = useLang();
+  const { language } = useLanguage();
+  const isRTL = language === "he";
   const logger = useLogger();
   const character = useRoleStore((s) => s.character);
 
@@ -246,6 +249,7 @@ export default function PowerDistributionContent({
                           }}
                           disabled={isRealSetting}
                           className={`w-full ${isRealSetting ? 'opacity-50 cursor-not-allowed' : 'accent-violet-500'} h-6 sm:h-auto`}
+                          style={{ direction: isRTL ? "rtl" : "ltr" }}
                           aria-label={`Adjust ${h.name || "this holder"}'s influence`}
                         />
                       </div>
