@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { audioManager } from "../lib/audioManager";
+import { useLang } from "../i18n/lang";
 
 interface LobbyPlayPopupProps {
     isOpen: boolean;
@@ -15,27 +16,51 @@ interface LobbyPlayPopupProps {
 }
 
 const SETTING_PRESETS = [
-    "Ancient Athens",
-    "Early North America (Settlers)",
-    "Modern United States",
-    "Future Mars Colony",
-    "Ancient Rome",
+    { key: "LOBBY_SETTING_ATHENS", icon: "🏛️" },
+    { key: "LOBBY_SETTING_NORTH_AMERICA", icon: "🌲" },
+    { key: "LOBBY_SETTING_USA", icon: "🗽" },
+    { key: "LOBBY_SETTING_MARS", icon: "🚀" },
+];
+
+const NAME_PRESETS = [
+    "LOBBY_NAME_ALEX",
+    "LOBBY_NAME_CASEY",
+    "LOBBY_NAME_JORDAN",
+    "LOBBY_NAME_TAYLOR",
+];
+
+const ROLE_PRESETS = [
+    "LOBBY_ROLE_LEADER",
+    "LOBBY_ROLE_COMMONER",
 ];
 
 export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }: LobbyPlayPopupProps) {
+    const lang = useLang();
+
     const [characterName, setCharacterName] = useState("");
     const [setting, setSetting] = useState("");
     const [role, setRole] = useState("");
     const [emphasis, setEmphasis] = useState("");
-    const [showPresets, setShowPresets] = useState(false);
 
-    const dropdownRef = useRef<HTMLDivElement>(null);
+    const [showNamePresets, setShowNamePresets] = useState(false);
+    const [showSettingPresets, setShowSettingPresets] = useState(false);
+    const [showRolePresets, setShowRolePresets] = useState(false);
 
-    // Close dropdown when clicking outside
+    const nameDropdownRef = useRef<HTMLDivElement>(null);
+    const settingDropdownRef = useRef<HTMLDivElement>(null);
+    const roleDropdownRef = useRef<HTMLDivElement>(null);
+
+    // Close dropdowns when clicking outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setShowPresets(false);
+            if (nameDropdownRef.current && !nameDropdownRef.current.contains(event.target as Node)) {
+                setShowNamePresets(false);
+            }
+            if (settingDropdownRef.current && !settingDropdownRef.current.contains(event.target as Node)) {
+                setShowSettingPresets(false);
+            }
+            if (roleDropdownRef.current && !roleDropdownRef.current.contains(event.target as Node)) {
+                setShowRolePresets(false);
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
@@ -74,34 +99,74 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                     >
                         {/* Header */}
                         <div className="px-8 pt-8 pb-4 text-center">
-                            <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent">
-                                Create Your Story
+                            <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-200 via-purple-300 to-purple-500 bg-clip-text text-transparent">
+                                {lang("CREATE_YOUR_STORY")}
                             </h2>
                             <p className="text-white/60 text-sm mt-1">
-                                Define the hero and the world they command
+                                {lang("LOBBY_PLAY_SUBTITLE")}
                             </p>
                         </div>
 
                         {/* Form */}
-                        <form onSubmit={handleSubmit} className="p-8 pt-2 space-y-6">
+                        <form onSubmit={handleSubmit} className="p-8 pt-2 space-y-5 overflow-y-auto max-h-[70vh]">
                             {/* Character Name */}
-                            <div className="space-y-2">
-                                <label className="text-xs font-semibold text-amber-300/80 uppercase tracking-wider ml-1">
-                                    Character Name
+                            <div className="space-y-2 relative" ref={nameDropdownRef}>
+                                <label className="text-xs font-semibold text-purple-300/80 uppercase tracking-wider ml-1">
+                                    {lang("PLAYER_NAME")}
                                 </label>
-                                <input
-                                    type="text"
-                                    value={characterName}
-                                    onChange={(e) => setCharacterName(e.target.value)}
-                                    placeholder="Enter your character's name"
-                                    className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:bg-white/10 transition-all font-medium"
-                                />
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        value={characterName}
+                                        onChange={(e) => {
+                                            setCharacterName(e.target.value);
+                                            setShowNamePresets(false);
+                                        }}
+                                        onFocus={() => setShowNamePresets(true)}
+                                        placeholder={lang("NAME_PLACEHOLDER")}
+                                        className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:bg-white/10 transition-all font-medium"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowNamePresets(!showNamePresets)}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                                    >
+                                        <svg className={`w-5 h-5 transition-transform ${showNamePresets ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </button>
+
+                                    <AnimatePresence>
+                                        {showNamePresets && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: -10 }}
+                                                animate={{ opacity: 1, y: 4 }}
+                                                exit={{ opacity: 0, y: -10 }}
+                                                className="absolute z-20 w-full bg-neutral-800 border border-white/10 rounded-2xl shadow-xl overflow-hidden max-h-48 overflow-y-auto"
+                                            >
+                                                {NAME_PRESETS.map((key) => (
+                                                    <button
+                                                        key={key}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setCharacterName(lang(key));
+                                                            setShowNamePresets(false);
+                                                        }}
+                                                        className="w-full px-5 py-3 text-left text-sm text-white/80 hover:bg-white/5 hover:text-white transition-colors border-b border-white/5 last:border-0"
+                                                    >
+                                                        {lang(key)}
+                                                    </button>
+                                                ))}
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
                             </div>
 
                             {/* Setting with Dropdown */}
-                            <div className="space-y-2 relative" ref={dropdownRef}>
-                                <label className="text-xs font-semibold text-amber-300/80 uppercase tracking-wider ml-1">
-                                    Setting
+                            <div className="space-y-2 relative" ref={settingDropdownRef}>
+                                <label className="text-xs font-semibold text-purple-300/80 uppercase tracking-wider ml-1">
+                                    {lang("DILEMMAS_SUBJECT")}
                                 </label>
                                 <div className="relative">
                                     <input
@@ -109,41 +174,41 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                         value={setting}
                                         onChange={(e) => {
                                             setSetting(e.target.value);
-                                            setShowPresets(true);
                                         }}
-                                        onFocus={() => setShowPresets(true)}
-                                        placeholder="e.g., Ancient Rome"
-                                        className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:bg-white/10 transition-all font-medium"
+                                        onFocus={() => setShowSettingPresets(true)}
+                                        placeholder="e.g., Ancient Athens"
+                                        className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:bg-white/10 transition-all font-medium"
                                     />
                                     <button
                                         type="button"
-                                        onClick={() => setShowPresets(!showPresets)}
+                                        onClick={() => setShowSettingPresets(!showSettingPresets)}
                                         className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
                                     >
-                                        <svg className={`w-5 h-5 transition-transform ${showPresets ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <svg className={`w-5 h-5 transition-transform ${showSettingPresets ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                         </svg>
                                     </button>
 
                                     <AnimatePresence>
-                                        {showPresets && (
+                                        {showSettingPresets && (
                                             <motion.div
                                                 initial={{ opacity: 0, y: -10 }}
                                                 animate={{ opacity: 1, y: 4 }}
                                                 exit={{ opacity: 0, y: -10 }}
-                                                className="absolute z-10 w-full bg-neutral-800 border border-white/10 rounded-2xl shadow-xl overflow-hidden max-h-48 overflow-y-auto"
+                                                className="absolute z-20 w-full bg-neutral-800 border border-white/10 rounded-2xl shadow-xl overflow-hidden max-h-48 overflow-y-auto"
                                             >
                                                 {SETTING_PRESETS.map((p) => (
                                                     <button
-                                                        key={p}
+                                                        key={p.key}
                                                         type="button"
                                                         onClick={() => {
-                                                            setSetting(p);
-                                                            setShowPresets(false);
+                                                            setSetting(lang(p.key));
+                                                            setShowSettingPresets(false);
                                                         }}
-                                                        className="w-full px-5 py-3 text-left text-sm text-white/80 hover:bg-white/5 hover:text-white transition-colors border-b border-white/5 last:border-0"
+                                                        className="w-full px-5 py-3 text-left text-sm text-white/80 hover:bg-white/5 hover:text-white transition-colors border-b border-white/5 last:border-0 flex items-center gap-3"
                                                     >
-                                                        {p}
+                                                        <span>{p.icon}</span>
+                                                        <span>{lang(p.key)}</span>
                                                     </button>
                                                 ))}
                                             </motion.div>
@@ -153,53 +218,92 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                             </div>
 
                             {/* Role */}
-                            <div className="space-y-2">
-                                <label className="text-xs font-semibold text-amber-300/80 uppercase tracking-wider ml-1">
-                                    Role
+                            <div className="space-y-2 relative" ref={roleDropdownRef}>
+                                <label className="text-xs font-semibold text-purple-300/80 uppercase tracking-wider ml-1">
+                                    {lang("YOUR_STARTING_STATE")}
                                 </label>
-                                <input
-                                    type="text"
-                                    value={role}
-                                    onChange={(e) => setRole(e.target.value)}
-                                    placeholder="e.g., The Emperor, High Priest, Rebel Leader"
-                                    className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:bg-white/10 transition-all font-medium"
-                                />
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        value={role}
+                                        onChange={(e) => {
+                                            setRole(e.target.value);
+                                        }}
+                                        onFocus={() => setShowRolePresets(true)}
+                                        placeholder="e.g., The Emperor, High Priest, Rebel Leader"
+                                        className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:bg-white/10 transition-all font-medium"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowRolePresets(!showRolePresets)}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                                    >
+                                        <svg className={`w-5 h-5 transition-transform ${showRolePresets ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </button>
+
+                                    <AnimatePresence>
+                                        {showRolePresets && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: -10 }}
+                                                animate={{ opacity: 1, y: 4 }}
+                                                exit={{ opacity: 0, y: -10 }}
+                                                className="absolute z-20 w-full bg-neutral-800 border border-white/10 rounded-2xl shadow-xl overflow-hidden max-h-48 overflow-y-auto"
+                                            >
+                                                {ROLE_PRESETS.map((key) => (
+                                                    <button
+                                                        key={key}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setRole(lang(key));
+                                                            setShowRolePresets(false);
+                                                        }}
+                                                        className="w-full px-5 py-3 text-left text-sm text-white/80 hover:bg-white/5 hover:text-white transition-colors border-b border-white/5 last:border-0"
+                                                    >
+                                                        {lang(key)}
+                                                    </button>
+                                                ))}
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
                             </div>
 
                             {/* Emphasis (Optional) */}
                             <div className="space-y-2">
-                                <label className="text-xs font-semibold text-amber-300/80 uppercase tracking-wider ml-1">
-                                    Emphasis <span className="text-white/30 lowercase">(optional)</span>
+                                <label className="text-xs font-semibold text-purple-300/80 uppercase tracking-wider ml-1">
+                                    {lang("INFO")} <span className="text-white/30 lowercase">({lang("COMING_SOON")})</span>
                                 </label>
                                 <input
                                     type="text"
                                     value={emphasis}
                                     onChange={(e) => setEmphasis(e.target.value)}
                                     placeholder="e.g., focus on military tensions, family honor"
-                                    className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:bg-white/10 transition-all font-medium"
+                                    className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:bg-white/10 transition-all font-medium"
                                 />
                             </div>
 
-                            {/* Error/Loading */}
-                            <div className="pt-2">
+                            {/* Submit Button */}
+                            <div className="pt-4 pb-2">
                                 <button
                                     type="submit"
                                     disabled={!isFormValid || isLoading}
-                                    className={`w-full h-14 rounded-2xl font-bold text-lg shadow-lg shadow-amber-900/20 transition-all active:scale-[0.98] ${isFormValid && !isLoading
-                                        ? "bg-gradient-to-r from-amber-400 to-amber-600 text-black hover:scale-[1.01] hover:shadow-amber-400/20"
+                                    className={`w-full h-14 rounded-2xl font-bold text-lg shadow-lg transition-all active:scale-[0.98] ${isFormValid && !isLoading
+                                        ? "bg-gradient-to-r from-purple-500 via-indigo-600 to-purple-700 text-white hover:scale-[1.01] shadow-purple-900/40"
                                         : "bg-white/5 text-white/20 cursor-not-allowed"
                                         }`}
                                 >
                                     {isLoading ? (
-                                        <div className="w-6 h-6 border-2 border-black/30 border-t-black rounded-full animate-spin mx-auto" />
+                                        <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
                                     ) : (
-                                        "Begin the Maze"
+                                        lang("LOBBY_BEGIN_GAME")
                                     )}
                                 </button>
                             </div>
                         </form>
 
-                        {/* Footer */}
+                        {/* Close Button */}
                         <button
                             onClick={onClose}
                             className="absolute top-6 right-6 p-2 rounded-full hover:bg-white/5 text-white/40 hover:text-white transition-all"
