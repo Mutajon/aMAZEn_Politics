@@ -1393,5 +1393,6 @@
   "CREATE_YOUR_STORY": "צרו את הסיפור שלכם",
   "LOBBY_PLACEHOLDER_SETTING": "לדוגמה: אתונה העתיקה",
   "LOBBY_PLACEHOLDER_ROLE": "לדוגמה: הקיסר, כוהן גדול, מנהיג מורדים",
-  "LOBBY_PLACEHOLDER_EMPHASIS": "לדוגמה: התמקדות במתחים צבאיים, כבוד המשפחה"
+  "LOBBY_PLACEHOLDER_EMPHASIS": "לדוגמה: התמקדות במתחים צבאיים, כבוד המשפחה",
+  "LOBBY_AVATAR_LABEL": "בחרו את האוואטר שלכם"
 }

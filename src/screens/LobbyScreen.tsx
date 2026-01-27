@@ -139,6 +139,7 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
     setting: string;
     role: string;
     emphasis: string;
+    avatar: string | null;
   }) => {
     setIsLoading(true);
     setShowPlayPopup(false);
@@ -183,11 +184,12 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       // Select the custom role
       roleStore.setRole(data.role);
 
-      // Create character object
+      // Create character object with optional avatar
       roleStore.setCharacter({
         name: data.characterName,
         gender: "any",
         description: `The ${data.role} in ${data.setting}`,
+        avatarUrl: data.avatar ? `/assets/images/avatars/${data.avatar}.png` : undefined,
       });
 
       // Character description for the card

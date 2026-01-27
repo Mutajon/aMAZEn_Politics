@@ -1499,5 +1499,6 @@
   "CREATE_YOUR_STORY": "Create Your Story",
   "LOBBY_PLACEHOLDER_SETTING": "e.g., Ancient Athens",
   "LOBBY_PLACEHOLDER_ROLE": "e.g., The Emperor, High Priest, Rebel Leader",
-  "LOBBY_PLACEHOLDER_EMPHASIS": "e.g., focus on military tensions, family honor"
+  "LOBBY_PLACEHOLDER_EMPHASIS": "e.g., focus on military tensions, family honor",
+  "LOBBY_AVATAR_LABEL": "Choose Your Avatar"
 }

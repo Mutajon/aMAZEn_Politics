@@ -12,6 +12,7 @@ interface LobbyPlayPopupProps {
         setting: string;
         role: string;
         emphasis: string;
+        avatar: string | null;
     }) => void;
     isLoading?: boolean;
 }
@@ -35,6 +36,14 @@ const ROLE_PRESETS = [
     "LOBBY_ROLE_COMMONER",
 ];
 
+// Avatar options - corresponds to sliced images in /public/assets/images/avatars/
+const AVATAR_LIST = [
+    "roman_senator", "pharaoh", "medieval_king", "asian_emperor", "african_king",
+    "elizabethan_queen", "washington", "lincoln_young", "suffragette", "victorian_man",
+    "civil_rights_leader", "president_elder", "businesswoman", "activist_elder", "entrepreneur",
+    "politician_woman", "politician_man", "young_professional", "elder_woman", "young_activist"
+];
+
 export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }: LobbyPlayPopupProps) {
     const lang = useLang();
     const { language } = useLanguage();
@@ -44,6 +53,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     const [setting, setSetting] = useState("");
     const [role, setRole] = useState("");
     const [emphasis, setEmphasis] = useState("");
+    const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
 
     const [showNamePresets, setShowNamePresets] = useState(false);
     const [showSettingPresets, setShowSettingPresets] = useState(false);
@@ -52,6 +62,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     const nameDropdownRef = useRef<HTMLDivElement>(null);
     const settingDropdownRef = useRef<HTMLDivElement>(null);
     const roleDropdownRef = useRef<HTMLDivElement>(null);
+    const avatarScrollRef = useRef<HTMLDivElement>(null);
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -75,7 +86,12 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         if (!characterName || !setting || !role || isLoading) return;
 
         audioManager.playSfx("click-soft");
-        onSubmit({ characterName, setting, role, emphasis });
+        onSubmit({ characterName, setting, role, emphasis, avatar: selectedAvatar });
+    };
+
+    const handleAvatarSelect = (avatar: string) => {
+        audioManager.playSfx("click-soft");
+        setSelectedAvatar(avatar);
     };
 
     const isFormValid = characterName.trim() && setting.trim() && role.trim();
@@ -112,6 +128,36 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
 
                         {/* Form */}
                         <form onSubmit={handleSubmit} className="p-8 pt-2 space-y-5 overflow-y-auto max-h-[70vh]">
+                            {/* Avatar Selection */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold text-amber-300/80 uppercase tracking-wider ml-1">
+                                    {lang("LOBBY_AVATAR_LABEL")}
+                                </label>
+                                <div
+                                    ref={avatarScrollRef}
+                                    className="flex gap-3 overflow-x-auto pb-2 px-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
+                                    style={{ scrollbarWidth: 'thin' }}
+                                >
+                                    {AVATAR_LIST.map((avatar) => (
+                                        <button
+                                            key={avatar}
+                                            type="button"
+                                            onClick={() => handleAvatarSelect(avatar)}
+                                            className={`flex-shrink-0 w-16 h-16 rounded-full overflow-hidden border-2 transition-all duration-200 ${selectedAvatar === avatar
+                                                    ? 'border-amber-400 ring-2 ring-amber-400/50 scale-110 shadow-lg shadow-amber-400/20'
+                                                    : 'border-white/10 hover:border-white/30 hover:scale-105'
+                                                }`}
+                                        >
+                                            <img
+                                                src={`/assets/images/avatars/${avatar}.png`}
+                                                alt={avatar.replace(/_/g, ' ')}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             {/* Character Name */}
                             <div className="space-y-2 relative" ref={nameDropdownRef}>
                                 <label className="text-xs font-semibold text-amber-300/80 uppercase tracking-wider ml-1">
