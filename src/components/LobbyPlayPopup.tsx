@@ -176,7 +176,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                             setSetting(e.target.value);
                                         }}
                                         onFocus={() => setShowSettingPresets(true)}
-                                        placeholder="e.g., Ancient Athens"
+                                        placeholder={lang("LOBBY_PLACEHOLDER_SETTING")}
                                         className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:bg-white/10 transition-all font-medium"
                                     />
                                     <button
@@ -230,7 +230,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                             setRole(e.target.value);
                                         }}
                                         onFocus={() => setShowRolePresets(true)}
-                                        placeholder="e.g., The Emperor, High Priest, Rebel Leader"
+                                        placeholder={lang("LOBBY_PLACEHOLDER_ROLE")}
                                         className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:bg-white/10 transition-all font-medium"
                                     />
                                     <button
@@ -279,7 +279,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                     type="text"
                                     value={emphasis}
                                     onChange={(e) => setEmphasis(e.target.value)}
-                                    placeholder="e.g., focus on military tensions, family honor"
+                                    placeholder={lang("LOBBY_PLACEHOLDER_EMPHASIS")}
                                     className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:bg-white/10 transition-all font-medium"
                                 />
                             </div>
