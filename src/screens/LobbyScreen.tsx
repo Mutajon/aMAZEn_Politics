@@ -18,6 +18,7 @@ import { useLanguage } from "../i18n/LanguageContext";
 import LanguageSelector from "../components/LanguageSelector";
 import { useLogger } from "../hooks/useLogger";
 import { audioManager } from "../lib/audioManager";
+import LobbyPlayPopup from "../components/LobbyPlayPopup";
 
 // localStorage key for tracking lobby games played
 const LOBBY_GAMES_PLAYED_KEY = 'lobby-games-played';
@@ -58,6 +59,7 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
   const [isLoading, setIsLoading] = useState(false);
   const [gamesPlayed, setGamesPlayed] = useState(0);
   const [isLimitReached, setIsLimitReached] = useState(false);
+  const [showPlayPopup, setShowPlayPopup] = useState(false);
 
   // Narrator and audio
   const narrator = useNarrator();
@@ -125,13 +127,26 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
     // Play click sound
     audioManager.playSfx('click-soft');
 
-    // Request fullscreen mode
-    await requestFullscreen();
+    // Open the new play popup instead of direct start
+    setShowPlayPopup(true);
+  };
 
-    // Start game
+  /**
+   * Handle the custom game start from the play popup
+   */
+  const handlePopupSubmit = async (data: {
+    characterName: string;
+    setting: string;
+    role: string;
+    emphasis: string;
+  }) => {
     setIsLoading(true);
+    setShowPlayPopup(false);
 
     try {
+      // Request fullscreen mode
+      await requestFullscreen();
+
       // Increment games played counter
       const newCount = incrementLobbyGames();
       setGamesPlayed(newCount);
@@ -159,18 +174,60 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       useMirrorQuizStore.getState().resetAll();
       clearAllSnapshots();
 
-      // Clear playerName and character for fresh start
-      useRoleStore.getState().setPlayerName(null);
-      useRoleStore.getState().setCharacter(null);
+      // --- Custom Scenario Setup ---
+      const roleStore = useRoleStore.getState();
+
+      // Set name
+      roleStore.setPlayerName(data.characterName);
+
+      // Select the custom role
+      roleStore.setRole(data.role);
+
+      // Create character object
+      roleStore.setCharacter({
+        name: data.characterName,
+        gender: "any",
+        description: `The ${data.role} in ${data.setting}`,
+      });
+
+      // Character description for the card
+      roleStore.setRoleDescription(data.role);
+
+      // Prepare analysis for a custom scenario
+      roleStore.setAnalysis({
+        systemName: data.setting,
+        systemDesc: `A unique scenario in ${data.setting} focusing on ${data.role}.`,
+        flavor: `The weights of power in ${data.setting} are shifting.`,
+        holders: [
+          { name: "Your Faction", percent: 40, icon: "👤" },
+          { name: "The Establishment", percent: 30, icon: "🏛️" },
+          { name: "The People", percent: 30, icon: "👥" },
+        ],
+        playerIndex: 0,
+        grounding: {
+          settingType: "real",
+          era: data.setting
+        },
+        dilemmaEmphasis: data.emphasis || `Role: ${data.role} in ${data.setting}.`,
+        roleScope: `As ${data.role} in ${data.setting}, you must navigate the complex political landscape to ensure your faction's survival and goals.`,
+        authorityLevel: "medium"
+      });
+
+      // Use the splash screen maze image as background for custom scenarios
+      roleStore.setRoleBackgroundImage("/assets/images/BKGs/mainBKG.jpg");
+
+      // Set role context
+      roleStore.setRoleContext(data.setting, `The story of ${data.characterName} in ${data.setting}.`, "N/A");
 
       // Prime narrator and start music
       narrator.prime();
       playMusic('background', true);
 
-      // Navigate to role selection (full carousel, all roles available)
-      push("/role");
+      // Navigate directly to compass (personality assessment)
+      // Custom scenarios skip /intro and /role screens
+      push("/compass-intro");
     } catch (error) {
-      console.error('Error starting lobby game:', error);
+      console.error('Error starting custom lobby game:', error);
       setIsLoading(false);
       alert('An error occurred while starting the game. Please try again.');
     }
@@ -272,7 +329,7 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
                   className="text-center space-y-4"
                 >
                   <p className="text-amber-300 text-lg font-medium">
-                    {language === 'he' 
+                    {language === 'he'
                       ? 'הגעת למגבלת המשחקים החינמיים'
                       : 'You have reached the free play limit'}
                   </p>
@@ -307,6 +364,13 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
           </>
         )}
       </div>
+      {/* Custom play popup */}
+      <LobbyPlayPopup
+        isOpen={showPlayPopup}
+        onClose={() => setShowPlayPopup(false)}
+        onSubmit={handlePopupSubmit}
+        isLoading={isLoading}
+      />
     </div>
   );
 }

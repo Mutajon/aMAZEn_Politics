@@ -1025,7 +1025,7 @@ app.post("/api/inquire", answerInquiry);
  * - Dynamic axis selection (Autonomy, Liberalism, Democracy)
  * - Includes tracking fields: valueTargeted, axisExplored
  *
- * Rollback: Set USE_PROMPT_V3 = false to use original prompt
+ * Note: V3 is the current and only active prompt version. Original and V4 versions have been removed.
  */
 
 

@@ -10,20 +10,10 @@ import {
 } from "../helpers/gameHelpers.mjs";
 import {
     buildGameMasterSystemPromptUnifiedV3,
-    buildGameMasterSystemPromptUnifiedV4,
     buildGameMasterUserPrompt
 } from "../services/promptBuilders.mjs";
 import { getTheoryPrompt } from "../theory-loader.mjs";
 
-/**
- * USE_PROMPT_V3: Toggle between original prompt and V3 (value-driven, private life focus)
- * V3 Features:
- * - Ultra-lean 3-step process (Value → Axis → Bridge)
- * - Private life focus for low/mid authority
- * - Setting-rooted details
- * - Dynamic axis selection (max 3 per axis)
- */
-const USE_PROMPT_V3 = true;
 
 /**
  * POST /api/reserve-game-slot
@@ -181,9 +171,7 @@ export async function gameTurnV2(req, res) {
             const languageCode = String(language || "en").toLowerCase();
             const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
             const dilemmaEmphasis = gameContext.dilemmaEmphasis || null;
-            const systemPrompt = USE_PROMPT_V3
-                ? buildGameMasterSystemPromptUnifiedV3(enrichedContext, languageCode, languageName, dilemmaEmphasis, character, grounding)
-                : buildGameMasterSystemPromptUnified(enrichedContext, languageCode, languageName);
+            const systemPrompt = buildGameMasterSystemPromptUnifiedV3(enrichedContext, languageCode, languageName, dilemmaEmphasis, character, grounding);
 
             // Build minimal Day 1 user prompt
             const userPrompt = buildGameMasterUserPrompt(day, null, null, 'dilemma', languageCode, languageName, dilemmaEmphasis);
@@ -364,11 +352,9 @@ export async function gameTurnV2(req, res) {
                 isGameEnd: false
             };
 
-            // Add tracking fields if using V3 (for frontend validation)
-            if (USE_PROMPT_V3) {
-                response.valueTargeted = parsed.valueTargeted || 'Unknown';
-                response.axisExplored = parsed.axisExplored || 'Unknown';
-            }
+            // Add tracking fields (for frontend validation)
+            response.valueTargeted = parsed.valueTargeted || 'Unknown';
+            response.axisExplored = parsed.axisExplored || 'Unknown';
 
             return res.json(response);
         }
@@ -653,11 +639,9 @@ export async function gameTurnV2(req, res) {
                 isGameEnd: isAftermathTurn
             };
 
-            // Add tracking fields if using V3 (for frontend validation)
-            if (USE_PROMPT_V3) {
-                response.valueTargeted = parsed.valueTargeted || 'Unknown';
-                response.axisExplored = parsed.axisExplored || 'Unknown';
-            }
+            // Add tracking fields (for frontend validation)
+            response.valueTargeted = parsed.valueTargeted || 'Unknown';
+            response.axisExplored = parsed.axisExplored || 'Unknown';
 
             // Log bridge field for debugging
             if (day > 1) {
