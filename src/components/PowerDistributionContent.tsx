@@ -42,6 +42,8 @@ interface PowerDistributionContentProps {
   onLooksGood: () => void;
   onShowSystemModal: () => void;
   onHideSystemModal: () => void;
+  showNoPointsError: boolean;
+  setShowNoPointsError: (val: boolean) => void;
 }
 
 export default function PowerDistributionContent({
@@ -62,6 +64,8 @@ export default function PowerDistributionContent({
   onLooksGood,
   onShowSystemModal,
   onHideSystemModal,
+  showNoPointsError,
+  setShowNoPointsError,
 }: PowerDistributionContentProps) {
   const lang = useLang();
   const { language } = useLanguage();
@@ -333,6 +337,38 @@ export default function PowerDistributionContent({
               {systemFlavor && (
                 <p className="mt-3 italic text-amber-200/90 text-sm sm:text-base">"{lang(systemFlavor).replace(/^"|"$/g, "")}"</p>
               )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* No Points Error Modal */}
+      <AnimatePresence>
+        {showNoPointsError && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60"
+            onClick={() => setShowNoPointsError(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative bg-rose-900 rounded-2xl p-6 border border-rose-500/30 shadow-2xl max-w-sm w-full text-center"
+              dir={isRTL ? "rtl" : "ltr"}
+            >
+              <p className="text-white text-lg font-medium mb-4 leading-relaxed">
+                {lang("QUESTIONNAIRE_NO_POINTS_ERROR")}
+              </p>
+              <button
+                onClick={() => setShowNoPointsError(false)}
+                className="bg-white text-rose-900 hover:bg-white/90 font-bold py-3 px-8 rounded-xl transition-all active:scale-[0.98]"
+              >
+                {lang("OK")}
+              </button>
             </motion.div>
           </motion.div>
         )}

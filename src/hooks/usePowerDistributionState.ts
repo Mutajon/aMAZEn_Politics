@@ -30,27 +30,17 @@ export function rebalance(
   holders: EnhancedPowerHolder[],
   idx: number,
   newValue: number
-): EnhancedPowerHolder[] {
-  const others = holders.filter((_, i) => i !== idx);
-  const othersSum = others.reduce((s, h) => s + h.percent, 0);
-  const remaining = 20 - clampPct(newValue);
+): EnhancedPowerHolder[] | null {
+  const currentTotalWithoutTarget = holders.reduce((s, h, i) => i === idx ? s : s + h.percent, 0);
+  const nextTotal = currentTotalWithoutTarget + clampPct(newValue);
 
-  if (othersSum <= 0) {
-    return holders.map((h, i) => ({ ...h, percent: i === idx ? clampPct(newValue) : 0 }));
+  if (nextTotal > 20) {
+    return null;
   }
 
-  const factor = remaining / othersSum;
-  const out = holders.map((h, i) =>
-    i === idx ? { ...h, percent: clampPct(newValue) } : { ...h, percent: clampPct(h.percent * factor) }
+  return holders.map((h, i) =>
+    i === idx ? { ...h, percent: clampPct(newValue) } : h
   );
-
-  let diff = 20 - out.reduce((s, h) => s + h.percent, 0);
-  for (let i = 0; diff !== 0 && i < out.length; i++) {
-    if (i === idx) continue;
-    out[i].percent += diff > 0 ? 1 : -1;
-    diff += diff > 0 ? -1 : 1;
-  }
-  return out;
 }
 
 export function usePowerDistributionState() {
@@ -74,6 +64,7 @@ export function usePowerDistributionState() {
 
   // UI state
   const [showSystemModal, setShowSystemModal] = useState(false);
+  const [showNoPointsError, setShowNoPointsError] = useState(false);
 
   // Initial state refs for reset functionality
   const initialHoldersRef = useRef<EnhancedPowerHolder[]>([]);
@@ -82,6 +73,10 @@ export function usePowerDistributionState() {
   // Handler functions
   const handleChangePercent = (idx: number, value: number) => {
     const updated = rebalance(holders, idx, value);
+    if (!updated) {
+      setShowNoPointsError(true);
+      return;
+    }
     updated.sort((a, b) => b.percent - a.percent);
     setHolders(updated);
   };
@@ -162,6 +157,8 @@ export function usePowerDistributionState() {
     // UI state
     showSystemModal,
     setShowSystemModal,
+    showNoPointsError,
+    setShowNoPointsError,
 
     // Refs
     initialHoldersRef,

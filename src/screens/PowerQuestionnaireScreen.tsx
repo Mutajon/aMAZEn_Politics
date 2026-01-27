@@ -47,6 +47,7 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
   const [activeTooltip, setActiveTooltip] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
+  const [showNoPointsError, setShowNoPointsError] = useState(false);
   const [typewriterText, setTypewriterText] = useState("");
   const [typewriterComplete, setTypewriterComplete] = useState(false);
 
@@ -93,47 +94,23 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
   const setHolders = phase === "q1" || phase === "q1_reasoning" ? setQ1Holders : setQ2Holders;
   const total = holders.reduce((s, h) => s + h.percent, 0);
 
-  // Handle slider change - new logic: only adjust others when total > 20
+  // Handle slider change - new logic: remove auto-balancing, prevent exceeding 20
   const handleSliderChange = useCallback(
     (idx: number, newValue: number) => {
       const clamped = Math.max(0, Math.min(20, Math.round(newValue)));
 
       setHolders((prev) => {
-        const newHolders = prev.map((h, i) =>
-          i === idx ? { ...h, percent: clamped } : { ...h }
-        );
+        const currentTotalWithoutTarget = prev.reduce((s, h, i) => i === idx ? s : s + h.percent, 0);
+        const nextTotal = currentTotalWithoutTarget + clamped;
 
-        const newTotal = newHolders.reduce((s, h) => s + h.percent, 0);
-
-        if (newTotal > 20) {
-          const excess = newTotal - 20;
-          const othersSum = newTotal - clamped;
-
-          if (othersSum > 0) {
-            const factor = (othersSum - excess) / othersSum;
-            for (let i = 0; i < newHolders.length; i++) {
-              if (i !== idx) {
-                newHolders[i] = {
-                  ...newHolders[i],
-                  percent: Math.max(0, Math.round(newHolders[i].percent * factor))
-                };
-              }
-            }
-
-            const finalTotal = newHolders.reduce((s, h) => s + h.percent, 0);
-            if (finalTotal !== 20) {
-              const diff = 20 - finalTotal;
-              for (let i = 0; i < newHolders.length; i++) {
-                if (i !== idx && newHolders[i].percent + diff >= 0 && newHolders[i].percent + diff <= 20) {
-                  newHolders[i] = { ...newHolders[i], percent: newHolders[i].percent + diff };
-                  break;
-                }
-              }
-            }
-          }
+        if (nextTotal > 20) {
+          setShowNoPointsError(true);
+          return prev;
         }
 
-        return newHolders;
+        return prev.map((h, i) =>
+          i === idx ? { ...h, percent: clamped } : h
+        );
       });
     },
     [setHolders]
@@ -472,6 +449,39 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
               <button
                 onClick={() => setShowWarning(false)}
                 className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-6 rounded-lg transition-colors"
+              >
+                {lang("OK")}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* No Points Error Modal */}
+      <AnimatePresence>
+        {showNoPointsError && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+            onClick={() => setShowNoPointsError(false)}
+          >
+            <div className="absolute inset-0 bg-black/50" />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative z-10 bg-rose-900 rounded-2xl p-6 border border-rose-500/30 shadow-2xl max-w-sm w-full text-center"
+              dir={isRTL ? "rtl" : "ltr"}
+            >
+              <p className="text-white text-lg font-medium mb-4 leading-relaxed">
+                {lang("QUESTIONNAIRE_NO_POINTS_ERROR")}
+              </p>
+              <button
+                onClick={() => setShowNoPointsError(false)}
+                className="bg-white text-rose-900 hover:bg-white/90 font-bold py-3 px-8 rounded-xl transition-all active:scale-[0.98]"
               >
                 {lang("OK")}
               </button>

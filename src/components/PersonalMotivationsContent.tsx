@@ -31,6 +31,7 @@ export default function PersonalMotivationsContent({
     const isRTL = language === "he";
 
     const [activeTooltip, setActiveTooltip] = useState<number | null>(null);
+    const [showNoPointsError, setShowNoPointsError] = useState(false);
 
     // Map the 10 motivations from COMPONENTS.what
     const motivations: ProjectHolder[] = COMPONENTS.what.map((c, i) => ({
@@ -45,37 +46,17 @@ export default function PersonalMotivationsContent({
     const handleSliderChange = useCallback(
         (idx: number, newValue: number) => {
             const clamped = Math.max(0, Math.min(20, Math.round(newValue)));
-            const newValues = [...distribution];
-            newValues[idx] = clamped;
 
-            const newTotal = newValues.reduce((s, v) => s + v, 0);
+            const currentTotalWithoutTarget = distribution.reduce((s, v, i) => i === idx ? s : s + v, 0);
+            const nextTotal = currentTotalWithoutTarget + clamped;
 
-            if (newTotal > 20) {
-                const excess = newTotal - 20;
-                const othersSum = newTotal - clamped;
-
-                if (othersSum > 0) {
-                    const factor = (othersSum - excess) / othersSum;
-                    for (let i = 0; i < newValues.length; i++) {
-                        if (i !== idx) {
-                            newValues[i] = Math.max(0, Math.round(newValues[i] * factor));
-                        }
-                    }
-
-                    // Final adjustment for rounding errors
-                    const finalTotal = newValues.reduce((s, v) => s + v, 0);
-                    if (finalTotal !== 20) {
-                        const diff = 20 - finalTotal;
-                        for (let i = 0; i < newValues.length; i++) {
-                            if (i !== idx && newValues[i] + diff >= 0 && newValues[i] + diff <= 20) {
-                                newValues[i] += diff;
-                                break;
-                            }
-                        }
-                    }
-                }
+            if (nextTotal > 20) {
+                setShowNoPointsError(true);
+                return;
             }
 
+            const newValues = [...distribution];
+            newValues[idx] = clamped;
             onChange(newValues);
         },
         [distribution, onChange]
@@ -196,6 +177,38 @@ export default function PersonalMotivationsContent({
                             <p className="text-white/80 text-base leading-relaxed">
                                 {lang(motivations[activeTooltip].descKey)}
                             </p>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* No Points Error Modal */}
+            <AnimatePresence>
+                {showNoPointsError && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60"
+                        onClick={() => setShowNoPointsError(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="relative bg-rose-900 rounded-2xl p-6 border border-rose-500/30 shadow-2xl max-w-sm w-full text-center"
+                            dir={isRTL ? "rtl" : "ltr"}
+                        >
+                            <p className="text-white text-lg font-medium mb-4 leading-relaxed">
+                                {lang("QUESTIONNAIRE_NO_POINTS_ERROR")}
+                            </p>
+                            <button
+                                onClick={() => setShowNoPointsError(false)}
+                                className="bg-white text-rose-900 hover:bg-white/90 font-bold py-3 px-8 rounded-xl transition-all active:scale-[0.98]"
+                            >
+                                {lang("OK")}
+                            </button>
                         </motion.div>
                     </motion.div>
                 )}

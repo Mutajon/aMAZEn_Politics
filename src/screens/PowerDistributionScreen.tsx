@@ -33,7 +33,7 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
 
   const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
   const roleBgStyle = useMemo(() => bgStyleWithRoleImage(roleBackgroundImage), [roleBackgroundImage]);
-  
+
   // Loading quotes for the overlay
   const LOADING_QUOTES = createTranslatedConst((lang) => [
     lang("POWER_QUOTE_1"),
@@ -41,10 +41,10 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
     lang("POWER_QUOTE_3"),
     lang("POWER_QUOTE_4"),
   ]);
-  
+
   // Use translated constants
   const loadingQuotes = useTranslatedConst(LOADING_QUOTES);
-  
+
   // Extract all state management
   const state = usePowerDistributionState();
   const {
@@ -61,6 +61,8 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
     systemFlavor,
     showSystemModal,
     setShowSystemModal,
+    showNoPointsError,
+    setShowNoPointsError,
     setAnalysis,
     handleChangePercent,
     handleChangeName,
@@ -128,6 +130,8 @@ export default function PowerDistributionScreen({ push }: { push: PushFn }) {
         onLooksGood={handleLooksGoodWithNavigation}
         onShowSystemModal={() => setShowSystemModal(true)}
         onHideSystemModal={() => setShowSystemModal(false)}
+        showNoPointsError={showNoPointsError}
+        setShowNoPointsError={setShowNoPointsError}
       />
     </div>
   );

@@ -23,6 +23,7 @@
   "MOTIVATIONS_Q_TOTAL_LABEL": "Total Points",
   "MOTIVATIONS_Q_REMAINING": "remaining",
   "MOTIVATIONS_Q_BUTTON_SUBMIT": "Save Priorities",
+  "QUESTIONNAIRE_NO_POINTS_ERROR": "There are no more points to distribute. You need to reduce points from other options if you want to increase more.",
   "MOTIVATIONS_DEBUG_BUTTON": "Personal Motivations (Debug)",
   "LANGUAGE": "Language",
   "MUSIC_VOLUME": "Music Volume",

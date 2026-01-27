@@ -24,6 +24,7 @@
   "MOTIVATIONS_Q_TOTAL_LABEL": "סה\"כ נקודות",
   "MOTIVATIONS_Q_REMAINING": "נותרו",
   "MOTIVATIONS_Q_BUTTON_SUBMIT": "שמירת עדיפויות",
+  "QUESTIONNAIRE_NO_POINTS_ERROR": "אין יותר נקודות לחלוקה. עליכם להפחית נקודות מאפשרויות אחרות כדי להוסיף כאן.",
   "MOTIVATIONS_DEBUG_BUTTON": "מניעים אישיים (Debug)",
   "LANGUAGE": "שפה",
   "MUSIC_VOLUME": "עוצמת מוזיקה",
