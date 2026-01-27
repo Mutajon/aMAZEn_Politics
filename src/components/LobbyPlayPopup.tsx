@@ -111,8 +111,8 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                         <form onSubmit={handleSubmit} className="p-8 pt-2 space-y-5 overflow-y-auto max-h-[70vh]">
                             {/* Character Name */}
                             <div className="space-y-2 relative" ref={nameDropdownRef}>
-                                <label className="text-xs font-semibold text-purple-300/80 uppercase tracking-wider ml-1">
-                                    {lang("PLAYER_NAME")}
+                                <label className="text-xs font-semibold text-amber-300/80 uppercase tracking-wider ml-1">
+                                    {lang("LOBBY_NAME_LABEL")}
                                 </label>
                                 <div className="relative">
                                     <input
@@ -124,7 +124,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                         }}
                                         onFocus={() => setShowNamePresets(true)}
                                         placeholder={lang("NAME_PLACEHOLDER")}
-                                        className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:bg-white/10 transition-all font-medium"
+                                        className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:bg-white/10 transition-all font-medium"
                                     />
                                     <button
                                         type="button"
@@ -165,8 +165,8 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
 
                             {/* Setting with Dropdown */}
                             <div className="space-y-2 relative" ref={settingDropdownRef}>
-                                <label className="text-xs font-semibold text-purple-300/80 uppercase tracking-wider ml-1">
-                                    {lang("DILEMMAS_SUBJECT")}
+                                <label className="text-xs font-semibold text-amber-300/80 uppercase tracking-wider ml-1">
+                                    {lang("LOBBY_SETTING_LABEL")}
                                 </label>
                                 <div className="relative">
                                     <input
@@ -177,7 +177,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                         }}
                                         onFocus={() => setShowSettingPresets(true)}
                                         placeholder="e.g., Ancient Athens"
-                                        className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:bg-white/10 transition-all font-medium"
+                                        className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:bg-white/10 transition-all font-medium"
                                     />
                                     <button
                                         type="button"
@@ -219,8 +219,8 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
 
                             {/* Role */}
                             <div className="space-y-2 relative" ref={roleDropdownRef}>
-                                <label className="text-xs font-semibold text-purple-300/80 uppercase tracking-wider ml-1">
-                                    {lang("YOUR_STARTING_STATE")}
+                                <label className="text-xs font-semibold text-amber-300/80 uppercase tracking-wider ml-1">
+                                    {lang("LOBBY_ROLE_LABEL")}
                                 </label>
                                 <div className="relative">
                                     <input
@@ -231,7 +231,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                         }}
                                         onFocus={() => setShowRolePresets(true)}
                                         placeholder="e.g., The Emperor, High Priest, Rebel Leader"
-                                        className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:bg-white/10 transition-all font-medium"
+                                        className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:bg-white/10 transition-all font-medium"
                                     />
                                     <button
                                         type="button"
@@ -272,15 +272,15 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
 
                             {/* Emphasis (Optional) */}
                             <div className="space-y-2">
-                                <label className="text-xs font-semibold text-purple-300/80 uppercase tracking-wider ml-1">
-                                    {lang("INFO")} <span className="text-white/30 lowercase">({lang("COMING_SOON")})</span>
+                                <label className="text-xs font-semibold text-amber-300/80 uppercase tracking-wider ml-1">
+                                    {lang("LOBBY_EMPHASIS_LABEL")} <span className="text-white/30 lowercase">({lang("LOBBY_OPTIONAL")})</span>
                                 </label>
                                 <input
                                     type="text"
                                     value={emphasis}
                                     onChange={(e) => setEmphasis(e.target.value)}
                                     placeholder="e.g., focus on military tensions, family honor"
-                                    className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:bg-white/10 transition-all font-medium"
+                                    className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:bg-white/10 transition-all font-medium"
                                 />
                             </div>
 
