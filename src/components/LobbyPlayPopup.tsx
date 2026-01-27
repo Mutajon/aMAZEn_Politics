@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { audioManager } from "../lib/audioManager";
 import { useLang } from "../i18n/lang";
+import { useLanguage } from "../i18n/LanguageContext";
 
 interface LobbyPlayPopupProps {
     isOpen: boolean;
@@ -36,6 +37,8 @@ const ROLE_PRESETS = [
 
 export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }: LobbyPlayPopupProps) {
     const lang = useLang();
+    const { language } = useLanguage();
+    const isRTL = language === 'he';
 
     const [characterName, setCharacterName] = useState("");
     const [setting, setSetting] = useState("");
@@ -129,7 +132,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                     <button
                                         type="button"
                                         onClick={() => setShowNamePresets(!showNamePresets)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                                        className={`absolute ${isRTL ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors`}
                                     >
                                         <svg className={`w-5 h-5 transition-transform ${showNamePresets ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -182,7 +185,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                     <button
                                         type="button"
                                         onClick={() => setShowSettingPresets(!showSettingPresets)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                                        className={`absolute ${isRTL ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors`}
                                     >
                                         <svg className={`w-5 h-5 transition-transform ${showSettingPresets ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -236,7 +239,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                     <button
                                         type="button"
                                         onClick={() => setShowRolePresets(!showRolePresets)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                                        className={`absolute ${isRTL ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors`}
                                     >
                                         <svg className={`w-5 h-5 transition-transform ${showRolePresets ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
