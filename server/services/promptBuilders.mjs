@@ -212,7 +212,11 @@ CRITICAL: Follow Golden Rules B & C - different tension from yesterday, actions 
 
 STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player RIGHT NOW.`;
     } else if (day === 8) {
-      prompt += `This is Day 8 - the aftermath. Follow the system prompt instructions for Day 8.`;
+      prompt += `This is DAY 8 - THE FINAL AFTERMATH.
+NO CHOICES. NO QUESTIONS.
+Set the "actions" field to an empty array [].
+Generate ONLY a vivid 2-3 sentence summary in the Game Master voice describing the final consequences of the Day 7 decision and how the story ends.
+DO NOT end with "What will you do?" or any question. This is the end.`;
     } else {
       prompt += `MANDATORY "bridge" FIELD - Generate ONE SENTENCE showing:
 1. What HAPPENED because of "${playerChoice.title}"
@@ -726,10 +730,10 @@ STEP 3: BRIDGE FROM PREVIOUS DAY (MANDATORY "bridge")
 - One sentence showing the OUTCOME of the last choice.
 - COMPETENCE RULE: If they were clever, flatter them and show the win, then pivot to an UNRELATED crisis.
 
-3. CONSTRAINTS
-- AUTHORITY: Low authority cannot command armies.
-- REALISM: Match setting culture, not modern morality.
-- TOPIC DIVERSITY: Shift topics after 2 days. Resolve old arcs in the bridge.
+- dynamicParams: 2-3 concrete consequences of the last player choice.
+  * Use an Emoji character for "icon" (e.g., "🔥", "🧱", "⚔️").
+  * Use brief text (2-4 words) for "text".
+  * Include numbers if they add impact (e.g., "50 lives lost").
 
 4. OUTPUT FORMAT (JSON ONLY)
 Return Valid JSON. No markdown.
@@ -754,6 +758,24 @@ Return Valid JSON. No markdown.
   },
   "dynamicParams": [{"icon": "...", "text": "..."}],
   "mirrorAdvice": "One cynicism. 20 words max."
+}
+
+## DAY 8 SCHEMA (Aftermath):
+{
+  "supportShift": {
+    "people": {"attitudeLevel": "...", "shortLine": "..."},
+    "holders": {"attitudeLevel": "...", "shortLine": "..."},
+    "mom": {"attitudeLevel": "...", "shortLine": "..."}
+  },
+  "dilemma": {
+    "title": "The Aftermath",
+    "description": "2-3 sentences max. NO direct questions.",
+    "actions": [],
+    "topic": "Conclusion",
+    "scope": "N/A"
+  },
+  "dynamicParams": [{"icon": "...", "text": "..."}],
+  "mirrorAdvice": "..."
 }
 `;
 
@@ -817,6 +839,9 @@ HEBREW RULES:
 - LAW #1: RECOGNIZE COMPETENCE. If they won, flatter them, then pivot.
 - LAW #2: TOPIC ROTATION. Shift topics after 2 days.
 - LAW #3: VALUE TRAPS. Pick a value, make it cost something.
+- dynamicParams: 2-3 concrete consequences.
+  * Use an Emoji character for "icon".
+  * Use brief text (2-4 words).
 
 3. OUTPUT FORMAT (JSON ONLY)
 {
@@ -826,6 +851,24 @@ HEBREW RULES:
     "actions": [
       {"title": "...", "summary": "...", "icon": "..."}
     ]
+  },
+  "supportShift": {
+    "people": {"attitudeLevel": "...", "shortLine": "..."},
+    "holders": {"attitudeLevel": "...", "shortLine": "..."},
+    "mom": {"attitudeLevel": "...", "shortLine": "..."}
+  },
+  "dynamicParams": [{"icon": "...", "text": "..."}],
+  "mirrorAdvice": "..."
+}
+
+## DAY 8 SCHEMA (Aftermath):
+{
+  "dilemma": {
+    "title": "The Aftermath",
+    "description": "2-3 sentences max. NO direct questions.",
+    "actions": [],
+    "topic": "Conclusion",
+    "scope": "N/A"
   },
   "supportShift": {
     "people": {"attitudeLevel": "...", "shortLine": "..."},

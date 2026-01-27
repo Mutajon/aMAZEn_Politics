@@ -550,6 +550,8 @@ async function fetchGameTurn(
     "pact": "🤝",
     "diplomacy": "🕊️",
     "corruption": "💰",
+    "authority": "👑",
+    "office": "🏛️",
 
     // Social / People
     "people": "👥",
@@ -557,6 +559,8 @@ async function fetchGameTurn(
     "public": "📢",
     "popularity": "⭐",
     "unrest": "💢",
+    "culture": "🎭",
+    "tradition": "📜",
 
     // Economy / Resources
     "economy": "📉",
@@ -565,6 +569,8 @@ async function fetchGameTurn(
     "debt": "💳",
     "food": "🍞",
     "resource": "💎",
+    "wealth": "💰",
+    "market": "📈",
 
     // Espionage / Secrets
     "spy": "🕵️",
@@ -572,6 +578,42 @@ async function fetchGameTurn(
     "intel": "👁️",
     "plot": "🕸️",
     "betrayal": "🗡️",
+
+    // Personal / Family
+    "family": "🏠",
+    "home": "🏠",
+    "friend": "👥",
+    "personal": "👤",
+    "self": "👤",
+
+    // Compass Values & Themes
+    "truth": "⚖️",
+    "trust": "🤝",
+    "liberty": "🕊️",
+    "agency": "🔓",
+    "equality": "🤝",
+    "equity": "⚖️",
+    "care": "❤️",
+    "solidarity": "✊",
+    "create": "🎨",
+    "courage": "🦁",
+    "wellbeing": "🌱",
+    "health": "🤒",
+    "safety": "🛡️",
+    "honor": "🎖️",
+    "sacrifice": "🕯️",
+    "sacred": "✨",
+    "awe": "🌟",
+    "evidence": "🔍",
+    "reason": "🗣️",
+    "revelation": "🌟",
+    "nature": "🌿",
+    "pragmatism": "🛠️",
+    "utility": "🛠️",
+    "aesthesis": "🎭",
+    "aesthetic": "🎨",
+    "fidelity": "💍",
+    "loyalty": "🛡️",
 
     // Abstract / Consequences
     "death": "💀",
@@ -599,13 +641,13 @@ async function fetchGameTurn(
         ? EMOJI_MAP[rawIcon]
         : (param.icon || '📰');
 
-      // Cleaning function to strip English prefixes (e.g. "reputation מוניטין" -> "מוניטין")
+      // Cleaning function to strip English words from strings if they contain Hebrew
       const cleanText = (text: string): string => {
         if (!text) return 'Unknown consequence';
-        // If text contains Hebrew, strip leading English words/punctuation
+        // If text contains Hebrew, strip ALL English words/punctuation/labels
         if (/[\u0590-\u05FF]/.test(text)) {
-          // Remove English words at the start
-          return text.replace(/^[A-Za-z\s\(\)\-]+(?=[\u0590-\u05FF])/, '').trim();
+          // Remove English words (sequences of letters) but keep numbers and Hebrew
+          return text.replace(/[A-Za-z][A-Za-z\s\-\/\(\)]*/g, '').trim().replace(/\s+/g, ' ');
         }
         return text;
       };
