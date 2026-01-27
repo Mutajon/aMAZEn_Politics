@@ -31,6 +31,7 @@ import { useCompassStore } from "../store/compassStore";
 import { useMirrorQuizStore } from "../store/mirrorQuizStore";
 import { useHighscoreStore } from "../store/highscoreStore";
 import { useRoleProgressStore } from "../store/roleProgressStore";
+import { getLocalizedHolderName } from "../data/powerDistributionTranslations";
 import { useLoggingStore } from "../store/loggingStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useMirrorTop3 } from "../hooks/useMirrorTop3";
@@ -108,8 +109,9 @@ export default function FinalScoreScreen({ push }: Props) {
   const breakdown: ScoreBreakdown =
     finalScoreCalculated && savedBreakdown ? savedBreakdown : liveBreakdown;
 
-  const midLabel =
-    analysis?.challengerSeat?.name || lang("FINAL_SCORE_POWER_HOLDERS_SUPPORT");
+  const midLabel = analysis?.challengerSeat?.name
+    ? getLocalizedHolderName(analysis.challengerSeat.name, lang)
+    : lang("FINAL_SCORE_POWER_HOLDERS_SUPPORT");
 
   const sequence: CategoryRenderInfo[] = useMemo(
     () => [
@@ -577,12 +579,14 @@ export default function FinalScoreScreen({ push }: Props) {
             <ArrowRight className="h-4 w-4" />
             {lang("FINAL_SCORE_PLAY_AGAIN")}
           </button>
-          <button
-            onClick={handleVisitHallOfFame}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/25 px-4 py-2 text-white/80 hover:bg-white/15 transition"
-          >
-            {lang("FINAL_SCORE_VISIT_HALL_OF_FAME")}
-          </button>
+          {!experimentMode && (
+            <button
+              onClick={handleVisitHallOfFame}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/25 px-4 py-2 text-white/80 hover:bg-white/15 transition"
+            >
+              {lang("FINAL_SCORE_VISIT_HALL_OF_FAME")}
+            </button>
+          )}
         </div>
       </div>
     </div>

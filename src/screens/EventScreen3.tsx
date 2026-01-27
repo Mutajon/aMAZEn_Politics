@@ -39,7 +39,7 @@ import type { CompassEffectPing } from "../components/MiniCompass";
 import { loadEventScreenSnapshot, clearEventScreenSnapshot } from "../lib/eventScreenSnapshot";
 import { useLang } from "../i18n/lang";
 import { useRoleProgressStore } from "../store/roleProgressStore";
-import { POWER_DISTRIBUTION_TRANSLATIONS } from "../data/powerDistributionTranslations";
+import { getLocalizedHolderName } from "../data/powerDistributionTranslations";
 import { useTimingLogger } from "../hooks/useTimingLogger";
 import { useReasoning } from "../hooks/useReasoning";
 import { useLogger } from "../hooks/useLogger";
@@ -228,20 +228,8 @@ export default function EventScreen3({ push }: Props) {
     });
 
     // Helper function to translate challenger seat name
-    const translateChallengerName = (name: string): string => {
-      // Check all predefined role translations for a matching holder name
-      for (const roleTranslations of Object.values(POWER_DISTRIBUTION_TRANSLATIONS)) {
-        const holderTranslation = roleTranslations.holders[name];
-        if (holderTranslation) {
-          return lang(holderTranslation.name);
-        }
-      }
-      // If no translation found, return name as-is (for AI-generated roles)
-      return name;
-    };
-
     const middleLabel = analysis?.challengerSeat?.name
-      ? translateChallengerName(analysis.challengerSeat.name)
+      ? getLocalizedHolderName(analysis.challengerSeat.name, lang)
       : lang("FINAL_SCORE_POWER_HOLDERS_SUPPORT");
 
     return {

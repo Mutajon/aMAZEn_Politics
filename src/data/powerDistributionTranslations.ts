@@ -130,3 +130,25 @@ export function translatePowerDistribution(
     } : undefined
   };
 }
+
+/**
+ * Standalone helper to translate a holder name (challenger or common holder)
+ */
+export function getLocalizedHolderName(name: string, lang: (key: string) => string): string {
+  // Check all predefined role translations for a matching holder name
+  for (const roleTranslations of Object.values(POWER_DISTRIBUTION_TRANSLATIONS)) {
+    const holderTranslation = roleTranslations.holders[name];
+    if (holderTranslation) {
+      return lang(holderTranslation.name);
+    }
+  }
+
+  // If the name itself is an i18n key (like "ATHENS_HOLDER_2_NAME"), translate it
+  const translated = lang(name);
+  if (translated !== name) {
+    return translated;
+  }
+
+  // If no translation found, return name as-is (for AI-generated roles)
+  return name;
+}

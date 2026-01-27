@@ -13,12 +13,13 @@ export default function PersonalMotivationsScreen({ push }: { push: PushFn }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const lang = useLang();
 
+    // Check for post-game type from query params
+    const searchParams = new URLSearchParams(window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '');
+    const isPostGame = searchParams.get("type") === "post-game";
+
     const handleSave = async () => {
         setIsSubmitting(true);
         setDistribution(localDistribution);
-
-        // Check if this is a post-game submission
-        const isPostGame = window.location.hash.includes("type=post-game");
 
         await saveMotivations(
             localDistribution,
@@ -48,6 +49,7 @@ export default function PersonalMotivationsScreen({ push }: { push: PushFn }) {
                 onChange={setLocalDistribution}
                 onSave={handleSave}
                 isSubmitting={isSubmitting}
+                isPostGame={isPostGame}
             />
         </div>
     );

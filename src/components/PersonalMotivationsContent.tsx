@@ -18,6 +18,7 @@ interface PersonalMotivationsContentProps {
     onChange: (newValues: number[]) => void;
     onSave: () => void;
     isSubmitting?: boolean;
+    isPostGame?: boolean;
 }
 
 export default function PersonalMotivationsContent({
@@ -25,6 +26,7 @@ export default function PersonalMotivationsContent({
     onChange,
     onSave,
     isSubmitting = false,
+    isPostGame = false,
 }: PersonalMotivationsContentProps) {
     const lang = useLang();
     const { language } = useLanguage();
@@ -67,10 +69,10 @@ export default function PersonalMotivationsContent({
             {/* Header */}
             <div className="text-center mb-6">
                 <h1 className="text-xl sm:text-2xl font-bold text-white mb-3 leading-relaxed">
-                    {lang("MOTIVATIONS_Q_HEADER")}
+                    {lang(isPostGame ? "MOTIVATIONS_Q_HEADER_POST_GAME" : "MOTIVATIONS_Q_HEADER")}
                 </h1>
                 <p className="text-sm sm:text-base text-gray-300">
-                    {lang("MOTIVATIONS_Q_SUBHEADER")}
+                    {lang(isPostGame ? "MOTIVATIONS_Q_SUBHEADER_POST_GAME" : "MOTIVATIONS_Q_SUBHEADER")}
                 </p>
             </div>
 

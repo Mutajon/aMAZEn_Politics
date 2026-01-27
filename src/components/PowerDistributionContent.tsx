@@ -72,6 +72,8 @@ export default function PowerDistributionContent({
   const isRTL = language === "he";
   const logger = useLogger();
   const character = useRoleStore((s) => s.character);
+  const selectedRole = useRoleStore((s) => s.selectedRole);
+  const isAthens = selectedRole === "athens_431" || selectedRole?.includes("Athens");
 
   // Get gender-aware translation keys
   const getGenderKey = (baseKey: string): string => {
@@ -212,7 +214,9 @@ export default function PowerDistributionContent({
 
                             {isPlayer && (
                               <span className="text-amber-300 text-xs sm:text-sm font-semibold">
-                                {lang(getGenderKey("POWER_THATS_YOU"))}
+                                {isAthens
+                                  ? lang("POWER_THATS_YOU_ATHENS")
+                                  : lang(getGenderKey("POWER_THATS_YOU"))}
                               </span>
                             )}
 
