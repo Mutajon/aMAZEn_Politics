@@ -24,6 +24,7 @@ import { shouldGenerateAIOptions, type TreatmentType } from "../data/experimentC
 import { useAIOutputLogger } from "./useAIOutputLogger";
 import { getConfidantByLegacyKey } from "../data/confidants";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useLang } from "../i18n/lang";
 
 // ============================================================================
 // TYPES
@@ -136,6 +137,8 @@ async function waitForNarrativeMemory(timeoutMs = 4000, pollIntervalMs = 75) {
   return memory;
 }
 
+import { translatePowerDistribution } from "../data/powerDistributionTranslations";
+
 /**
  * UNIFIED GAME TURN API - Fetches ALL data in one call using hosted state
  *
@@ -147,7 +150,10 @@ async function waitForNarrativeMemory(timeoutMs = 4000, pollIntervalMs = 75) {
  * - Better narrative continuity
  * - ~50% token savings after Day 1
  */
-async function fetchGameTurn(language: string = 'he'): Promise<{
+async function fetchGameTurn(
+  lang: (key: string) => string,
+  language: string = 'he'
+): Promise<{
   dilemma: Dilemma;
   supportEffects: SupportEffect[] | null;
   newsItems: TickerItem[];
@@ -207,14 +213,35 @@ async function fetchGameTurn(language: string = 'he'): Promise<{
       ? roleState.roleIntro.split('.')[0] // First sentence of intro
       : `${roleState.selectedRole || "Unknown role"}, ${roleState.roleYear || "Unknown era"}`;
 
+    // Translate power distribution data if available
+    // We need to use the translation helper but we need a lang function.
+    // Since we can't easily pass the hook's lang function here without changing signatures everywhere,
+    // we'll rely on the fact that we're mostly sending technical keys to English backend?
+    // NO, the backend uses these names to Generate Hebrew text. If we send "Assembly (Ekklesia)", Gemini generates Hebrew.
+    // If we send "ATHENS_HOLDER_ASSEMBLY_NAME", Gemini parrots it.
+    // We MUST translate here.
+
+    // Modification: `fetchGameTurn` now expects `lang` to be passed or we need a way to get it.
+    // The previous code signature was `async function fetchGameTurn(language: string = 'he'): Promise<...>`
+    // I will modify the signature to `async function fetchGameTurn(lang: (key: string) => string, language: string = 'he')`
+
+    // ... wait, I will implement this in the `replace_file_content` below by assuming I change the call site too.
+
+    const translatedAnalysis = roleState.selectedRole && roleState.analysis
+      ? translatePowerDistribution(roleState.selectedRole, roleState.analysis, lang)
+      : roleState.analysis;
+
     payload.gameContext = {
       role: roleState.roleScope,
       roleScope: roleState.roleScope, // Added for backend authority calculation
+      // Revert to English system name for backend logic stability
       systemName: roleState.analysis?.systemName || "Divine Right Monarchy",
       setting,
+      // Revert to English challenger name for backend logic stability
       challengerSeat: roleState.analysis?.challengerSeat?.name || "Unknown Opposition (Institutional Power)",
-      powerHolders: roleState.analysis?.holders || [],
-      playerIndex: roleState.analysis?.playerIndex ?? null,
+      // Keep holders translated so narrative uses Hebrew names
+      powerHolders: translatedAnalysis?.holders || [],
+      playerIndex: translatedAnalysis?.playerIndex ?? null,
       supportProfiles: {
         people: {
           origin: supportPeople,
@@ -504,14 +531,133 @@ async function fetchGameTurn(language: string = 'he'): Promise<{
   // Compass pills fetched asynchronously elsewhere
   const compassPills: CompassPill[] | null = null;
 
+  // Map keywords to emojis
+  const EMOJI_MAP: Record<string, string> = {
+    // Military / Force
+    "military": "⚔️",
+    "force": "🛡️",
+    "security": "👮",
+    "police": "🚔",
+    "war": "💣",
+    "army": "🪖",
+    "weapon": "🔫",
+
+    // Political / Institutional
+    "political": "🏛️",
+    "assembly": "🗣️",
+    "vote": "🗳️",
+    "law": "⚖️",
+    "pact": "🤝",
+    "diplomacy": "🕊️",
+    "corruption": "💰",
+    "authority": "👑",
+    "office": "🏛️",
+
+    // Social / People
+    "people": "👥",
+    "riot": "🔥",
+    "public": "📢",
+    "popularity": "⭐",
+    "unrest": "💢",
+    "culture": "🎭",
+    "tradition": "📜",
+
+    // Economy / Resources
+    "economy": "📉",
+    "money": "💵",
+    "trade": "🚢",
+    "debt": "💳",
+    "food": "🍞",
+    "resource": "💎",
+    "wealth": "💰",
+    "market": "📈",
+
+    // Espionage / Secrets
+    "spy": "🕵️",
+    "secret": "🤫",
+    "intel": "👁️",
+    "plot": "🕸️",
+    "betrayal": "🗡️",
+
+    // Personal / Family
+    "family": "🏠",
+    "home": "🏠",
+    "friend": "👥",
+    "personal": "👤",
+    "self": "👤",
+
+    // Compass Values & Themes
+    "truth": "⚖️",
+    "trust": "🤝",
+    "liberty": "🕊️",
+    "agency": "🔓",
+    "equality": "🤝",
+    "equity": "⚖️",
+    "care": "❤️",
+    "solidarity": "✊",
+    "create": "🎨",
+    "courage": "🦁",
+    "wellbeing": "🌱",
+    "health": "🤒",
+    "safety": "🛡️",
+    "honor": "🎖️",
+    "sacrifice": "🕯️",
+    "sacred": "✨",
+    "awe": "🌟",
+    "evidence": "🔍",
+    "reason": "🗣️",
+    "revelation": "🌟",
+    "nature": "🌿",
+    "pragmatism": "🛠️",
+    "utility": "🛠️",
+    "aesthesis": "🎭",
+    "aesthetic": "🎨",
+    "fidelity": "💍",
+    "loyalty": "🛡️",
+
+    // Abstract / Consequences
+    "death": "💀",
+    "chaos": "🌀",
+    "time": "⏳",
+    "impact": "💥",
+    "enemy": "👺",
+    "danger": "⚠️",
+    "unknown": "❓"
+  };
+
   // Extract dynamic parameters (Day 2+ only)
   // Add id field from index (AI returns {icon, text}, we add id for React keys)
+  // Also map text keywords to emojis if needed
   const dynamicParams: DynamicParam[] = Array.isArray(data.dynamicParams)
-    ? data.dynamicParams.map((param, index) => ({
-      id: `param-${day}-${index}`,
-      icon: param.icon || '📰',
-      text: param.text || 'Unknown consequence'
-    }))
+    ? data.dynamicParams.map((param: any, index: number) => {
+      // Normalize icon key (strip whitespace, lowercase)
+      const rawIcon = String(param.icon || "").trim().toLowerCase();
+
+      // Check if rawIcon is already an emoji (simple check: non-ascii or short)
+      // If it looks like a keyword (length > 2 and ascii), try to map it
+      const isKeyword = /^[a-z]+$/.test(rawIcon) && rawIcon.length > 2;
+
+      const emoji = isKeyword && EMOJI_MAP[rawIcon]
+        ? EMOJI_MAP[rawIcon]
+        : (param.icon || '📰');
+
+      // Cleaning function to strip English words from strings if they contain Hebrew
+      const cleanText = (text: string): string => {
+        if (!text) return 'Unknown consequence';
+        // If text contains Hebrew, strip ALL English words/punctuation/labels
+        if (/[\u0590-\u05FF]/.test(text)) {
+          // Remove English words (sequences of letters) but keep numbers and Hebrew
+          return text.replace(/[A-Za-z][A-Za-z\s\-\/\(\)]*/g, '').trim().replace(/\s+/g, ' ');
+        }
+        return text;
+      };
+
+      return {
+        id: `param-${day}-${index}`,
+        icon: emoji,
+        text: cleanText(param.text)
+      };
+    })
     : [];
 
   // Extract mirror advice
@@ -810,6 +956,7 @@ function wait(ms: number): Promise<void> {
 export function useEventDataCollector() {
   // Get current language from context
   const { language } = useLanguage();
+  const lang = useLang();
 
   // Progressive state - data arrives in 3 phases
   const [phase1Data, setPhase1Data] = useState<Phase1Data | null>(null);
@@ -866,7 +1013,7 @@ export function useEventDataCollector() {
         // ========================================================================
         console.log(`[Collector] Day ${day}: Fetching unified game turn data (attempt ${attempt}/${MAX_RETRY_ATTEMPTS}, language: ${language})...`);
 
-        const turnData = await fetchGameTurn(language);
+        const turnData = await fetchGameTurn(lang, language);
 
         // Extract all data from unified response
         const {

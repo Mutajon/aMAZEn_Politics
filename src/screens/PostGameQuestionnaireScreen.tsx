@@ -11,7 +11,6 @@ import { useLang } from "../i18n/lang";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useQuestionnaireStore } from "../store/questionnaireStore";
 import { useLoggingStore } from "../store/loggingStore";
-import { useSettingsStore } from "../store/settingsStore";
 import { POWER_ENTITIES } from "../data/powerEntities";
 import PowerReasoningModal from "../components/PowerReasoningModal";
 
@@ -26,7 +25,6 @@ export default function PostGameQuestionnaireScreen({ push }: { push: (route: st
   const lang = useLang();
   const { language } = useLanguage();
   const isRTL = language === "he";
-  const isMobile = useSettingsStore((s) => s.isMobileDevice);
 
   // Store
   const {
@@ -44,53 +42,30 @@ export default function PostGameQuestionnaireScreen({ push }: { push: (route: st
   const [activeTooltip, setActiveTooltip] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showWarning, setShowWarning] = useState(false);
+  const [showNoPointsError, setShowNoPointsError] = useState(false);
 
   // Refs for scrolling
   const containerRef = useRef<HTMLDivElement>(null);
 
   const total = holders.reduce((s, h) => s + h.percent, 0);
 
-  // Handle slider change - only adjust others when total > 100
+  // Handle slider change - logic: remove auto-balancing, prevent exceeding 20
   const handleSliderChange = useCallback(
     (idx: number, newValue: number) => {
-      const clamped = Math.max(0, Math.min(100, Math.round(newValue)));
+      const clamped = Math.max(0, Math.min(20, Math.round(newValue)));
 
       setHolders((prev) => {
-        const newHolders = prev.map((h, i) =>
-          i === idx ? { ...h, percent: clamped } : { ...h }
-        );
+        const currentTotalWithoutTarget = prev.reduce((s, h, i) => i === idx ? s : s + h.percent, 0);
+        const nextTotal = currentTotalWithoutTarget + clamped;
 
-        const newTotal = newHolders.reduce((s, h) => s + h.percent, 0);
-
-        if (newTotal > 100) {
-          const excess = newTotal - 100;
-          const othersSum = newTotal - clamped;
-
-          if (othersSum > 0) {
-            const factor = (othersSum - excess) / othersSum;
-            for (let i = 0; i < newHolders.length; i++) {
-              if (i !== idx) {
-                newHolders[i] = {
-                  ...newHolders[i],
-                  percent: Math.max(0, Math.round(newHolders[i].percent * factor))
-                };
-              }
-            }
-
-            const finalTotal = newHolders.reduce((s, h) => s + h.percent, 0);
-            if (finalTotal !== 100) {
-              const diff = 100 - finalTotal;
-              for (let i = 0; i < newHolders.length; i++) {
-                if (i !== idx && newHolders[i].percent + diff >= 0 && newHolders[i].percent + diff <= 100) {
-                  newHolders[i] = { ...newHolders[i], percent: newHolders[i].percent + diff };
-                  break;
-                }
-              }
-            }
-          }
+        if (nextTotal > 20) {
+          setShowNoPointsError(true);
+          return prev;
         }
 
-        return newHolders;
+        return prev.map((h, i) =>
+          i === idx ? { ...h, percent: clamped } : h
+        );
       });
     },
     []
@@ -98,7 +73,7 @@ export default function PostGameQuestionnaireScreen({ push }: { push: (route: st
 
   // Handle next button - show reasoning modal
   const handleNext = async () => {
-    if (total !== 100) {
+    if (total !== 20) {
       setShowWarning(true);
       return;
     }
@@ -141,7 +116,7 @@ export default function PostGameQuestionnaireScreen({ push }: { push: (route: st
 
     markPostGameCompleted();
     setIsSubmitting(false);
-    push("/thank-you");
+    push("/personal-motivations?type=post-game");
   };
 
   // Tooltip handlers
@@ -223,19 +198,19 @@ export default function PostGameQuestionnaireScreen({ push }: { push: (route: st
                       </button>
                     </div>
                     <span className="text-white font-bold text-lg min-w-[3rem] text-center">
-                      {holder.percent}%
+                      {holder.percent}
                     </span>
                   </div>
 
                   <input
                     type="range"
                     min={0}
-                    max={100}
+                    max={20}
                     step={1}
                     value={holder.percent}
                     onChange={(e) => handleSliderChange(idx, Number(e.target.value))}
                     className="w-full h-2 accent-violet-500 cursor-pointer"
-                    style={{ direction: "ltr" }}
+                    style={{ direction: isRTL ? "rtl" : "ltr" }}
                   />
                 </motion.div>
               );
@@ -244,9 +219,9 @@ export default function PostGameQuestionnaireScreen({ push }: { push: (route: st
 
           {/* Total display */}
           <div className="text-center mb-4">
-            <span className={`text-sm ${total === 100 ? 'text-green-400' : 'text-gray-400'}`}>
-              {lang("POWER_Q_TOTAL_LABEL")}: <span className="text-white font-bold">{total}%</span>
-              {total !== 100 && <span className="text-yellow-400 ml-2">({100 - total} {lang("POWER_Q_REMAINING")})</span>}
+            <span className={`text-sm ${total === 20 ? 'text-green-400' : 'text-gray-400'}`}>
+              {lang("POWER_Q_TOTAL_LABEL")}: <span className="text-white font-bold">{total}</span>
+              {total !== 20 && <span className="text-yellow-400 ml-2">({20 - total} {lang("POWER_Q_REMAINING")})</span>}
             </span>
           </div>
 
@@ -271,7 +246,7 @@ export default function PostGameQuestionnaireScreen({ push }: { push: (route: st
       {/* Reasoning Modal */}
       <PowerReasoningModal
         isOpen={phase === "reasoning"}
-        onClose={() => {}} // Cannot close without submitting
+        onClose={() => { }} // Cannot close without submitting
         onSubmit={handleReasoningSubmit}
         promptText={reasoningPrompt}
         isSubmitting={isSubmitting}
@@ -315,7 +290,7 @@ export default function PostGameQuestionnaireScreen({ push }: { push: (route: st
         )}
       </AnimatePresence>
 
-      {/* Warning Modal - Total must equal 100 */}
+      {/* Warning Modal - Total must equal 20 */}
       <AnimatePresence>
         {showWarning && (
           <motion.div
@@ -336,12 +311,45 @@ export default function PostGameQuestionnaireScreen({ push }: { push: (route: st
             >
               <p className="text-white text-lg mb-4">
                 {language === "he"
-                  ? `הסכום חייב להיות 100 נקודות (כרגע: ${total})`
-                  : `Total must equal 100 points (currently: ${total})`}
+                  ? `הסכום חייב להיות 20 נקודות (כרגע: ${total})`
+                  : `Total must equal 20 points (currently: ${total})`}
               </p>
               <button
                 onClick={() => setShowWarning(false)}
                 className="bg-violet-600 hover:bg-violet-500 text-white font-bold py-2 px-6 rounded-lg transition-colors"
+              >
+                {lang("OK")}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* No Points Error Modal */}
+      <AnimatePresence>
+        {showNoPointsError && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+            onClick={() => setShowNoPointsError(false)}
+          >
+            <div className="absolute inset-0 bg-black/50" />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative z-10 bg-rose-900 rounded-2xl p-6 border border-rose-500/30 shadow-2xl max-w-sm w-full text-center"
+              dir={isRTL ? "rtl" : "ltr"}
+            >
+              <p className="text-white text-lg font-medium mb-4 leading-relaxed">
+                {lang("QUESTIONNAIRE_NO_POINTS_ERROR")}
+              </p>
+              <button
+                onClick={() => setShowNoPointsError(false)}
+                className="bg-white text-rose-900 hover:bg-white/90 font-bold py-3 px-8 rounded-xl transition-all active:scale-[0.98]"
               >
                 {lang("OK")}
               </button>

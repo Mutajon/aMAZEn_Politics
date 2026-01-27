@@ -11,11 +11,11 @@ type QuestionnaireState = {
   hasCompleted: boolean;
   completedAt: number | null;
 
-  // Q1: Current distribution (10 values, sum = 100)
+  // Q1: Current distribution (10 values, sum = 20)
   currentDistribution: number[];
   currentReasoning: string | null;
 
-  // Q2: Ideal distribution (10 values, sum = 100)
+  // Q2: Ideal distribution (10 values, sum = 20)
   idealDistribution: number[];
   idealReasoning: string | null;
 
@@ -41,7 +41,7 @@ type QuestionnaireState = {
   reset: () => void;
 };
 
-// Default: all zeros (player must manually distribute 100 points)
+// Default: all zeros (player must manually distribute 20 points)
 const DEFAULT_DISTRIBUTION = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
 export const useQuestionnaireStore = create<QuestionnaireState>()(

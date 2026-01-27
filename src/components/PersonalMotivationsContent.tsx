@@ -1,0 +1,220 @@
+// src/components/PersonalMotivationsContent.tsx
+import { useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { HelpCircle, X } from "lucide-react";
+import { useLang } from "../i18n/lang";
+import { useLanguage } from "../i18n/LanguageContext";
+import { COMPONENTS } from "../data/compass-data";
+
+type ProjectHolder = {
+    id: string;
+    nameKey: string;
+    descKey: string;
+    percent: number;
+};
+
+interface PersonalMotivationsContentProps {
+    distribution: number[];
+    onChange: (newValues: number[]) => void;
+    onSave: () => void;
+    isSubmitting?: boolean;
+    isPostGame?: boolean;
+}
+
+export default function PersonalMotivationsContent({
+    distribution,
+    onChange,
+    onSave,
+    isSubmitting = false,
+    isPostGame = false,
+}: PersonalMotivationsContentProps) {
+    const lang = useLang();
+    const { language } = useLanguage();
+    const isRTL = language === "he";
+
+    const [activeTooltip, setActiveTooltip] = useState<number | null>(null);
+    const [showNoPointsError, setShowNoPointsError] = useState(false);
+
+    // Map the 10 motivations from COMPONENTS.what
+    const motivations: ProjectHolder[] = COMPONENTS.what.map((c, i) => ({
+        id: c.short,
+        nameKey: `COMPASS_VALUE_${c.short.replace("/", "_").replace(".", "").toUpperCase()}`,
+        descKey: `COMPASS_VALUE_${c.short.replace("/", "_").replace(".", "").toUpperCase()}_FULL`,
+        percent: distribution[i] || 0,
+    }));
+
+    const total = motivations.reduce((s, m) => s + m.percent, 0);
+
+    const handleSliderChange = useCallback(
+        (idx: number, newValue: number) => {
+            const clamped = Math.max(0, Math.min(20, Math.round(newValue)));
+
+            const currentTotalWithoutTarget = distribution.reduce((s, v, i) => i === idx ? s : s + v, 0);
+            const nextTotal = currentTotalWithoutTarget + clamped;
+
+            if (nextTotal > 20) {
+                setShowNoPointsError(true);
+                return;
+            }
+
+            const newValues = [...distribution];
+            newValues[idx] = clamped;
+            onChange(newValues);
+        },
+        [distribution, onChange]
+    );
+
+    return (
+        <div className="relative z-10 flex flex-col min-h-full px-4 py-6 sm:px-8 w-full md:w-1/2 md:mx-auto">
+            {/* Header */}
+            <div className="text-center mb-6">
+                <h1 className="text-xl sm:text-2xl font-bold text-white mb-3 leading-relaxed">
+                    {lang(isPostGame ? "MOTIVATIONS_Q_HEADER_POST_GAME" : "MOTIVATIONS_Q_HEADER")}
+                </h1>
+                <p className="text-sm sm:text-base text-gray-300">
+                    {lang(isPostGame ? "MOTIVATIONS_Q_SUBHEADER_POST_GAME" : "MOTIVATIONS_Q_SUBHEADER")}
+                </p>
+            </div>
+
+            {/* List */}
+            <div className="flex-1 space-y-3 mb-6">
+                {motivations.map((m, idx) => (
+                    <motion.div
+                        key={m.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="bg-white/10 backdrop-blur-sm rounded-lg p-3 sm:p-4 hover:bg-white/20 transition-colors"
+                    >
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <span className="text-white font-medium text-sm sm:text-base">
+                                    {lang(m.nameKey)}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTooltip(idx)}
+                                    className="text-gray-400 hover:text-white transition-colors p-1"
+                                >
+                                    <HelpCircle className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <span className="text-white font-bold text-lg min-w-[3rem] text-center">
+                                {m.percent}
+                            </span>
+                        </div>
+
+                        <input
+                            type="range"
+                            min={0}
+                            max={20}
+                            step={1}
+                            value={m.percent}
+                            onChange={(e) => handleSliderChange(idx, Number(e.target.value))}
+                            className="w-full h-2 accent-amber-400 cursor-pointer"
+                            style={{ direction: isRTL ? "rtl" : "ltr" }}
+                        />
+                    </motion.div>
+                ))}
+            </div>
+
+            {/* Footer */}
+            <div className="mt-auto space-y-4">
+                {/* Total display */}
+                <div className="text-center">
+                    <span className={`text-sm ${total === 20 ? 'text-green-400' : 'text-amber-400'}`}>
+                        {lang("MOTIVATIONS_Q_TOTAL_LABEL")}: <span className="text-white font-bold">{total}</span>
+                        {total !== 20 && (
+                            <span className="ml-2 font-medium">
+                                ({20 - total} {lang("MOTIVATIONS_Q_REMAINING")})
+                            </span>
+                        )}
+                    </span>
+                </div>
+
+                {/* Submit Button */}
+                <motion.button
+                    onClick={onSave}
+                    disabled={isSubmitting || total !== 20}
+                    className={`
+            w-full py-4 rounded-xl font-bold text-lg
+            ${total === 20
+                            ? "bg-gradient-to-r from-amber-400 to-amber-600 text-slate-900 shadow-lg shadow-amber-900/20"
+                            : "bg-white/10 text-white/30 cursor-not-allowed"}
+            transition-all active:scale-[0.98]
+          `}
+                    whileHover={total === 20 ? { scale: 1.01 } : {}}
+                >
+                    {isSubmitting ? "..." : lang("MOTIVATIONS_Q_BUTTON_SUBMIT")}
+                </motion.button>
+            </div>
+
+            {/* Tooltip Portal-like */}
+            <AnimatePresence>
+                {activeTooltip !== null && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60"
+                        onClick={() => setActiveTooltip(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="relative bg-slate-900 rounded-2xl p-6 border border-white/10 shadow-2xl max-w-sm w-full"
+                            dir={isRTL ? "rtl" : "ltr"}
+                        >
+                            <button
+                                onClick={() => setActiveTooltip(null)}
+                                className={`absolute top-3 ${isRTL ? "left-3" : "right-3"} text-white/40 hover:text-white transition-colors`}
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                            <h3 className="text-amber-400 font-bold text-lg mb-3">
+                                {lang(motivations[activeTooltip].nameKey)}
+                            </h3>
+                            <p className="text-white/80 text-base leading-relaxed">
+                                {lang(motivations[activeTooltip].descKey)}
+                            </p>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* No Points Error Modal */}
+            <AnimatePresence>
+                {showNoPointsError && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60"
+                        onClick={() => setShowNoPointsError(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="relative bg-rose-900 rounded-2xl p-6 border border-rose-500/30 shadow-2xl max-w-sm w-full text-center"
+                            dir={isRTL ? "rtl" : "ltr"}
+                        >
+                            <p className="text-white text-lg font-medium mb-4 leading-relaxed">
+                                {lang("QUESTIONNAIRE_NO_POINTS_ERROR")}
+                            </p>
+                            <button
+                                onClick={() => setShowNoPointsError(false)}
+                                className="bg-white text-rose-900 hover:bg-white/90 font-bold py-3 px-8 rounded-xl transition-all active:scale-[0.98]"
+                            >
+                                {lang("OK")}
+                            </button>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}

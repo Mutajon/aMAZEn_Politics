@@ -29,18 +29,22 @@ import CompassVisScreen from "./screens/CompassVisScreen";
 import CompassIntroStart from "./screens/CompassIntroStart";
 import MirrorDialogueScreen from "./screens/MirrorDialogueScreen";
 import MirrorQuizScreen from "./screens/MirrorQuizScreen";
-import BackgroundIntroScreen from "./screens/BackgroundIntroScreen";
 import DifficultyScreen from "./screens/DifficultyScreen";
 import GoalsSelectionScreen from "./screens/GoalsSelectionScreen";
 import { useEnsureMirroredAvatarOnce } from "./hooks/useEnsureMirroredAvatarOnce";
 import EventScreen3 from "./screens/EventScreen3";
-import HighscoreScreen from "./screens/HighscoreScreen"; // Legacy (V1)
 import HighscoreScreenV2 from "./screens/HighscoreScreenV2"; // V2: Global/Local tabs with userId tracking
 import AchievementsScreen from "./screens/AchievementsScreen";
 import MirrorScreen from "./screens/MirrorScreen";
 import AftermathScreen from "./screens/AftermathScreen";
+import PersonalMotivationsScreen from "./screens/PersonalMotivationsScreen";
 import FinalScoreScreen from "./screens/FinalScoreScreen";
 import DownfallScreen from "./screens/DownfallScreen";
+import BackgroundIntroScreen from "./screens/BackgroundIntroScreen";
+import GameCappedScreen from "./screens/GameCappedScreen";
+import PowerQuestionnaireScreen from "./screens/PowerQuestionnaireScreen";
+import PostGameQuestionnaireScreen from "./screens/PostGameQuestionnaireScreen";
+import ThankYouScreen from "./screens/ThankYouScreen";
 import AudioControls from "./components/AudioControls";
 import { useAudioManager } from "./hooks/useAudioManager";
 import { useSettingsStore } from "./store/settingsStore";
@@ -53,12 +57,7 @@ import { useSessionLogger } from "./hooks/useSessionLogger";
 import { usePartialSummaryLogger } from "./hooks/usePartialSummaryLogger";
 import { PendingSummaryManager } from "./lib/pendingSummaryManager";
 import { sendSessionSummary } from "./hooks/useSessionSummary";
-import GameCappedScreen from "./screens/GameCappedScreen";
-import PowerQuestionnaireScreen from "./screens/PowerQuestionnaireScreen";
-import PostGameQuestionnaireScreen from "./screens/PostGameQuestionnaireScreen";
-import ThankYouScreen from "./screens/ThankYouScreen";
 import { AnimatePresence, motion } from "framer-motion";
-import { LandscapePrompt } from "./components/LandscapePrompt";
 
 if (import.meta.env.DEV) {
   import("./dev/storesDebug").then(m => m.attachStoresDebug());
@@ -123,7 +122,6 @@ export default function App() {
   const enableModifiers = useSettingsStore((s) => s.enableModifiers);
   const debugMode = useSettingsStore((s) => s.debugMode);
   const consented = useLoggingStore((s) => s.consented);
-  const gameId = useDilemmaStore((s) => s.gameId);
   // const [gameStatus, setGameStatus] = useState<GameStatus>('loading');
 
   console.debug("[App] 📍 Current route:", route);
@@ -272,11 +270,12 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
           {route.startsWith("/highscores") && <HighscoreScreenV2 />} {/* V2: Global/Local tabs */}
           {route === "/achievements" && <AchievementsScreen />}
           {route === "/aftermath" && <AftermathScreen push={push} />}
-          {route === "/final-score" && <FinalScoreScreen key={gameId} push={push} />}
+          {route.startsWith("/personal-motivations") && <PersonalMotivationsScreen push={push} />}
+          {route.startsWith("/final-score") && <FinalScoreScreen key={gameId} push={push} />}
           {route === "/capped" && <GameCappedScreen push={push} />}
-          {route === "/power-questionnaire" && <PowerQuestionnaireScreen push={push} />}
-          {route === "/post-game-questionnaire" && <PostGameQuestionnaireScreen push={push} />}
-          {route === "/thank-you" && <ThankYouScreen />}
+          {route.startsWith("/power-questionnaire") && <PowerQuestionnaireScreen push={push} />}
+          {route.startsWith("/post-game-questionnaire") && <PostGameQuestionnaireScreen push={push} />}
+          {route.startsWith("/thank-you") && <ThankYouScreen />}
 
           {/* Backstage route - Development mode (bypasses experiments) */}
           {route === "/backstage" && (

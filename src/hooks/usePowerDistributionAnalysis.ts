@@ -39,7 +39,7 @@ async function fetchAnalysis(role: string): Promise<AnalysisResult> {
       try {
         const j = await res.json();
         if (j?.error) throw new AIConnectionError(String(j.error));
-      } catch {}
+      } catch { }
       throw new AIConnectionError(`AI analysis failed (HTTP ${res.status})`);
     }
 
@@ -56,8 +56,8 @@ async function fetchAnalysis(role: string): Promise<AnalysisResult> {
 // Icon assignment logic
 function getIconKeyPool() {
   return [
-    "Crown","Shield","Coins","Landmark","BookOpen","Gavel","Scale","Swords",
-    "Users","Flame","Building2","Banknote","ScrollText",
+    "Crown", "Shield", "Coins", "Landmark", "BookOpen", "Gavel", "Scale", "Swords",
+    "Users", "Flame", "Building2", "Banknote", "ScrollText",
   ] as const;
 }
 
@@ -141,10 +141,10 @@ function coerceAndDecorate(
   if (base.length > 5) base = [...base].sort((a, b) => b.percent - a.percent).slice(0, 5);
 
   const sum = base.reduce((s, h) => s + (h.percent ?? 0), 0);
-  if (sum > 0 && sum !== 100) {
-    const factor = 100 / sum;
+  if (sum > 0 && sum !== 20) {
+    const factor = 20 / sum;
     base = base.map((h) => ({ ...h, percent: clampPct((h.percent ?? 0) * factor) }));
-    let diff = 100 - base.reduce((s, h) => s + h.percent, 0);
+    let diff = 20 - base.reduce((s, h) => s + h.percent, 0);
     for (let i = 0; diff !== 0 && i < base.length; i++) {
       base[i].percent += diff > 0 ? 1 : -1;
       diff += diff > 0 ? -1 : 1;

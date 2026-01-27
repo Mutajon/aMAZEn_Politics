@@ -633,7 +633,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       roleScope: "The Successor/Manager of a hereditary family enterprise. You have inherited the 'Trade of the Bound' (slavery). You are responsible for providing the labor force that builds the Great Temple and maintains the village's economic dominance.",
       storyThemes: ["ancestral_debt_vs_conscience", "sacred_vs_profane", "economic_stability_vs_reform", "human_cost_of_civilization"],
       authorityLevel: "medium",
-      dilemmaEmphasis: "NARRATIVE LENS (Tenochtitlan 1519): You manage the 'Trade of the Bound' (slaves) for the Empire. Core tension: Sacred Duty vs. Human Cost. Dilemmas should focus on the brutal economics of human tribute, the threat of revolt from within, and the ominous pressure from the Alliance to deliver more bodies. Survival depends on satisfying the gods and the market, often at the cost of your conscience.",
+      dilemmaEmphasis: "NARRATIVE LENS (Tenochtitlan 1519): You manage the 'Trade of the Bound' (slaves) for the Empire. [Language Instruction]: When writing in Hebrew, strictly use the term 'עבדים' for slaves. Core tension: Sacred Duty vs. Human Cost. Dilemmas should focus on the brutal economics of human tribute, the threat of revolt from within, and the ominous pressure from the Alliance to deliver more bodies. Survival depends on satisfying the gods and the market, often at the cost of your conscience.",
 
     },
     characters: {
