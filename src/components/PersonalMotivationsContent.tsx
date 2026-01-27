@@ -63,7 +63,7 @@ export default function PersonalMotivationsContent({
     );
 
     return (
-        <div className="relative z-10 flex flex-col min-h-full px-4 py-6 sm:px-8 w-full md:w-1/2 md:max-auto mx-auto bg-black/40 backdrop-blur-md rounded-3xl border border-white/5 my-4 overflow-hidden">
+        <div className="relative z-10 flex flex-col min-h-full px-4 py-6 sm:px-8 w-full md:w-1/2 md:mx-auto">
             {/* Header */}
             <div className="text-center mb-6">
                 <h1 className="text-xl sm:text-2xl font-bold text-white mb-3 leading-relaxed">
@@ -82,7 +82,7 @@ export default function PersonalMotivationsContent({
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: idx * 0.05 }}
-                        className="bg-white/5 rounded-xl p-3 sm:p-4 border border-white/5 hover:border-white/10 transition-colors"
+                        className="bg-white/10 backdrop-blur-sm rounded-lg p-3 sm:p-4 hover:bg-white/20 transition-colors"
                     >
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">

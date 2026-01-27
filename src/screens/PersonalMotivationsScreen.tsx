@@ -37,9 +37,12 @@ export default function PersonalMotivationsScreen({ push }: { push: PushFn }) {
 
     return (
         <div
-            className="min-h-dvh w-full flex items-center justify-center p-4 overflow-y-auto"
+            className="fixed inset-0 flex flex-col overflow-y-auto"
             style={bgStyleSplash}
         >
+            {/* Semi-transparent overlay */}
+            <div className="fixed inset-0 bg-black/60 pointer-events-none" />
+
             <PersonalMotivationsContent
                 distribution={localDistribution}
                 onChange={setLocalDistribution}
