@@ -143,9 +143,9 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                             key={avatar}
                                             type="button"
                                             onClick={() => handleAvatarSelect(avatar)}
-                                            className={`flex-shrink-0 w-16 h-16 rounded-full overflow-hidden border-2 transition-all duration-200 ${selectedAvatar === avatar
-                                                    ? 'border-amber-400 ring-2 ring-amber-400/50 scale-110 shadow-lg shadow-amber-400/20'
-                                                    : 'border-white/10 hover:border-white/30 hover:scale-105'
+                                            className={`flex-shrink-0 w-20 h-20 rounded-full overflow-hidden border-2 transition-all duration-200 ${selectedAvatar === avatar
+                                                ? 'border-amber-400 ring-2 ring-amber-400/50 scale-110 shadow-lg shadow-amber-400/20'
+                                                : 'border-white/10 hover:border-white/30 hover:scale-105'
                                                 }`}
                                         >
                                             <img
