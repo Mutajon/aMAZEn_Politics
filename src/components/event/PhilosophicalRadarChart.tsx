@@ -155,17 +155,15 @@ const PhilosophicalRadarChart: React.FC<PhilosophicalRadarChartProps> = ({
                 return (
                     <motion.button
                         key={pole}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
                         onClick={() => setSelectedPole(pole)}
-                        className="absolute z-10 px-3 py-1.5 rounded-full border border-white/10 backdrop-blur-md shadow-lg flex items-center gap-2 group transition-all"
+                        className="absolute z-10 px-3 py-1.5 rounded-full border border-white/10 backdrop-blur-md shadow-lg flex items-center gap-2 group"
                         style={{
                             left: `calc(50% + ${p.x - center}px)`,
                             top: `calc(50% + ${p.y - center}px)`,
-                            transform: 'translate(-50%, -50%)',
                             backgroundColor: `${colors[pole]}15`,
                             borderColor: `${colors[pole]}30`,
                         }}
+                        initial={{ x: "-50%", y: "-50%" }}
                     >
                         <span
                             className="text-[11px] font-black tracking-widest uppercase transition-colors"
