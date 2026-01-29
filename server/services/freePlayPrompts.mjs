@@ -36,8 +36,20 @@ INSTRUCTIONS:
 - Directly address the player as "you".
 - Place them physically in the scene (sights, sounds).
 - Establish the weight of their specific position.
+- **Support Entities**: Identify 2 key political entities for this specific role:
+  1. "Population": The general public/subjects relevant to the role (e.g., "The Peasantry", "Voters", "The Colony").
+  2. "Opposition": The primary institutional or social antagonist/monitor (e.g., "The Church", "The Board", "Military High Command").
+  - Choose a relevant emoji icon for each.
+
 - Tone: Spoken, natural, engaging. NO flowery academic language.
-- Output JSON: { "intro": "..." }
+- Output JSON: 
+{ 
+  "intro": "...", 
+  "supportEntities": [
+    { "name": "Population Name", "icon": "👥", "type": "population" }, 
+    { "name": "Opposition Name", "icon": "🏛️", "type": "opposition" }
+  ]
+}
 `;
 }
 
@@ -77,6 +89,7 @@ RULES & TONE:
 2. **SPOKEN, DRAMATIC LANGUAGE**:
    - Short, punchy sentences. "The mob is angry." not "The populace is exhibiting signs of unrest."
    - Active voice. Direct address ("You see...").
+   - NO numbering in action titles (e.g. "Action", NOT "Action 1" or "Action (1)").
    - NO distinct "Axis" analysis needed (Democracy/Autonomy etc). Just raw political/ethical conflict.
 
 3. **DYNAMIC WORLD**:
@@ -95,7 +108,8 @@ OUTPUT SCHEMA (JSON ONLY):
     "description": "Situation description + Bridge from previous action (if any). End with a direct question.",
     "actions": [
       { "title": "Option A", "summary": "Concrete action details", "icon": "emoji" },
-      { "title": "Option B", "summary": "Concrete action details", "icon": "emoji" }
+      { "title": "Option B", "summary": "Concrete action details", "icon": "emoji" },
+      { "title": "Option C", "summary": "Concrete action details", "icon": "emoji" }
     ],
     "topic": "Current Topic (e.g. War, Economy, Faith)",
     "scope": "Personal/Local/National"

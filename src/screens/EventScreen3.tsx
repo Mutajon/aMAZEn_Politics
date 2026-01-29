@@ -82,14 +82,14 @@ export default function EventScreen3({ push }: Props) {
 
     if (supportPeople < CRISIS_THRESHOLD) {
       crisisArray.push({
-        entity: "The People",
+        entity: analysis?.holders?.[2]?.name || "The People",
         currentSupport: supportPeople,
         type: "people"
       });
     }
 
     if (supportMiddle < CRISIS_THRESHOLD) {
-      const challengerName = analysis?.challengerSeat?.name || "Power Holders";
+      const challengerName = analysis?.holders?.[1]?.name || analysis?.challengerSeat?.name || "Power Holders";
       crisisArray.push({
         entity: challengerName,
         currentSupport: supportMiddle,
@@ -231,9 +231,9 @@ export default function EventScreen3({ push }: Props) {
     });
 
     // Helper function to translate challenger seat name
-    const middleLabel = analysis?.challengerSeat?.name
+    const middleLabel = analysis?.holders?.[1]?.name || (analysis?.challengerSeat?.name
       ? getLocalizedHolderName(analysis.challengerSeat.name, lang)
-      : lang("FINAL_SCORE_POWER_HOLDERS_SUPPORT");
+      : lang("FINAL_SCORE_POWER_HOLDERS_SUPPORT"));
 
     return {
       total: breakdown.final,
@@ -241,7 +241,7 @@ export default function EventScreen3({ push }: Props) {
       components: [
         {
           id: "people" as const,
-          label: lang("FINAL_SCORE_PUBLIC_SUPPORT"),
+          label: analysis?.holders?.[2]?.name || lang("FINAL_SCORE_PUBLIC_SUPPORT"),
           valueLabel: `${breakdown.support.people.percent}%`,
           points: breakdown.support.people.points,
           maxPoints: breakdown.support.people.maxPoints,
@@ -1031,7 +1031,7 @@ export default function EventScreen3({ push }: Props) {
               budget={budget}
               daysLeft={daysLeft}
               showBudget={showBudget}
-              scoreGoal={roleProgress?.goal ?? null}
+              scoreGoal={roleProgress?.goal ?? analysis?.targetScore ?? null}
               goalStatus={roleProgress?.status ?? "uncompleted"}
               score={score}
               scoreDetails={scoreDetails}

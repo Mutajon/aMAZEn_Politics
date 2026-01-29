@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Dices } from "lucide-react";
 import { audioManager } from "../lib/audioManager";
 import { useLang } from "../i18n/lang";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -14,8 +15,10 @@ interface LobbyPlayPopupProps {
         role: string;
         emphasis: string;
         gender: string;
+        difficulty: string; // NEW: Difficulty level
         avatar: string | null;
         introText?: string;
+        supportEntities?: Array<{ name: string; icon: string; type: string }>;
     }) => void;
     isLoading?: boolean;
 }
@@ -57,11 +60,12 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     const [role, setRole] = useState("");
     const [emphasis, setEmphasis] = useState("");
     const [gender, setGender] = useState("male");
+    const [difficulty, setDifficulty] = useState("easy");
     const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
 
     // New state for Intro flow
     const [step, setStep] = useState<'form' | 'intro'>('form');
-    const [introData, setIntroData] = useState<{ intro: string, mirrorMsg: string } | null>(null);
+    const [introData, setIntroData] = useState<{ intro: string, mirrorMsg: string, supportEntities?: any[] } | null>(null);
     const [isGeneratingIntro, setIsGeneratingIntro] = useState(false);
 
     const [showNamePresets, setShowNamePresets] = useState(false);
@@ -107,7 +111,8 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                         setting,
                         playerName: characterName,
                         emphasis,
-                        gender
+                        gender,
+                        difficulty
                     })
                 });
                 const data = await res.json();
@@ -116,11 +121,11 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                     setStep('intro');
                 } else {
                     // Fallback if failed - just start game
-                    onSubmit({ characterName, setting, role, emphasis, gender, avatar: selectedAvatar });
+                    onSubmit({ characterName, setting, role, emphasis, gender, difficulty, avatar: selectedAvatar });
                 }
             } catch (err) {
                 console.error("Failed to generate intro:", err);
-                onSubmit({ characterName, setting, role, emphasis, gender, avatar: selectedAvatar });
+                onSubmit({ characterName, setting, role, emphasis, gender, difficulty, avatar: selectedAvatar });
             } finally {
                 setIsGeneratingIntro(false);
             }
@@ -133,8 +138,10 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                 role,
                 emphasis,
                 gender,
+                difficulty,
                 avatar: selectedAvatar,
-                introText: introData?.intro
+                introText: introData?.intro,
+                supportEntities: introData?.supportEntities
             });
         }
     };
@@ -145,6 +152,34 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     };
 
     const isFormValid = characterName.trim() && setting.trim() && role.trim();
+
+    const handleRandomize = () => {
+        audioManager.playSfx("click-soft");
+
+        // Random Avatar
+        const randomAvatar = AVATAR_LIST[Math.floor(Math.random() * AVATAR_LIST.length)];
+        setSelectedAvatar(randomAvatar);
+
+        // Random Gender
+        const genders = ['male', 'female', 'other'];
+        setGender(genders[Math.floor(Math.random() * genders.length)]);
+
+        // Random Difficulty
+        const difficulties = ['easy', 'normal', 'hard'];
+        setDifficulty(difficulties[Math.floor(Math.random() * difficulties.length)]);
+
+        // Random Setting
+        const randomSetting = SETTING_PRESETS[Math.floor(Math.random() * SETTING_PRESETS.length)];
+        setSetting(lang(randomSetting.key));
+
+        // Random Role
+        const randomRole = ROLE_PRESETS[Math.floor(Math.random() * ROLE_PRESETS.length)];
+        setRole(lang(randomRole));
+
+        // Random Name
+        const randomNameKey = NAME_PRESETS[Math.floor(Math.random() * NAME_PRESETS.length)];
+        setCharacterName(lang(randomNameKey));
+    };
 
     return (
         <AnimatePresence>
@@ -280,6 +315,55 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                         </div>
                                     </div>
 
+                                    {/* Gender Selection (Moved below Name) */}
+                                    <div className="space-y-2 relative">
+                                        <label className="text-xs font-semibold text-amber-300/80 uppercase tracking-wider ml-1">
+                                            {lang("LOBBY_GENDER_LABEL") || "Character Gender"}
+                                        </label>
+                                        <div className="relative">
+                                            <select
+                                                value={gender}
+                                                onChange={(e) => setGender(e.target.value)}
+                                                className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white appearance-none focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:bg-white/10 transition-all font-medium"
+                                            >
+                                                <option value="male" className="bg-neutral-900">{lang("LOBBY_GENDER_MALE") || "Male"}</option>
+                                                <option value="female" className="bg-neutral-900">{lang("LOBBY_GENDER_FEMALE") || "Female"}</option>
+                                                <option value="other" className="bg-neutral-900">{lang("LOBBY_GENDER_OTHER") || "Other"}</option>
+                                            </select>
+                                            <div className={`absolute ${isRTL ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 pointer-events-none text-white/40`}>
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Difficulty Selection (NEW) */}
+                                    <div className="space-y-2 relative">
+                                        <label className="text-xs font-semibold text-amber-300/80 uppercase tracking-wider ml-1">
+                                            {lang("LOBBY_DIFFICULTY_LABEL") || "Difficulty"}
+                                        </label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {[
+                                                { id: 'easy', label: 'LOBBY_DIFFICULTY_EASY', default: 'Easy', color: 'text-emerald-300', bg: 'bg-emerald-500/10 border-emerald-500/30' },
+                                                { id: 'normal', label: 'LOBBY_DIFFICULTY_NORMAL', default: 'Normal', color: 'text-amber-300', bg: 'bg-amber-500/10 border-amber-500/30' },
+                                                { id: 'hard', label: 'LOBBY_DIFFICULTY_HARD', default: 'Hard', color: 'text-rose-300', bg: 'bg-rose-500/10 border-rose-500/30' }
+                                            ].map((level) => (
+                                                <button
+                                                    key={level.id}
+                                                    type="button"
+                                                    onClick={() => setDifficulty(level.id)}
+                                                    className={`h-12 rounded-2xl border font-medium transition-all ${difficulty === level.id
+                                                        ? `${level.bg} ${level.color} ring-1 ring-offset-0 ring-${level.bg.split(' ')[0].replace('bg-', '')}`
+                                                        : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white'
+                                                        }`}
+                                                >
+                                                    {lang(level.label) || level.default}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
                                     {/* Setting with Dropdown */}
                                     <div className="space-y-2 relative" ref={settingDropdownRef}>
                                         <label className="text-xs font-semibold text-amber-300/80 uppercase tracking-wider ml-1">
@@ -401,28 +485,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                         />
                                     </div>
 
-                                    {/* Gender Selection */}
-                                    <div className="space-y-2 relative">
-                                        <label className="text-xs font-semibold text-amber-300/80 uppercase tracking-wider ml-1">
-                                            {lang("LOBBY_GENDER_LABEL") || "Character Gender"}
-                                        </label>
-                                        <div className="relative">
-                                            <select
-                                                value={gender}
-                                                onChange={(e) => setGender(e.target.value)}
-                                                className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white appearance-none focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:bg-white/10 transition-all font-medium"
-                                            >
-                                                <option value="male" className="bg-neutral-900">{lang("LOBBY_GENDER_MALE") || "Male"}</option>
-                                                <option value="female" className="bg-neutral-900">{lang("LOBBY_GENDER_FEMALE") || "Female"}</option>
-                                                <option value="other" className="bg-neutral-900">{lang("LOBBY_GENDER_OTHER") || "Other"}</option>
-                                            </select>
-                                            <div className={`absolute ${isRTL ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 pointer-events-none text-white/40`}>
-                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                </svg>
-                                            </div>
-                                        </div>
-                                    </div>
+
                                 </>
                             ) : (
                                 <div className="space-y-6">
@@ -479,6 +542,18 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                             )}
                         </form>
 
+                        {/* Randomize Button */}
+                        {step === 'form' && (
+                            <button
+                                onClick={handleRandomize}
+                                type="button"
+                                className="absolute top-6 left-6 p-2 rounded-full hover:bg-white/5 text-white/40 hover:text-white transition-all group"
+                                title={lang("LOBBY_RANDOMIZE") || "Randomize"}
+                            >
+                                <Dices className="w-6 h-6 transition-transform group-hover:rotate-180 duration-500" />
+                            </button>
+                        )}
+
                         {/* Close Button */}
                         <button
                             onClick={onClose}
@@ -490,7 +565,8 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                         </button>
                     </motion.div>
                 </motion.div>
-            )}
-        </AnimatePresence>
+            )
+            }
+        </AnimatePresence >
     );
 }

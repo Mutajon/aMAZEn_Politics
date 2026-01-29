@@ -44,6 +44,7 @@ export type AnalysisResult = {
     settingType: "real" | "fictional" | "unclear";
     era: string;
   };
+  targetScore?: number; // NEW: Custom difficulty target score (for Free Play)
 };
 
 export type Character = {

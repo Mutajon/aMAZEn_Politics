@@ -140,8 +140,10 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
     role: string;
     emphasis: string;
     gender: string;
+    difficulty: string;
     avatar: string | null;
     introText?: string;
+    supportEntities?: Array<{ name: string; icon: string; type: string }>;
   }) => {
     setIsLoading(true);
     setShowPlayPopup(false);
@@ -200,6 +202,15 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       // Character description for the card
       roleStore.setRoleDescription(data.role);
 
+      // Determine Target Score (Difficulty)
+      let targetScore = 1150; // Normal
+      if (data.difficulty === 'easy') targetScore = 950;
+      if (data.difficulty === 'hard') targetScore = 1300;
+
+      // Determine Support Entities (Dynamic)
+      const population = data.supportEntities?.find(e => e.type === 'population') || { name: "The People", icon: "👥" };
+      const opposition = data.supportEntities?.find(e => e.type === 'opposition') || { name: "The Establishment", icon: "🏛️" };
+
       // Prepare analysis for a custom scenario
       roleStore.setAnalysis({
         systemName: data.setting,
@@ -207,9 +218,10 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
         flavor: `The weights of power in ${data.setting} are shifting.`,
         holders: [
           { name: "Your Faction", percent: 40, icon: "👤" },
-          { name: "The Establishment", percent: 30, icon: "🏛️" },
-          { name: "The People", percent: 30, icon: "👥" },
+          { name: opposition.name, percent: 30, icon: opposition.icon }, // "Middle" / Antagonist
+          { name: population.name, percent: 30, icon: population.icon }, // "People" / Population
         ],
+        targetScore, // Pass difficulty target to store
         playerIndex: 0,
         grounding: {
           settingType: "real",

@@ -690,6 +690,7 @@ export async function freePlayIntro(req, res) {
 
         return res.json({
             intro: parsed?.intro || "Welcome to your story.",
+            supportEntities: parsed?.supportEntities || null,
             mirrorMsg: "LOBBY_MIRROR_FREEPLAY_MSG"
         });
     } catch (e) {
