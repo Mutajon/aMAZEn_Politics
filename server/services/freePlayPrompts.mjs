@@ -119,8 +119,9 @@ RULES & TONE:
    - NO numbering in action titles (e.g. "Action", NOT "Action 1" or "Action (1)").
    - **DILEMMA DESCRIPTION**: Max 3 sentences.
    - **ACTION SUMMARIES**: Exactly 1 short sentence.
-4. **SUPPORT SHIFTS**: After the player makes a choice, you MUST provide a \`supportShift\` analysis for each entity based on their attitude and the context.
-   - attitudeLevel: slightly_supportive, moderately_supportive, strongly_supportive, slightly_opposed, moderately_opposed, strongly_opposed, dead.
+4. **PHILOSOPHICAL JUDGMENT**: After the player makes a choice, you must judge which philosophical poles were supported by their action.
+   - Poles: democracy, oligarchy, autonomy, heteronomy, liberalism, totalism.
+   - Return only the poles that received a "boost" based on the player's specific reasoning and action.
 5. **GENDER GRAMMAR**: Use ${genderGrammar} grammar for the player.
 
 OUTPUT SCHEMA (JSON ONLY):
@@ -142,7 +143,8 @@ OUTPUT SCHEMA (JSON ONLY):
     "scopeUsed": "Chosen Scope",
     "axisUsed": "Chosen Axis"
   },
-  "mirrorAdvice": "One witty sentence from the friendly magic mirror.",
+  "mirrorAdvice": "One witty sentence from the friendly magic mirror judging the player's philosophical stance.",
+  "axisPills": ["democracy", "autonomy"], 
   "dynamicParams": [ 
     { "icon": "🔥", "text": "Short consequence (max 3)" } 
   ]

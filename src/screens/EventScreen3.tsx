@@ -27,9 +27,11 @@ import { DynamicParameters, buildDynamicParamsItems } from "../components/event/
 import DilemmaCard from "../components/event/DilemmaCard";
 import MirrorCard from "../components/event/MirrorCard";
 import CompassPillsOverlay from "../components/event/CompassPillsOverlay";
+import PhilosophicalPillsOverlay from "../components/event/PhilosophicalPillsOverlay";
 import ActionDeck, { type ActionCard } from "../components/event/ActionDeck";
 import CrisisWarningBanner, { type CrisisInfo } from "../components/event/CrisisWarningBanner";
 import { actionsToDeckCards } from "../components/event/actionVisuals";
+import { PALETTE, type PropKey } from "../data/compass-data";
 import { useCoinFlights, CoinFlightOverlay } from "../components/event/CoinFlightSystem";
 import { AnimatePresence } from "framer-motion";
 import { bgStyleWithRoleImage } from "../lib/ui";
@@ -1122,16 +1124,25 @@ export default function EventScreen3({ push }: Props) {
               // onExploreClick temporarily removed - navigation bugs prevent safe return to EventScreen
               />
               {/* Compass Pills Overlay - appears at Step 4A (Day 2+) */}
-              {showCompassPills && (
-                <CompassPillsOverlay
-                  effectPills={compassPings}
-                  loading={false}
-                  color="#7de8ff"
-                  tutorialMode={tutorial.tutorialActive && tutorial.tutorialStep === 'awaiting-compass-pills'}
-                  tutorialPillsButtonRef={(el) => setTutorialPillsRef(el)}
-                  onTutorialPillsClick={tutorial.onCompassPillsClicked}
-                  forceCollapse={tutorial.tutorialStep === 'awaiting-compass-pills'}
-                />
+              {isFreePlay ? (
+                collectedData?.axisPills && (
+                  <PhilosophicalPillsOverlay
+                    pills={collectedData.axisPills}
+                    loading={isCollecting}
+                  />
+                )
+              ) : (
+                showCompassPills && (
+                  <CompassPillsOverlay
+                    effectPills={compassPings}
+                    loading={isCollecting}
+                    color={PALETTE[collectedData?.valueTargeted as PropKey]?.base}
+                    tutorialMode={tutorial.tutorialActive && tutorial.tutorialStep === 'awaiting-compass-pills'}
+                    tutorialPillsButtonRef={(el) => setTutorialPillsRef(el)}
+                    onTutorialPillsClick={tutorial.onCompassPillsClicked}
+                    forceCollapse={tutorial.tutorialStep === 'awaiting-compass-pills'}
+                  />
+                )
               )}
             </div>
           )}

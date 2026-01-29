@@ -11,6 +11,12 @@ import { useRoleStore } from "./roleStore";
 import { useCompassStore } from "./compassStore"; // <-- A) use compass values (0..10)
 import { COMPONENTS } from "../data/compass-data"; // <-- B) component definitions for value names
 import { getTreatmentConfig, type TreatmentType } from "../data/experimentConfig"; // <-- Inquiry system config
+// import { aiLogger } from "../lib/aiLogger"; // Removed as it's not used in the store logic
+
+export type PhilosophicalPole =
+  | "democracy" | "oligarchy"
+  | "autonomy" | "heteronomy"
+  | "liberalism" | "totalism";
 
 // gated debug logger
 function dlog(...args: any[]) {
@@ -155,6 +161,9 @@ type DilemmaState = {
   // Pending compass pills (applied in cleaner phase, displayed in EventScreen)
   pendingCompassPills: CompassPill[] | null;
 
+  // Philosophical axes (Free Play mode) - 0-7 scale
+  philosophicalAxes: Record<PhilosophicalPole, number>;
+
   nextDay: () => void;
   setTotalDays: (n: number) => void;
   applyChoice: (id: "a" | "b" | "c") => void;
@@ -242,6 +251,10 @@ type DilemmaState = {
   detectAndSetCrisis: () => "downfall" | "people" | "challenger" | "caring" | null;  // Detect crisis after support updates, returns crisis mode
   clearCrisis: () => void;          // Clear crisis state after handling
   savePreviousSupport: () => void;  // Store support values before updates
+
+  // Philosophical axes methods
+  applyAxisPills: (pills: PhilosophicalPole[]) => void;
+  resetPhilosophicalAxes: () => void;
 };
 
 // Type for goal status changes (used for audio/visual feedback)
@@ -360,6 +373,12 @@ export const useDilemmaStore = create<DilemmaState>()(
       previousSupportValues: null,
       pendingCompassPills: null,
 
+      // Philosophical axes (Free Play)
+      philosophicalAxes: {
+        democracy: 1, oligarchy: 1,
+        autonomy: 1, heteronomy: 1,
+        liberalism: 1, totalism: 1
+      },
 
 
       nextDay() {
@@ -403,6 +422,10 @@ export const useDilemmaStore = create<DilemmaState>()(
 
       reset() {
         dlog("reset dilemmas");
+        if (get().conversationActive) {
+          get().endConversation();
+        }
+
         set({
           day: 1,
           gameId: null,
@@ -1019,6 +1042,33 @@ export const useDilemmaStore = create<DilemmaState>()(
           crisisMode: null,
           crisisEntity: null,
           previousSupportValues: null
+        });
+      },
+
+      applyAxisPills(pills: PhilosophicalPole[]) {
+        if (!pills || !Array.isArray(pills)) return;
+
+        dlog("applyAxisPills ->", pills);
+
+        set(state => {
+          const next = { ...state.philosophicalAxes };
+          pills.forEach(pill => {
+            if (next[pill] !== undefined) {
+              next[pill] = Math.min(7, next[pill] + 1);
+            }
+          });
+          return { philosophicalAxes: next };
+        });
+      },
+
+      resetPhilosophicalAxes() {
+        dlog("resetPhilosophicalAxes");
+        set({
+          philosophicalAxes: {
+            democracy: 1, oligarchy: 1,
+            autonomy: 1, heteronomy: 1,
+            liberalism: 1, totalism: 1
+          }
         });
       },
     }),

@@ -756,6 +756,11 @@ export async function freePlayTurn(req, res) {
                 role, setting, playerName, emphasis, gender, language,
                 supportEntities: supportEntities || [],
                 support: { people: 50, holders: 50, mom: 50 },
+                philosophicalAxes: {
+                    democracy: 1, oligarchy: 1,
+                    autonomy: 1, heteronomy: 1,
+                    liberalism: 1, totalism: 1
+                },
                 systemPrompt,
                 messages: [
                     { role: "user", content: userPrompt },
@@ -779,6 +784,8 @@ export async function freePlayTurn(req, res) {
                 dynamicParams: parsed.dynamicParams || [],
                 supportShift: null,
                 currentSupport: { people: 50, holders: 50, mom: 50 },
+                axisPills: parsed.axisPills || [],
+                philosophicalAxes: meta.philosophicalAxes,
                 axisUsed: parsed.dilemma?.axisUsed || parsed.dilemma?.axis || "Unknown",
                 scopeUsed: parsed.dilemma?.scopeUsed || parsed.dilemma?.scope || "Unknown"
             });
@@ -846,11 +853,26 @@ export async function freePlayTurn(req, res) {
                 updatedSupport.mom = Math.max(0, Math.min(100, (updatedSupport.mom || 50) + (supportShift.mom?.delta || 0)));
             }
 
+            // Update philosophical axes based on axisPills
+            const axisPills = parsed.axisPills || [];
+            const updatedAxes = {
+                ...(conversation.meta.philosophicalAxes || {
+                    democracy: 1, oligarchy: 1, autonomy: 1, heteronomy: 1, liberalism: 1, totalism: 1
+                })
+            };
+
+            axisPills.forEach(pill => {
+                if (updatedAxes[pill] !== undefined) {
+                    updatedAxes[pill] = Math.min(7, updatedAxes[pill] + 1);
+                }
+            });
+
             const updatedMeta = {
                 ...conversation.meta,
-                systemPrompt, // Store the newly built prompt if needed, or keep previous
+                systemPrompt,
                 messages: [...conversation.meta.messages, ...newMessages],
                 support: updatedSupport,
+                philosophicalAxes: updatedAxes,
                 topicHistory: [
                     ...history,
                     {
@@ -872,6 +894,8 @@ export async function freePlayTurn(req, res) {
                 dynamicParams: parsed.dynamicParams,
                 supportShift, // Numeric deltas and "why"
                 currentSupport: updatedSupport, // Absolute values 0-100
+                axisPills,
+                philosophicalAxes: updatedAxes,
                 isGameEnd: day >= 8,
                 axisUsed: parsed.dilemma?.axisUsed || parsed.dilemma?.axis || "Unknown",
                 scopeUsed: parsed.dilemma?.scopeUsed || parsed.dilemma?.scope || "Unknown"

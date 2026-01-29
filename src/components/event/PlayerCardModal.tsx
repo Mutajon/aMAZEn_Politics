@@ -23,6 +23,9 @@ import { useCompassStore } from "../../store/compassStore";
 import { ValueExplanationModal } from "./ValueExplanationModal";
 import { useLang } from "../../i18n/lang";
 import { translateCompassValue, translatePoliticalSystem } from "../../i18n/translateGameData";
+import { useSettingsStore } from "../../store/settingsStore";
+import { useDilemmaStore } from "../../store/dilemmaStore";
+import PhilosophicalRadarChart from "./PhilosophicalRadarChart";
 
 type Props = {
   isOpen: boolean;
@@ -146,6 +149,8 @@ export default function PlayerCardModal({
   const roleYear = useRoleStore((s) => s.roleYear);
   const roleDescription = useRoleStore((s) => s.roleDescription);
   const compassValues = useCompassStore((s) => s.values); // Live compass values
+  const philosophicalAxes = useDilemmaStore((s) => s.philosophicalAxes); // Philosophical axes (Free Play)
+  const isFreePlay = useSettingsStore((s) => s.isFreePlay);
 
   // Tutorial: select a random value to highlight
   const [tutorialTarget, setTutorialTarget] = useState<{ propKey: PropKey; index: number } | null>(null);
@@ -276,7 +281,8 @@ export default function PlayerCardModal({
                     {roleDescription}
                   </p>
                 )}
-                {roleTitle && roleYear && (
+                {/* Simplified header for Free Play: remove repeating system name and N/A metadata */}
+                {!isFreePlay && roleTitle && roleYear && (
                   <p className="text-sm text-white/50 mt-1 truncate">
                     {roleTitle.split(' — ')[0]}, {roleYear}
                   </p>
@@ -287,51 +293,60 @@ export default function PlayerCardModal({
 
           {/* Content */}
           <div className="px-6 pb-6 pt-4 space-y-6">
-            {/* Compass Values Grid */}
+            {/* Compass Values Grid or Philosophical Radar Chart */}
             <div>
-              <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3">
-                {lang("YOUR_CURRENT_MAIN_VALUES")}
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {PROPERTIES.map((prop) => {
-                  const dimensionName = {
-                    what: lang("COMPASS_WHAT"),
-                    whence: lang("COMPASS_WHENCE"),
-                    how: lang("COMPASS_HOW"),
-                    whither: lang("COMPASS_WHITHER")
-                  }[prop.key];
+              {!isFreePlay && (
+                <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3">
+                  {lang("YOUR_CURRENT_MAIN_VALUES")}
+                </h3>
+              )}
 
-                  const dimensionSubtitle = {
-                    what: lang("COMPASS_WHAT_SUBTITLE"),
-                    whence: lang("COMPASS_WHENCE_SUBTITLE"),
-                    how: lang("COMPASS_HOW_SUBTITLE"),
-                    whither: lang("COMPASS_WHITHER_SUBTITLE")
-                  }[prop.key];
+              {isFreePlay ? (
+                <div className="flex justify-center py-4">
+                  <PhilosophicalRadarChart values={philosophicalAxes} />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {PROPERTIES.map((prop) => {
+                    const dimensionName = {
+                      what: lang("COMPASS_WHAT"),
+                      whence: lang("COMPASS_WHENCE"),
+                      how: lang("COMPASS_HOW"),
+                      whither: lang("COMPASS_WHITHER")
+                    }[prop.key];
 
-                  return (
-                    <CompassBox
-                      key={prop.key}
-                      propKey={prop.key}
-                      title={dimensionName}
-                      subtitle={dimensionSubtitle}
-                      color={PALETTE[prop.key].base}
-                      topValues={topValues[prop.key]}
-                      tutorialMode={tutorialMode}
-                      highlightedIndex={
-                        tutorialMode && tutorialTarget?.propKey === prop.key
-                          ? tutorialTarget.index
-                          : -1
-                      }
-                      onValueClick={(value, idx) => handleValueClick(value, prop.key, idx)}
-                      valueRef={
-                        tutorialMode && tutorialTarget?.propKey === prop.key
-                          ? tutorialValueRef
-                          : undefined
-                      }
-                    />
-                  );
-                })}
-              </div>
+                    const dimensionSubtitle = {
+                      what: lang("COMPASS_WHAT_SUBTITLE"),
+                      whence: lang("COMPASS_WHENCE_SUBTITLE"),
+                      how: lang("COMPASS_HOW_SUBTITLE"),
+                      whither: lang("COMPASS_WHITHER_SUBTITLE")
+                    }[prop.key];
+
+                    return (
+                      <CompassBox
+                        key={prop.key}
+                        propKey={prop.key}
+                        title={dimensionName}
+                        subtitle={dimensionSubtitle}
+                        color={PALETTE[prop.key].base}
+                        topValues={topValues[prop.key]}
+                        tutorialMode={tutorialMode}
+                        highlightedIndex={
+                          tutorialMode && tutorialTarget?.propKey === prop.key
+                            ? tutorialTarget.index
+                            : -1
+                        }
+                        onValueClick={(value, idx) => handleValueClick(value, prop.key, idx)}
+                        valueRef={
+                          tutorialMode && tutorialTarget?.propKey === prop.key
+                            ? tutorialValueRef
+                            : undefined
+                        }
+                      />
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </motion.div>

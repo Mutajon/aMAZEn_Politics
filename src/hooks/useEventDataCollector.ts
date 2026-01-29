@@ -11,7 +11,8 @@
 // Dependencies: dilemmaStore, roleStore, compassStore
 
 import { useState, useCallback, useRef } from "react";
-import { useDilemmaStore } from "../store/dilemmaStore";
+import { translatePoliticalSystem } from '../i18n/translateGameData';
+import { useDilemmaStore, type PhilosophicalPole } from '../store/dilemmaStore';
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
 import { useSettingsStore } from "../store/settingsStore";
@@ -62,6 +63,7 @@ export type Phase1Data = {
 export type Phase2Data = {
   compassPills: CompassPill[] | null;
   dynamicParams: DynamicParam[] | null;
+  axisPills?: PhilosophicalPole[];
 };
 
 // PHASE 3: Tertiary data - loads in background while user reads
@@ -164,6 +166,7 @@ async function fetchGameTurn(
   valueTargeted?: string;  // The compass value being tested by this dilemma
   axisExplored?: string;   // The political axis being explored
   scopeUsed?: string;      // The situation scope being used
+  axisPills?: PhilosophicalPole[]; // Philosophical poles supported by action
 }> {
   const {
     gameId,
@@ -1053,7 +1056,8 @@ export function useEventDataCollector() {
           mirrorText,
           axisExplored,
           scopeUsed,
-          valueTargeted
+          valueTargeted,
+          axisPills
         } = turnData;
 
         console.log(`[Collector] ✅ Unified data received for Day ${day} (attempt ${attempt})`);
@@ -1092,6 +1096,11 @@ export function useEventDataCollector() {
 
         // Reset inquiry credits for new dilemma (treatment-based feature)
         useDilemmaStore.getState().resetInquiryCredits();
+
+        // Apply philosophical axis pills if in Free Play mode
+        if (useSettingsStore.getState().isFreePlay && axisPills) {
+          useDilemmaStore.getState().applyAxisPills(axisPills);
+        }
 
         // Mark collecting as done - UI can render!
         setIsCollecting(false);
