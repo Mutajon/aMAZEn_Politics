@@ -55,6 +55,7 @@ export type Phase1Data = {
   newsItems: TickerItem[]; // Empty array (disabled)
   valueTargeted?: string; // The compass value being tested by this dilemma (for trap context)
   axisExplored?: string;  // The political axis being explored
+  scopeUsed?: string;     // The situation scope being used
 };
 
 // PHASE 2: Secondary data - loads in background while user reads
@@ -162,6 +163,7 @@ async function fetchGameTurn(
   mirrorText: string;
   valueTargeted?: string;  // The compass value being tested by this dilemma
   axisExplored?: string;   // The political axis being explored
+  scopeUsed?: string;      // The situation scope being used
 }> {
   const {
     gameId,
@@ -691,9 +693,10 @@ async function fetchGameTurn(
 
   // Extract value trap context (for compass analysis)
   const valueTargeted = data.valueTargeted || undefined;
-  const axisExplored = data.axisExplored || undefined;
+  const axisExplored = data.axisUsed || data.axisExplored || undefined;
+  const scopeUsed = data.scopeUsed || undefined;
 
-  console.log(`[fetchGameTurn] ✅ Unified response received: ${data.actions.length} actions, 0 pills (pills fetched separately), ${dynamicParams.length} params, valueTargeted=${valueTargeted || 'N/A'}`);
+  console.log(`[fetchGameTurn] ✅ Unified response received: ${data.actions.length} actions, 0 pills (pills fetched separately), ${dynamicParams.length} params, valueTargeted=${valueTargeted || 'N/A'}, axisExplored=${axisExplored || 'N/A'}`);
 
   return {
     dilemma,
@@ -703,7 +706,8 @@ async function fetchGameTurn(
     dynamicParams,
     mirrorText,
     valueTargeted,
-    axisExplored
+    axisExplored,
+    scopeUsed
   };
 }
 
@@ -1047,6 +1051,9 @@ export function useEventDataCollector() {
           supportEffects,
           dynamicParams,
           mirrorText,
+          axisExplored,
+          scopeUsed,
+          valueTargeted
         } = turnData;
 
         console.log(`[Collector] ✅ Unified data received for Day ${day} (attempt ${attempt})`);
@@ -1072,6 +1079,9 @@ export function useEventDataCollector() {
           dilemma,
           supportEffects,
           newsItems: [], // Disabled
+          axisExplored,
+          scopeUsed,
+          valueTargeted
         };
 
         // Set Phase 1 data immediately - triggers UI render!

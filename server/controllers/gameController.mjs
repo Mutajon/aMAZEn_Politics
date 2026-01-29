@@ -591,7 +591,8 @@ export async function gameTurnV2(req, res) {
             topicHistory.push({
                 day,
                 topic: parsed.dilemma?.topic || 'Unknown',
-                scope: parsed.dilemma?.scope || 'Unknown',
+                scope: parsed.dilemma?.scopeUsed || parsed.dilemma?.scope || 'Unknown',
+                axis: parsed.dilemma?.axisUsed || parsed.dilemma?.axis || 'Unknown',
                 tensionCluster: currentCluster,
                 title: parsed.dilemma?.title || '',        // For semantic similarity validation
                 description: parsed.dilemma?.description || ''  // For semantic similarity validation
@@ -719,7 +720,8 @@ export async function freePlayTurn(req, res) {
             gender,
             gameId,
             playerChoice, // Day 2+ only
-            language = 'en'
+            language = 'en',
+            supportEntities // For Day 1 initialization
         } = req.body;
 
         if (!gameId) return res.status(400).json({ error: "Missing gameId" });
@@ -733,7 +735,7 @@ export async function freePlayTurn(req, res) {
             console.log(`[FREE-PLAY] Day 1: Starting new game for ${playerName} (${role}, gender: ${gender})`);
 
             // Build System Prompt
-            const context = { role, setting, playerName, emphasis, gender, language };
+            const context = { role, setting, playerName, emphasis, gender, language, supportEntities };
             const systemPrompt = buildFreePlaySystemPrompt(context);
             const userPrompt = buildFreePlayUserPrompt(1, null, null, 0);
 
@@ -751,7 +753,9 @@ export async function freePlayTurn(req, res) {
             // Store Conversation
             const meta = {
                 type: 'free-play',
-                role, setting, playerName, emphasis,
+                role, setting, playerName, emphasis, gender, language,
+                supportEntities: supportEntities || [],
+                support: { people: 50, holders: 50, mom: 50 },
                 systemPrompt,
                 messages: [
                     { role: "user", content: userPrompt },
@@ -759,7 +763,9 @@ export async function freePlayTurn(req, res) {
                 ],
                 topicHistory: [{
                     day: 1,
-                    topic: parsed.dilemma?.topic || "Unknown"
+                    topic: parsed.dilemma?.topic || "Unknown",
+                    scope: parsed.dilemma?.scopeUsed || parsed.dilemma?.scope || "Unknown",
+                    axis: parsed.dilemma?.axisUsed || parsed.dilemma?.axis || "Unknown"
                 }]
             };
 
@@ -770,7 +776,11 @@ export async function freePlayTurn(req, res) {
                 description: parsed.dilemma?.description || "Something happens...",
                 actions: parsed.dilemma?.actions || [],
                 mirrorAdvice: parsed.mirrorAdvice,
-                dynamicParams: parsed.dynamicParams || []
+                dynamicParams: parsed.dynamicParams || [],
+                supportShift: null,
+                currentSupport: { people: 50, holders: 50, mom: 50 },
+                axisUsed: parsed.dilemma?.axisUsed || parsed.dilemma?.axis || "Unknown",
+                scopeUsed: parsed.dilemma?.scopeUsed || parsed.dilemma?.scope || "Unknown"
             });
         }
 
@@ -797,8 +807,18 @@ export async function freePlayTurn(req, res) {
 
             const userPrompt = buildFreePlayUserPrompt(day, playerChoice, lastTopic, consecutiveDays);
 
+            const systemPrompt = buildFreePlaySystemPrompt({
+                role: conversation.meta.role,
+                setting: conversation.meta.setting,
+                playerName: conversation.meta.playerName,
+                emphasis: conversation.meta.emphasis,
+                language: conversation.meta.language,
+                gender: conversation.meta.gender,
+                supportEntities: conversation.meta.supportEntities
+            });
+
             const messages = [
-                { role: "system", content: conversation.meta.systemPrompt },
+                { role: "system", content: systemPrompt },
                 ...conversation.meta.messages,
                 { role: "user", content: userPrompt }
             ];
@@ -814,12 +834,31 @@ export async function freePlayTurn(req, res) {
                 { role: "assistant", content: aiResponse.content }
             ];
 
+            // Process support shift
+            const currentSupport = conversation.meta.support || { people: 50, holders: 50, mom: 50 };
+            const supportShift = parsed.supportShift ? convertSupportShiftToDeltas(parsed.supportShift, currentSupport) : null;
+
+            // Updated support
+            const updatedSupport = { ...currentSupport };
+            if (supportShift) {
+                updatedSupport.people = Math.max(0, Math.min(100, (updatedSupport.people || 50) + (supportShift.people?.delta || 0)));
+                updatedSupport.holders = Math.max(0, Math.min(100, (updatedSupport.holders || 50) + (supportShift.holders?.delta || 0)));
+                updatedSupport.mom = Math.max(0, Math.min(100, (updatedSupport.mom || 50) + (supportShift.mom?.delta || 0)));
+            }
+
             const updatedMeta = {
                 ...conversation.meta,
+                systemPrompt, // Store the newly built prompt if needed, or keep previous
                 messages: [...conversation.meta.messages, ...newMessages],
+                support: updatedSupport,
                 topicHistory: [
                     ...history,
-                    { day, topic: parsed.dilemma?.topic || "Unknown" }
+                    {
+                        day,
+                        topic: parsed.dilemma?.topic || "Unknown",
+                        scope: parsed.dilemma?.scopeUsed || parsed.dilemma?.scope || "Unknown",
+                        axis: parsed.dilemma?.axisUsed || parsed.dilemma?.axis || "Unknown"
+                    }
                 ]
             };
 
@@ -831,7 +870,11 @@ export async function freePlayTurn(req, res) {
                 actions: parsed.dilemma?.actions,
                 mirrorAdvice: parsed.mirrorAdvice,
                 dynamicParams: parsed.dynamicParams,
-                isGameEnd: day >= 8
+                supportShift, // Numeric deltas and "why"
+                currentSupport: updatedSupport, // Absolute values 0-100
+                isGameEnd: day >= 8,
+                axisUsed: parsed.dilemma?.axisUsed || parsed.dilemma?.axis || "Unknown",
+                scopeUsed: parsed.dilemma?.scopeUsed || parsed.dilemma?.scope || "Unknown"
             });
         }
 

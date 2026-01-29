@@ -238,12 +238,12 @@ export function calculateAuthorityLevel(e12, powerHolders, playerIndex, roleScop
 export function convertSupportShiftToDeltas(supportShift, currentSupport) {
     // Randomized delta ranges for each reaction level
     const REACTION_RANGES = {
-        slightly_supportive: { min: 1, max: 5 },
-        moderately_supportive: { min: 6, max: 10 },
-        strongly_supportive: { min: 11, max: 15 },
-        slightly_opposed: { min: -5, max: -1 },
-        moderately_opposed: { min: -10, max: -6 },
-        strongly_opposed: { min: -15, max: -11 },
+        slightly_supportive: { min: 1, max: 4 },
+        moderately_supportive: { min: 5, max: 8 },
+        strongly_supportive: { min: 9, max: 13 },
+        slightly_opposed: { min: -4, max: -1 },
+        moderately_opposed: { min: -8, max: -5 },
+        strongly_opposed: { min: -13, max: -9 },
         dead: { min: -100, max: -100 }
     };
 

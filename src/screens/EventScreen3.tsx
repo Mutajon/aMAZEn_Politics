@@ -1024,6 +1024,14 @@ export default function EventScreen3({ push }: Props) {
           </button>
         )}
 
+        {/* Debug: Philosophical Axis & Scope Display */}
+        {debugMode && collectedData && (
+          <div className="fixed top-16 right-4 p-2 text-[10px] font-mono bg-black/80 border border-white/20 text-white/70 rounded z-50 flex flex-col gap-1 pointer-events-none">
+            <div>AXIS: <span className="text-amber-400 font-bold uppercase tracking-wider">{collectedData.axisExplored || 'N/A'}</span></div>
+            <div>SCOPE: <span className="text-blue-400 font-bold uppercase tracking-wider">{collectedData.scopeUsed || 'N/A'}</span></div>
+          </div>
+        )}
+
         <div className="max-w-3xl mx-auto space-y-2 md:space-y-3">
           {/* Step 0+: ResourceBar (always visible) */}
           {presentationStep >= 0 && (
@@ -1098,6 +1106,8 @@ export default function EventScreen3({ push }: Props) {
                   description={collectedData.dilemma.description}
                   speaker={collectedData.dilemma.speaker}
                   speakerDescription={collectedData.dilemma.speakerDescription}
+                  axis={collectedData.axisExplored}
+                  scope={collectedData.scopeUsed}
                 />
               )}
             </>

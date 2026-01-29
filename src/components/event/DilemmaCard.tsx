@@ -31,9 +31,11 @@ export type DilemmaProps = {
   description: string; // keep it ~2–3 sentences
   speaker?: string; // Speaker name from AI or predefined (unused, kept for API compatibility)
   speakerDescription?: string; // AI-generated description (unused, kept for API compatibility)
+  axis?: string;
+  scope?: string;
 };
 
-export default function DilemmaCard({ title, description }: DilemmaProps) {
+export default function DilemmaCard({ title, description, axis, scope }: DilemmaProps) {
   const lang = useLang();
   const treatment = useSettingsStore(state => state.treatment) as TreatmentType;
   const config = getTreatmentConfig(treatment);
@@ -67,6 +69,22 @@ export default function DilemmaCard({ title, description }: DilemmaProps) {
         transition={{ type: "tween", duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         aria-label="Current dilemma"
       >
+        {/* Axis & Scope Badges (Free Play only) */}
+        {(axis || scope) && (
+          <div className="absolute top-2 right-3 flex gap-1.5 pointer-events-none">
+            {axis && axis !== 'Unknown' && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-tighter font-bold bg-amber-400/10 text-amber-300/60 border border-amber-400/20">
+                {axis}
+              </span>
+            )}
+            {scope && scope !== 'Unknown' && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-tighter font-bold bg-blue-400/10 text-blue-300/60 border border-blue-400/20">
+                {scope}
+              </span>
+            )}
+          </div>
+        )}
+
         <div className={TITLE_CLASS}>{title}</div>
         <p className={`mt-1 ${DESC_CLASS}`}>{description}</p>
 

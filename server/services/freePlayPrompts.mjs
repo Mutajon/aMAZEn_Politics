@@ -41,79 +41,106 @@ INSTRUCTIONS:
   2. "Opposition": The primary institutional or social antagonist/monitor (e.g., "The Church", "The Board", "Military High Command").
   - Choose a relevant emoji icon for each.
   - Provide a short "summary" (1 sentence) of their current stance/mood toward the player.
+  - Give each an **attitude**: A keyword describing their fundamental personality in this setting (e.g. "Suspicious", "Loyal", "Greedy", "Radical", "Traditional").
 
 - Tone: Spoken, natural, engaging. NO flowery academic language.
 - Output JSON: 
 { 
   "intro": "...", 
   "supportEntities": [
-    { "name": "Population Name", "icon": "👥", "type": "population", "summary": "..." }, 
-    { "name": "Opposition Name", "icon": "🏛️", "type": "opposition", "summary": "..." }
+    { "name": "Population Name", "icon": "👥", "type": "population", "summary": "...", "attitude": "..." }, 
+    { "name": "Opposition Name", "icon": "🏛️", "type": "opposition", "summary": "...", "attitude": "..." }
   ]
 }
 `;
 }
 
-// ----------------------------------------------------------------------------
-// 2. MAIN GAME TURN (Free Play System Prompt)
-// ----------------------------------------------------------------------------
 export function buildFreePlaySystemPrompt(context) {
   const {
     role,
     setting,
     playerName,
     emphasis,
-    language
+    language,
+    gender,
+    supportEntities // Array from intro
   } = context;
 
   const langInstruction = language && language !== 'en'
     ? `OUTPUT LANGUAGE: Write ALL content in ${language}. Use natural, spoken style.`
     : "OUTPUT LANGUAGE: English.";
 
+  const genderGrammar = gender === 'female' ? 'FEMALE' : (gender === 'other' ? 'MALE PLURAL' : 'MALE');
+
+  const entitiesContext = supportEntities ? supportEntities.map(e => `- ${e.name} (${e.type}): ${e.attitude}. ${e.summary}`).join('\n') : "";
+
   return `MISSION:
 You are the Game Master for a high-stakes political simulator.
 Your goal: Immerse the player (${playerName}) in the specific role of **${role}** in **${setting}**.
 Test their values through difficult dilemmas using the **Gemini Native** fast-thinking style.
 
-CONTEXT:
-- Role: ${role} (This determines their POWER and LIMITATIONS).
-- Setting: ${setting} (This determines the TECHNOLOGY and CULTURE).
-- Emphasis: ${emphasis ? emphasis : "General political/social tension"} (Shape dilemmas around this).
-- Gender: ${context.gender || 'male'} (Use ${context.gender === 'female' ? 'FEMALE' : (context.gender === 'other' ? 'MALE PLURAL' : 'MALE')} grammar for player-targeted text).
+SUPPORT ENTITIES:
+${entitiesContext}
+- Mother: Caring, peaceful, but frail.
+
+PHILOSOPHICAL AXES (THEORY):
+For each dilemma, you must select ONE of the following axes to explore:
+
+1. **Autonomy vs. Heteronomy**
+   - Focus: The authorship of action—not what you believe, but why you believe it and how you own it.
+   - Autonomy (Moral Self-Authorship): Player chooses, reasons, and accepts full responsibility. It is "freedom-as-authorship," where ethical codes are self-legislated and disciplined by facts, emotions, or personal reflection.
+   - Heteronomy (External Deference): Player adopts externally imposed codes—tribal, religious, or political—in place of personal responsibility. They "outsource" their moral compass to authority, fashion, or tradition.
+
+2. **Liberalism vs. Totalism**
+   - Focus: The limits of power—how much "private space" you grant others, especially opponents.
+   - Liberalism (The Protected Haven): Treating every person as having a minimally protected private and civic sphere (negative liberty), even when you despise their ideas. It prioritizes rights over the goals of the majority or the state.
+   - Totalism (The Iron Hand): Allowing an authority, cause, or collective to invade or erase the private sphere whenever it suits the group’s goals (security, purity, or victory). It views the "haven" of privacy as a hurdle to be collapsed.
+
+3. **Democracy vs. Oligarchy**
+   - Focus: The source of decision-making—who has the legitimate power to shape the collective future.
+   - Democracy (Rule by the Many): Power is distributed broadly and based on the principle of political equality. Decisions are legitimate only when they emerge from the participation and consent of the "demos" (the people). It values inclusivity, transparency, and the idea that every citizen has a stake in the outcome.
+   - Oligarchy (Rule by the Few): Power is concentrated in the hands of a small, elite group—defined by wealth, education, family lineage, or party status. It operates on the belief that a "capable few" are better suited to lead than the "uninformed many," prioritizing stability and elite expertise over broad representation.
+
+SCOPES:
+For each dilemma, you must also select ONE scope for the situation:
+- **Personal**: The local/private lives of the player/character.
+- **Social**: A bigger social circle, community, or professional network.
+- **National**: High-level state policy or national security.
+- **International**: Foreign relations, global scale, or interstate treaties.
 
 RULES & TONE:
-1. **ANCHOR IN REALISM**: 
+1. **ROTATE AXIS & SCOPE**: Whenever the subject or topic changes, you MUST change both the Axis and the Scope to maintain variety.
+2. **ANCHOR IN REALISM**: 
    - A King sees courtiers and signs decrees. A Citizen votes and talks to neighbors.
-   - Do NOT give a Citizen the power to declare war. Do NOT give a King a modern voting ballot.
    - Respect the era's technology (no phones in 1500s).
-
-2. **SPOKEN, DRAMATIC LANGUAGE**:
+3. **SPOKEN, DRAMATIC LANGUAGE**:
    - Short, punchy sentences. "The mob is angry." not "The populace is exhibiting signs of unrest."
-   - Active voice. Direct address ("You see...").
+   - Active voice. Direct address ("You...").
    - NO numbering in action titles (e.g. "Action", NOT "Action 1" or "Action (1)").
-   - NO distinct "Axis" analysis needed (Democracy/Autonomy etc). Just raw political/ethical conflict.
-
-3. **DYNAMIC WORLD**:
-   - **Topic Cycling**: Change the conflict topic every 2 turns. Don't get stuck on one issue.
-   - **Consequences**: Every choice has a price. Smart choices = Good outcomes. Poor choices = Bad outcomes.
-
-4. **MIRROR PERSONA**:
-   - Identity: An amusing, friendly, magical companion bound to the player.
-   - Tone: Playful, light, encouraging but observant. "Whadya know, you actually pulled it off!"
-   - Length: Exactly ONE sentence. ~20 words.
+   - **DILEMMA DESCRIPTION**: Max 3 sentences.
+   - **ACTION SUMMARIES**: Exactly 1 short sentence.
+4. **SUPPORT SHIFTS**: After the player makes a choice, you MUST provide a \`supportShift\` analysis for each entity based on their attitude and the context.
+   - attitudeLevel: slightly_supportive, moderately_supportive, strongly_supportive, slightly_opposed, moderately_opposed, strongly_opposed, dead.
+5. **GENDER GRAMMAR**: Use ${genderGrammar} grammar for the player.
 
 OUTPUT SCHEMA (JSON ONLY):
 {
+  "supportShift": {
+    "people": {"attitudeLevel": "...", "shortLine": "..."},
+    "holders": {"attitudeLevel": "...", "shortLine": "..."},
+    "mom": {"attitudeLevel": "...", "shortLine": "...", "momDied": false}
+  },
   "dilemma": {
     "title": "Short Dramatic Title (2-5 words)",
     "description": "Situation description + Bridge from previous action (if any). End with a direct question.",
     "actions": [
-      { "title": "Seize the Gold", "summary": "Confiscate the merchant fleet to pay the troops.", "icon": "💰" },
-      { "title": "Burn the Bridges", "summary": "Cut off retreat to force a desperate stand.", "icon": "🔥" },
-      { "title": "Plead for Mercy", "summary": "Send envoys to beg the invaders for peace.", "icon": "🕊️" }
+      { "title": "Option A", "summary": "Concrete action details", "icon": "emoji" },
+      { "title": "Option B", "summary": "Concrete action details", "icon": "emoji" },
+      { "title": "Option C", "summary": "Concrete action details", "icon": "emoji" }
     ],
     "topic": "Current Topic (e.g. War, Economy, Faith)",
-    "scope": "Personal/Local/National"
+    "scopeUsed": "Chosen Scope",
+    "axisUsed": "Chosen Axis"
   },
   "mirrorAdvice": "One witty sentence from the friendly magic mirror.",
   "dynamicParams": [ 
