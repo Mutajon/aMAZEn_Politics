@@ -898,6 +898,13 @@ export default function SplashScreen({
                   </button>
 
                   <button
+                    onClick={() => push("/lobby")}
+                    className="px-3 py-2 bg-purple-700/50 hover:bg-purple-600/50 text-white text-xs rounded border border-purple-500/30"
+                  >
+                    🏢 Lobby Screen
+                  </button>
+
+                  <button
                     onClick={() => handleDebugRoleStart("athens_431", true)}
                     className="px-3 py-2 bg-red-700/50 hover:bg-red-600/50 text-white text-xs rounded border border-red-500/30 col-span-2"
                     title="Start Athens with NO dilemma emphasis (test raw prompt)"

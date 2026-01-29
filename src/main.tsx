@@ -354,9 +354,11 @@ const useStrict = import.meta.env.MODE !== "development";
     usePastGamesStore.getState().clearAll();
     useFragmentsStore.getState().clearFragments();
     useFragmentsStore.getState().resetIntro();
+    localStorage.removeItem('lobby-games-played');
     console.log('✅ Experiment progress reset! All roles unlocked.');
     console.log('✅ Past games cleared.');
     console.log('✅ Fragments cleared and intro reset.');
+    console.log('✅ Lobby games counter reset.');
     console.log('💡 Refresh the page if you\'re on role selection screen.');
   }
 };
@@ -410,6 +412,7 @@ const useStrict = import.meta.env.MODE !== "development";
     // Manual cleanup
     localStorage.removeItem('logging_queue_backup');
     localStorage.removeItem('hasSeenTutorial');
+    localStorage.removeItem('lobby-games-played');
 
     console.log('✅ Complete reset successful!');
     console.log('   → Game state cleared (dilemma/compass/role)');
@@ -428,6 +431,12 @@ const useStrict = import.meta.env.MODE !== "development";
 };
 
 // Tutorial management
+(window as any).resetLobbyGames = () => {
+  localStorage.removeItem('lobby-games-played');
+  console.log('✅ Lobby games counter reset to 0');
+  console.log('💡 Refresh the page to see the changes on the lobby screen.');
+};
+
 (window as any).resetDay2Tutorial = () => {
   resetDay2Tutorial();
   console.log('✅ Day 2 tutorial reset');
@@ -441,13 +450,13 @@ const useStrict = import.meta.env.MODE !== "development";
   // Component names for each dimension (10 per dimension)
   const labels: Record<string, string[]> = {
     what: ['Truth/Trust', 'Liberty/Agency', 'Equality/Equity', 'Care/Solidarity', 'Create/Courage',
-           'Wellbeing', 'Security/Safety', 'Freedom/Responsibility', 'Honor/Sacrifice', 'Sacred/Awe'],
+      'Wellbeing', 'Security/Safety', 'Freedom/Responsibility', 'Honor/Sacrifice', 'Sacred/Awe'],
     whence: ['Evidence', 'Public Reason', 'Personal', 'Tradition', 'Revelation',
-             'Nature', 'Pragmatism', 'Aesthesis', 'Fidelity', 'Law (Office)'],
+      'Nature', 'Pragmatism', 'Aesthesis', 'Fidelity', 'Law (Office)'],
     how: ['Law/Std.', 'Deliberation', 'Mobilize', 'Markets', 'Mutual Aid',
-          'Ritual', 'Design', 'Enforce', 'Civic Culture', 'Philanthropy'],
+      'Ritual', 'Design', 'Enforce', 'Civic Culture', 'Philanthropy'],
     whither: ['Self', 'Family', 'Friends', 'In-Group', 'Nation',
-              'Civiliz.', 'Humanity', 'Earth', 'Cosmos', 'God'],
+      'Civiliz.', 'Humanity', 'Earth', 'Cosmos', 'God'],
   };
 
   const dimensionNames: Record<string, string> = {

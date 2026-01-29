@@ -179,6 +179,7 @@ async function fetchGameTurn(
   } = useDilemmaStore.getState();
 
   const { values: compassValues } = useCompassStore.getState();
+  const { isFreePlay } = useSettingsStore.getState();
 
   // Day 1: Initialize game if no gameId exists
   if (day === 1 && !gameId) {
@@ -268,9 +269,9 @@ async function fetchGameTurn(
       dilemmaEmphasis: roleState.analysis?.dilemmaEmphasis ?? null
     };
 
-    // Subject focus (outside gameContext for v2)
     payload.dilemmasSubjectEnabled = dilemmasSubjectEnabled || false;
     payload.dilemmasSubject = dilemmasSubject || null;
+    payload.gender = roleState.character?.gender || "male";
   }
 
   // Day 2+: Send player choice + current compass values
@@ -295,6 +296,9 @@ async function fetchGameTurn(
     // Subject focus for Day 2+
     payload.dilemmasSubjectEnabled = dilemmasSubjectEnabled || false;
     payload.dilemmasSubject = dilemmasSubject || null;
+
+    const roleState = useRoleStore.getState();
+    payload.gender = roleState.character?.gender || "male";
   }
 
   // Pass debug mode setting to server for verbose logging
@@ -345,18 +349,40 @@ async function fetchGameTurn(
     }
   }
 
-  console.log(`[fetchGameTurn] Calling /api/game-turn-v2 for Day ${day}, gameId=${currentGameId}, treatment=${treatment}, generateActions=${payload.generateActions}, useXAI=${useXAI}, useGemini=${useGemini}, language=${language}`);
+  console.log(`[fetchGameTurn] Calling ${isFreePlay ? '/api/free-play/turn' : '/api/game-turn-v2'} for Day ${day}, gameId=${currentGameId}, treatment=${treatment}, generateActions=${payload.generateActions}, useXAI=${useXAI}, useGemini=${useGemini}, language=${language}`);
 
   // Log compass values being sent for mirror advice debugging
   if (payload.gameContext?.playerCompassTopValues) {
     console.log("[fetchGameTurn] Player compass top values:", payload.gameContext.playerCompassTopValues);
   }
 
-  const response = await fetch("/api/game-turn-v2", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
+  // --- FREE PLAY MODE SWITCH ---
+  let response;
+  if (isFreePlay) {
+    // For Free Play, we use a simpler payload structure at the top level for the controller
+    const roleState = useRoleStore.getState();
+    response = await fetch("/api/free-play/turn", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...payload,
+        // Top-level fields required by freePlayTurn and freePlayIntro controllers
+        role: roleState.selectedRole || roleState.analysis?.systemName,
+        setting: roleState.analysis?.systemName || "Unknown Setting",
+        playerName: roleState.character?.name || roleState.playerName || "Player",
+        emphasis: roleState.analysis?.dilemmaEmphasis,
+        gender: roleState.character?.gender || "male",
+        language: language
+      })
+    });
+  } else {
+    // Standard V2 Game Turn
+    response = await fetch("/api/game-turn-v2", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  }
 
   if (!response.ok) {
     const errorText = await response.text();

@@ -51,7 +51,7 @@ import {
 } from "./services/promptBuilders.mjs";
 
 import { registerUser, generateIntroParagraph, validateRole, extractTrait } from "./controllers/userController.mjs";
-import { reserveGameSlot, gameTurnV2, gameTurnCleanup, generateAftermath, answerInquiry } from "./controllers/gameController.mjs";
+import { reserveGameSlot, gameTurnV2, gameTurnCleanup, generateAftermath, answerInquiry, freePlayIntro, freePlayTurn } from "./controllers/gameController.mjs";
 import { suggestBackground, analyzeCompass, generateNewsTicker, validateSuggestion, generateDynamicParameters, suggestScenario, seedNarrative } from "./controllers/contentController.mjs";
 import { textToSpeech } from "./controllers/voiceController.mjs";
 
@@ -118,6 +118,10 @@ app.use(bodyParser.json());
 
 // -------------------- User Registration & Treatment Assignment --------------------
 app.post("/api/users/register", registerUser);
+
+// -------------------- Free Play Mode --------------------
+app.post("/api/free-play/intro", freePlayIntro);
+app.post("/api/free-play/turn", freePlayTurn);
 
 // -------------------- Power Distribution Questionnaire --------------------
 /**

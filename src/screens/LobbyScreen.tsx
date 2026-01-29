@@ -139,7 +139,9 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
     setting: string;
     role: string;
     emphasis: string;
+    gender: string;
     avatar: string | null;
+    introText?: string;
   }) => {
     setIsLoading(true);
     setShowPlayPopup(false);
@@ -157,6 +159,9 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
 
       // Enable lobby mode (for play again routing)
       setLobbyMode(true);
+
+      // Enable Free Play mode
+      useSettingsStore.getState().setFreePlayMode(true);
 
       // Set treatment to semiAutonomy (standard gameplay)
       setTreatment('semiAutonomy');
@@ -184,10 +189,10 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       // Select the custom role
       roleStore.setRole(data.role);
 
-      // Create character object with optional avatar
+      // Create character object with selected gender and avatar
       roleStore.setCharacter({
         name: data.characterName,
-        gender: "any",
+        gender: data.gender as "male" | "female" | "any",
         description: `The ${data.role} in ${data.setting}`,
         avatarUrl: data.avatar ? `/assets/images/avatars/${data.avatar}.png` : undefined,
       });
@@ -219,15 +224,14 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       roleStore.setRoleBackgroundImage("/assets/images/BKGs/mainBKG.jpg");
 
       // Set role context
-      roleStore.setRoleContext(data.setting, `The story of ${data.characterName} in ${data.setting}.`, "N/A");
+      roleStore.setRoleContext(data.setting, data.introText || `The story of ${data.characterName} in ${data.setting}.`, "N/A");
 
       // Prime narrator and start music
       narrator.prime();
       playMusic('background', true);
 
-      // Navigate directly to compass (personality assessment)
-      // Custom scenarios skip /intro and /role screens
-      push("/compass-intro");
+      // Navigate directly to event screen (skip assessments/intro)
+      push("/event");
     } catch (error) {
       console.error('Error starting custom lobby game:', error);
       setIsLoading(false);

@@ -95,6 +95,10 @@ type SettingsState = {
   // --- NEW: Lobby mode (session-only, for external website flow) ---
   lobbyMode: boolean;
   setLobbyMode: (v: boolean) => void;
+
+  // --- NEW: Free Play Mode (session-only, lightweight Gemini prompts) ---
+  isFreePlay: boolean;
+  setFreePlayMode: (v: boolean) => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -194,6 +198,10 @@ export const useSettingsStore = create<SettingsState>()(
       // Used when game is started from external website lobby flow
       lobbyMode: false,
       setLobbyMode: (v) => set({ lobbyMode: v }),
+
+      // NEW: Free Play Mode (default false, session-only - NOT persisted)
+      isFreePlay: false,
+      setFreePlayMode: (v) => set({ isFreePlay: v }),
     }),
     {
       // Bump key so no stale objects hide the new fields

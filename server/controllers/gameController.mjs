@@ -12,6 +12,11 @@ import {
     buildGameMasterSystemPromptUnifiedV3,
     buildGameMasterUserPrompt
 } from "../services/promptBuilders.mjs";
+import {
+    buildFreePlayIntroSystemPrompt,
+    buildFreePlaySystemPrompt,
+    buildFreePlayUserPrompt
+} from "../services/freePlayPrompts.mjs";
 import { getTheoryPrompt } from "../theory-loader.mjs";
 
 
@@ -660,6 +665,178 @@ export async function gameTurnV2(req, res) {
             error: "Game turn generation failed",
             message: error?.message || "Unknown error"
         });
+    }
+}
+
+/**
+ * POST /api/free-play/intro
+ * Generate short intro and set up free play session
+ */
+export async function freePlayIntro(req, res) {
+    try {
+        const { role, setting, playerName, emphasis, gender } = req.body;
+
+        console.log(`[FREE-PLAY-INTRO] Generating intro for ${role} in ${setting} (gender: ${gender})...`);
+
+        const systemPrompt = buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender);
+        // Using "intro" as a dummy user prompt to trigger generation
+        const messages = [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: "Generate the intro." }
+        ];
+
+        const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
+        const parsed = safeParseJSON(aiResponse.content, { debugTag: "FREE-PLAY-INTRO" });
+
+        return res.json({
+            intro: parsed?.intro || "Welcome to your story.",
+            mirrorMsg: "LOBBY_MIRROR_FREEPLAY_MSG"
+        });
+    } catch (e) {
+        console.error("[FREE-PLAY-INTRO] Error:", e);
+        res.status(500).json({ error: "Failed to generate intro" });
+    }
+}
+
+
+/**
+ * POST /api/free-play/turn
+ * Main loop for Free Play mode (Gemini Native)
+ */
+export async function freePlayTurn(req, res) {
+    try {
+        console.log("\n========================================");
+        console.log("🎮 [FREE-PLAY] /api/free-play/turn called");
+        console.log("========================================\n");
+
+        const {
+            day,
+            role,
+            setting,
+            playerName,
+            emphasis,
+            gender,
+            gameId,
+            playerChoice, // Day 2+ only
+            language = 'en'
+        } = req.body;
+
+        if (!gameId) return res.status(400).json({ error: "Missing gameId" });
+
+        let conversation = getConversation(gameId);
+
+        // --------------------------------------------------------
+        // DAY 1: Start New Game
+        // --------------------------------------------------------
+        if (day === 1) {
+            console.log(`[FREE-PLAY] Day 1: Starting new game for ${playerName} (${role}, gender: ${gender})`);
+
+            // Build System Prompt
+            const context = { role, setting, playerName, emphasis, gender, language };
+            const systemPrompt = buildFreePlaySystemPrompt(context);
+            const userPrompt = buildFreePlayUserPrompt(1, null, null, 0);
+
+            const messages = [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt }
+            ];
+
+            // Call Gemini
+            const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
+            const parsed = safeParseJSON(aiResponse.content, { debugTag: "FREE-PLAY-DAY1" });
+
+            if (!parsed) throw new Error("Failed to parse Day 1 response");
+
+            // Store Conversation
+            const meta = {
+                type: 'free-play',
+                role, setting, playerName, emphasis,
+                systemPrompt,
+                messages: [
+                    { role: "user", content: userPrompt },
+                    { role: "assistant", content: aiResponse.content }
+                ],
+                topicHistory: [{
+                    day: 1,
+                    topic: parsed.dilemma?.topic || "Unknown"
+                }]
+            };
+
+            storeConversation(gameId, gameId, 'gemini', meta);
+
+            return res.json({
+                title: parsed.dilemma?.title || "Dilemma",
+                description: parsed.dilemma?.description || "Something happens...",
+                actions: parsed.dilemma?.actions || [],
+                mirrorAdvice: parsed.mirrorAdvice,
+                dynamicParams: parsed.dynamicParams || []
+            });
+        }
+
+        // --------------------------------------------------------
+        // DAY 2+: Follow Up
+        // --------------------------------------------------------
+        if (day > 1) {
+            if (!conversation) return res.status(404).json({ error: "Game not found" });
+            if (!playerChoice) return res.status(400).json({ error: "Missing playerChoice" });
+
+            console.log(`[FREE-PLAY] Day ${day}: Processing follow-up`);
+
+            // Topic Logic
+            const history = conversation.meta.topicHistory || [];
+            const lastTopicEntry = history[history.length - 1];
+            const lastTopic = lastTopicEntry ? lastTopicEntry.topic : "Unknown";
+
+            // Count consecutive days on this topic
+            let consecutiveDays = 0;
+            for (let i = history.length - 1; i >= 0; i--) {
+                if (history[i].topic === lastTopic) consecutiveDays++;
+                else break;
+            }
+
+            const userPrompt = buildFreePlayUserPrompt(day, playerChoice, lastTopic, consecutiveDays);
+
+            const messages = [
+                { role: "system", content: conversation.meta.systemPrompt },
+                ...conversation.meta.messages,
+                { role: "user", content: userPrompt }
+            ];
+
+            const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
+            const parsed = safeParseJSON(aiResponse.content, { debugTag: `FREE-PLAY-DAY${day}` });
+
+            if (!parsed) throw new Error("Failed to parse response");
+
+            // Update History
+            const newMessages = [
+                { role: "user", content: userPrompt },
+                { role: "assistant", content: aiResponse.content }
+            ];
+
+            const updatedMeta = {
+                ...conversation.meta,
+                messages: [...conversation.meta.messages, ...newMessages],
+                topicHistory: [
+                    ...history,
+                    { day, topic: parsed.dilemma?.topic || "Unknown" }
+                ]
+            };
+
+            storeConversation(gameId, gameId, 'gemini', updatedMeta);
+
+            return res.json({
+                title: parsed.dilemma?.title,
+                description: parsed.dilemma?.description,
+                actions: parsed.dilemma?.actions,
+                mirrorAdvice: parsed.mirrorAdvice,
+                dynamicParams: parsed.dynamicParams,
+                isGameEnd: day >= 8
+            });
+        }
+
+    } catch (e) {
+        console.error("[FREE-PLAY] Error:", e);
+        res.status(500).json({ error: "Free Play turn failed" });
     }
 }
 

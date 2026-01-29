@@ -163,7 +163,11 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
               opacity: IMG_OPACITY,
             }}
           >
-            <MirrorImage mirrorSize={IMG_WIDTH_PX} mirrorAlt="Mirror" />
+            <MirrorImage
+              mirrorSize={IMG_WIDTH_PX}
+              mirrorAlt="Mirror"
+              src={useSettingsStore.getState().isFreePlay ? "/assets/images/mirror.png" : "/assets/images/mirrorBroken.png"}
+            />
           </div>
 
           {/* Reflection overlay */}

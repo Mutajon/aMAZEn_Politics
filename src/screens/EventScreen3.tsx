@@ -59,6 +59,9 @@ type Props = {
 export default function EventScreen3({ push }: Props) {
   const lang = useLang();
 
+  // Free Play check
+  const isFreePlay = useSettingsStore(s => s.isFreePlay);
+
   // Global state (read only - single source of truth)
   const { day, totalDays, budget, supportPeople, supportMiddle, supportMom, score, crisisMode: storedCrisisMode } = useDilemmaStore();
   const { character, roleBackgroundImage, analysis } = useRoleStore();
@@ -740,7 +743,8 @@ export default function EventScreen3({ push }: Props) {
     }
 
     // Check if reasoning is required for this day
-    const shouldShowReasoning = reasoning.shouldShowReasoning();
+    // FREE PLAY: Always skip reasoning
+    const shouldShowReasoning = !isFreePlay && reasoning.shouldShowReasoning();
 
     if (shouldShowReasoning) {
       console.log('[EventScreen3] 💭 Reasoning required - temporarily hiding loading for modal');
@@ -831,7 +835,8 @@ export default function EventScreen3({ push }: Props) {
     };
 
     // Check if reasoning is required for this day
-    const shouldShowReasoning = reasoning.shouldShowReasoning();
+    // FREE PLAY: Always skip reasoning
+    const shouldShowReasoning = !isFreePlay && reasoning.shouldShowReasoning();
 
     if (shouldShowReasoning) {
       console.log('[EventScreen3] 💭 Reasoning required - temporarily hiding loading for modal');

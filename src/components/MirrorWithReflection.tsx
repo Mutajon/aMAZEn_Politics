@@ -56,10 +56,11 @@ export function MirrorImage({
   mirrorSize,
   className = "",
   mirrorAlt = "Mystic mirror",
-}: Pick<MirrorWithReflectionProps, "mirrorSize" | "className" | "mirrorAlt">) {
+  src = "/assets/images/mirrorBroken.png",
+}: Pick<MirrorWithReflectionProps, "mirrorSize" | "className" | "mirrorAlt"> & { src?: string }) {
   return (
     <img
-      src="/assets/images/mirrorBroken.png"
+      src={src}
       alt={mirrorAlt}
       width={mirrorSize}
       height={mirrorSize}
