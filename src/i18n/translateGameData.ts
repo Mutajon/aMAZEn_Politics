@@ -21,7 +21,11 @@ export function translateDemocracyLevel(level: DemocracyLevel, lang: (key: strin
  * Translates political system names to translation keys
  */
 export function translatePoliticalSystem(systemName: string, lang: (key: string) => string): string {
-  // Normalize the system name to a key format
+  // Try direct translation first (in case it's already an i18n key like ATHENS_SYSTEM_NAME)
+  const direct = lang(systemName);
+  if (direct !== systemName) return direct;
+
+  // Normalize the system name to a key format for the prefix
   const normalizedKey = systemName
     .toUpperCase()
     .replace(/\s+/g, "_")

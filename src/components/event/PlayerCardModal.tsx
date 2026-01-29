@@ -22,7 +22,7 @@ import { useRoleStore } from "../../store/roleStore";
 import { useCompassStore } from "../../store/compassStore";
 import { ValueExplanationModal } from "./ValueExplanationModal";
 import { useLang } from "../../i18n/lang";
-import { translateCompassValue } from "../../i18n/translateGameData";
+import { translateCompassValue, translatePoliticalSystem } from "../../i18n/translateGameData";
 
 type Props = {
   isOpen: boolean;
@@ -179,7 +179,7 @@ export default function PlayerCardModal({
 
   // Compute derived values
   const playerName = character?.name || lang("PLAYER_CARD_UNKNOWN_LEADER");
-  const systemName = analysis?.systemName || lang("PLAYER_CARD_UNKNOWN_SYSTEM");
+  const systemName = translatePoliticalSystem(analysis?.systemName || "PLAYER_CARD_UNKNOWN_SYSTEM", lang);
   const topValues = getAllTopCompassValues(compassValues, 2);
 
   // Handle value click (works in both tutorial and normal mode)
