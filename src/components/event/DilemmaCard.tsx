@@ -12,9 +12,9 @@
 //
 // 🔧 Easy knobs (edit these first - Mobile-first responsive):
 const TITLE_CLASS = "text-sm md:text-base font-semibold text-white/95";
-const DESC_CLASS  = "text-[14px] md:text-[14px] leading-snug text-white/85";
-const CARD_PAD    = "px-3 py-2 md:px-4 md:py-3"; // uniform padding
-const CARD_TONE   = "border-slate-700/50 bg-black/60 backdrop-blur-sm ring-1 ring-amber-400/40 rounded-2xl shadow-sm";
+const DESC_CLASS = "text-[14px] md:text-[14px] leading-snug text-white/85";
+const CARD_PAD = "px-3 py-2 md:px-4 md:py-3"; // uniform padding
+const CARD_TONE = "border-slate-700/50 bg-black/60 backdrop-blur-sm ring-1 ring-amber-400/40 rounded-2xl shadow-sm";
 
 import { motion } from "framer-motion";
 import { MessageCircle } from "lucide-react";
@@ -38,6 +38,7 @@ export default function DilemmaCard({ title, description }: DilemmaProps) {
   const treatment = useSettingsStore(state => state.treatment) as TreatmentType;
   const config = getTreatmentConfig(treatment);
   const inquiryCreditsRemaining = useDilemmaStore(state => state.inquiryCreditsRemaining);
+  const isFreePlay = useSettingsStore(state => state.isFreePlay);
 
   const {
     isOpen,
@@ -53,8 +54,8 @@ export default function DilemmaCard({ title, description }: DilemmaProps) {
     dilemmaDescription
   } = useInquiring();
 
-  // Only show inquiry button if treatment allows it
-  const showInquiryButton = config.inquiryTokensPerDilemma > 0;
+  // Only show inquiry button if treatment allows it and it's NOT Free Play
+  const showInquiryButton = config.inquiryTokensPerDilemma > 0 && !isFreePlay;
   const hasCredits = inquiryCreditsRemaining > 0;
 
   return (

@@ -157,8 +157,21 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         audioManager.playSfx("click-soft");
 
         // Random Avatar
-        const randomAvatar = AVATAR_LIST[Math.floor(Math.random() * AVATAR_LIST.length)];
+        const randomIndex = Math.floor(Math.random() * AVATAR_LIST.length);
+        const randomAvatar = AVATAR_LIST[randomIndex];
         setSelectedAvatar(randomAvatar);
+
+        // Scroll to selected avatar
+        if (avatarScrollRef.current) {
+            const container = avatarScrollRef.current;
+            const itemWidth = 80; // w-20
+            const gap = 12; // gap-3
+            const scrollLeft = randomIndex * (itemWidth + gap) - (container.offsetWidth / 2) + (itemWidth / 2);
+            container.scrollTo({
+                left: scrollLeft,
+                behavior: 'smooth'
+            });
+        }
 
         // Random Gender
         const genders = ['male', 'female', 'other'];

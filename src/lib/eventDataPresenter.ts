@@ -15,6 +15,7 @@
 
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
+import { useSettingsStore } from "../store/settingsStore";
 import type { CollectedData } from "../hooks/useEventDataCollector";
 import { lang } from "../i18n/lang";
 import { POWER_DISTRIBUTION_TRANSLATIONS } from "../data/powerDistributionTranslations";
@@ -190,36 +191,56 @@ export function buildSupportItems(
 }> {
   const { supportPeople, supportMiddle, supportMom, momAlive } = useDilemmaStore.getState();
   const { analysis } = useRoleStore.getState();
+  const { isFreePlay } = useSettingsStore.getState();
 
-  // Helper function to translate challenger seat name
+  // Helper function to translate holder name (standard roles)
   const translateChallengerName = (name: string): string => {
     // 1. If name is already a likely translation key (uppercase with underscores), try translating it directly
     if (/^[A-Z0-9_]+$/.test(name)) {
       const directTranslation = lang(name);
-      // If lang returns the key itself, it means no translation found - continue to search
-      // But if it returns something else, we found it!
-      if (directTranslation !== name) {
-        return directTranslation;
-      }
+      if (directTranslation !== name) return directTranslation;
     }
 
     // 2. Check all predefined role translations for a matching holder name
     for (const roleTranslations of Object.values(POWER_DISTRIBUTION_TRANSLATIONS)) {
       const holderTranslation = roleTranslations.holders[name];
-      if (holderTranslation) {
-        return lang(holderTranslation.name);
-      }
+      if (holderTranslation) return lang(holderTranslation.name);
     }
 
-    // 3. Fallback: return name as-is
     return name;
   };
 
-  // Get middle entity info from challenger seat (primary institutional opponent)
-  const challengerSeat = analysis?.challengerSeat;
-  const middleEntity = challengerSeat
-    ? { name: translateChallengerName(challengerSeat.name), icon: "🏛️" } // Translate challenger seat name
-    : { name: lang("COUNCIL"), icon: "🏛️" }; // Fallback to generic "Council"
+  // Get dynamic entity info for Free Play
+  let populationInfo = { name: lang("SUPPORT_THE_PEOPLE"), icon: "👥" };
+  let oppositionInfo = { name: lang("COUNCIL"), icon: "🏛️" };
+
+  if (isFreePlay && analysis?.holders && analysis.holders.length >= 3) {
+    // In Free Play Lobby: [0]=Player, [1]=Opposition, [2]=Population
+    const oppHolder = analysis.holders[1];
+    const popHolder = analysis.holders[2];
+
+    if (oppHolder) {
+      oppositionInfo = {
+        name: oppHolder.name,
+        icon: oppHolder.icon || "🏛️"
+      };
+    }
+    if (popHolder) {
+      populationInfo = {
+        name: popHolder.name,
+        icon: popHolder.icon || "👥"
+      };
+    }
+  } else {
+    // Normal assess/experiment flow
+    const challengerSeat = analysis?.challengerSeat;
+    if (challengerSeat) {
+      oppositionInfo = {
+        name: translateChallengerName(challengerSeat.name),
+        icon: "🏛️"
+      };
+    }
+  }
 
   // Show deltas only after Step 2 (presentationStep >= 2)
   const showDeltas = presentationStep >= 2;
@@ -236,7 +257,6 @@ export function buildSupportItems(
   };
 
   // Import icons (these need to be imported at component level, so we'll use React.createElement)
-  // For now, return simple structure - EventScreen3 will add icons
   const peopleEffect = getEffectData("people");
   const middleEffect = getEffectData("middle");
   const momEffect = getEffectData("mom");
@@ -244,25 +264,25 @@ export function buildSupportItems(
   return [
     {
       id: "people",
-      name: lang("SUPPORT_THE_PEOPLE"),
+      name: populationInfo.name,
       percent: supportPeople,
-      initialPercent: initialValues?.people, // Animation starts from this value
+      initialPercent: initialValues?.people,
       delta: peopleEffect.delta,
       trend: peopleEffect.trend,
       note: peopleEffect.note,
-      icon: null as any, // Filled in by EventScreen3
+      icon: populationInfo.icon as any,
       accentClass: "bg-emerald-600",
       moodVariant: "civic" as const,
     },
     {
       id: "middle",
-      name: middleEntity.name,
+      name: oppositionInfo.name,
       percent: supportMiddle,
-      initialPercent: initialValues?.middle, // Animation starts from this value
+      initialPercent: initialValues?.middle,
       delta: middleEffect.delta,
       trend: middleEffect.trend,
       note: middleEffect.note,
-      icon: null as any, // Filled in by EventScreen3
+      icon: oppositionInfo.icon as any,
       accentClass: "bg-amber-600",
       moodVariant: "civic" as const,
     },

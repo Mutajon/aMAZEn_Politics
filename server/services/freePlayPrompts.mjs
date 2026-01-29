@@ -22,7 +22,7 @@ export function buildFreePlayIntroSystemPrompt(role, setting, playerName, emphas
   const genderLine = `GENDER: Use ${genderGrammar} grammar for the player (especially in gendered languages like Hebrew).`;
 
   return `MISSION:
-You are the narrator of a political drama.
+You are the narrator of a political drama. 
 Generate a short, atmospheric introductory paragraph (2-3 sentences max) to set the mood for the player.
 
 CONTEXT:
@@ -33,21 +33,22 @@ ${emphasisLine}
 ${genderLine}
 
 INSTRUCTIONS:
-- Directly address the player as "you".
+- Directly address the player as "you". 
 - Place them physically in the scene (sights, sounds).
 - Establish the weight of their specific position.
-- **Support Entities**: Identify 2 key political entities for this specific role:
+- **Support Entities**: Identify exactly 2 key political entities for this specific role:
   1. "Population": The general public/subjects relevant to the role (e.g., "The Peasantry", "Voters", "The Colony").
   2. "Opposition": The primary institutional or social antagonist/monitor (e.g., "The Church", "The Board", "Military High Command").
   - Choose a relevant emoji icon for each.
+  - Provide a short "summary" (1 sentence) of their current stance/mood toward the player.
 
 - Tone: Spoken, natural, engaging. NO flowery academic language.
 - Output JSON: 
 { 
   "intro": "...", 
   "supportEntities": [
-    { "name": "Population Name", "icon": "👥", "type": "population" }, 
-    { "name": "Opposition Name", "icon": "🏛️", "type": "opposition" }
+    { "name": "Population Name", "icon": "👥", "type": "population", "summary": "..." }, 
+    { "name": "Opposition Name", "icon": "🏛️", "type": "opposition", "summary": "..." }
   ]
 }
 `;
@@ -107,9 +108,9 @@ OUTPUT SCHEMA (JSON ONLY):
     "title": "Short Dramatic Title (2-5 words)",
     "description": "Situation description + Bridge from previous action (if any). End with a direct question.",
     "actions": [
-      { "title": "Option A", "summary": "Concrete action details", "icon": "emoji" },
-      { "title": "Option B", "summary": "Concrete action details", "icon": "emoji" },
-      { "title": "Option C", "summary": "Concrete action details", "icon": "emoji" }
+      { "title": "Seize the Gold", "summary": "Confiscate the merchant fleet to pay the troops.", "icon": "💰" },
+      { "title": "Burn the Bridges", "summary": "Cut off retreat to force a desperate stand.", "icon": "🔥" },
+      { "title": "Plead for Mercy", "summary": "Send envoys to beg the invaders for peace.", "icon": "🕊️" }
     ],
     "topic": "Current Topic (e.g. War, Economy, Faith)",
     "scope": "Personal/Local/National"
