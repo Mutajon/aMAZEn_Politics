@@ -49,17 +49,20 @@ export type MirrorWithReflectionProps = {
   mirrorAlt?: string;
 };
 
+import React from "react";
+
 /**
  * Mirror image only (for use inside shimmer wrapper)
  */
-export function MirrorImage({
+export const MirrorImage = React.forwardRef<HTMLImageElement, Pick<MirrorWithReflectionProps, "mirrorSize" | "className" | "mirrorAlt"> & { src?: string }>(({
   mirrorSize,
   className = "",
   mirrorAlt = "Mystic mirror",
   src = "/assets/images/mirrorBroken.png",
-}: Pick<MirrorWithReflectionProps, "mirrorSize" | "className" | "mirrorAlt"> & { src?: string }) {
+}, ref) => {
   return (
     <img
+      ref={ref}
       src={src}
       alt={mirrorAlt}
       width={mirrorSize}
@@ -67,7 +70,7 @@ export function MirrorImage({
       className={`w-full h-full object-cover rounded-full ${className}`}
     />
   );
-}
+});
 
 /**
  * Reflection overlay only (render as sibling to shimmer wrapper)

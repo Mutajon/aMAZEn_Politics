@@ -2,6 +2,7 @@
 // Restored visuals + animated budget counter + anchor for coin flights + goals display
 
 import React, { useState } from "react";
+import { motion } from "framer-motion";
 import { Hourglass, Coins, Trophy, User } from "lucide-react";
 import GoalsCompact from "./GoalsCompact";
 import PlayerCardModal from "./PlayerCardModal";
@@ -39,6 +40,7 @@ type Props = {
   onTutorialModalClose?: () => void;
   tutorialValueRef?: (element: HTMLElement | null) => void;
   avatarButtonRef?: (element: HTMLElement | null) => void;
+  avatarPopCount?: number;
 };
 
 export default function ResourceBar({
@@ -56,6 +58,7 @@ export default function ResourceBar({
   onTutorialModalClose,
   tutorialValueRef,
   avatarButtonRef,
+  avatarPopCount = 0,
 }: Props) {
   // Check if modifiers (difficulty + goals) are enabled
   const enableModifiers = useSettingsStore((s) => s.enableModifiers);
@@ -201,12 +204,23 @@ export default function ResourceBar({
         {isMobile && <AudioButtonsInline />}
 
         {/* Player Avatar Section */}
-        <button
-          ref={avatarButtonRef}
+        <motion.button
+          ref={avatarButtonRef as any}
+          key={`avatar-pop-${avatarPopCount}`}
+          animate={avatarPopCount > 0 ? {
+            scale: [1, 1.25, 1],
+            rotate: [0, -5, 5, 0],
+            boxShadow: [
+              "0 0 0px rgba(255,255,255,0)",
+              "0 0 20px rgba(255,255,255,0.5)",
+              "0 0 0px rgba(255,255,255,0)"
+            ]
+          } : {}}
+          transition={{ duration: 0.4, ease: "easeOut" }}
           onClick={handleAvatarClick}
           className={`shrink-0 rounded-xl overflow-hidden ring-1 transition-all duration-200 ${tutorialMode
-              ? 'ring-yellow-400 ring-2 bg-white/10 z-[9100] relative'
-              : 'ring-white/15 bg-white/5 hover:ring-white/30 hover:bg-white/10'
+            ? 'ring-yellow-400 ring-2 bg-white/10 z-[9100] relative'
+            : 'ring-white/15 bg-white/5 hover:ring-white/30 hover:bg-white/10'
             }`}
           style={{ width: 80, height: 80, minWidth: 80 }}
           aria-label={`View ${playerName}'s character information`}
@@ -224,7 +238,7 @@ export default function ResourceBar({
               <User className="w-8 h-8 text-white/80" />
             </div>
           )}
-        </button>
+        </motion.button>
 
         {/* Goals Section (only if modifiers enabled) */}
         {enableModifiers && <GoalsCompact />}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Info, X } from 'lucide-react';
 import type { PhilosophicalPole } from '../../store/dilemmaStore';
@@ -52,14 +52,29 @@ const PhilosophicalRadarChart: React.FC<PhilosophicalRadarChartProps> = ({
 
     const getPoint = (index: number, value: number, rOverride?: number) => {
         const angle = (index * 60 - 90) * (Math.PI / 180);
-        const r = rOverride !== undefined ? rOverride : (value / maxVal) * radius;
+        const r = rOverride !== undefined ? rOverride : (Math.max(0, value) / maxVal) * radius;
         return {
             x: center + r * Math.cos(angle),
             y: center + r * Math.sin(angle)
         };
     };
 
-    const dataPoints = poles.map((pole, i) => getPoint(i, values[pole]));
+    // Animated values state
+    const [animatedValues, setAnimatedValues] = useState<Record<PhilosophicalPole, number>>(() => {
+        const zeroValues = {} as Record<PhilosophicalPole, number>;
+        poles.forEach(pole => zeroValues[pole] = 0);
+        return zeroValues;
+    });
+
+    useEffect(() => {
+        // Small delay to allow the modal opening animation to start/complete a bit
+        const timer = setTimeout(() => {
+            setAnimatedValues(values);
+        }, 150);
+        return () => clearTimeout(timer);
+    }, [values]);
+
+    const dataPoints = poles.map((pole, i) => getPoint(i, animatedValues[pole]));
     const polygonPoints = dataPoints.map(p => `${p.x},${p.y}`).join(' ');
 
     // Grid levels
@@ -119,19 +134,23 @@ const PhilosophicalRadarChart: React.FC<PhilosophicalRadarChartProps> = ({
                 })}
 
                 {/* Data polygon */}
-                <polygon
+                <motion.polygon
                     points={polygonPoints}
                     fill="rgba(255, 255, 255, 0.1)"
                     stroke="white"
                     strokeWidth={4}
                     strokeLinejoin="round"
                     filter="url(#chart-glow)"
-                    style={{ transition: 'all 1s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
+                    animate={{ points: polygonPoints }}
+                    transition={{
+                        duration: 1.5,
+                        ease: [0.34, 1.56, 0.64, 1]
+                    }}
                 />
 
                 {/* Value points */}
                 {dataPoints.map((p, i) => (
-                    <circle
+                    <motion.circle
                         key={i}
                         cx={p.x}
                         cy={p.y}
@@ -141,7 +160,11 @@ const PhilosophicalRadarChart: React.FC<PhilosophicalRadarChartProps> = ({
                         strokeWidth={2}
                         filter="url(#chart-glow)"
                         className="cursor-help shadow-lg"
-                        style={{ transition: 'all 1s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
+                        animate={{ cx: p.x, cy: p.y }}
+                        transition={{
+                            duration: 1.5,
+                            ease: [0.34, 1.56, 0.64, 1]
+                        }}
                         onClick={() => setSelectedPole(poles[i])}
                     />
                 ))}

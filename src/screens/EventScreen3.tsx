@@ -8,7 +8,7 @@
 //
 // Uses: useEventDataCollector, presentEventData, buildSupportItems, cleanAndAdvanceDay
 
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useSettingsStore } from "../store/settingsStore";
@@ -143,6 +143,15 @@ export default function EventScreen3({ push }: Props) {
     middle: number;
     mom: number;
   } | null>(null);
+
+  // Animation Refs for Pill Flights
+  const mirrorRef = useRef<HTMLImageElement | null>(null);
+  const avatarRef = useRef<HTMLButtonElement | null>(null);
+  const [avatarPopCount, setAvatarPopCount] = useState(0);
+
+  const handleAvatarHit = useCallback(() => {
+    setAvatarPopCount(prev => prev + 1);
+  }, []);
 
   // Coin flight system (persists across all phases)
   const { flights, triggerCoinFlight, clearFlights } = useCoinFlights();
@@ -1053,6 +1062,11 @@ export default function EventScreen3({ push }: Props) {
               score={score}
               scoreDetails={scoreDetails}
               avatarSrc={character?.avatarUrl || null}
+              avatarButtonRef={(el) => {
+                avatarRef.current = el as HTMLButtonElement;
+                setTutorialAvatarRef(el);
+              }}
+              avatarPopCount={avatarPopCount}
               tutorialMode={tutorial.tutorialActive}
               onTutorialAvatarClick={tutorial.onAvatarOpened}
               onTutorialValueClick={tutorial.onValueClicked}
@@ -1061,7 +1075,6 @@ export default function EventScreen3({ push }: Props) {
                 tutorial.onModalClosed(() => tutorialPillsRef !== null);
               }}
               tutorialValueRef={(el) => setTutorialValueRef(el)}
-              avatarButtonRef={(el) => setTutorialAvatarRef(el)}
             />
           )}
 
@@ -1126,6 +1139,7 @@ export default function EventScreen3({ push }: Props) {
               <MirrorCard
                 text={collectedData.mirrorText}
                 avatarUrl={character?.avatarUrl}
+                mirrorRef={mirrorRef}
               // onExploreClick temporarily removed - navigation bugs prevent safe return to EventScreen
               />
               {/* Compass Pills Overlay - appears at Step 4A (Day 2+) */}
@@ -1134,6 +1148,9 @@ export default function EventScreen3({ push }: Props) {
                   <PhilosophicalPillsOverlay
                     pills={collectedData.axisPills}
                     loading={isCollecting}
+                    mirrorRef={mirrorRef}
+                    avatarRef={avatarRef}
+                    onAvatarHit={handleAvatarHit}
                   />
                 )
               ) : (

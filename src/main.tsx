@@ -413,6 +413,7 @@ const useStrict = import.meta.env.MODE !== "development";
     localStorage.removeItem('logging_queue_backup');
     localStorage.removeItem('hasSeenTutorial');
     localStorage.removeItem('lobby-games-played');
+    localStorage.removeItem('hasSeenLobbyDiceOverlay');
 
     console.log('✅ Complete reset successful!');
     console.log('   → Game state cleared (dilemma/compass/role)');
@@ -431,11 +432,13 @@ const useStrict = import.meta.env.MODE !== "development";
 };
 
 // Tutorial management
-(window as any).resetLobbyGames = () => {
+const resetLobbyGames = () => {
   localStorage.removeItem('lobby-games-played');
-  console.log('✅ Lobby games counter reset to 0');
+  localStorage.removeItem('hasSeenLobbyDiceOverlay');
+  console.log('✅ Lobby games counter and instruction overlay reset');
   console.log('💡 Refresh the page to see the changes on the lobby screen.');
 };
+(window as any).resetLobbyGames = resetLobbyGames;
 
 (window as any).resetDay2Tutorial = () => {
   resetDay2Tutorial();

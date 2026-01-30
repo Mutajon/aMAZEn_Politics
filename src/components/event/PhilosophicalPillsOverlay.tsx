@@ -1,13 +1,16 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { useAudioManager } from "../../hooks/useAudioManager";
 import { useLanguage } from "../../i18n/LanguageContext";
-import type { PhilosophicalPole } from "../../store/dilemmaStore";
+import { useDilemmaStore, type PhilosophicalPole } from "../../store/dilemmaStore";
 
 type Props = {
     pills: PhilosophicalPole[];
     loading: boolean;
+    mirrorRef: React.RefObject<HTMLImageElement | null>;
+    avatarRef: React.RefObject<HTMLButtonElement | null>;
+    onAvatarHit?: () => void;
 };
 
 const POLE_LABELS: Record<PhilosophicalPole, string> = {
@@ -31,187 +34,120 @@ const POLE_COLORS: Record<PhilosophicalPole, string> = {
 export default function PhilosophicalPillsOverlay({
     pills,
     loading,
+    mirrorRef,
+    avatarRef,
+    onAvatarHit,
 }: Props) {
     const { playSfx } = useAudioManager();
     const { language } = useLanguage();
     const isRTL = language === 'he';
 
-    const [expanded, setExpanded] = useState<boolean>(true);
+    // State to track which pills are currently animating
+    const [activePills, setActivePills] = useState<PhilosophicalPole[]>([]);
+    const [hasStarted, setHasStarted] = useState(false);
 
-    const batchKey = useMemo(() => pills.join("|"), [pills]);
-
-    const timerRef = useRef<number | null>(null);
+    // Track the flight progress of each pill
+    const [pillSteps, setPillSteps] = useState<Record<number, 'spawn' | 'hover' | 'fly' | 'done'>>({});
 
     useEffect(() => {
-        if (loading || pills.length === 0) {
-            setExpanded(false);
-            if (timerRef.current) {
-                window.clearTimeout(timerRef.current);
-                timerRef.current = null;
-            }
-            return;
+        if (!loading && pills.length > 0 && !hasStarted) {
+            setHasStarted(true);
+            setActivePills(pills);
+        } else if (loading || pills.length === 0) {
+            setHasStarted(false);
+            setActivePills([]);
+            setPillSteps({});
         }
+    }, [pills, loading, hasStarted]);
 
-        setExpanded(true);
-        playSfx('achievement');
+    // Handle step transitions for each pill
+    const advanceStep = (index: number) => {
+        setPillSteps(prev => {
+            const current = prev[index] || 'spawn';
+            if (current === 'spawn') return { ...prev, [index]: 'hover' };
+            if (current === 'hover') return { ...prev, [index]: 'fly' };
+            if (current === 'fly') {
+                // Update actual store value
+                const pole = activePills[index];
+                if (pole) {
+                    useDilemmaStore.getState().applyAxisPills([pole]);
+                }
 
-        if (timerRef.current) window.clearTimeout(timerRef.current);
-        timerRef.current = window.setTimeout(() => {
-            setExpanded(false);
-            timerRef.current = null;
-        }, 2500) as unknown as number;
-
-        return () => {
-            if (timerRef.current) {
-                window.clearTimeout(timerRef.current);
-                timerRef.current = null;
+                if (onAvatarHit) onAvatarHit();
+                playSfx('fragment-collected'); // Subtle hit sound
+                return { ...prev, [index]: 'done' };
             }
-        };
-    }, [batchKey, loading, pills.length, playSfx]);
-
-    const hasPills = pills.length > 0;
-
-    const buttonPosition = {
-        x: isRTL ? 190 : -190,
-        y: 0
+            return prev;
+        });
     };
 
+    // Calculate positions
+    const getPositions = () => {
+        if (typeof window === 'undefined') return { mirror: { x: 0, y: 0 }, avatar: { x: 0, y: 0 } };
+
+        const mirrorRect = mirrorRef.current?.getBoundingClientRect() || { left: 0, top: 0, width: 0, height: 0 };
+        const avatarRect = avatarRef.current?.getBoundingClientRect() || { left: 0, top: 0, width: 0, height: 0 };
+
+        return {
+            mirror: {
+                x: mirrorRect.left + mirrorRect.width / 2,
+                y: mirrorRect.top + mirrorRect.height / 2
+            },
+            avatar: {
+                x: avatarRect.left + avatarRect.width / 2,
+                y: avatarRect.top + avatarRect.height / 2
+            }
+        };
+    };
+
+    const pos = getPositions();
+
     return (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center z-30">
-            {loading && (
-                <div className="flex items-center justify-center text-white/50">
-                    <span className="inline-block w-5 h-5 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                </div>
-            )}
+        <div className="fixed inset-0 pointer-events-none z-[100]">
+            <AnimatePresence>
+                {activePills.map((pole, index) => {
+                    const step = pillSteps[index] || 'spawn';
+                    if (step === 'done') return null;
 
-            {!loading && hasPills && (
-                <AnimatePresence mode="popLayout">
-                    {expanded ? (
+                    const label = POLE_LABELS[pole];
+                    const bg = POLE_COLORS[pole];
+
+                    return (
                         <motion.div
-                            key="pills-expanded"
-                            className="pointer-events-auto absolute flex flex-col items-center gap-2"
+                            key={`${pole}-${index}`}
+                            className="absolute rounded-full px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 shadow-lg border border-white/40"
                             style={{
-                                top: "50%",
-                                left: "50%",
-                                transform: "translate(-50%, -50%)",
+                                background: bg,
+                                color: "white",
+                                left: 0,
+                                top: 0,
                             }}
-                        >
-                            <motion.button
-                                type="button"
-                                onClick={() => setExpanded(false)}
-                                className="
-                  absolute -top-1 -left-20 z-10
-                  w-8 h-8 rounded-full
-                  bg-white/20 hover:bg-white/30
-                  backdrop-blur-sm border border-white/40
-                  flex items-center justify-center
-                  transition-colors cursor-pointer
-                  focus:outline-none
-                "
-                                initial={{ opacity: 0, scale: 0.5 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.5 }}
-                                transition={{ duration: 0.2 }}
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.95 }}
-                            >
-                                <X className="w-5 h-5 text-white" />
-                            </motion.button>
-
-                            {pills.map((pole, index) => {
-                                const label = POLE_LABELS[pole];
-                                const bg = POLE_COLORS[pole];
-                                const stackOffset = (index - pills.length / 2 + 0.5) * 36;
-
-                                return (
-                                    <motion.button
-                                        key={`${pole}-${index}`}
-                                        type="button"
-                                        onClick={() => setExpanded(false)}
-                                        className="rounded-full px-3 py-1.5 text-xs font-bold focus:outline-none absolute flex items-center gap-1.5"
-                                        style={{
-                                            background: bg,
-                                            color: "white",
-                                            border: "1.5px solid rgba(255,255,255,0.9)",
-                                            boxShadow: "0 6px 18px rgba(0,0,0,0.25)",
-                                            whiteSpace: "nowrap",
-                                            top: "50%",
-                                            left: "50%",
-                                        }}
-                                        initial={{
-                                            opacity: 0,
-                                            scale: 0.1,
-                                            x: buttonPosition.x,
-                                            y: buttonPosition.y,
-                                        }}
-                                        animate={{
-                                            opacity: 1,
-                                            scale: 1,
-                                            x: -60,
-                                            y: stackOffset - 15,
-                                        }}
-                                        exit={{
-                                            opacity: 0,
-                                            scale: 0.1,
-                                            x: buttonPosition.x,
-                                            y: buttonPosition.y,
-                                        }}
-                                        transition={{
-                                            type: "spring",
-                                            stiffness: 400,
-                                            damping: 25,
-                                            delay: index * 0.08,
-                                        }}
-                                    >
-                                        <ShieldCheck className="w-3.5 h-3.5" />
-                                        <span>+{label}</span>
-                                    </motion.button>
-                                );
-                            })}
-                        </motion.div>
-                    ) : (
-                        <motion.button
-                            key="pills-collapsed"
-                            type="button"
-                            onClick={() => setExpanded(true)}
-                            className="
-                pointer-events-auto
-                absolute top-1/2 -translate-y-1/2
-                inline-flex items-center justify-center
-                w-9 h-9 rounded-full
-                text-white text-base font-bold
-                focus:outline-none
-                border border-white/30
-              "
-                            style={{
-                                left: isRTL ? 'auto' : '0px',
-                                right: isRTL ? '0px' : 'auto',
-                                transform: `translateY(-50%) ${isRTL ? 'translateX(130%)' : 'translateX(-130%)'}`,
-                                background: "linear-gradient(135deg, #8b5cf6, #ec4899)",
-                                boxShadow: "0 6px 18px rgba(0,0,0,0.35)",
+                            initial={{
+                                opacity: 0,
+                                scale: 0.5,
+                                x: pos.mirror.x,
+                                y: pos.mirror.y,
                             }}
-                            initial={{ opacity: 0, scale: 0.5 }}
                             animate={{
                                 opacity: 1,
-                                scale: [0.5, 1.15, 1],
-                            }}
-                            exit={{
-                                opacity: 0,
-                                scale: [1, 1.2, 0.5],
+                                scale: 1,
+                                // Hover logic
+                                x: step === 'hover' ? pos.mirror.x + (isRTL ? 40 : -40) : (step === 'fly' ? pos.avatar.x : pos.mirror.x),
+                                y: step === 'hover' ? pos.mirror.y - 40 : (step === 'fly' ? pos.avatar.y : pos.mirror.y),
                             }}
                             transition={{
-                                duration: 0.4,
-                                times: [0, 0.5, 1],
-                                ease: "easeOut",
+                                delay: index * 0.3, // Successive creation
+                                duration: step === 'fly' ? 0.6 : 1.0,
+                                ease: step === 'fly' ? "circIn" : "easeOut"
                             }}
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.95 }}
+                            onAnimationComplete={() => advanceStep(index)}
                         >
-                            +
-                        </motion.button>
-                    )}
-                </AnimatePresence>
-            )}
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            <span>+{label}</span>
+                        </motion.div>
+                    );
+                })}
+            </AnimatePresence>
         </div>
     );
 }

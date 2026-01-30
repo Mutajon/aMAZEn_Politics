@@ -53,9 +53,10 @@ export type MirrorCardProps = {
   className?: string;
   onExploreClick?: () => void; // NEW: Callback for explore button
   avatarUrl?: string; // Avatar URL for reflection overlay in mirror
+  mirrorRef?: React.RefObject<HTMLImageElement | null>; // NEW: Ref for mirror image
 };
 
-export default function MirrorCard({ text, italic = true, className, onExploreClick, avatarUrl }: MirrorCardProps) {
+export default function MirrorCard({ text, italic = true, className, onExploreClick, avatarUrl, mirrorRef }: MirrorCardProps) {
   // Mobile detection for responsive mirror positioning
   const isMobile = useSettingsStore((s) => s.isMobileDevice);
 
@@ -164,6 +165,7 @@ export default function MirrorCard({ text, italic = true, className, onExploreCl
             }}
           >
             <MirrorImage
+              ref={mirrorRef}
               mirrorSize={IMG_WIDTH_PX}
               mirrorAlt="Mirror"
               src={useSettingsStore.getState().isFreePlay ? "/assets/images/mirror.png" : "/assets/images/mirrorBroken.png"}

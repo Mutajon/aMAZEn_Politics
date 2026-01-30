@@ -871,7 +871,7 @@ export async function freePlayTurn(req, res) {
             const axisPills = parsed.axisPills || [];
             const updatedAxes = {
                 ...(conversation.meta.philosophicalAxes || {
-                    democracy: 1, oligarchy: 1, autonomy: 1, heteronomy: 1, liberalism: 1, totalism: 1
+                    democracy: 0, oligarchy: 0, autonomy: 0, heteronomy: 0, liberalism: 0, totalism: 0
                 })
             };
 
