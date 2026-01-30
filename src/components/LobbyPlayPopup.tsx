@@ -26,7 +26,12 @@ interface LobbyPlayPopupProps {
 const SETTING_PRESETS = [
     { key: "LOBBY_SETTING_ATHENS", icon: "🏛️" },
     { key: "LOBBY_SETTING_NORTH_AMERICA", icon: "🌲" },
+    { key: "LOBBY_SETTING_PARIS_1789", icon: "🇫🇷" },
+    { key: "LOBBY_SETTING_MING_DYNASTY", icon: "🐉" },
+    { key: "LOBBY_SETTING_SPANISH_REVOLUTION", icon: "⚖️" },
     { key: "LOBBY_SETTING_USA", icon: "🗽" },
+    { key: "LOBBY_SETTING_SILICON_VALLEY_2045", icon: "💻" },
+    { key: "LOBBY_SETTING_BUNKER", icon: "☢️" },
     { key: "LOBBY_SETTING_MARS", icon: "🚀" },
 ];
 
@@ -62,6 +67,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     const [gender, setGender] = useState("male");
     const [difficulty, setDifficulty] = useState("easy");
     const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
+    const [showDiceOverlay, setShowDiceOverlay] = useState(false);
 
     // New state for Intro flow
     const [step, setStep] = useState<'form' | 'intro'>('form');
@@ -93,6 +99,16 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    // Show informational overlay on first open
+    useEffect(() => {
+        if (isOpen) {
+            const hasSeenOverlay = localStorage.getItem('hasSeenLobbyDiceOverlay');
+            if (!hasSeenOverlay) {
+                setShowDiceOverlay(true);
+            }
+        }
+    }, [isOpen]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -580,6 +596,41 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                 </motion.div>
             )
             }
+
+            {/* Dice/Manual Instruction Overlay */}
+            {showDiceOverlay && (
+                <motion.div
+                    className="fixed inset-0 z-[110] grid place-items-center p-6 bg-black/60 backdrop-blur-md"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                >
+                    <motion.div
+                        className="w-full max-w-sm bg-neutral-900 border border-amber-500/30 rounded-[32px] p-8 shadow-2xl text-center space-y-6"
+                        initial={{ scale: 0.9, y: 20 }}
+                        animate={{ scale: 1, y: 0 }}
+                    >
+                        <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto">
+                            <Dices className="w-8 h-8 text-amber-500" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white">
+                            {lang("LOBBY_OVERLAY_TITLE")}
+                        </h3>
+                        <p className="text-white/70 text-sm leading-relaxed">
+                            {lang("LOBBY_OVERLAY_TEXT")}
+                        </p>
+                        <button
+                            onClick={() => {
+                                localStorage.setItem('hasSeenLobbyDiceOverlay', 'true');
+                                setShowDiceOverlay(false);
+                                audioManager.playSfx("click-soft");
+                            }}
+                            className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-2xl transition-colors"
+                        >
+                            {lang("LOBBY_OVERLAY_GOT_IT")}
+                        </button>
+                    </motion.div>
+                </motion.div>
+            )}
         </AnimatePresence >
     );
 }

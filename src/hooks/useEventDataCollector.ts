@@ -530,6 +530,7 @@ async function fetchGameTurn(
       supportPeople: latestPeople,
       supportMiddle: latestMiddle,
       supportMom: latestMom,
+      isFreePlay,
     });
 
     setScore(breakdown.final);

@@ -11,6 +11,7 @@
 
 import { useMemo } from "react";
 import { useDilemmaStore } from "../store/dilemmaStore";
+import { useSettingsStore } from "../store/settingsStore";
 import {
   calculateLiveScoreBreakdown,
   calculateFinalScore,
@@ -25,16 +26,18 @@ export function useScoreCalculation(): ScoreBreakdown {
   const supportPeople = useDilemmaStore((s) => s.supportPeople);
   const supportMiddle = useDilemmaStore((s) => s.supportMiddle);
   const supportMom = useDilemmaStore((s) => s.supportMom);
+  const isFreePlay = useSettingsStore((s) => s.isFreePlay);
 
   return useMemo(() => {
     const breakdown = calculateLiveScoreBreakdown({
       supportPeople,
       supportMiddle,
       supportMom,
+      isFreePlay,
     });
 
     // ensure final is normalized (guards against numeric drift)
     breakdown.final = calculateFinalScore(breakdown);
     return breakdown;
-  }, [supportPeople, supportMiddle, supportMom]);
+  }, [supportPeople, supportMiddle, supportMom, isFreePlay]);
 }

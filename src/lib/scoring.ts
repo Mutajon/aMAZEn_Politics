@@ -95,16 +95,20 @@ export function calculateLiveScoreBreakdown({
   supportPeople,
   supportMiddle,
   supportMom,
+  isFreePlay = false,
 }: {
   supportPeople: number;
   supportMiddle: number;
   supportMom: number;
+  isFreePlay?: boolean;
 }): ScoreBreakdown {
   const people = buildSupportTrackBreakdown(supportPeople);
   const middle = buildSupportTrackBreakdown(supportMiddle);
   const mom = buildSupportTrackBreakdown(supportMom);
 
-  const supportTotal = people.points + middle.points + mom.points;
+  const tracks = isFreePlay ? [people, middle] : [people, middle, mom];
+  const supportTotal = tracks.reduce((sum, t) => sum + t.points, 0);
+  const maxPoints = tracks.length * SUPPORT_TRACK_MAX_POINTS;
   const final = Math.max(0, supportTotal);
 
   return {
@@ -113,10 +117,10 @@ export function calculateLiveScoreBreakdown({
       middle,
       mom,
       total: supportTotal,
-      maxPoints: SUPPORT_TOTAL_MAX_POINTS,
+      maxPoints,
     },
     final,
-    maxFinal: MAX_FINAL_SCORE,
+    maxFinal: maxPoints,
   };
 }
 

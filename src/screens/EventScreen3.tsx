@@ -230,6 +230,7 @@ export default function EventScreen3({ push }: Props) {
       supportPeople,
       supportMiddle,
       supportMom,
+      isFreePlay,
     });
 
     // Helper function to translate challenger seat name
@@ -1114,8 +1115,6 @@ export default function EventScreen3({ push }: Props) {
                   description={collectedData.dilemma.description}
                   speaker={collectedData.dilemma.speaker}
                   speakerDescription={collectedData.dilemma.speakerDescription}
-                  axis={collectedData.axisExplored}
-                  scope={collectedData.scopeUsed}
                 />
               )}
             </>

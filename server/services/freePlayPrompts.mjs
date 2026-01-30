@@ -41,15 +41,14 @@ INSTRUCTIONS:
   2. "Opposition": The primary institutional or social antagonist/monitor (e.g., "The Church", "The Board", "Military High Command").
   - Choose a relevant emoji icon for each.
   - Provide a short "summary" (1 sentence) of their current stance/mood toward the player.
-  - Give each an **attitude**: A keyword describing their fundamental personality in this setting (e.g. "Suspicious", "Loyal", "Greedy", "Radical", "Traditional").
 
 - Tone: Spoken, natural, engaging. NO flowery academic language.
 - Output JSON: 
 { 
   "intro": "...", 
   "supportEntities": [
-    { "name": "Population Name", "icon": "👥", "type": "population", "summary": "...", "attitude": "..." }, 
-    { "name": "Opposition Name", "icon": "🏛️", "type": "opposition", "summary": "...", "attitude": "..." }
+    { "name": "Population Name", "icon": "👥", "type": "population", "summary": "..." }, 
+    { "name": "Opposition Name", "icon": "🏛️", "type": "opposition", "summary": "..." }
   ]
 }
 `;
@@ -59,7 +58,7 @@ export function buildFreePlaySystemPrompt(context) {
   const { role, setting, playerName, emphasis, language, gender, supportEntities } = context;
   const lang = language === 'he' ? "Hebrew (Natural/Spoken)" : "English";
   const genderGrammar = gender === 'female' ? 'FEMALE' : (gender === 'other' ? 'MALE PLURAL' : 'MALE');
-  const entities = supportEntities ? supportEntities.map(e => `- ${e.name} (${e.type}): ${e.attitude}. ${e.summary}`).join('\n') : "";
+  const entities = supportEntities ? supportEntities.map(e => `- ${e.name} (${e.type}): ${e.summary}`).join('\n') : "";
 
   return `MISSION:
 Game Master for ${playerName}. Role: ${role}, Setting: ${setting}. ${emphasis ? `Focus: ${emphasis}.` : ""}
@@ -79,6 +78,8 @@ RULES:
 - Constraints: Dilemma max 3 sentences. Generate exactly 3 UNIQUE and distinct actions per dilemma.
 - Action Variety: Each action must lead in a different thematic or ideological direction.
 - Forbidden: DO NOT number the actions (no "(1)", "(2)", etc. in titles). DO NOT repeat the same option.
+- **Support Shift Logic**: Do NOT use pre-baked attitudes. Instead, perform a REALISTIC situational analysis: Given the player's Role, the Setting, and their last Decision, how would these specific entities (Population/Opposition) react?
+- Allowed attitudeLevel: "strongly_supportive", "moderately_supportive", "slightly_supportive", "slightly_opposed", "moderately_opposed", "strongly_opposed".
 - Support: Identify "axisPills" (the poles boosted by the player's last choice).
 
 SCHEMA:

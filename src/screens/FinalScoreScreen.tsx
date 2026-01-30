@@ -71,6 +71,7 @@ const formatNumber = new Intl.NumberFormat(undefined, {
 export default function FinalScoreScreen({ push }: Props) {
   const lang = useLang();
   const liveBreakdown = useScoreCalculation();
+  const isFreePlay = useSettingsStore(s => s.isFreePlay);
 
   const finalScoreCalculated = useDilemmaStore((s) => s.finalScoreCalculated);
   const savedBreakdown = useDilemmaStore((s) => s.finalScoreBreakdown);
@@ -139,7 +140,10 @@ export default function FinalScoreScreen({ push }: Props) {
         maxPoints: breakdown.support.mom.maxPoints,
         icon: <Heart className="h-6 w-6" />,
       },
-    ],
+    ].filter(item => {
+      if (isFreePlay && item.key === 'mom') return false;
+      return true;
+    }) as CategoryRenderInfo[],
     [
       breakdown.support.people.points,
       breakdown.support.people.percent,
