@@ -13,14 +13,7 @@ type Props = {
     onAvatarHit?: () => void;
 };
 
-const POLE_LABELS: Record<PhilosophicalPole, string> = {
-    democracy: 'Democracy',
-    autonomy: 'Autonomy',
-    totalism: 'Totalism',
-    oligarchy: 'Oligarchy',
-    heteronomy: 'Heteronomy',
-    liberalism: 'Liberalism'
-};
+// Basic icons for poles if needed, but we use Lucide icons mostly
 
 const POLE_COLORS: Record<PhilosophicalPole, string> = {
     democracy: '#8b5cf6', // purple
@@ -39,7 +32,7 @@ export default function PhilosophicalPillsOverlay({
     onAvatarHit,
 }: Props) {
     const { playSfx } = useAudioManager();
-    const { language } = useLanguage();
+    const { language, lang } = useLanguage();
     const isRTL = language === 'he';
 
     // State to track which pills are currently animating
@@ -72,10 +65,13 @@ export default function PhilosophicalPillsOverlay({
                 const pole = activePills[index];
                 if (pole) {
                     console.log(`[PillsOverlay] 🎯 Pill hit! Applying +1 to ${pole}`);
-                    useDilemmaStore.getState().applyAxisPills([pole]);
+                    // Move to next tick to avoid React warning about state update during render/animation step
+                    setTimeout(() => {
+                        useDilemmaStore.getState().applyAxisPills([pole]);
+                        if (onAvatarHit) onAvatarHit();
+                    }, 0);
                 }
 
-                if (onAvatarHit) onAvatarHit();
                 playSfx('fragment-collected'); // Subtle hit sound
                 return { ...prev, [index]: 'done' };
             }
@@ -111,7 +107,6 @@ export default function PhilosophicalPillsOverlay({
                     const step = pillSteps[index] || 'spawn';
                     if (step === 'done') return null;
 
-                    const label = POLE_LABELS[pole];
                     const bg = POLE_COLORS[pole];
 
                     return (
@@ -145,7 +140,7 @@ export default function PhilosophicalPillsOverlay({
                             onAnimationComplete={() => advanceStep(index)}
                         >
                             <ShieldCheck className="w-3.5 h-3.5" />
-                            <span>+{label}</span>
+                            <span>+{lang(`PHILOSOPHICAL_POLE_${pole.toUpperCase()}`)}</span>
                         </motion.div>
                     );
                 })}

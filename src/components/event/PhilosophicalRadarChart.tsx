@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Info, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import type { PhilosophicalPole } from '../../store/dilemmaStore';
 import { useLanguage } from '../../i18n/LanguageContext';
 
@@ -14,6 +14,7 @@ const PhilosophicalRadarChart: React.FC<PhilosophicalRadarChartProps> = ({
     size = 400
 }) => {
     const [selectedPole, setSelectedPole] = useState<PhilosophicalPole | null>(null);
+    const [hoveredPole, setHoveredPole] = useState<PhilosophicalPole | null>(null);
     const { lang, language } = useLanguage();
     const isHe = language === 'he';
 
@@ -75,8 +76,19 @@ const PhilosophicalRadarChart: React.FC<PhilosophicalRadarChartProps> = ({
         return () => clearTimeout(timer);
     }, [values]);
 
-    const dataPoints = poles.map((pole, i) => getPoint(i, animatedValues[pole]));
-    const polygonPoints = dataPoints.map(p => `${p.x},${p.y}`).join(' ');
+    // Safe value extractor to ensure and clamp values
+    const getSafeValue = (pole: PhilosophicalPole) => {
+        const val = animatedValues[pole];
+        if (typeof val !== 'number' || isNaN(val)) return 0;
+        return Math.max(0, Math.min(maxVal, val));
+    };
+
+    const dataPoints = poles.map((pole, i) => getPoint(i, getSafeValue(pole)));
+    const polygonPoints = dataPoints.map(p => {
+        const x = typeof p.x === 'number' && !isNaN(p.x) ? p.x : center;
+        const y = typeof p.y === 'number' && !isNaN(p.y) ? p.y : center;
+        return `${x},${y}`;
+    }).join(' ');
 
     // Grid levels
     const gridLevels = [1, 2, 3, 4, 5, 6, 7];
@@ -150,26 +162,62 @@ const PhilosophicalRadarChart: React.FC<PhilosophicalRadarChartProps> = ({
                 />
 
                 {/* Value points */}
-                {dataPoints.map((p, i) => (
-                    <motion.circle
-                        key={i}
-                        cx={p.x}
-                        cy={p.y}
-                        r={6}
-                        fill={colors[poles[i]]}
-                        stroke="white"
-                        strokeWidth={2}
-                        filter="url(#chart-glow)"
-                        className="cursor-help shadow-lg"
-                        animate={{ cx: p.x, cy: p.y }}
-                        transition={{
-                            duration: 1.5,
-                            ease: [0.34, 1.56, 0.64, 1]
-                        }}
-                        onClick={() => setSelectedPole(poles[i])}
-                    />
-                ))}
+                {dataPoints.map((p, i) => {
+                    const pole = poles[i];
+                    const x = typeof p.x === 'number' && !isNaN(p.x) ? p.x : center;
+                    const y = typeof p.y === 'number' && !isNaN(p.y) ? p.y : center;
+                    const isHovered = hoveredPole === pole;
+
+                    return (
+                        <g key={pole}>
+                            {/* Larger invisible hit area for easier interactions */}
+                            <circle
+                                cx={x} cy={y} r={15}
+                                fill="transparent"
+                                className="cursor-pointer"
+                                onMouseEnter={() => setHoveredPole(pole)}
+                                onMouseLeave={() => setHoveredPole(null)}
+                                onClick={() => setSelectedPole(pole)}
+                            />
+                            {/* The actual visible dot */}
+                            <motion.circle
+                                cx={x}
+                                cy={y}
+                                r={isHovered ? 8 : 6}
+                                fill={colors[pole]}
+                                stroke="white"
+                                strokeWidth={2}
+                                filter="url(#chart-glow)"
+                                animate={{ cx: x, cy: y, r: isHovered ? 8 : 6 }}
+                                transition={{
+                                    duration: 1.5,
+                                    ease: [0.34, 1.56, 0.64, 1]
+                                }}
+                                className="pointer-events-none"
+                            />
+                        </g>
+                    );
+                })}
             </svg>
+
+            {/* Hover Tooltip Pill */}
+            <AnimatePresence>
+                {hoveredPole && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.8, y: -10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.8, y: -10 }}
+                        className="absolute z-50 px-3 py-1 rounded-full bg-white/95 text-slate-900 text-[11px] font-bold shadow-xl border border-white pointer-events-none whitespace-nowrap"
+                        style={{
+                            left: `calc(50% + ${dataPoints[poles.indexOf(hoveredPole)].x - center}px)`,
+                            top: `calc(50% + ${dataPoints[poles.indexOf(hoveredPole)].y - center}px - 28px)`,
+                            transform: 'translateX(-50%)'
+                        }}
+                    >
+                        {getPoleTitle(hoveredPole)} {getSafeValue(hoveredPole)}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Absolute positioned HTML Pills for better interactivity */}
             {poles.map((pole, i) => {
@@ -180,12 +228,13 @@ const PhilosophicalRadarChart: React.FC<PhilosophicalRadarChartProps> = ({
                     <motion.button
                         key={pole}
                         onClick={() => setSelectedPole(pole)}
-                        className="absolute z-10 px-3 py-1.5 rounded-full border border-white/10 backdrop-blur-md shadow-lg flex items-center gap-2 group"
+                        onMouseEnter={() => setHoveredPole(pole)}
+                        onMouseLeave={() => setHoveredPole(null)}
+                        className="absolute z-10 px-3 py-1.5 rounded-full border border-white/5 bg-white/5 hover:bg-white/10 flex items-center gap-2 group transition-all"
                         style={{
                             left: `calc(50% + ${p.x - center}px)`,
                             top: `calc(50% + ${p.y - center}px)`,
-                            backgroundColor: `${colors[pole]}15`,
-                            borderColor: `${colors[pole]}30`,
+                            borderColor: `${colors[pole]}20`,
                         }}
                         initial={{ x: "-50%", y: "-50%" }}
                     >
@@ -195,7 +244,9 @@ const PhilosophicalRadarChart: React.FC<PhilosophicalRadarChartProps> = ({
                         >
                             {getPoleTitle(pole)}
                         </span>
-                        <Info className="w-3 h-3 opacity-40 group-hover:opacity-100 transition-opacity" style={{ color: colors[pole] }} />
+                        <span className="text-[11px] font-bold opacity-60 group-hover:opacity-100 transition-opacity" style={{ color: colors[pole] }}>
+                            {getSafeValue(pole)}
+                        </span>
                     </motion.button>
                 );
             })}

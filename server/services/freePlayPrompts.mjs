@@ -98,8 +98,9 @@ SCHEMA:
     "topic": "...", "scopeUsed": "...", "axisUsed": "..."
   },
   "mirrorAdvice": "One witty sentence.",
-  "axisPills": ["pole1", "pole2"]
+  "axisPills": ["democracy", "totalism", "etc"]
 }
+CRITICAL: The "axisPills" array MUST only contain the English IDs: "democracy", "autonomy", "totalism", "oligarchy", "heteronomy", "liberalism". DO NOT translate these keys.
 `;
 }
 
@@ -108,9 +109,9 @@ SCHEMA:
 // ----------------------------------------------------------------------------
 export function buildFreePlayUserPrompt(day, playerChoice, lastTopic, consecutiveDays) {
   if (day === 1) {
-    return `Create the first dilemma for this Role.
-- Establish the physical scene.
-- Present a concrete problem requiring an immediate decision.`;
+    return `Establish the physical scene and present a concrete problem requiring an immediate decision.
+Based on the Role and Setting, identify which philosophical poles (democracy, autonomy, etc.) would be established as the foundation or reinforced by this initial situation.
+Include these in the "axisPills" array.`;
   }
 
   const topicInstruction = consecutiveDays >= 2
@@ -123,6 +124,7 @@ Last choice: "${playerChoice.title}"
 1. **BRIDGE**: Show the consequence of the player's choice.
 2. **TOPIC**: ${topicInstruction}
 3. **MIRROR**: Add a witty judgment.
+4. **AXIS**: Analyze the player's last choice ("${playerChoice.title}") and identify which poles (1-2 max) it reinforced. Include these in "axisPills".
 
 Generate the next dilemma with exactly 3 UNIQUE and non-numbered actions.`;
 }

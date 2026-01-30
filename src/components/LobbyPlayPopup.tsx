@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Dices } from "lucide-react";
+import { Dices, Target, Trophy } from "lucide-react";
 import { audioManager } from "../lib/audioManager";
 import { useLang } from "../i18n/lang";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -564,31 +564,88 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                 ) : (
                                     <div className="space-y-6">
                                         {/* INTRO TEXT */}
-                                        <div className={`p-4 rounded-xl bg-gradient-to-br from-indigo-900/30 to-purple-900/30 border border-white/10 text-lg leading-relaxed text-indigo-100 ${isRTL ? 'text-right' : 'text-left'}`}>
-                                            "{introData?.intro}"
+                                        <div className={`relative p-6 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 shadow-inner group ${isRTL ? 'text-right' : 'text-left'}`}>
+                                            <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/40 rounded-full" />
+                                            <p className="text-xl leading-relaxed text-indigo-100 italic font-serif opacity-90 group-hover:opacity-100 transition-opacity">
+                                                "{introData?.intro}"
+                                            </p>
+                                        </div>
+
+                                        {/* GAME PARAMETERS PILLS */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            {/* JUDGES */}
+                                            <div className="space-y-2.5">
+                                                <div className={`text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold px-1 ${isRTL ? 'text-right' : 'text-left'}`}>
+                                                    {lang("LOBBY_JUDGES_LABEL") || "The Observers"}
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {(introData?.supportEntities || [
+                                                        { name: lang("LOBBY_ENTITY_PEOPLE"), icon: "👥" },
+                                                        { name: lang("LOBBY_ENTITY_ESTABLISHMENT"), icon: "🏛️" }
+                                                    ]).map((entity, i) => (
+                                                        <motion.div
+                                                            key={i}
+                                                            initial={{ opacity: 0, scale: 0.9 }}
+                                                            animate={{ opacity: 1, scale: 1 }}
+                                                            transition={{ delay: 0.2 + i * 0.1 }}
+                                                            className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 shadow-lg hover:bg-white/10 transition-all cursor-default group"
+                                                        >
+                                                            <span className="text-xl group-hover:scale-110 transition-transform">{entity.icon}</span>
+                                                            <span className="text-xs font-bold text-white/80 group-hover:text-white transition-colors">{entity.name}</span>
+                                                        </motion.div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* GOAL */}
+                                            <div className="space-y-2.5">
+                                                <div className={`text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold px-1 ${isRTL ? 'text-right' : 'text-left'}`}>
+                                                    {lang("LOBBY_GOAL_LABEL") || "The Objective"}
+                                                </div>
+                                                <motion.div
+                                                    initial={{ opacity: 0, scale: 0.9 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    transition={{ delay: 0.4 }}
+                                                    className="flex items-center gap-3.5 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 shadow-lg group hover:border-amber-500/50 transition-all"
+                                                >
+                                                    <div className="p-2 rounded-lg bg-amber-500/20 group-hover:bg-amber-500/30 transition-colors">
+                                                        <Target className="w-5 h-5 text-amber-500" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-[10px] text-amber-500/60 leading-none mb-1.5 font-bold uppercase tracking-wider">{lang("LOBBY_TARGET_SCORE_SHORT") || "Score Target"}</div>
+                                                        <div className="text-xl font-black text-amber-500 leading-none tracking-tight">
+                                                            {difficulty === 'easy' ? 950 : difficulty === 'hard' ? 1300 : 1150}
+                                                        </div>
+                                                    </div>
+                                                    <Trophy className="w-4 h-4 text-amber-500/30 ml-auto group-hover:text-amber-500/50 transition-colors" />
+                                                </motion.div>
+                                            </div>
                                         </div>
 
                                         {/* MIRROR CONTAINER */}
                                         <div className="relative p-6 rounded-2xl bg-neutral-900/80 border border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.1)] overflow-hidden">
                                             <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-amber-500/5 to-transparent pointer-events-none" />
 
-                                            <div className="flex flex-col items-center gap-4 text-center relative z-10">
+                                            <div className="flex flex-col items-center gap-5 text-center relative z-10">
                                                 {/* Mirror Icon/Title */}
-                                                <div className="w-20 h-24 relative">
+                                                <div className="w-24 h-28 relative">
                                                     <img
                                                         src="/assets/images/mirror.png"
                                                         alt="Mirror"
                                                         className="w-full h-full object-contain filter drop-shadow-[0_0_15px_rgba(245,158,11,0.4)]"
                                                     />
                                                     <MirrorReflection
-                                                        mirrorSize={80}
+                                                        mirrorSize={90}
                                                         avatarUrl={selectedAvatar ? `/assets/images/avatars/${selectedAvatar}.png` : undefined}
                                                     />
                                                 </div>
 
-                                                <p className="text-amber-200/90 italic font-serif text-lg">
-                                                    "{lang(introData?.mirrorMsg || "LOBBY_MIRROR_FREEPLAY_MSG")}"
-                                                </p>
+                                                <div className="space-y-1">
+                                                    <div className="text-[10px] uppercase tracking-[0.3em] text-amber-500/40 font-black">Reflections</div>
+                                                    <p className="text-amber-200/90 italic font-serif text-xl leading-relaxed max-w-md">
+                                                        "{lang(introData?.mirrorMsg || "LOBBY_MIRROR_FREEPLAY_MSG")}"
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -616,7 +673,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                             </form>
 
                             {/* Randomize Button */}
-                            {step === 'form' && (
+                            {(step === 'form' && !isGeneratingIntro) && (
                                 <button
                                     onClick={handleRandomize}
                                     type="button"

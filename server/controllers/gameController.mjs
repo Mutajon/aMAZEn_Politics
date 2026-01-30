@@ -19,6 +19,31 @@ import {
 } from "../services/freePlayPrompts.mjs";
 import { getTheoryPrompt } from "../theory-loader.mjs";
 
+// Helper to map axis names (especially Hebrew ones) back to English keys
+function mapPhilosophicalAxis(rawAxis) {
+    if (!rawAxis) return null;
+    const axis = String(rawAxis).toLowerCase().trim();
+
+    const map = {
+        // English
+        'democracy': 'democracy',
+        'autonomy': 'autonomy',
+        'totalism': 'totalism',
+        'oligarchy': 'oligarchy',
+        'heteronomy': 'heteronomy',
+        'liberalism': 'liberalism',
+
+        // Hebrew (AI often translates these)
+        'דמוקרטיה': 'democracy',
+        'אוטונומיה': 'autonomy',
+        'טוטליזם': 'totalism',
+        'אוליגרכיה': 'oligarchy',
+        'הטרונומיה': 'heteronomy',
+        'ליברליזם': 'liberalism'
+    };
+
+    return map[axis] || axis;
+}
 
 /**
  * POST /api/reserve-game-slot
@@ -750,17 +775,22 @@ export async function freePlayTurn(req, res) {
 
             if (!parsed) throw new Error("Failed to parse Day 1 response");
 
-            // Store Conversation
+            const updatedAxes = {
+                democracy: 0, oligarchy: 0,
+                autonomy: 0, heteronomy: 0,
+                liberalism: 0, totalism: 0
+            };
+
+            // Day 1: No pills yet as no choices made
+            const axisPills = [];
+
+            // Store Conversation with zeroed axes
             const meta = {
                 type: 'free-play',
                 role, setting, playerName, emphasis, gender, language,
                 supportEntities: supportEntities || [],
                 support: { people: 50, holders: 50 },
-                philosophicalAxes: {
-                    democracy: 1, oligarchy: 1,
-                    autonomy: 1, heteronomy: 1,
-                    liberalism: 1, totalism: 1
-                },
+                philosophicalAxes: updatedAxes,
                 systemPrompt,
                 messages: [
                     { role: "user", content: userPrompt },
@@ -791,8 +821,7 @@ export async function freePlayTurn(req, res) {
                 return true;
             });
 
-            console.log('[freePlayTurn] axisPills:', parsed.axisPills);
-            console.log('[freePlayTurn] updatedAxes:', updatedAxes);
+            console.log('[freePlayTurn] Day 1: axisPills empty, axes zeroed');
 
             return res.json({
                 title: parsed.dilemma?.title || "Dilemma",
@@ -802,7 +831,7 @@ export async function freePlayTurn(req, res) {
                 dynamicParams: [], // Empty for Free Play
                 supportShift: null,
                 currentSupport: { people: 50, holders: 50 },
-                axisPills: parsed.axisPills || [],
+                axisPills: [],
                 philosophicalAxes: updatedAxes,
                 axisUsed: parsed.dilemma?.axisUsed || parsed.dilemma?.axis || "Unknown",
                 scopeUsed: parsed.dilemma?.scopeUsed || parsed.dilemma?.scope || "Unknown"
@@ -871,7 +900,9 @@ export async function freePlayTurn(req, res) {
             }
 
             // Update philosophical axes based on axisPills
-            const axisPills = parsed.axisPills || [];
+            const axisPillsRaw = parsed.axisPills || [];
+            const axisPills = axisPillsRaw.map(mapPhilosophicalAxis).filter(Boolean);
+
             const updatedAxes = {
                 ...(conversation.meta.philosophicalAxes || {
                     democracy: 0, oligarchy: 0, autonomy: 0, heteronomy: 0, liberalism: 0, totalism: 0

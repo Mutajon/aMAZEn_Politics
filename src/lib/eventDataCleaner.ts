@@ -122,10 +122,12 @@ export async function cleanAndAdvanceDay(
   // ========================================================================
   // STEP 3.5: Fetch and apply compass deltas IMMEDIATELY (Day 1+ with gameId)
   // This ensures compass values are updated BEFORE day advances
+  // SKIP THIS ENTIRELY FOR FREE PLAY (We use core philosophical axes instead)
   // ========================================================================
   const { day, gameId } = useDilemmaStore.getState();
+  const { isFreePlay } = useSettingsStore.getState();
 
-  if (day >= 1 && gameId) {
+  if (day >= 1 && gameId && !isFreePlay) {
     console.log('[Cleaner] Fetching compass deltas for current action...');
 
     try {
