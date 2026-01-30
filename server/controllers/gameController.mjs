@@ -755,7 +755,7 @@ export async function freePlayTurn(req, res) {
                 type: 'free-play',
                 role, setting, playerName, emphasis, gender, language,
                 supportEntities: supportEntities || [],
-                support: { people: 50, holders: 50, mom: 50 },
+                support: { people: 50, holders: 50 },
                 philosophicalAxes: {
                     democracy: 1, oligarchy: 1,
                     autonomy: 1, heteronomy: 1,
@@ -776,14 +776,29 @@ export async function freePlayTurn(req, res) {
 
             storeConversation(gameId, gameId, 'gemini', meta);
 
+            // Sanitize and deduplicate actions
+            let processedActions = (parsed.dilemma?.actions || []).map(a => ({
+                ...a,
+                title: (a.title || "").replace(/^\d+[\.\)\-]\s*/, '').replace(/\s*\(\d+\)$/, '').trim()
+            }));
+
+            // Basic deduplication
+            const seenTitles = new Set();
+            processedActions = processedActions.filter(a => {
+                const normalized = (a.title || "").toLowerCase();
+                if (seenTitles.has(normalized)) return false;
+                seenTitles.add(normalized);
+                return true;
+            });
+
             return res.json({
                 title: parsed.dilemma?.title || "Dilemma",
                 description: parsed.dilemma?.description || "Something happens...",
-                actions: parsed.dilemma?.actions || [],
+                actions: processedActions,
                 mirrorAdvice: parsed.mirrorAdvice,
-                dynamicParams: parsed.dynamicParams || [],
+                dynamicParams: [], // Empty for Free Play
                 supportShift: null,
-                currentSupport: { people: 50, holders: 50, mom: 50 },
+                currentSupport: { people: 50, holders: 50 },
                 axisPills: parsed.axisPills || [],
                 philosophicalAxes: meta.philosophicalAxes,
                 axisUsed: parsed.dilemma?.axisUsed || parsed.dilemma?.axis || "Unknown",
@@ -842,15 +857,14 @@ export async function freePlayTurn(req, res) {
             ];
 
             // Process support shift
-            const currentSupport = conversation.meta.support || { people: 50, holders: 50, mom: 50 };
+            const currentSupport = conversation.meta.support || { people: 50, holders: 50 };
             const supportShift = parsed.supportShift ? convertSupportShiftToDeltas(parsed.supportShift, currentSupport) : null;
 
             // Updated support
             const updatedSupport = { ...currentSupport };
             if (supportShift) {
-                updatedSupport.people = Math.max(0, Math.min(100, (updatedSupport.people || 50) + (supportShift.people?.delta || 0)));
-                updatedSupport.holders = Math.max(0, Math.min(100, (updatedSupport.holders || 50) + (supportShift.holders?.delta || 0)));
-                updatedSupport.mom = Math.max(0, Math.min(100, (updatedSupport.mom || 50) + (supportShift.mom?.delta || 0)));
+                if (supportShift.people) updatedSupport.people = Math.max(0, Math.min(100, (updatedSupport.people || 50) + (supportShift.people.delta || 0)));
+                if (supportShift.holders) updatedSupport.holders = Math.max(0, Math.min(100, (updatedSupport.holders || 50) + (supportShift.holders.delta || 0)));
             }
 
             // Update philosophical axes based on axisPills
@@ -886,12 +900,27 @@ export async function freePlayTurn(req, res) {
 
             storeConversation(gameId, gameId, 'gemini', updatedMeta);
 
+            // Sanitize and deduplicate actions
+            let processedActions = (parsed.dilemma?.actions || []).map(a => ({
+                ...a,
+                title: (a.title || "").replace(/^\d+[\.\)\-]\s*/, '').replace(/\s*\(\d+\)$/, '').trim()
+            }));
+
+            // Basic deduplication
+            const seenTitles = new Set();
+            processedActions = processedActions.filter(a => {
+                const normalized = (a.title || "").toLowerCase();
+                if (seenTitles.has(normalized)) return false;
+                seenTitles.add(normalized);
+                return true;
+            });
+
             return res.json({
                 title: parsed.dilemma?.title,
                 description: parsed.dilemma?.description,
-                actions: parsed.dilemma?.actions,
+                actions: processedActions,
                 mirrorAdvice: parsed.mirrorAdvice,
-                dynamicParams: parsed.dynamicParams,
+                dynamicParams: [], // Empty for Free Play
                 supportShift, // Numeric deltas and "why"
                 currentSupport: updatedSupport, // Absolute values 0-100
                 axisPills,

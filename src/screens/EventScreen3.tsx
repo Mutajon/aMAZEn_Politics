@@ -99,7 +99,7 @@ export default function EventScreen3({ push }: Props) {
       });
     }
 
-    if (supportMom < CRISIS_THRESHOLD) {
+    if (!isFreePlay && supportMom < CRISIS_THRESHOLD) {
       crisisArray.push({
         entity: "Personal Anchor",
         currentSupport: supportMom,
@@ -108,7 +108,7 @@ export default function EventScreen3({ push }: Props) {
     }
 
     return crisisArray;
-  }, [supportPeople, supportMiddle, supportMom, analysis]);
+  }, [supportPeople, supportMiddle, supportMom, analysis, isFreePlay]);
 
   // Data collection (progressive 3-phase loading)
   const {
@@ -169,7 +169,7 @@ export default function EventScreen3({ push }: Props) {
   const { startPrefetch: startAftermathPrefetch } = useAftermathPrefetch();
 
   // Tutorial system (Day 2 only)
-  const tutorial = useDay2Tutorial();
+  const tutorial = useDay2Tutorial(isFreePlay);
   const [tutorialAvatarRef, setTutorialAvatarRef] = useState<HTMLElement | null>(null);
   const [tutorialValueRef, setTutorialValueRef] = useState<HTMLElement | null>(null);
   const [tutorialPillsRef, setTutorialPillsRef] = useState<HTMLElement | null>(null);
@@ -237,32 +237,37 @@ export default function EventScreen3({ push }: Props) {
       ? getLocalizedHolderName(analysis.challengerSeat.name, lang)
       : lang("FINAL_SCORE_POWER_HOLDERS_SUPPORT"));
 
+    const components: ResourceBarScoreDetails["components"] = [
+      {
+        id: "people" as const,
+        label: analysis?.holders?.[2]?.name || lang("FINAL_SCORE_PUBLIC_SUPPORT"),
+        valueLabel: `${breakdown.support.people.percent}%`,
+        points: breakdown.support.people.points,
+        maxPoints: breakdown.support.people.maxPoints,
+      },
+      {
+        id: "middle" as const,
+        label: middleLabel,
+        valueLabel: `${breakdown.support.middle.percent}%`,
+        points: breakdown.support.middle.points,
+        maxPoints: breakdown.support.middle.maxPoints,
+      }
+    ];
+
+    if (!isFreePlay) {
+      components.push({
+        id: "mom" as const,
+        label: lang("FINAL_SCORE_MOM_SUPPORT"),
+        valueLabel: `${breakdown.support.mom.percent}%`,
+        points: breakdown.support.mom.points,
+        maxPoints: breakdown.support.mom.maxPoints,
+      });
+    }
+
     return {
       total: breakdown.final,
       maxTotal: breakdown.maxFinal,
-      components: [
-        {
-          id: "people" as const,
-          label: analysis?.holders?.[2]?.name || lang("FINAL_SCORE_PUBLIC_SUPPORT"),
-          valueLabel: `${breakdown.support.people.percent}%`,
-          points: breakdown.support.people.points,
-          maxPoints: breakdown.support.people.maxPoints,
-        },
-        {
-          id: "middle" as const,
-          label: middleLabel,
-          valueLabel: `${breakdown.support.middle.percent}%`,
-          points: breakdown.support.middle.points,
-          maxPoints: breakdown.support.middle.maxPoints,
-        },
-        {
-          id: "mom" as const,
-          label: lang("FINAL_SCORE_MOM_SUPPORT"),
-          valueLabel: `${breakdown.support.mom.percent}%`,
-          points: breakdown.support.mom.points,
-          maxPoints: breakdown.support.mom.maxPoints,
-        },
-      ],
+      components
     } as const;
   }, [
     supportPeople,
@@ -270,6 +275,7 @@ export default function EventScreen3({ push }: Props) {
     supportMom,
     analysis?.challengerSeat?.name,
     lang,
+    isFreePlay
   ]);
 
   // ========================================================================
@@ -1063,8 +1069,8 @@ export default function EventScreen3({ push }: Props) {
             <SupportList items={supportItems} animateDurationMs={5000} />
           )}
 
-          {/* Step 3+: DynamicParameters - Shows 1-3 narrative impacts with emoji (Day 2+ only) */}
-          {presentationStep >= 3 && day >= 2 && (
+          {/* Step 3+: DynamicParameters - Shows 1-3 narrative impacts with emoji (Day 2+ only, Hidden in Free Play) */}
+          {presentationStep >= 3 && day >= 2 && !isFreePlay && (
             <DynamicParameters items={parameterItems} />
           )}
 

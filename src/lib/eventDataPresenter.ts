@@ -261,7 +261,7 @@ export function buildSupportItems(
   const middleEffect = getEffectData("middle");
   const momEffect = getEffectData("mom");
 
-  return [
+  const allItems = [
     {
       id: "people",
       name: populationInfo.name,
@@ -300,4 +300,11 @@ export function buildSupportItems(
       isDeceased: !momAlive, // NEW: Pass deceased flag to UI
     }
   ];
+
+  // In Free Play, completely remove the "Mother" track (id: 'mom')
+  if (isFreePlay) {
+    return allItems.filter(item => item.id !== 'mom');
+  }
+
+  return allItems;
 }

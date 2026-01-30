@@ -560,7 +560,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                             <button
                                 onClick={handleRandomize}
                                 type="button"
-                                className="absolute top-6 left-6 p-2 rounded-full hover:bg-white/5 text-white/40 hover:text-white transition-all group"
+                                className="absolute top-6 left-6 p-2 rounded-full hover:bg-white/5 text-amber-500/80 hover:text-amber-400 transition-all group shadow-[0_0_15px_rgba(245,158,11,0.2)]"
                                 title={lang("LOBBY_RANDOMIZE") || "Randomize"}
                             >
                                 <Dices className="w-6 h-6 transition-transform group-hover:rotate-180 duration-500" />

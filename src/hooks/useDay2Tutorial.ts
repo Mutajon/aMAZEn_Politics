@@ -10,7 +10,7 @@ export type TutorialStep =
   | 'awaiting-compass-pills'
   | 'complete';
 
-export function useDay2Tutorial() {
+export function useDay2Tutorial(isFreePlay: boolean = false) {
   const [tutorialStep, setTutorialStep] = useState<TutorialStep>('inactive');
   const [tutorialCompleted, setTutorialCompleted] = useState<boolean>(() => {
     return localStorage.getItem(TUTORIAL_STORAGE_KEY) === 'true';
@@ -26,11 +26,20 @@ export function useDay2Tutorial() {
   // Handle avatar being clicked - advance to awaiting-value after delay
   const onAvatarOpened = useCallback(() => {
     if (tutorialStep === 'awaiting-avatar') {
-      setTimeout(() => {
-        setTutorialStep('awaiting-value');
-      }, 1000);
+      if (isFreePlay) {
+        // Special case: In Free Play mode, we only have one step.
+        // Once the avatar is opened, the tutorial is complete.
+        console.log('[Tutorial] Free Play mode detected: Completing tutorial after avatar opened');
+        setTutorialStep('complete');
+        localStorage.setItem(TUTORIAL_STORAGE_KEY, 'true');
+        setTutorialCompleted(true);
+      } else {
+        setTimeout(() => {
+          setTutorialStep('awaiting-value');
+        }, 1000);
+      }
     }
-  }, [tutorialStep]);
+  }, [tutorialStep, isFreePlay]);
 
   // Handle a value being clicked - hide overlay while viewing details
   const onValueClicked = useCallback(() => {

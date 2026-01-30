@@ -471,19 +471,19 @@ async function fetchGameTurn(
       }));
     }
 
-    // STEP 0: Save previous support values BEFORE updating (for crisis context)
+    // STEP 0: Save previous support values BEFORE updating
     const { savePreviousSupport } = useDilemmaStore.getState();
     savePreviousSupport();
 
-    // STEP 1: Calculate new values
-    const newPeople = Math.max(0, Math.min(100, supportPeople + people.delta));
-    const newMom = Math.max(0, Math.min(100, supportMom + mom.delta));
-    const newMiddle = Math.max(0, Math.min(100, supportMiddle + holders.delta));
+    // STEP 1: Calculate new values (only for provided tracks)
+    const newPeople = people ? Math.max(0, Math.min(100, supportPeople + (people.delta || 0))) : supportPeople;
+    const newMiddle = holders ? Math.max(0, Math.min(100, supportMiddle + (holders.delta || 0))) : supportMiddle;
+    const newMom = mom ? Math.max(0, Math.min(100, supportMom + (mom.delta || 0))) : supportMom;
 
     // STEP 2: Apply new support values
     setSupportPeople(newPeople);
-    setSupportMom(newMom);
     setSupportMiddle(newMiddle);
+    setSupportMom(newMom);
 
     console.log('[fetchGameTurn] 📊 Support values updated:', {
       people: `${supportPeople} → ${newPeople}`,
@@ -491,49 +491,30 @@ async function fetchGameTurn(
       mom: `${supportMom} → ${newMom}`
     });
 
-    // STEP 3: DETECT CRISIS after support updates (NEW TIMING!)
-    // This fixes the one-day lag issue - crisis is detected immediately when drop occurs
+    // STEP 3: Detect crisis
     const { detectAndSetCrisis, clearCrisis } = useDilemmaStore.getState();
-
-    // Clear previous crisis state first
     clearCrisis();
-
-    // Detect new crisis based on updated values
     const detectedCrisis = detectAndSetCrisis();
+    if (detectedCrisis) console.log('[fetchGameTurn] 🚨 CRISIS DETECTED:', detectedCrisis);
 
-    if (detectedCrisis) {
-      console.log('[fetchGameTurn] 🚨 CRISIS DETECTED:', detectedCrisis);
-    } else {
-      console.log('[fetchGameTurn] ✅ No crisis - all support tracks healthy');
-    }
-
-    // STEP 4: Update minimum values for continuous goal tracking
+    // STEP 4: Update minimum values
     const { updateMinimumValues, evaluateGoals } = useDilemmaStore.getState();
     updateMinimumValues();
-    console.log('[fetchGameTurn] ✅ Minimum values updated after support shifts');
 
     // STEP 5: Re-evaluate goals
     const goalChanges = evaluateGoals();
-    console.log('[fetchGameTurn] ✅ Goals re-evaluated after support shifts');
-
-    // Play achievement sound if any goal status changed
     if (goalChanges.length > 0) {
-      console.log('[fetchGameTurn] 🎵 Goal status changed, playing achievement sound:', goalChanges);
       audioManager.playSfx('achievement');
-
       goalChanges.forEach(change => {
-        window.dispatchEvent(new CustomEvent('goal-status-changed', {
-          detail: change
-        }));
+        window.dispatchEvent(new CustomEvent('goal-status-changed', { detail: change }));
       });
     }
 
     // Store support effects for UI
-    supportEffects = [
-      { id: "people", delta: people.delta, explain: people.why },
-      { id: "mom", delta: mom.delta, explain: mom.why },
-      { id: "middle", delta: holders.delta, explain: holders.why }
-    ];
+    supportEffects = [];
+    if (people) supportEffects.push({ id: "people", delta: people.delta, explain: people.why });
+    if (holders) supportEffects.push({ id: "middle", delta: holders.delta, explain: holders.why });
+    if (mom) supportEffects.push({ id: "mom", delta: mom.delta, explain: mom.why });
   }
 
   // Update live score once all resource values have been applied.
