@@ -1,8 +1,10 @@
 {
   "GAME_TITLE": "Democracy Game",
+  "HISTORY_OF_DECISIONS": "Decision History",
   "WELCOME_MESSAGE": "Welcome to the Democracy Game!",
   "START_GAME": "Start Game",
   "LOADING": "Loading...",
+  "SUPPORT_VALUES_TITLE": "SUPPORT VALUES",
   "PLAYER_NAME": "Player Name",
   "ENTER_NAME": "Enter your name",
   "CONTINUE": "Continue",

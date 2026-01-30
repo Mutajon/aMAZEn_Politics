@@ -163,6 +163,7 @@ type DilemmaState = {
 
   // Philosophical axes (Free Play mode) - 0-7 scale
   philosophicalAxes: Record<PhilosophicalPole, number>;
+  freePlayHistory: Array<{ day: number; title: string; pills: PhilosophicalPole[] }>;
 
   nextDay: () => void;
   setTotalDays: (n: number) => void;
@@ -379,6 +380,7 @@ export const useDilemmaStore = create<DilemmaState>()(
         autonomy: 0, heteronomy: 0,
         liberalism: 0, totalism: 0
       },
+      freePlayHistory: [],
 
 
       nextDay() {
@@ -485,6 +487,7 @@ export const useDilemmaStore = create<DilemmaState>()(
           selfJudgment: null,
           justFinishedGame: false,
           lastGameScore: null,
+          freePlayHistory: [],
         });
       },
 
@@ -1050,6 +1053,10 @@ export const useDilemmaStore = create<DilemmaState>()(
 
         dlog("applyAxisPills ->", pills);
 
+        // Get current day and dilemma title for history
+        const { day, current } = get();
+        const dilemmaTitle = current?.title || "Unknown Dilemma";
+
         set(state => {
           const next = { ...state.philosophicalAxes };
           pills.forEach(pill => {
@@ -1057,7 +1064,23 @@ export const useDilemmaStore = create<DilemmaState>()(
               next[pill] = Math.min(7, next[pill] + 1);
             }
           });
-          return { philosophicalAxes: next };
+
+          // Add to history
+          // Only add if not already present for this day (simple de-dupe)
+          const history = [...state.freePlayHistory];
+          const existing = history.find(h => h.day === day);
+
+          if (!existing && pills.length > 0) {
+            history.push({ day, title: dilemmaTitle, pills });
+          } else if (existing) {
+            // Append pills if entry exists (rare case of split updates)
+            const newPills = pills.filter(p => !existing.pills.includes(p));
+            if (newPills.length > 0) {
+              existing.pills = [...existing.pills, ...newPills];
+            }
+          }
+
+          return { philosophicalAxes: next, freePlayHistory: history };
         });
       },
 

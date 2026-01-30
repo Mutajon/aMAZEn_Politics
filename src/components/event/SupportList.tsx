@@ -66,6 +66,7 @@ export default function SupportList({
 
   return (
     <div className="border-slate-400/30 bg-slate-900/60 backdrop-blur-sm rounded-2xl p-3 md:p-4">
+      <h3 className="text-[10px] uppercase tracking-widest font-bold text-white/40 mb-3 px-1">{lang("SUPPORT_VALUES_TITLE")}</h3>
       <div className="space-y-2 md:space-y-2">
         {items.map((it, index) => (
           <SupportCard
@@ -282,14 +283,14 @@ function SupportCard({
       transition={
         isCrisis
           ? {
-              opacity: { duration: 2, repeat: Infinity, ease: "easeInOut" }, // Continuous pulse
-              x: { duration: 0.5, delay: index * 0.2, ease: [0.25, 0.46, 0.45, 0.94] } // Initial slide-in
-            }
+            opacity: { duration: 2, repeat: Infinity, ease: "easeInOut" }, // Continuous pulse
+            x: { duration: 0.5, delay: index * 0.2, ease: [0.25, 0.46, 0.45, 0.94] } // Initial slide-in
+          }
           : {
-              duration: 0.5,
-              delay: index * 0.2, // Stagger: 0s, 0.2s, 0.4s
-              ease: [0.25, 0.46, 0.45, 0.94] // easeOutQuart
-            }
+            duration: 0.5,
+            delay: index * 0.2, // Stagger: 0s, 0.2s, 0.4s
+            ease: [0.25, 0.46, 0.45, 0.94] // easeOutQuart
+          }
       }
       onClick={handleClick}
       onKeyDown={handleKeyDown}
@@ -321,8 +322,8 @@ function SupportCard({
                 isCrisis
                   ? "bg-red-500/25 border-red-400/60 text-red-200" // Crisis: bright red styling
                   : isLow
-                  ? "bg-white/10 border-white/15 text-rose-300" // Warning: subtle red text
-                  : "bg-white/10 border-white/15 text-white", // Normal: white
+                    ? "bg-white/10 border-white/15 text-rose-300" // Warning: subtle red text
+                    : "bg-white/10 border-white/15 text-white", // Normal: white
               ].join(" ")}
             >
               {pctDisplay}%
@@ -371,7 +372,7 @@ function SupportCard({
                     transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut", type: "tween" }}
                     className="inline-block will-change-transform"
                   >
-                    <ArrowDown className={`${ARROW_SIZE_CLASS}`} strokeWidth={2.5} color="#fca5a5"/>
+                    <ArrowDown className={`${ARROW_SIZE_CLASS}`} strokeWidth={2.5} color="#fca5a5" />
                   </motion.span>
                 )}
               </div>

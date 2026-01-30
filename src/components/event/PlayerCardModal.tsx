@@ -15,7 +15,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, User } from "lucide-react";
+import { X, User, ShieldCheck } from "lucide-react";
 import { PROPERTIES, PALETTE, COMPONENTS, type PropKey } from "../../data/compass-data";
 import { getAllTopCompassValues, type CompassComponentValue } from "../../lib/compassHelpers";
 import { useRoleStore } from "../../store/roleStore";
@@ -150,6 +150,7 @@ export default function PlayerCardModal({
   const roleDescription = useRoleStore((s) => s.roleDescription);
   const compassValues = useCompassStore((s) => s.values); // Live compass values
   const philosophicalAxes = useDilemmaStore((s) => s.philosophicalAxes); // Philosophical axes (Free Play)
+  const freePlayHistory = useDilemmaStore((s) => s.freePlayHistory);
   const isFreePlay = useSettingsStore((s) => s.isFreePlay);
 
   // Tutorial: select a random value to highlight
@@ -348,6 +349,36 @@ export default function PlayerCardModal({
                 </div>
               )}
             </div>
+
+            {/* Free Play History Section */}
+            {isFreePlay && freePlayHistory.length > 0 && (
+              <div className="border-t border-white/10 pt-4 mt-2">
+                <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3 px-1">
+                  {lang("HISTORY_OF_DECISIONS")}
+                </h3>
+                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                  {[...freePlayHistory].reverse().map((entry) => (
+                    <div key={entry.day} className="bg-white/5 rounded-lg p-3 border border-white/5 hover:bg-white/10 transition-colors">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="text-xs text-white/40 uppercase font-mono mt-0.5">Day {entry.day}</span>
+                      </div>
+                      <p className="text-white/90 font-medium mb-3 text-sm leading-relaxed">{entry.title}</p>
+
+                      {entry.pills.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {entry.pills.map((pill, i) => (
+                            <div key={i} className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-xs">
+                              <ShieldCheck className="w-3 h-3 text-indigo-400" />
+                              <span>{lang(`PHILOSOPHICAL_POLE_${pill.toUpperCase()}`)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </motion.div>
       </div>

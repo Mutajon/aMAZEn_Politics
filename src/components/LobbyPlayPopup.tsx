@@ -48,11 +48,20 @@ const ROLE_PRESETS = [
 ];
 
 // Avatar options - corresponds to sliced images in /public/assets/images/avatars/
-const AVATAR_LIST = [
+const MALE_AVATARS = [
     "roman_senator", "pharaoh", "medieval_king", "asian_emperor", "african_king",
-    "elizabethan_queen", "washington", "lincoln_young", "suffragette", "victorian_man",
-    "civil_rights_leader", "president_elder", "businesswoman", "activist_elder", "entrepreneur",
-    "politician_woman", "politician_man", "young_professional", "elder_woman", "young_activist"
+    "washington", "lincoln_young", "victorian_man", "civil_rights_leader",
+    "president_elder", "politician_man", "entrepreneur", "young_professional"
+];
+
+const FEMALE_AVATARS = [
+    "elizabethan_queen", "suffragette", "businesswoman", "activist_elder",
+    "politician_woman", "elder_woman", "young_activist"
+];
+
+const AVATAR_LIST = [
+    ...MALE_AVATARS,
+    ...FEMALE_AVATARS
 ];
 
 export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }: LobbyPlayPopupProps) {
@@ -180,26 +189,32 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     const handleRandomize = () => {
         audioManager.playSfx("click-soft");
 
-        // Random Avatar
-        const randomIndex = Math.floor(Math.random() * AVATAR_LIST.length);
-        const randomAvatar = AVATAR_LIST[randomIndex];
+        // 1. Random Gender
+        const genders = ['male', 'female', 'other'];
+        const newGender = genders[Math.floor(Math.random() * genders.length)];
+        setGender(newGender);
+
+        // 2. Filter Avatars based on Gender
+        let availableAvatars = AVATAR_LIST;
+        if (newGender === 'male') availableAvatars = MALE_AVATARS;
+        if (newGender === 'female') availableAvatars = FEMALE_AVATARS;
+
+        // 3. Random Avatar from filtered list
+        const randomAvatar = availableAvatars[Math.floor(Math.random() * availableAvatars.length)];
         setSelectedAvatar(randomAvatar);
 
-        // Scroll to selected avatar
-        if (avatarScrollRef.current) {
+        // Scroll to selected avatar in the main list
+        const mainIndex = AVATAR_LIST.indexOf(randomAvatar);
+        if (avatarScrollRef.current && mainIndex !== -1) {
             const container = avatarScrollRef.current;
             const itemWidth = 80; // w-20
             const gap = 12; // gap-3
-            const scrollLeft = randomIndex * (itemWidth + gap) - (container.offsetWidth / 2) + (itemWidth / 2);
+            const scrollLeft = mainIndex * (itemWidth + gap) - (container.offsetWidth / 2) + (itemWidth / 2);
             container.scrollTo({
                 left: scrollLeft,
                 behavior: 'smooth'
             });
         }
-
-        // Random Gender
-        const genders = ['male', 'female', 'other'];
-        setGender(genders[Math.floor(Math.random() * genders.length)]);
 
         // Random Difficulty
         const difficulties = ['easy', 'normal', 'hard'];

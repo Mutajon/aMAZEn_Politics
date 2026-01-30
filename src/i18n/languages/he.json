@@ -1,9 +1,11 @@
 {
   "_comment": "Hebrew translations - Updated 2026-01-03",
   "GAME_TITLE": "משחק הדמוקרטיה",
+  "HISTORY_OF_DECISIONS": "היסטוריית החלטות",
   "WELCOME_MESSAGE": "ברוכים הבאים למשחק הדמוקרטיה!",
   "START_GAME": "התחל משחק",
   "LOADING": "טוען...",
+  "SUPPORT_VALUES_TITLE": "אחוזי תמיכה",
   "PLAYER_NAME": "שם השחקן",
   "ENTER_NAME": "הכנס את שמך",
   "CONTINUE": "המשך",
