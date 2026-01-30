@@ -51,8 +51,9 @@ const PhilosophicalRadarChart: React.FC<PhilosophicalRadarChartProps> = ({
     const maxVal = 7;
 
     const getPoint = (index: number, value: number, rOverride?: number) => {
+        const val = typeof value === 'number' && !isNaN(value) ? value : 0;
         const angle = (index * 60 - 90) * (Math.PI / 180);
-        const r = rOverride !== undefined ? rOverride : (Math.max(0, value) / maxVal) * radius;
+        const r = rOverride !== undefined ? rOverride : (Math.max(0, val) / maxVal) * radius;
         return {
             x: center + r * Math.cos(angle),
             y: center + r * Math.sin(angle)

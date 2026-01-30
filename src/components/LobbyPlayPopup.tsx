@@ -5,7 +5,6 @@ import { audioManager } from "../lib/audioManager";
 import { useLang } from "../i18n/lang";
 import { useLanguage } from "../i18n/LanguageContext";
 import { MirrorReflection } from "./MirrorWithReflection";
-import { useSettingsStore } from "../store/settingsStore";
 
 interface LobbyPlayPopupProps {
     isOpen: boolean;
@@ -60,7 +59,6 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     const lang = useLang();
     const { language } = useLanguage();
     const isRTL = language === 'he';
-    const debugMode = useSettingsStore(s => s.debugMode);
 
     const [characterName, setCharacterName] = useState("");
     const [setting, setSetting] = useState("");
@@ -619,26 +617,14 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
 
                             {/* Randomize Button */}
                             {step === 'form' && (
-                                <div className="absolute top-6 left-6 flex items-center gap-2">
-                                    <button
-                                        onClick={handleRandomize}
-                                        type="button"
-                                        className="p-2 rounded-full hover:bg-white/5 text-amber-500/80 hover:text-amber-400 transition-all group shadow-[0_0_15px_rgba(245,158,11,0.2)]"
-                                        title={lang("LOBBY_RANDOMIZE") || "Randomize"}
-                                    >
-                                        <Dices className="w-6 h-6 transition-transform group-hover:rotate-180 duration-500" />
-                                    </button>
-
-                                    {/* DEBUG: Re-show tutorial button */}
-                                    {debugMode && (
-                                        <button
-                                            onClick={() => setShowDiceOverlay(true)}
-                                            className="px-2 py-1 text-[10px] bg-white/5 hover:bg-white/10 text-white/40 rounded border border-white/10 uppercase tracking-tighter"
-                                        >
-                                            Show Instructions
-                                        </button>
-                                    )}
-                                </div>
+                                <button
+                                    onClick={handleRandomize}
+                                    type="button"
+                                    className="absolute top-6 left-6 p-2 rounded-full hover:bg-white/5 text-amber-500/80 hover:text-amber-400 transition-all group shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+                                    title={lang("LOBBY_RANDOMIZE") || "Randomize"}
+                                >
+                                    <Dices className="w-6 h-6 transition-transform group-hover:rotate-180 duration-500" />
+                                </button>
                             )}
 
                             {/* Close Button */}

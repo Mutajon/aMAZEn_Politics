@@ -791,6 +791,9 @@ export async function freePlayTurn(req, res) {
                 return true;
             });
 
+            console.log('[freePlayTurn] axisPills:', parsed.axisPills);
+            console.log('[freePlayTurn] updatedAxes:', updatedAxes);
+
             return res.json({
                 title: parsed.dilemma?.title || "Dilemma",
                 description: parsed.dilemma?.description || "Something happens...",
@@ -800,7 +803,7 @@ export async function freePlayTurn(req, res) {
                 supportShift: null,
                 currentSupport: { people: 50, holders: 50 },
                 axisPills: parsed.axisPills || [],
-                philosophicalAxes: meta.philosophicalAxes,
+                philosophicalAxes: updatedAxes,
                 axisUsed: parsed.dilemma?.axisUsed || parsed.dilemma?.axis || "Unknown",
                 scopeUsed: parsed.dilemma?.scopeUsed || parsed.dilemma?.scope || "Unknown"
             });

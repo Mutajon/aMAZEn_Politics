@@ -167,6 +167,7 @@ async function fetchGameTurn(
   axisExplored?: string;   // The political axis being explored
   scopeUsed?: string;      // The situation scope being used
   axisPills?: PhilosophicalPole[]; // Philosophical poles supported by action
+  philosophicalAxes?: Record<PhilosophicalPole, number>;
 }> {
   const {
     gameId,
@@ -681,7 +682,7 @@ async function fetchGameTurn(
   const axisExplored = data.axisUsed || data.axisExplored || undefined;
   const scopeUsed = data.scopeUsed || undefined;
 
-  console.log(`[fetchGameTurn] ✅ Unified response received: ${data.actions.length} actions, 0 pills (pills fetched separately), ${dynamicParams.length} params, valueTargeted=${valueTargeted || 'N/A'}, axisExplored=${axisExplored || 'N/A'}`);
+  console.log(`[fetchGameTurn] ✅ Unified response received: ${data.actions.length} actions, ${data.axisPills?.length || 0} axisPills, ${dynamicParams.length} params, valueTargeted=${valueTargeted || 'N/A'}, axisExplored=${axisExplored || 'N/A'}`);
 
   return {
     dilemma,
@@ -692,7 +693,9 @@ async function fetchGameTurn(
     mirrorText,
     valueTargeted,
     axisExplored,
-    scopeUsed
+    scopeUsed,
+    axisPills: data.axisPills || [],
+    philosophicalAxes: data.philosophicalAxes
   };
 }
 
@@ -1042,7 +1045,7 @@ export function useEventDataCollector() {
           axisPills
         } = turnData;
 
-        console.log(`[Collector] ✅ Unified data received for Day ${day} (attempt ${attempt})`);
+        console.log(`[Collector] ✅ Unified data received for Day ${day} (axisPills: ${axisPills?.length || 0})`);
 
         // ========================================================================
         // LOG AI OUTPUTS ONCE AT SOURCE (prevents duplication from reactive effects)
@@ -1079,11 +1082,6 @@ export function useEventDataCollector() {
         // Reset inquiry credits for new dilemma (treatment-based feature)
         useDilemmaStore.getState().resetInquiryCredits();
 
-        // Apply philosophical axis pills if in Free Play mode
-        if (useSettingsStore.getState().isFreePlay && axisPills) {
-          useDilemmaStore.getState().applyAxisPills(axisPills);
-        }
-
         // Mark collecting as done - UI can render!
         setIsCollecting(false);
 
@@ -1092,17 +1090,13 @@ export function useEventDataCollector() {
           onReadyCallbackRef.current();
         }
 
-        // Set Phase 2 data (dynamic params only)
-        // NOTE: Compass pills are NO LONGER fetched here!
-        // They're now fetched and applied in eventDataCleaner.ts (Step 3.5)
-        // IMMEDIATELY after action confirmation, BEFORE day advancement.
-        // This fixes the one-day delay where compass values weren't updated until the next day.
-        setPhase2Data({ compassPills: null, dynamicParams });
+        // Set Phase 2 data (dynamic params + axis pills)
+        setPhase2Data({ compassPills: null, dynamicParams, axisPills });
 
         // Set Phase 3 data (mirror advice)
         setPhase3Data({ mirrorText });
 
-        console.log(`[Collector] ✅ All 3 phases populated from unified response`);
+        console.log(`[Collector] ✅ All 3 phases populated from unified response. axisPills:`, axisPills);
 
         // SUCCESS! Exit the retry loop
         return;

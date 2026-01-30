@@ -51,6 +51,7 @@ export default function PhilosophicalPillsOverlay({
 
     useEffect(() => {
         if (!loading && pills.length > 0 && !hasStarted) {
+            console.log('[PillsOverlay] 💊 New pills received for animation:', pills);
             setHasStarted(true);
             setActivePills(pills);
         } else if (loading || pills.length === 0) {
@@ -70,6 +71,7 @@ export default function PhilosophicalPillsOverlay({
                 // Update actual store value
                 const pole = activePills[index];
                 if (pole) {
+                    console.log(`[PillsOverlay] 🎯 Pill hit! Applying +1 to ${pole}`);
                     useDilemmaStore.getState().applyAxisPills([pole]);
                 }
 
