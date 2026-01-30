@@ -15,6 +15,12 @@ const PhilosophicalRadarChart: React.FC<PhilosophicalRadarChartProps> = ({
 }) => {
     const [selectedPole, setSelectedPole] = useState<PhilosophicalPole | null>(null);
     const [hoveredPole, setHoveredPole] = useState<PhilosophicalPole | null>(null);
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
     const { lang, language } = useLanguage();
     const isHe = language === 'he';
 
@@ -93,6 +99,8 @@ const PhilosophicalRadarChart: React.FC<PhilosophicalRadarChartProps> = ({
     // Grid levels
     const gridLevels = [1, 2, 3, 4, 5, 6, 7];
 
+    if (!isMounted) return null;
+
     return (
         <div className="relative flex flex-col items-center justify-center p-12 bg-black/40 rounded-[2.5rem] border border-white/10 backdrop-blur-2xl shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] overflow-hidden" style={{ width: size + 140, height: size + 100 }}>
             {/* Background Glows */}
@@ -153,7 +161,7 @@ const PhilosophicalRadarChart: React.FC<PhilosophicalRadarChartProps> = ({
                     stroke="white"
                     strokeWidth={4}
                     strokeLinejoin="round"
-                    filter="url(#chart-glow)"
+                    // Removed chart-glow filter to prevent bounding box artifacts
                     animate={{ points: polygonPoints }}
                     transition={{
                         duration: 1.5,
@@ -179,7 +187,7 @@ const PhilosophicalRadarChart: React.FC<PhilosophicalRadarChartProps> = ({
                                 onMouseLeave={() => setHoveredPole(null)}
                                 onClick={() => setSelectedPole(pole)}
                             />
-                            {/* The actual visible dot */}
+                            {/* The actual visible dot - Filter removed to fix bounding box artifact */}
                             <motion.circle
                                 cx={x}
                                 cy={y}
@@ -187,7 +195,6 @@ const PhilosophicalRadarChart: React.FC<PhilosophicalRadarChartProps> = ({
                                 fill={colors[pole]}
                                 stroke="white"
                                 strokeWidth={2}
-                                filter="url(#chart-glow)"
                                 animate={{ cx: x, cy: y, r: isHovered ? 8 : 6 }}
                                 transition={{
                                     duration: 1.5,

@@ -47,6 +47,7 @@ export default function PhilosophicalPillsOverlay({
             console.log('[PillsOverlay] 💊 New pills received for animation:', pills);
             setHasStarted(true);
             setActivePills(pills);
+            playSfx('achievement'); // Play sound once per batch, similar to compass overlay
         } else if (loading || pills.length === 0) {
             setHasStarted(false);
             setActivePills([]);
@@ -72,7 +73,6 @@ export default function PhilosophicalPillsOverlay({
                     }, 0);
                 }
 
-                playSfx('fragment-collected'); // Subtle hit sound
                 return { ...prev, [index]: 'done' };
             }
             return prev;
