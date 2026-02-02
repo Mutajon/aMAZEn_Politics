@@ -504,6 +504,67 @@ const resetLobbyGames = () => {
   return values;
 };
 
+// -------------------- Email Testing Commands --------------------
+// Test email configuration
+(window as any).testEmailConfig = async () => {
+  try {
+    console.log('📧 Testing email configuration...');
+    const response = await fetch('/api/test-email-config');
+    const result = await response.json();
+    
+    if (result.success) {
+      console.log('✅ Email configuration is valid');
+      console.log('📨 Ready to send notifications');
+    } else {
+      console.log('❌ Email configuration test failed');
+      console.log('⚠️  Check EMAIL_USER and EMAIL_PASS in .env');
+    }
+    return result;
+  } catch (error) {
+    console.error('❌ Failed to test email config:', error);
+  }
+};
+
+// Send a test threshold email
+(window as any).testThresholdEmail = async (gamesRemaining = 50) => {
+  try {
+    console.log(`📧 Sending test threshold email for ${gamesRemaining} games remaining...`);
+    const response = await fetch('/api/test-threshold-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gamesRemaining })
+    });
+    const result = await response.json();
+    
+    if (result.success) {
+      console.log('✅ Test email sent successfully');
+      console.log('📬 Check the recipient inbox');
+    } else {
+      console.log('❌ Failed to send test email');
+    }
+    return result;
+  } catch (error) {
+    console.error('❌ Failed to send test email:', error);
+  }
+};
+
+// Reset email flag (allows sending threshold email again)
+(window as any).resetEmailFlag = async () => {
+  try {
+    console.log('🔄 Resetting email flag...');
+    const response = await fetch('/api/reset-email-flag', { method: 'POST' });
+    const result = await response.json();
+    
+    if (result.success) {
+      console.log('✅ Email flag reset successfully');
+      console.log('📧 Threshold email can be sent again');
+    }
+    return result;
+  } catch (error) {
+    console.error('❌ Failed to reset email flag:', error);
+  }
+};
+
 // HIDDEN FOR EXPERIMENTAL DISTRIBUTION
 // Console commands are still available but not advertised to users
 // Log available commands

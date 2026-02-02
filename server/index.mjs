@@ -54,6 +54,7 @@ import { registerUser, generateIntroParagraph, validateRole, extractTrait } from
 import { reserveGameSlot, gameTurnV2, gameTurnCleanup, generateAftermath, answerInquiry, freePlayIntro, freePlayTurn } from "./controllers/gameController.mjs";
 import { suggestBackground, analyzeCompass, generateNewsTicker, validateSuggestion, generateDynamicParameters, suggestScenario, seedNarrative } from "./controllers/contentController.mjs";
 import { textToSpeech } from "./controllers/voiceController.mjs";
+import { testEmailConfiguration, sendThresholdAlert, resetEmailFlag } from "./services/emailService.mjs";
 
 // -------------------- Process Error Handlers ---------------------------
 /**
@@ -247,6 +248,49 @@ app.post("/api/motivations-questionnaire", async (req, res) => {
 
 // -------------------- Game Slot Reservation --------------------
 app.post("/api/reserve-game-slot", reserveGameSlot);
+
+// -------------------- Email Testing Endpoints --------------------
+// Test email configuration
+app.get("/api/test-email-config", async (req, res) => {
+  try {
+    const isValid = await testEmailConfiguration();
+    res.json({ 
+      success: isValid,
+      message: isValid ? "Email configuration is valid" : "Email configuration test failed"
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Send a test threshold alert
+app.post("/api/test-threshold-email", async (req, res) => {
+  try {
+    const { gamesRemaining = 50 } = req.body;
+    await sendThresholdAlert(gamesRemaining, 50);
+    res.json({ 
+      success: true,
+      message: `Test email sent for ${gamesRemaining} games remaining`
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Reset email flag (for testing)
+app.post("/api/reset-email-flag", (req, res) => {
+  resetEmailFlag();
+  res.json({ 
+    success: true,
+    message: "Email flag reset successfully"
+  });
+});
 
 // -------------------- Data Logging Routes --------------------
 // Mount logging API endpoints (for research data collection)
