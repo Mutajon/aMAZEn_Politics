@@ -274,6 +274,8 @@ LANGUAGE RULES (STRICT):
 3. CONCRETE. If a camera can't see it, don't write it. No "tensions rise". Show "soldiers blocking the road".
 - END with the punch: "He knows. Your mother told him."
 - NO metaphors, poetic phrasing, or fancy adjectives.
+- NO numbering for actions (no "(1)", "(2)", "(3)" or "1.", "2.", "3." in titles).
+- Generate exactly 3 UNIQUE and distinct actions per dilemma.
 ${languageCode === 'he' ? `
 4. HEBREW TONE (STRICT):
    - USE PLAIN, SPOKEN HEBREW (SAFA PSHUTA). Clean, smooth, and to the point.

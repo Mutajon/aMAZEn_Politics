@@ -226,11 +226,12 @@ async function fetchGameTurn(
     payload.gameContext = {
       role: roleState.roleScope,
       roleScope: roleState.roleScope, // Added for backend authority calculation
-      // Revert to English system name for backend logic stability
-      systemName: roleState.analysis?.systemName || "Divine Right Monarchy",
+      // Use translated system name for narrative, but provide technical reference for backend logic
+      systemName: translatedAnalysis?.systemName || "Divine Right Monarchy",
+      systemNameTechnical: roleState.analysis?.systemName || "Divine Right Monarchy",
       setting,
-      // Revert to English challenger name for backend logic stability
-      challengerSeat: roleState.analysis?.challengerSeat?.name || "Unknown Opposition (Institutional Power)",
+      // Use translated challenger name for AI prompt
+      challengerSeat: translatedAnalysis?.challengerSeat?.name || "Unknown Opposition (Institutional Power)",
       // Keep holders translated so narrative uses Hebrew names
       powerHolders: translatedAnalysis?.holders || [],
       playerIndex: translatedAnalysis?.playerIndex ?? null,

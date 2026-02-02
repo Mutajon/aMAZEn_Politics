@@ -298,6 +298,10 @@ export async function gameTurnV2(req, res) {
                     }
                 }
 
+                if (parsed) {
+                    parsed = sanitizeDilemmaResponse(parsed);
+                }
+
                 // If parsing succeeded, break out of retry loop
                 if (parsed) {
                     if (retryCount > 0) {
@@ -540,6 +544,10 @@ export async function gameTurnV2(req, res) {
                     } catch (commaError) {
                         console.error(`[GAME-TURN-V2] Comma repair failed (attempt ${retryCount + 1}):`, commaError.message);
                     }
+                }
+
+                if (parsed) {
+                    parsed = sanitizeDilemmaResponse(parsed);
                 }
 
                 // If parsing succeeded
@@ -1432,18 +1440,31 @@ function sanitizeDilemmaResponse(rawResponse) {
         return null;
     }
 
-    const sanitized = {
-        ...rawResponse,
-        dilemma: rawResponse.dilemma || {},
-        actions: rawResponse.actions || []
-    };
+    // Handle both { dilemma: { actions: [] } } and { actions: [] }
+    const dilemma = rawResponse.dilemma || rawResponse;
+    const actions = dilemma.actions || [];
 
-    // Ensure actions array has exactly 3 items
-    if (sanitized.actions.length !== 3) {
-        console.warn(`[SANITIZE] Expected 3 actions, got ${sanitized.actions.length}`);
+    // Sanitize and deduplicate actions
+    let processedActions = actions.map(a => ({
+        ...a,
+        title: (a.title || "").replace(/^\d+[\.\)\-]\s*/, '').replace(/\s*\(\d+\)$/, '').trim()
+    }));
+
+    // Ensure exactly 3 actions
+    if (processedActions.length > 3) {
+        processedActions = processedActions.slice(0, 3);
+    } else if (processedActions.length < 3 && processedActions.length > 0) {
+        // Duplicate the last action if we have fewer than 3? No, better to log warning
+        console.warn(`[SANITIZE] Only ${processedActions.length} actions generated.`);
     }
 
-    return sanitized;
+    return {
+        ...rawResponse,
+        dilemma: {
+            ...(rawResponse.dilemma || {}),
+            actions: processedActions
+        }
+    };
 }
 
 /**

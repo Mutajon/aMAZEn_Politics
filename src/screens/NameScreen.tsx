@@ -73,6 +73,22 @@ const LOADING_QUOTES = createTranslatedConst((lang) => [
   lang("LOADING_QUOTE_10"),
 ]);
 
+const MALE_AVATARS = [
+  "roman_senator", "pharaoh", "medieval_king", "asian_emperor", "african_king",
+  "washington", "lincoln_young", "victorian_man", "civil_rights_leader",
+  "president_elder", "politician_man", "entrepreneur", "young_professional"
+];
+
+const FEMALE_AVATARS = [
+  "elizabethan_queen", "suffragette", "businesswoman", "activist_elder",
+  "politician_woman", "elder_woman", "young_activist"
+];
+
+const AVATAR_LIST = [
+  ...MALE_AVATARS,
+  ...FEMALE_AVATARS
+];
+
 const OVERLAY_TITLE = createTranslatedConst((lang) => lang("GENERATING_CHARACTER"));
 
 function extractPhysical(input: string): string {
@@ -179,18 +195,11 @@ export default function NameScreen({ push }: { push: PushFn }) {
   };
 
   // In free play mode, start with empty name to show placeholder
-  // In experiment mode, use playerName from DreamScreen
-  const [editableName, setEditableName] = useState<string>(() => {
-    if (experimentMode) {
-      return "";
-    }
-    // In free play, only use playerName if it exists (from DreamScreen)
-    // Otherwise start empty to show the placeholder
-    return playerName || "";
-  });
+  // In experiment mode, use playerName from DreamScreen if available
+  const [editableName, setEditableName] = useState<string>(playerName || "");
 
   // Use finalName for actual processing (falls back to default if empty)
-  const name = experimentMode ? (playerName || character?.name || "") : (editableName.trim() || getDefaultName(gender));
+  const name = editableName.trim() || getDefaultName(gender);
   const [physical, setPhysical] = useState<string>(character?.description || "");
   const [trio, setTrio] = useState<Trio | null>(null);
   const [bgObject, setBgObject] = useState<string>(character?.bgObject || "");
@@ -200,9 +209,11 @@ export default function NameScreen({ push }: { push: PushFn }) {
   // New state for avatar generation and two-phase UI
   const [phase, setPhase] = useState<"input" | "avatar">("input");
   const [avatarUrl, setAvatarUrl] = useState<string>(character?.avatarUrl || "");
+  const [selectedAvatarId, setSelectedAvatarId] = useState<string | null>(null);
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [avatarAttempt, setAvatarAttempt] = useState(0);
   const avatarReqRef = useRef(0);
+  const avatarScrollRef = useRef<HTMLDivElement>(null);
 
   // Retry configuration for avatar generation
   const MAX_AVATAR_RETRIES = 3;
@@ -390,6 +401,24 @@ export default function NameScreen({ push }: { push: PushFn }) {
     // Play click sound
     audioManager.playSfx('click-soft');
 
+    if (experimentMode && selectedAvatarId) {
+      // In experiment mode, use selected static avatar and skip generation
+      const avatarAssetUrl = `/assets/images/avatars/${selectedAvatarId}.png`;
+      const fullChar: Character = {
+        gender,
+        name: name.trim(),
+        description: physical.trim(),
+        avatarUrl: avatarAssetUrl,
+        imagePrompt: "", // No AI prompt for static avatar
+        bgObject,
+      };
+      setCharacter(fullChar);
+
+      logger.log('character_created_manual', name, `User selected manual avatar ${selectedAvatarId}`);
+      push("/power");
+      return;
+    }
+
     if (phase === "input") {
       // Phase 1: Clear any existing avatar and save character data, then move to avatar generation
       logger.log('button_click', 'Create Character', 'User clicked Create Character button');
@@ -441,7 +470,6 @@ export default function NameScreen({ push }: { push: PushFn }) {
           </h2>
 
           {phase === "input" ? (
-            // Phase 1: Input form
             <>
               <div className="flex items-center gap-8 justify-center">
                 <label className="flex items-center gap-2 text-white">
@@ -485,54 +513,78 @@ export default function NameScreen({ push }: { push: PushFn }) {
                 </label>
               </div>
 
-              {/* Player name - display only in experiment mode, editable in free play */}
-              {experimentMode ? (
-                name && (
-                  <div className="mt-6 text-center">
-                    <div className="text-white/70 text-sm mb-1">{lang("PLAYER_NAME")}</div>
-                    <div className="text-xl font-semibold text-amber-300">{name}</div>
-                  </div>
-                )
-              ) : (
-                <div className="mt-6">
-                  <div className="text-white/90 mb-2">{lang("PLAYER_NAME")}</div>
-                  <input
-                    type="text"
-                    value={editableName}
-                    onChange={(e) => {
-                      setEditableName(e.target.value);
-                      logger.log('character_name', e.target.value, 'User entered character name');
-                    }}
-                    placeholder={getDefaultName(gender)}
-                    className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-gray-400 placeholder:italic focus:outline-none focus:ring-2 focus:ring-amber-300/60"
-                  />
-                </div>
-              )}
-
+              {/* Player name */}
               <div className="mt-6">
-                <div className="text-white/90 mb-2">{lang("DESCRIPTION_LABEL")}</div>
-                <textarea
-                  rows={6}
-                  value={physical}
+                <div className="text-white/90 mb-2">{lang("PLAYER_NAME")}</div>
+                <input
+                  type="text"
+                  value={editableName}
                   onChange={(e) => {
-                    setPhysical(e.target.value);
-                    logger.log('character_description', e.target.value, 'User entered character description');
+                    setEditableName(e.target.value);
+                    logger.log('character_name', e.target.value, 'User entered character name');
                   }}
-                  placeholder={lang("DESCRIPTION_PLACEHOLDER")}
-                  className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
+                  placeholder={experimentMode ? (playerName || lang("NAME_PLACEHOLDER")) : getDefaultName(gender)}
+                  className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-gray-400 placeholder:italic focus:outline-none focus:ring-2 focus:ring-amber-300/60"
                 />
               </div>
 
-              <div className="mt-6 flex justify-center">
+              <div className="mt-6">
+                {experimentMode ? (
+                  <>
+                    <div className="text-white/90 mb-3">{lang("LOBBY_AVATAR_LABEL") || "Choose Avatar"}</div>
+                    <div
+                      ref={avatarScrollRef}
+                      className="flex gap-4 overflow-x-auto pb-4 px-1 scrollbar-thin scrollbar-thumb-amber-500/30 scrollbar-track-transparent snap-x"
+                    >
+                      {AVATAR_LIST.map((avatar) => (
+                        <button
+                          key={avatar}
+                          type="button"
+                          onClick={() => {
+                            setSelectedAvatarId(avatar);
+                            audioManager.playSfx("click-soft");
+                          }}
+                          className={`flex-shrink-0 w-24 h-24 rounded-full overflow-hidden border-2 transition-all duration-200 snap-center ${selectedAvatarId === avatar
+                            ? 'border-amber-400 ring-4 ring-amber-400/40 scale-110 shadow-[0_0_20px_rgba(251,191,36,0.4)]'
+                            : 'border-white/10 hover:border-white/40 hover:scale-105'
+                            }`}
+                        >
+                          <img
+                            src={`/assets/images/avatars/${avatar}.png`}
+                            alt={avatar.replace(/_/g, ' ')}
+                            className="w-full h-full object-cover"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-white/90 mb-2">{lang("DESCRIPTION_LABEL")}</div>
+                    <textarea
+                      rows={6}
+                      value={physical}
+                      onChange={(e) => {
+                        setPhysical(e.target.value);
+                        logger.log('character_description', e.target.value, 'User entered character description');
+                      }}
+                      placeholder={lang("DESCRIPTION_PLACEHOLDER")}
+                      className="w-full px-4 py-3 rounded-xl bg-white/95 text-[#0b1335] placeholder:text-[#0b1335]/60 focus:outline-none focus:ring-2 focus:ring-amber-300/60"
+                    />
+                  </>
+                )}
+              </div>
+
+              <div className="mt-8 flex justify-center">
                 <button
-                  disabled={loading || !physical.trim()}
+                  disabled={loading || (experimentMode ? !selectedAvatarId : !physical.trim())}
                   onClick={onContinue}
-                  className={`rounded-2xl px-5 py-3 font-semibold text-lg shadow-lg ${!loading && physical.trim()
-                    ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-[#0b1335] hover:scale-[1.02] active:scale-[0.98]"
-                    : "bg-white/10 text-white/60 cursor-not-allowed"
+                  className={`rounded-2xl px-8 py-4 font-bold text-xl shadow-xl transition-all ${!loading && (experimentMode ? selectedAvatarId : physical.trim())
+                    ? "bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 text-[#0b1335] hover:scale-[1.05] active:scale-[0.95] ring-2 ring-amber-300/30"
+                    : "bg-white/10 text-white/40 cursor-not-allowed"
                     }`}
                 >
-                  {lang("CREATE_CHARACTER")}
+                  {experimentMode ? lang("CONTINUE") : lang("CREATE_CHARACTER")}
                 </button>
               </div>
             </>

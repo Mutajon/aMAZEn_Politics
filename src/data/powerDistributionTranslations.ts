@@ -104,8 +104,19 @@ export function translatePowerDistribution(
   const translations = POWER_DISTRIBUTION_TRANSLATIONS[roleId];
 
   if (!translations) {
-    // If no translations exist (custom role), return as-is
-    return powerDistribution;
+    // If no explicit translations exist for this role, we still try to translate keys directly
+    return {
+      ...powerDistribution,
+      systemName: lang(powerDistribution.systemName),
+      holders: (powerDistribution.holders || []).map((holder: any) => ({
+        ...holder,
+        name: getLocalizedHolderName(holder.name, lang)
+      })),
+      challengerSeat: powerDistribution.challengerSeat ? {
+        ...powerDistribution.challengerSeat,
+        name: getLocalizedHolderName(powerDistribution.challengerSeat.name, lang)
+      } : undefined
+    };
   }
 
   return {
