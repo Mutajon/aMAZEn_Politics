@@ -26,7 +26,7 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
   // Load language from localStorage or default to English
   const [language, setLanguageState] = useState<Language>(() => {
     const saved = localStorage.getItem('game-language');
-    return (saved as Language) || 'he';
+    return (saved as Language) || 'en';
   });
   const [translations, setTranslations] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
