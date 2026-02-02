@@ -45,6 +45,7 @@ import GameCappedScreen from "./screens/GameCappedScreen";
 import PowerQuestionnaireScreen from "./screens/PowerQuestionnaireScreen";
 import PostGameQuestionnaireScreen from "./screens/PostGameQuestionnaireScreen";
 import ThankYouScreen from "./screens/ThankYouScreen";
+import { LabSplashScreen } from "./screens/LabSplashScreen";
 import AudioControls from "./components/AudioControls";
 import { useAudioManager } from "./hooks/useAudioManager";
 import { useSettingsStore } from "./store/settingsStore";
@@ -276,6 +277,7 @@ function AppContent({ route, push, enableModifiers }: { route: string; push: (ro
           {route.startsWith("/power-questionnaire") && <PowerQuestionnaireScreen push={push} />}
           {route.startsWith("/post-game-questionnaire") && <PostGameQuestionnaireScreen push={push} />}
           {route.startsWith("/thank-you") && <ThankYouScreen />}
+          {route === "/lab" && <LabSplashScreen />}
 
           {/* Backstage route - Development mode (bypasses experiments) */}
           {route === "/backstage" && (

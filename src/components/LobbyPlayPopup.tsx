@@ -4,6 +4,7 @@ import { Dices, Target, Trophy } from "lucide-react";
 import { audioManager } from "../lib/audioManager";
 import { useLang } from "../i18n/lang";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useDilemmaStore } from "../store/dilemmaStore";
 import { MirrorReflection } from "./MirrorWithReflection";
 
 interface LobbyPlayPopupProps {
@@ -145,7 +146,8 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                         playerName: characterName,
                         emphasis,
                         gender,
-                        difficulty
+                        difficulty,
+                        model: useDilemmaStore.getState().aiModelOverride
                     })
                 });
                 const data = await res.json();

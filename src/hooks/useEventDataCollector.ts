@@ -11,7 +11,6 @@
 // Dependencies: dilemmaStore, roleStore, compassStore
 
 import { useState, useCallback, useRef } from "react";
-import { translatePoliticalSystem } from '../i18n/translateGameData';
 import { useDilemmaStore, type PhilosophicalPole } from '../store/dilemmaStore';
 import { useRoleStore } from "../store/roleStore";
 import { useCompassStore } from "../store/compassStore";
@@ -124,22 +123,6 @@ function topKWithNames(arr: number[] | undefined, prop: PropKey, k = 3): Array<{
     .map(x => ({ name: x.name, strength: Math.round(x.v * 10) / 10 }));
 }
 
-/**
- * Get top overall values across all compass dimensions
- * NO threshold filtering - just sort and take top K
- */
-async function waitForNarrativeMemory(timeoutMs = 4000, pollIntervalMs = 75) {
-  const deadline = Date.now() + timeoutMs;
-
-  let memory = useDilemmaStore.getState().narrativeMemory;
-  while (!memory && Date.now() < deadline) {
-    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
-    memory = useDilemmaStore.getState().narrativeMemory;
-  }
-
-  return memory;
-}
-
 import { translatePowerDistribution } from "../data/powerDistributionTranslations";
 
 /**
@@ -181,7 +164,8 @@ async function fetchGameTurn(
     setSupportMiddle,
     setSupportMom,
     updateSubjectStreak,
-    initializeGame
+    initializeGame,
+    aiModelOverride
   } = useDilemmaStore.getState();
 
   const { values: compassValues } = useCompassStore.getState();
@@ -204,7 +188,8 @@ async function fetchGameTurn(
     day,
     totalDays,
     isFirstDilemma: day === 1,
-    isFollowUp: day > 1
+    isFollowUp: day > 1,
+    model: aiModelOverride
   };
 
   // Day 1: Send full game context
@@ -340,6 +325,7 @@ async function fetchGameTurn(
             role: payload.gameContext.role,
             systemName: payload.gameContext.systemName
           },
+          model: aiModelOverride,
           debugMode
         })
       });
@@ -454,7 +440,6 @@ async function fetchGameTurn(
 
   // Extract support effects (Day 2+ only)
   let supportEffects: SupportEffect[] | null = null;
-  let momDiedThisTurn = false;
 
   if (data.supportShift && day > 1) {
     const { people, mom, holders, momDied } = data.supportShift;
@@ -462,7 +447,6 @@ async function fetchGameTurn(
     // Check if mom died this turn
     if (momDied === true) {
       console.log('[fetchGameTurn] 💀 MOM DIED THIS TURN');
-      momDiedThisTurn = true;
       const { setMomDead } = useDilemmaStore.getState();
       setMomDead();
 
@@ -699,22 +683,6 @@ async function fetchGameTurn(
   };
 }
 
-// Helper: Get top 2 "what" compass values for Day 1 personalization
-function getTop2WhatValues(): string[] {
-  const compassValues = useCompassStore.getState().values;
-  const whatValues = compassValues?.what || [];
-
-  return whatValues
-    .map((v, i) => ({
-      v: Number(v) || 0,
-      i,
-      name: COMPONENTS.what?.[i]?.short || `What #${i + 1}`
-    }))
-    .sort((a, b) => b.v - a.v)
-    .slice(0, 2)
-    .map(x => x.name);
-}
-
 function transformCompassHints(rawHints: any): CompassPill[] {
   if (!Array.isArray(rawHints)) return [];
   const validProps = new Set<CompassPill['prop']>(["what", "whence", "how", "whither"]);
@@ -768,6 +736,7 @@ export async function fetchCompassHintsForAction(
 
     console.log(`[fetchCompassHintsForAction] Calling /api/compass-conversation/analyze for gameId=${gameId}, trapContext=${trapContext?.valueTargeted || 'none'}`);
 
+    const { aiModelOverride } = useDilemmaStore.getState();
     const response = await fetch("/api/compass-conversation/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -777,7 +746,8 @@ export async function fetchCompassHintsForAction(
         gameContext,
         debugMode,
         trapContext,  // NEW: Include trap context for value-aware analysis
-        language: language // Pass language to API
+        language: language, // Pass language to API
+        model: aiModelOverride
       })
     });
 
@@ -870,12 +840,14 @@ async function fetchDynamicParams(lastChoice: DilemmaAction): Promise<DynamicPar
   };
 
   try {
+    const { aiModelOverride } = useDilemmaStore.getState();
     const response = await fetch("/api/dynamic-parameters", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         lastChoice,
-        politicalContext
+        politicalContext,
+        model: aiModelOverride
       })
     });
 
@@ -929,7 +901,8 @@ async function fetchMirrorText(dilemma: Dilemma): Promise<string> {
         summary: a.summary
       }))
     },
-    useAnthropic: useLightDilemmaAnthropic
+    useAnthropic: useLightDilemmaAnthropic,
+    model: useDilemmaStore.getState().aiModelOverride
   };
 
   try {

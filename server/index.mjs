@@ -439,7 +439,8 @@ app.post("/api/analyze-role", async (req, res) => {
   req.setTimeout(120000);
 
   try {
-    const role = String(req.body?.role || "").trim();
+    const { role: rawRole, model: modelOverride = null } = req.body || {};
+    const role = String(rawRole || "").trim();
 
     const FALLBACK = {
       systemName: "Republican Oligarchy",
@@ -573,7 +574,7 @@ IMPORTANT:
 ALLOWED_POLITIES: ${JSON.stringify(ALLOWED_POLITIES)}
 Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setting, rely on actual historical context; if fictional/unclear, infer plausibly.`;
 
-    const out = await aiJSONGemini({ system, user, model: "gemini-2.5-flash", temperature: 0.2, fallback: FALLBACK });
+    const out = await aiJSONGemini({ system, user, model: modelOverride || "gemini-2.5-flash", temperature: 0.2, fallback: FALLBACK });
 
     // Normalize holders
     let holders = Array.isArray(out?.holders) ? out.holders.slice(0, 5) : FALLBACK.holders;
@@ -689,6 +690,7 @@ app.post("/api/mirror-light", async (req, res) => {
     const useAnthropic = !!req.body?.useAnthropic;
     const topWhat = Array.isArray(req.body?.topWhat) ? req.body.topWhat.slice(0, 2) : [];
     const dilemma = req.body?.dilemma || null;
+    const modelOverride = req.body?.model || null;
 
     console.log("\n[mirror-light] ===== REQUEST DEBUG =====");
     console.log(`[mirror-light] Using provider: ${useAnthropic ? 'ANTHROPIC (Claude)' : 'OPENAI (GPT)'}`);
@@ -740,7 +742,7 @@ app.post("/api/mirror-light", async (req, res) => {
 
     console.log("[mirror-light] Calling Gemini with personality prompt...");
 
-    const text = await aiTextGemini({ system, user, model: "gemini-2.5-flash" });
+    const text = await aiTextGemini({ system, user, model: modelOverride || "gemini-2.5-flash" });
 
     // Sanitizer: enforce one sentence, remove digits, tame slashes/quotes, cap words
     const raw = (text || "The mirror squints… then grins mischievously.").trim();
@@ -873,7 +875,8 @@ NEVER use singular addressing (NO "אתה" or "את").`
     console.log("[mirror-quiz-light] Language:", language);
     console.log("[mirror-quiz-light] User prompt sent to AI:", user);
 
-    const text = await aiTextGemini({ system, user, model: "gemini-2.5-flash" });
+    const modelOverride = req.body?.model || null;
+    const text = await aiTextGemini({ system, user, model: modelOverride || "gemini-2.5-flash" });
 
     // Log raw AI response
     console.log("[mirror-quiz-light] Raw AI response:", text);
@@ -1123,7 +1126,7 @@ app.post("/api/compass-conversation/init", async (req, res) => {
       return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
     }
 
-    const { gameId, gameContext, debugMode = false } = req.body || {};
+    const { gameId, gameContext, debugMode = false, model: modelOverride = null } = req.body || {};
 
     // Validation
     if (!gameId || typeof gameId !== "string") {
@@ -1221,6 +1224,7 @@ Wait for SCENARIO CONTEXT, PLAYER ROLE, POLITICAL SYSTEM, and ACTION.`;
     // Store conversation (using compass-prefixed key for separate namespace from game-turn)
     storeConversation(`compass-${gameId}`, `compass-${gameId}`, "openai", {
       messages,
+      aiModel: modelOverride, // Store model override
       compassDefinitions: true, // Flag that definitions are stored
       gameContext: gameContext || null // Store context for reference
     });
@@ -1259,7 +1263,7 @@ app.post("/api/compass-conversation/analyze", async (req, res) => {
       return res.status(500).json({ error: "Missing GEMINI_API_KEY" });
     }
 
-    const { gameId, action, reasoning, gameContext, trapContext, debugMode = false, language = 'he' } = req.body || {};
+    const { gameId, action, reasoning, gameContext, trapContext, debugMode = false, language = 'he', model: modelOverride = null } = req.body || {};
     const actionTitle = typeof action?.title === "string" ? action.title.trim().slice(0, 160) : "";
     const actionSummary = typeof action?.summary === "string" ? action.summary.trim().slice(0, 400) : "";
 
@@ -1364,7 +1368,8 @@ ${languageInstruction}
         { role: "user", content: fallbackUserPrompt }
       ];
 
-      const aiResponse = await callGeminiChat(messages, MODEL_COMPASS_HINTS, { responseType: 'text' });
+      const chosenModel = modelOverride || MODEL_COMPASS_HINTS;
+      const aiResponse = await callGeminiChat(messages, chosenModel, { responseType: 'text' });
       const parsed = parseCompassHintsResponse(aiResponse.content);
 
       // Extract mirrorMessage if present (for reasoning analysis)
@@ -1499,7 +1504,8 @@ Return JSON in this shape:
     ];
 
     // Call AI (using Gemini for consistency with dilemma/aftermath)
-    const aiResponse = await callGeminiChat(messages, MODEL_COMPASS_HINTS, { responseType: 'text' });
+    const chosenModel = modelOverride || conversation.meta?.aiModel || MODEL_COMPASS_HINTS;
+    const aiResponse = await callGeminiChat(messages, chosenModel, { responseType: 'text' });
     const content = aiResponse?.content;
 
     if (!content) {

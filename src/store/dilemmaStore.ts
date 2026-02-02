@@ -165,6 +165,10 @@ type DilemmaState = {
   philosophicalAxes: Record<PhilosophicalPole, number>;
   freePlayHistory: Array<{ day: number; title: string; pills: PhilosophicalPole[] }>;
 
+  // AI Model Override (Lab Mode)
+  aiModelOverride: string | null;
+  setAiModelOverride: (model: string | null) => void;
+
   nextDay: () => void;
   setTotalDays: (n: number) => void;
   applyChoice: (id: "a" | "b" | "c") => void;
@@ -382,6 +386,12 @@ export const useDilemmaStore = create<DilemmaState>()(
       },
       freePlayHistory: [],
 
+      aiModelOverride: null,
+      setAiModelOverride: (model) => {
+        dlog("setAiModelOverride ->", model);
+        set({ aiModelOverride: model });
+      },
+
 
       nextDay() {
         const { day } = get();
@@ -488,6 +498,7 @@ export const useDilemmaStore = create<DilemmaState>()(
           justFinishedGame: false,
           lastGameScore: null,
           freePlayHistory: [],
+          aiModelOverride: null, // Reset override on full reset
         });
       },
 

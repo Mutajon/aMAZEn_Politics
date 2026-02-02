@@ -2,6 +2,7 @@
 import { COMPONENTS, PROPERTIES, type PropKey } from "../data/compass-data";
 import type { CompassValues } from "../store/compassStore";
 import { useSettingsStore } from "../store/settingsStore";
+import { useDilemmaStore } from "../store/dilemmaStore";
 import { lang } from "../i18n/lang";
 import { translateCompassValue } from "../i18n/translateGameData";
 
@@ -28,6 +29,7 @@ export async function generateMirrorSummary(
           topWhence: whenceTop.map(minify),
           topOverall: overall.map(minify),
           useAnthropic: useLightDilemmaAnthropic,
+          model: useDilemmaStore.getState().aiModelOverride
         }),
       });
       if (resp.ok) {
@@ -91,8 +93,8 @@ function localSummary({ whatTop, whenceTop }: { whatTop: TopItem[]; whenceTop: T
   const j = whenceTop[0]?.label ? soften(whenceTop[0].label) : null;
 
   if (!w && !j) return "The mirror blinks—too little to go on… for now.";
-  if (w && !j)  return `Well now… it looks like you're driven by ${w}. The glint in your eye gives it away.`;
-  if (!w && j)  return `Curious—you mainly justify things through ${j}. The mirror takes note.`;
+  if (w && !j) return `Well now… it looks like you're driven by ${w}. The glint in your eye gives it away.`;
+  if (!w && j) return `Curious—you mainly justify things through ${j}. The mirror takes note.`;
   return `Well, well… you seem driven by ${w}, and you mostly justify it through ${j}. The mirror is amused.`;
 }
 
@@ -142,6 +144,7 @@ export async function generateMirrorQuizSummary(
           topWhence: whenceTop.map(minify),
           useAnthropic: useLightDilemmaAnthropic,
           language: language, // Send only language code, not the full prompt (security)
+          model: useDilemmaStore.getState().aiModelOverride
         }),
       });
 

@@ -125,6 +125,7 @@ export async function gameTurnV2(req, res) {
             useXAI = false,
             useGemini = false,
             debugMode = false,
+            model: modelOverride = null, // LAB MODE OVERRIDE
             language = 'he' // Get language from client (default: Hebrew)
         } = req.body;
 
@@ -260,8 +261,8 @@ export async function gameTurnV2(req, res) {
                 }
 
                 const aiStart = Date.now();
-                const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
-                console.log(`[TIMING] Day 1 AI call took ${Date.now() - aiStart}ms`);
+                const aiResponse = await callGeminiChat(messages, modelOverride || "gemini-2.5-flash");
+                console.log(`[TIMING] Day 1 AI call took ${Date.now() - aiStart}ms (model: ${modelOverride || 'gemini-2.5-flash'})`);
 
                 content = aiResponse?.content;
                 if (!content) {
@@ -322,6 +323,7 @@ export async function gameTurnV2(req, res) {
                 systemName: gameContext.systemName,
                 challengerName,
                 authorityLevel,
+                aiModel: modelOverride, // Store override for subsequent turns
                 dilemmaEmphasis, // Store for Day 2+ reminders
                 topicHistory: [{
                     day: 1,
@@ -502,8 +504,9 @@ export async function gameTurnV2(req, res) {
                 }
 
                 const aiStart = Date.now();
-                const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
-                console.log(`[TIMING] Day ${day} AI call took ${Date.now() - aiStart}ms`);
+                const chosenModel = modelOverride || conversation.meta.aiModel || "gemini-2.5-flash";
+                const aiResponse = await callGeminiChat(messages, chosenModel);
+                console.log(`[TIMING] Day ${day} AI call took ${Date.now() - aiStart}ms (model: ${chosenModel})`);
 
                 content = aiResponse?.content;
                 if (!content) {
@@ -700,9 +703,9 @@ export async function gameTurnV2(req, res) {
  */
 export async function freePlayIntro(req, res) {
     try {
-        const { role, setting, playerName, emphasis, gender } = req.body;
+        const { role, setting, playerName, emphasis, gender, model: modelOverride = null } = req.body;
 
-        console.log(`[FREE-PLAY-INTRO] Generating intro for ${role} in ${setting} (gender: ${gender})...`);
+        console.log(`[FREE-PLAY-INTRO] Generating intro for ${role} in ${setting} (gender: ${gender}, model: ${modelOverride || 'default'})...`);
 
         const systemPrompt = buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender);
         // Using "intro" as a dummy user prompt to trigger generation
@@ -711,7 +714,7 @@ export async function freePlayIntro(req, res) {
             { role: "user", content: "Generate the intro." }
         ];
 
-        const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
+        const aiResponse = await callGeminiChat(messages, modelOverride || "gemini-2.5-flash");
         const parsed = safeParseJSON(aiResponse.content, { debugTag: "FREE-PLAY-INTRO" });
 
         return res.json({
@@ -746,6 +749,7 @@ export async function freePlayTurn(req, res) {
             gameId,
             playerChoice, // Day 2+ only
             language = 'en',
+            model: modelOverride = null, // LAB MODE OVERRIDE
             supportEntities // For Day 1 initialization
         } = req.body;
 
@@ -770,7 +774,7 @@ export async function freePlayTurn(req, res) {
             ];
 
             // Call Gemini
-            const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
+            const aiResponse = await callGeminiChat(messages, modelOverride || "gemini-2.5-flash");
             const parsed = safeParseJSON(aiResponse.content, { debugTag: "FREE-PLAY-DAY1" });
 
             if (!parsed) throw new Error("Failed to parse Day 1 response");
@@ -787,6 +791,7 @@ export async function freePlayTurn(req, res) {
             // Store Conversation with zeroed axes
             const meta = {
                 type: 'free-play',
+                aiModel: modelOverride, // Store for turn generation
                 role, setting, playerName, emphasis, gender, language,
                 supportEntities: supportEntities || [],
                 support: { people: 50, holders: 50 },
@@ -877,7 +882,8 @@ export async function freePlayTurn(req, res) {
                 { role: "user", content: userPrompt }
             ];
 
-            const aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
+            const chosenModel = modelOverride || conversation.meta.aiModel || "gemini-2.5-flash";
+            const aiResponse = await callGeminiChat(messages, chosenModel);
             const parsed = safeParseJSON(aiResponse.content, { debugTag: `FREE-PLAY-DAY${day}` });
 
             if (!parsed) throw new Error("Failed to parse response");
@@ -1082,6 +1088,7 @@ export async function generateAftermath(req, res) {
             finalSupport,
             topCompassValues,
             debug,
+            model: modelOverride = null, // LAB MODE OVERRIDE
             language = 'en' // Get language from client (default: English)
         } = req.body || {};
 
@@ -1316,7 +1323,9 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
             }
 
             try {
-                aiResponse = await callGeminiChat(messages, "gemini-2.5-flash");
+                const conversation = gameId ? getConversation(gameId) : null;
+                const chosenModel = modelOverride || conversation?.meta?.aiModel || "gemini-2.5-flash";
+                aiResponse = await callGeminiChat(messages, chosenModel);
                 if (aiResponse?.content) {
                     // Add debug tag for tracing
                     result = safeParseJSON(aiResponse.content, { debugTag: `aftermath-gemini-${attempt + 1}` });
@@ -1443,7 +1452,7 @@ function sanitizeDilemmaResponse(rawResponse) {
  */
 export async function answerInquiry(req, res) {
     try {
-        const { gameId, day, question, language = 'en' } = req.body;
+        const { gameId, day, question, language = 'en', model: modelOverride = null } = req.body;
 
         if (!gameId || !question) {
             return res.status(400).json({ error: "Missing gameId or question" });
@@ -1503,7 +1512,8 @@ Directly answer the question based on previous context. Do NOT invent contradict
         ];
 
         // Call AI
-        const response = await callGeminiChat(generationMessages, MODEL_VALIDATE_GEMINI, { responseType: 'text' });
+        const chosenModel = modelOverride || conversation.meta?.aiModel || MODEL_VALIDATE_GEMINI;
+        const response = await callGeminiChat(generationMessages, chosenModel, { responseType: 'text' });
 
         const answer = response?.content || "The Game Master remains silent.";
 

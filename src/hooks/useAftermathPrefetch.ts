@@ -81,7 +81,7 @@ function extractTopCompassValues(): TopCompassValue[] {
  */
 function buildAftermathRequest(language: string): AftermathRequest {
   const { character, selectedRole, analysis, roleTitle, roleDescription } = useRoleStore.getState();
-  const { gameId, dilemmaHistory, supportPeople, supportMiddle, supportMom } = useDilemmaStore.getState();
+  const { gameId, dilemmaHistory, supportPeople, supportMiddle, supportMom, aiModelOverride } = useDilemmaStore.getState();
   const { debugMode } = useSettingsStore.getState();
 
   return {
@@ -98,6 +98,7 @@ function buildAftermathRequest(language: string): AftermathRequest {
     },
     topCompassValues: extractTopCompassValues(),
     debug: debugMode,
+    model: aiModelOverride,
     language
   };
 }

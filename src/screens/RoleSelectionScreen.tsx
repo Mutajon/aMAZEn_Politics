@@ -12,6 +12,7 @@ import { useLang } from "../i18n/lang";
 import { PREDEFINED_ROLES_ARRAY, getRoleImagePaths } from "../data/predefinedRoles";
 import { useSettingsStore } from "../store/settingsStore";
 import { useLoggingStore } from "../store/loggingStore";
+import { useDilemmaStore } from "../store/dilemmaStore";
 
 import { useRoleCarousel, type CarouselItem } from "../hooks/useRoleCarousel";
 import RoleListItem from "../components/roleSelection/RoleListItem";
@@ -112,6 +113,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
     setScenarioSuccess(false);
 
     try {
+      const { aiModelOverride } = useDilemmaStore.getState();
       const response = await fetch("/api/suggest-scenario", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -120,7 +122,8 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
           role: scenarioForm.role.trim(),
           settings: scenarioForm.settings.trim(),
           introParagraph: scenarioForm.introParagraph.trim() || undefined,
-          topicsToEmphasis: scenarioForm.topicsToEmphasis.trim() || undefined
+          topicsToEmphasis: scenarioForm.topicsToEmphasis.trim() || undefined,
+          model: aiModelOverride
         })
       });
 

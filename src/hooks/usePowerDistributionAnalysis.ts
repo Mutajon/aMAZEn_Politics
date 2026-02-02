@@ -11,6 +11,7 @@
 import { useEffect } from "react";
 import type { AnalysisResult, PowerHolder } from "../store/roleStore";
 import { useRoleStore } from "../store/roleStore";
+import { useDilemmaStore } from "../store/dilemmaStore";
 import { AIConnectionError } from "../lib/validation";
 import { POLITICAL_SYSTEMS } from "../data/politicalSystems";
 import type { FetchState, EnhancedPowerHolder } from "./usePowerDistributionState";
@@ -27,9 +28,10 @@ async function fetchAnalysis(role: string): Promise<AnalysisResult> {
   const timer = setTimeout(() => controller.abort(), 130000); // 130s (server timeout is 120s)
 
   try {
+    const { aiModelOverride } = useDilemmaStore.getState();
     const res = await fetch("/api/analyze-role", {
       method: "POST",
-      body: JSON.stringify({ role }),
+      body: JSON.stringify({ role, model: aiModelOverride }),
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
     });

@@ -36,7 +36,8 @@ export function useInquiring() {
     inquiryCreditsRemaining,
     getInquiriesForCurrentDay,
     addInquiry,
-    canInquire
+    canInquire,
+    aiModelOverride
   } = useDilemmaStore();
 
   /**
@@ -107,7 +108,8 @@ export function useInquiring() {
               description: currentDilemma.description
             },
             day,
-            language: getCurrentLanguage()
+            language: getCurrentLanguage(),
+            model: aiModelOverride
           })
         });
 

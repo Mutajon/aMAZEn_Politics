@@ -29,7 +29,7 @@ function backgroundHeuristic(role = "") {
  */
 export async function suggestBackground(req, res) {
     try {
-        const { role, gender } = req.body || {};
+        const { role, gender, model: modelOverride = null } = req.body || {};
         const system =
             "Output a single JSON object with key 'object' naming one concise, iconic background object that visually matches the role. " +
             "Max 3 words. Example: {\"object\":\"red pagoda\"}. No prose.";
@@ -39,7 +39,7 @@ export async function suggestBackground(req, res) {
         const ai = await aiJSONGemini({
             system,
             user,
-            model: "gemini-2.5-flash",
+            model: modelOverride || "gemini-2.5-flash",
             temperature: 0.2,
             fallback: { object: backgroundHeuristic(role) },
         });
@@ -59,7 +59,8 @@ export async function suggestBackground(req, res) {
  */
 export async function analyzeCompass(req, res) {
     try {
-        const text = String(req.body?.text || "").trim();
+        const { text: rawText, model: modelOverride = null } = req.body || {};
+        const text = String(rawText || "").trim();
         if (!text) return res.status(400).json({ error: "Missing 'text'." });
 
         // OPTIMIZED: Component definitions moved to system prompt (81% token reduction: 682 → 133 tokens)
@@ -89,7 +90,7 @@ export async function analyzeCompass(req, res) {
         const items = await aiJSONGemini({
             system,
             user,
-            model: "gemini-2.5-flash",
+            model: modelOverride || "gemini-2.5-flash",
             temperature: 0.2,
             fallback: [],
         });
@@ -113,6 +114,7 @@ export async function generateNewsTicker(req, res) {
         const epochReq = String(req.body?.epoch || "").toLowerCase(); // "modern" | "ancient" | "futuristic" (optional)
         const last = req.body?.last || null; // { title, summary, cost? }
         const language = String(req.body?.language || "en").toLowerCase();
+        const modelOverride = req.body?.model || null;
         const languageName = LANGUAGE_NAMES[language] || LANGUAGE_NAMES.en;
 
         // Heuristic epoch if caller didn't pass one
@@ -168,7 +170,7 @@ export async function generateNewsTicker(req, res) {
         const items = await aiJSONGemini({
             system,
             user,
-            model: "gemini-2.5-flash",
+            model: modelOverride || "gemini-2.5-flash",
             fallback: null, // No fallbacks - always generate based on actual context
         });
 
@@ -236,7 +238,8 @@ export async function validateSuggestion(req, res) {
             year,
             politicalSystem = "",
             roleName = "",
-            roleScope = ""
+            roleScope = "",
+            model: modelOverride = null
         } = req.body || {};
         if (typeof text !== "string" || typeof title !== "string" || typeof description !== "string") {
             return res.status(400).json({ error: "Missing text/title/description" });
@@ -268,7 +271,7 @@ export async function validateSuggestion(req, res) {
         const raw = await aiJSONGemini({
             system,
             user,
-            model: MODEL_VALIDATE_GEMINI,
+            model: modelOverride || MODEL_VALIDATE_GEMINI,
             temperature: 0,
             fallback: { valid: true, reason: "Accepted (fallback)" }
         });
@@ -302,6 +305,7 @@ export async function generateDynamicParameters(req, res) {
             lastChoice, // DilemmaAction: { id, title, summary, cost, iconHint }
             politicalContext, // { role, systemName, day, totalDays, compassValues }
             debug = false,
+            model: modelOverride = null,
             language = 'en'
         } = req.body;
 
@@ -447,7 +451,7 @@ Based on this political decision, generate 1-3 specific dynamic parameters that 
             const result = await aiJSONGemini({
                 system,
                 user,
-                model: "gemini-2.5-flash",
+                model: modelOverride || "gemini-2.5-flash",
                 temperature: 0.8,
                 fallback: { parameters: [] }
             });
@@ -556,7 +560,7 @@ export async function suggestScenario(req, res) {
  */
 export async function seedNarrative(req, res) {
     try {
-        const { gameId, gameContext } = req.body;
+        const { gameId, gameContext, model: modelOverride = null } = req.body;
 
         // Validate required fields
         if (!gameId || typeof gameId !== 'string') {
@@ -704,7 +708,7 @@ Return STRICT JSON ONLY.`;
         const result = await aiJSONGemini({
             system: systemPrompt,
             user: userPrompt,
-            model: "gemini-2.5-flash",
+            model: modelOverride || "gemini-2.5-flash",
             temperature: 0.7, // Slightly more creative for narrative generation
             fallback
         });

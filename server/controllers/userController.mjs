@@ -130,6 +130,7 @@ export async function generateIntroParagraph(req, res) {
             setting,
             authorityLevel,
             challengerName,
+            model: modelOverride = null, // LAB MODE OVERRIDE
         } = req.body || {};
 
         const roleText = String(role || "").slice(0, 200).trim();
@@ -202,7 +203,7 @@ export async function generateIntroParagraph(req, res) {
         // tiny retry wrapper (handles occasional upstream 503s)
         const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         async function getParagraphOnce() {
-            return (await aiTextGemini({ system, user, model: "gemini-2.5-flash" }))?.trim() || "";
+            return (await aiTextGemini({ system, user, model: modelOverride || "gemini-2.5-flash" }))?.trim() || "";
         }
 
         let paragraph = "";
@@ -244,7 +245,13 @@ export async function generateIntroParagraph(req, res) {
  * POST /api/validate-role
  */
 export async function validateRole(req, res) {
-    const raw = (req.body?.text || req.body?.role || req.body?.input || "").toString().trim();
+    const {
+        text,
+        role,
+        input,
+        model: modelOverride = null
+    } = req.body || {};
+    const raw = (text || role || input || "").toString().trim();
 
     const system =
         "You validate a single short line describing a player's ROLE in a game where they'll face political/social dilemmas.\n" +
@@ -269,7 +276,7 @@ export async function validateRole(req, res) {
 
     const user = `Input: ${raw || ""}`;
 
-    const out = await aiJSONGemini({ system, user, model: "gemini-2.5-flash", temperature: 0, fallback: null });
+    const out = await aiJSONGemini({ system, user, model: modelOverride || "gemini-2.5-flash", temperature: 0, fallback: null });
     if (!out || typeof out.valid !== "boolean") {
         return res.status(503).json({ error: "AI validator unavailable" });
     }
@@ -280,7 +287,7 @@ export async function validateRole(req, res) {
  * POST /api/extract-trait
  */
 export async function extractTrait(req, res) {
-    const { description, language } = req.body;
+    const { description, language, model: modelOverride = null } = req.body || {};
 
     if (!description) {
         return res.status(400).json({ error: "Description required" });
@@ -309,7 +316,7 @@ Examples:
         const result = await aiJSONGemini({
             system,
             user: description,
-            model: "gemini-2.5-flash",
+            model: modelOverride || "gemini-2.5-flash",
             temperature: 0.2,
             fallback: { trait: description }
         });

@@ -14,7 +14,7 @@ import { saveMotivations } from "../lib/motivationsLogic";
 import PersonalMotivationsContent from "../components/PersonalMotivationsContent";
 import { clearAftermathPrefetch } from "../hooks/useAftermathPrefetch";
 import { usePastGamesStore } from "../store/pastGamesStore";
-import { PREDEFINED_ROLES_ARRAY, EXPERIMENT_PREDEFINED_ROLE_KEYS, type PredefinedRoleData, getRoleImagePaths } from "../data/predefinedRoles";
+import { PREDEFINED_ROLES_ARRAY, EXPERIMENT_PREDEFINED_ROLE_KEYS, getRoleImagePaths } from "../data/predefinedRoles";
 import { audioManager } from "../lib/audioManager";
 import { loggingService } from "../lib/loggingService";
 import { ShardWithAvatar } from "../components/fragments/ShardWithAvatar";
@@ -383,12 +383,14 @@ export default function DreamScreen({ push }: { push: PushFn }) {
     // Custom trait is valid - call AI to extract short trait (bilingual)
     setExtractingTrait(true);
     try {
+      const { aiModelOverride } = useDilemmaStore.getState();
       const response = await fetch("/api/extract-trait", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           description: trimmed,
           language: getCurrentLanguage(),
+          model: aiModelOverride,
         }),
       });
       const data = await response.json();

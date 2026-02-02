@@ -8,12 +8,13 @@
 
 import { useCallback, useState } from "react";
 import { useSettingsStore } from "../store/settingsStore";
+import { useDilemmaStore } from "../store/dilemmaStore";
 import { TTS_VOICE } from "../lib/ttsConfig";
 import { getCurrentLanguage } from "../i18n/lang";
 
 type SpeakOptions = {
   voiceName?: string;           // Gemini voice name; default from VITE_TTS_VOICE env var
-  format?: "mp3" | "opus" | "aac" | "flac";
+  format?: "mp3" | "opus" | "aac" | "flac" | "wav";
   volume?: number;              // 0..1
   instructions?: string;        // Optional: Style/tone instructions (prepended to text for Gemini)
 };
@@ -47,7 +48,7 @@ export function useNarrator() {
       return;
     }
 
-    try { globalAudioRef?.pause?.(); } catch {}
+    try { globalAudioRef?.pause?.(); } catch { }
     globalAudioRef = null;
 
     if (globalObjectUrlRef) {
@@ -73,7 +74,7 @@ export function useNarrator() {
       const a = new Audio();
       a.preload = "auto";
       // a silent play/pause to unlock
-      a.play().then(() => a.pause()).catch(() => {});
+      a.play().then(() => a.pause()).catch(() => { });
       log("prime() done");
     } catch (e) {
       log("prime() error:", e);
@@ -90,8 +91,8 @@ export function useNarrator() {
       if (!text?.trim()) {
         // return a no-op that behaves like "already ready"
         return {
-          start: async () => {},
-          dispose: () => {},
+          start: async () => { },
+          dispose: () => { },
           disposed: () => true,
         };
       }
@@ -100,8 +101,8 @@ export function useNarrator() {
       if (!narrationEnabled || getCurrentLanguage() === 'he') {
         // narration off or Hebrew → don't block UI; provide a no-op that is "ready"
         return {
-          start: async () => {},
-          dispose: () => {},
+          start: async () => { },
+          dispose: () => { },
           disposed: () => true,
         };
       }
@@ -118,10 +119,12 @@ export function useNarrator() {
       log("prepare() fetch /api/tts … voice =", voice, "format =", format, instructions ? `instructions = "${instructions}"` : "");
 
       // Build request body - only include instructions if defined
-      const requestBody: { text: string; voice: string; format: string; instructions?: string } = {
+      const { aiModelOverride } = useDilemmaStore.getState();
+      const requestBody: { text: string; voice: string; format: string; instructions?: string; model?: string | null } = {
         text,
         voice,
         format,
+        model: aiModelOverride
       };
       if (instructions) {
         requestBody.instructions = instructions;
@@ -141,11 +144,11 @@ export function useNarrator() {
       const buf = await r.arrayBuffer();
       const type =
         format === "wav" ? "audio/wav" :
-        format === "aac" ? "audio/aac" :
-        format === "flac" ? "audio/flac" :
-        format === "opus" ? "audio/ogg" :
-        format === "mp3" ? "audio/mpeg" :
-        "audio/wav";  // Default to WAV for Gemini TTS
+          format === "aac" ? "audio/aac" :
+            format === "flac" ? "audio/flac" :
+              format === "opus" ? "audio/ogg" :
+                format === "mp3" ? "audio/mpeg" :
+                  "audio/wav";  // Default to WAV for Gemini TTS
       const blob = new Blob([buf], { type });
       const url = URL.createObjectURL(blob);
 
@@ -204,7 +207,7 @@ export function useNarrator() {
         if (disposed) return;
         disposed = true;
         globalIsPlayingRef = false;
-        try { audio.pause(); } catch {}
+        try { audio.pause(); } catch { }
         audio.src = "";
         if (globalObjectUrlRef) {
           URL.revokeObjectURL(globalObjectUrlRef);
@@ -237,6 +240,6 @@ export function useNarrator() {
     speak,
     stop,
     prime,
-    setPreferredVoice: () => {}, // no-op; we pass voice per call
+    setPreferredVoice: () => { }, // no-op; we pass voice per call
   };
 }

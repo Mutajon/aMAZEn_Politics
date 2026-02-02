@@ -10,6 +10,7 @@ export type NewsTickerRequest = {
   epoch?: "modern" | "ancient" | "futuristic";
   last?: { title: string; summary: string; cost?: number } | null;
   language?: string;
+  model?: string | null;
 };
 
 export async function fetchNewsTickerItems(req: NewsTickerRequest): Promise<TickerItem[]> {
