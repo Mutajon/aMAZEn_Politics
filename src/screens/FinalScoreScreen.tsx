@@ -71,7 +71,6 @@ const formatNumber = new Intl.NumberFormat(undefined, {
 export default function FinalScoreScreen({ push }: Props) {
   const lang = useLang();
   const liveBreakdown = useScoreCalculation();
-  const isFreePlay = useSettingsStore(s => s.isFreePlay);
 
   const finalScoreCalculated = useDilemmaStore((s) => s.finalScoreCalculated);
   const savedBreakdown = useDilemmaStore((s) => s.finalScoreBreakdown);
@@ -140,10 +139,7 @@ export default function FinalScoreScreen({ push }: Props) {
         maxPoints: breakdown.support.mom.maxPoints,
         icon: <Heart className="h-6 w-6" />,
       },
-    ].filter(item => {
-      if (isFreePlay && item.key === 'mom') return false;
-      return true;
-    }) as CategoryRenderInfo[],
+    ],
     [
       breakdown.support.people.points,
       breakdown.support.people.percent,
@@ -160,8 +156,19 @@ export default function FinalScoreScreen({ push }: Props) {
     () => new Array(sequence.length + 1).fill(0)
   );
   const displayValuesRef = useRef(displayValues);
-  const [step, setStep] = useState(0);
-  const [running, setRunning] = useState(true);
+  const [step, setStep] = useState(() => {
+    // Check if we should skip animation (e.g., coming back from Highscores)
+    if (typeof window !== 'undefined' && window.location.hash.includes('skipAnimation=true')) {
+      return sequence.length + 1;
+    }
+    return 0;
+  });
+  const [running, setRunning] = useState(() => {
+    if (typeof window !== 'undefined' && window.location.hash.includes('skipAnimation=true')) {
+      return false;
+    }
+    return true;
+  });
   const rafRef = useRef<number | null>(null);
   const startTimeRef = useRef(0);
 
@@ -294,6 +301,15 @@ export default function FinalScoreScreen({ push }: Props) {
   ]);
 
   useEffect(() => {
+    // Skip recording if in experiment mode as requested by user
+    if (experimentMode) {
+      if (step === sequence.length + 1 && !finalScoreSubmitted) {
+        markScoreSubmitted(); // Mark as 'submitted' anyway to prevent repeated checks
+        console.log('[FinalScore] 💡 Highscore recording disabled in Experiment Mode');
+      }
+      return;
+    }
+
     if (step === sequence.length + 1 && !finalScoreSubmitted && ratings) {
       const entry = buildHighscoreEntry(
         breakdown,
@@ -488,7 +504,7 @@ export default function FinalScoreScreen({ push }: Props) {
       "User clicked Visit Hall of Fame"
     );
     const playerName = character?.name || lang("FINAL_SCORE_UNKNOWN_LEADER");
-    push(`/highscores?highlight=${encodeURIComponent(playerName)}`);
+    push(`/highscores?from=final-score&highlight=${encodeURIComponent(playerName)}`);
   };
 
   const finalScoreDisplay = displayValues[sequence.length];
@@ -583,11 +599,14 @@ export default function FinalScoreScreen({ push }: Props) {
             <ArrowRight className="h-4 w-4" />
             {lang("FINAL_SCORE_PLAY_AGAIN")}
           </button>
-          {!experimentMode && (
+
+          {/* Always show Hall of Fame in Lobby (Free Play) mode */}
+          {(lobbyMode || !experimentMode) && (
             <button
               onClick={handleVisitHallOfFame}
               className="inline-flex items-center gap-2 rounded-xl border border-white/25 px-4 py-2 text-white/80 hover:bg-white/15 transition"
             >
+              <Trophy className="h-4 w-4" />
               {lang("FINAL_SCORE_VISIT_HALL_OF_FAME")}
             </button>
           )}

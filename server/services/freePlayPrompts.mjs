@@ -36,9 +36,10 @@ INSTRUCTIONS:
 - Directly address the player as "you". 
 - Place them physically in the scene (sights, sounds).
 - Establish the weight of their specific position.
-- **Support Entities**: Identify exactly 2 key political entities for this specific role:
+- **Support Entities**: Identify exactly 3 key entities for this specific role:
   1. "Population": The general public/subjects relevant to the role (e.g., "The Peasantry", "Voters", "The Colony").
   2. "Opposition": The primary institutional or social antagonist/monitor (e.g., "The Church", "The Board", "Military High Command").
+  3. "Personal Anchor": This MUST be the player's Mother ("Mom"). She represents personal empathy, family stakes, and the weight of conscience.
   - Choose a relevant emoji icon for each.
   - Provide a short "summary" (1 sentence) of their current stance/mood toward the player.
 
@@ -48,7 +49,8 @@ INSTRUCTIONS:
   "intro": "...", 
   "supportEntities": [
     { "name": "Population Name", "icon": "👥", "type": "population", "summary": "..." }, 
-    { "name": "Opposition Name", "icon": "🏛️", "type": "opposition", "summary": "..." }
+    { "name": "Opposition Name", "icon": "🏛️", "type": "opposition", "summary": "..." },
+    { "name": "Mom", "icon": "❤️", "type": "mom", "summary": "..." }
   ]
 }
 `;
@@ -78,7 +80,7 @@ RULES:
 - Constraints: Dilemma max 3 sentences. Generate exactly 3 UNIQUE and distinct actions per dilemma.
 - Action Variety: Each action must lead in a different thematic or ideological direction.
 - Forbidden: DO NOT number the actions (no "(1)", "(2)", etc. in titles). DO NOT repeat the same option.
-- **Support Shift Logic**: Do NOT use pre-baked attitudes. Instead, perform a REALISTIC situational analysis: Given the player's Role, the Setting, and their last Decision, how would these specific entities (Population/Opposition) react?
+- **Support Shift Logic**: Do NOT use pre-baked attitudes. Instead, perform a REALISTIC situational analysis: Given the player's Role, the Setting, and their last Decision, how would these specific entities (Population/Opposition/Personal Anchor) react?
 - Allowed attitudeLevel: "strongly_supportive", "moderately_supportive", "slightly_supportive", "slightly_opposed", "moderately_opposed", "strongly_opposed".
 - Support: Identify "axisPills" (the poles boosted by the player's last choice).
 
@@ -86,7 +88,8 @@ SCHEMA:
 {
   "supportShift": {
     "people": {"attitudeLevel": "...", "shortLine": "..."},
-    "holders": {"attitudeLevel": "...", "shortLine": "..."}
+    "holders": {"attitudeLevel": "...", "shortLine": "..."},
+    "mom": {"attitudeLevel": "...", "shortLine": "..."}
   },
   "dilemma": {
     "title": "...", "description": "Situation + Bridge. End with question.",

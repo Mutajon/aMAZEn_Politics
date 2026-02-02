@@ -18,12 +18,12 @@ import type { HighscoreEntry } from "../data/highscores-default";
 // CONSTANTS
 // ===========================================================================
 
-export const SUPPORT_TRACK_MAX_POINTS = 500;
+export const SUPPORT_TRACK_MAX_POINTS = 100;
 export const SUPPORT_TRACK_COUNT = 3;
 export const SUPPORT_TOTAL_MAX_POINTS =
-  SUPPORT_TRACK_MAX_POINTS * SUPPORT_TRACK_COUNT; // 1500
+  SUPPORT_TRACK_MAX_POINTS * SUPPORT_TRACK_COUNT; // 300
 
-export const MAX_FINAL_SCORE = SUPPORT_TOTAL_MAX_POINTS; // 1500
+export const MAX_FINAL_SCORE = SUPPORT_TOTAL_MAX_POINTS; // 300
 
 // ===========================================================================
 // TYPES
@@ -95,7 +95,7 @@ export function calculateLiveScoreBreakdown({
   supportPeople,
   supportMiddle,
   supportMom,
-  isFreePlay = false,
+  isFreePlay: _isFreePlay = false,
 }: {
   supportPeople: number;
   supportMiddle: number;
@@ -106,7 +106,8 @@ export function calculateLiveScoreBreakdown({
   const middle = buildSupportTrackBreakdown(supportMiddle);
   const mom = buildSupportTrackBreakdown(supportMom);
 
-  const tracks = isFreePlay ? [people, middle] : [people, middle, mom];
+  // USER requested Mom track to be back in Free Play too
+  const tracks = [people, middle, mom];
   const supportTotal = tracks.reduce((sum, t) => sum + t.points, 0);
   const maxPoints = tracks.length * SUPPORT_TRACK_MAX_POINTS;
   const final = Math.max(0, supportTotal);

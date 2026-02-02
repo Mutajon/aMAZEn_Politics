@@ -6,6 +6,15 @@ import { useLang } from "../i18n/lang";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { MirrorReflection } from "./MirrorWithReflection";
+import { useSettingsStore } from "../store/settingsStore";
+
+const MODEL_OPTIONS = [
+    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+    { value: "gemini-2.5-flash-preview-09-2025", label: "Gemini 2.5 Flash Preview" },
+    { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+    { value: "gemini-3-flash-preview", label: "Gemini 3 Flash Preview" },
+    { value: "gemini-3-pro-preview", label: "Gemini 3 Pro Preview" },
+];
 
 interface LobbyPlayPopupProps {
     isOpen: boolean;
@@ -69,6 +78,8 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     const lang = useLang();
     const { language } = useLanguage();
     const isRTL = language === 'he';
+    const debugMode = useSettingsStore(s => s.debugMode);
+    const { aiModelOverride, setAiModelOverride } = useDilemmaStore();
 
     const [characterName, setCharacterName] = useState("");
     const [setting, setSetting] = useState("");
@@ -577,6 +588,29 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                                 className="w-full h-12 px-5 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:bg-white/10 transition-all font-medium"
                                             />
                                         </div>
+
+                                        {/* DEBUG: AI Model Selector */}
+                                        {debugMode && (
+                                            <div className="space-y-2 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
+                                                <label className="text-[10px] font-bold text-amber-500 uppercase tracking-widest ml-1">
+                                                    DEBUG: AI Model Override
+                                                </label>
+                                                <select
+                                                    value={aiModelOverride || "gemini-2.5-flash"}
+                                                    onChange={(e) => setAiModelOverride(e.target.value)}
+                                                    className="w-full h-11 px-4 bg-slate-900/50 border border-amber-500/30 rounded-xl text-amber-200 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all"
+                                                >
+                                                    {MODEL_OPTIONS.map((opt) => (
+                                                        <option key={opt.value} value={opt.value} className="bg-slate-900">
+                                                            {opt.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-[9px] text-amber-500/60 mt-1 italic">
+                                                    Visible only in debug mode. Affects this session's Free Play calls.
+                                                </p>
+                                            </div>
+                                        )}
                                     </>
                                 ) : (
                                     <div className="space-y-6">
@@ -631,7 +665,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                                     <div>
                                                         <div className="text-[10px] text-amber-500/60 leading-none mb-1.5 font-bold uppercase tracking-wider">{lang("LOBBY_TARGET_SCORE_SHORT") || "Score Target"}</div>
                                                         <div className="text-xl font-black text-amber-500 leading-none tracking-tight">
-                                                            {difficulty === 'easy' ? 950 : difficulty === 'hard' ? 1300 : 1150}
+                                                            {difficulty === 'easy' ? 200 : difficulty === 'hard' ? 250 : 225}
                                                         </div>
                                                     </div>
                                                     <Trophy className="w-4 h-4 text-amber-500/30 ml-auto group-hover:text-amber-500/50 transition-colors" />

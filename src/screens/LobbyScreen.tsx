@@ -203,9 +203,9 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       roleStore.setRoleDescription(data.role);
 
       // Determine Target Score (Difficulty)
-      let targetScore = 1150; // Normal
-      if (data.difficulty === 'easy') targetScore = 950;
-      if (data.difficulty === 'hard') targetScore = 1300;
+      let targetScore = 225; // Normal
+      if (data.difficulty === 'easy') targetScore = 200;
+      if (data.difficulty === 'hard') targetScore = 250;
 
       // Determine Support Entities (Dynamic)
       const population = data.supportEntities?.find(e => e.type === 'population') || { name: "The People", icon: "👥" };

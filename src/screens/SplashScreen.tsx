@@ -802,6 +802,44 @@ export default function SplashScreen({
                 </motion.button>
               )}
 
+              {/* Debug: Lobby (only visible in debugMode) */}
+              {debugMode && (
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: showButton ? 1 : 0 }}
+                  transition={{ delay: 0.15, type: "spring", stiffness: 250, damping: 22 }}
+                  style={{ visibility: showButton ? "visible" : "hidden" }}
+                  onClick={() => {
+                    audioManager.playSfx('click-soft');
+                    push("/lobby");
+                  }}
+                  className="w-[14rem] rounded-2xl px-4 py-2.5 text-sm font-semibold
+               bg-white/10 hover:bg-white/20 text-white/90 border border-white/10
+               shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-white/30 transition-all"
+                >
+                  Lobby (Debug)
+                </motion.button>
+              )}
+
+              {/* Debug: Lab (only visible in debugMode) */}
+              {debugMode && (
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: showButton ? 1 : 0 }}
+                  transition={{ delay: 0.2, type: "spring", stiffness: 250, damping: 22 }}
+                  style={{ visibility: showButton ? "visible" : "hidden" }}
+                  onClick={() => {
+                    audioManager.playSfx('click-soft');
+                    push("/lab");
+                  }}
+                  className="w-[14rem] rounded-2xl px-4 py-2.5 text-sm font-semibold
+               bg-white/10 hover:bg-white/20 text-white/90 border border-white/10
+               shadow-lg active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-white/30 transition-all"
+                >
+                  Lab (Debug)
+                </motion.button>
+              )}
+
               {/* Free Play Button - TEMPORARILY HIDDEN FOR EXPERIMENT */}
               {false && (
                 <motion.button
@@ -897,12 +935,6 @@ export default function SplashScreen({
                     🦅 N. America (Has Emphasis)
                   </button>
 
-                  <button
-                    onClick={() => push("/lobby")}
-                    className="px-3 py-2 bg-purple-700/50 hover:bg-purple-600/50 text-white text-xs rounded border border-purple-500/30"
-                  >
-                    🏢 Lobby Screen
-                  </button>
 
                   <button
                     onClick={() => handleDebugRoleStart("athens_431", true)}
@@ -922,30 +954,32 @@ export default function SplashScreen({
       {experimentMode && <IDCollectionModal isOpen={showIDModal} onSubmit={handleIDSubmit} />}
 
       {/* Hebrew Translation Warning Popup */}
-      {showHebrewWarning && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60"
-          onClick={(e) => e.stopPropagation()}
-        >
+      {
+        showHebrewWarning && (
           <div
-            className="bg-neutral-900 p-6 rounded-2xl max-w-sm text-center border border-white/10"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-white/90 mb-4 text-right leading-relaxed" dir="rtl">
-              השפה מוגדרת כרגע על עברית. דעו שהתרגום לעברית לא מלא, ייתכנו שגיאות ובפרט ניסוחים לא ניטרליים מבחינה מגדרית. אנו מתנצלים על כך. אם תעדיפו לשחק באנגלית, לחצו בפינה ימין למעלה אחרי סגירת הפופאפ הזה.
-            </p>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowHebrewWarning(false);
-              }}
-              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-medium transition-colors"
+            <div
+              className="bg-neutral-900 p-6 rounded-2xl max-w-sm text-center border border-white/10"
+              onClick={(e) => e.stopPropagation()}
             >
-              הבנתי
-            </button>
+              <p className="text-white/90 mb-4 text-right leading-relaxed" dir="rtl">
+                השפה מוגדרת כרגע על עברית. דעו שהתרגום לעברית לא מלא, ייתכנו שגיאות ובפרט ניסוחים לא ניטרליים מבחינה מגדרית. אנו מתנצלים על כך. אם תעדיפו לשחק באנגלית, לחצו בפינה ימין למעלה אחרי סגירת הפופאפ הזה.
+              </p>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowHebrewWarning(false);
+                }}
+                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white font-medium transition-colors"
+              >
+                הבנתי
+              </button>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 }

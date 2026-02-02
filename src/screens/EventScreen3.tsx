@@ -264,15 +264,14 @@ export default function EventScreen3({ push }: Props) {
       }
     ];
 
-    if (!isFreePlay) {
-      components.push({
-        id: "mom" as const,
-        label: lang("FINAL_SCORE_MOM_SUPPORT"),
-        valueLabel: `${breakdown.support.mom.percent}%`,
-        points: breakdown.support.mom.points,
-        maxPoints: breakdown.support.mom.maxPoints,
-      });
-    }
+    // USER requested Mom track to be back in Free Play too
+    components.push({
+      id: "mom" as const,
+      label: lang("FINAL_SCORE_MOM_SUPPORT"),
+      valueLabel: `${breakdown.support.mom.percent}%`,
+      points: breakdown.support.mom.points,
+      maxPoints: breakdown.support.mom.maxPoints,
+    });
 
     return {
       total: breakdown.final,

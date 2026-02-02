@@ -301,10 +301,6 @@ export function buildSupportItems(
     }
   ];
 
-  // In Free Play, completely remove the "Mother" track (id: 'mom')
-  if (isFreePlay) {
-    return allItems.filter(item => item.id !== 'mom');
-  }
 
   return allItems;
 }

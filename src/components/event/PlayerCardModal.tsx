@@ -43,6 +43,15 @@ interface SelectedValueForExplanation {
   dimension: PropKey;
 }
 
+const POLE_COLORS: Record<string, string> = {
+  democracy: '#c084fc', // purple-400
+  autonomy: '#22d3ee', // cyan-400
+  totalism: '#fb7185', // rose-400
+  oligarchy: '#818cf8', // indigo-400
+  heteronomy: '#34d399', // emerald-400
+  liberalism: '#f472b6'  // pink-400
+};
+
 /**
  * Renders a single compass dimension box showing top values
  */
@@ -366,12 +375,24 @@ export default function PlayerCardModal({
 
                       {entry.pills.length > 0 && (
                         <div className="flex flex-wrap gap-2">
-                          {entry.pills.map((pill, i) => (
-                            <div key={i} className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-xs">
-                              <ShieldCheck className="w-3 h-3 text-indigo-400" />
-                              <span>{lang(`PHILOSOPHICAL_POLE_${pill.toUpperCase()}`)}</span>
-                            </div>
-                          ))}
+                          {entry.pills.map((pill, i) => {
+                            const pole = pill.toLowerCase() as keyof typeof POLE_COLORS;
+                            const color = POLE_COLORS[pole] || '#818cf8'; // fallback to indigo
+                            return (
+                              <div
+                                key={i}
+                                className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-bold border"
+                                style={{
+                                  backgroundColor: `${color}15`,
+                                  borderColor: `${color}40`,
+                                  color: color
+                                }}
+                              >
+                                <ShieldCheck className="w-3 h-3" style={{ color }} />
+                                <span>{lang(`PHILOSOPHICAL_POLE_${pill.toUpperCase()}`)}</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>

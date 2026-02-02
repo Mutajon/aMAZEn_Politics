@@ -15,25 +15,25 @@ export default function HighscoreScreenV2() {
   const userId = useLoggingStore((s) => s.userId);
   const [activeTab, setActiveTab] = useState<TabType>("global");
   const [selected, setSelected] = useState<HighscoreEntry | null>(null);
-  
+
   // Fetch data based on active tab
   const {
     entries: globalEntries,
     loading: globalLoading,
     error: globalError,
   } = useGlobalHighscores();
-  
+
   const {
     entries: userEntries,
     loading: userLoading,
     error: userError,
     bestScore,
   } = useUserHighscores(userId || "");
-  
+
   const entries = activeTab === "global" ? globalEntries : userEntries;
   const loading = activeTab === "global" ? globalLoading : userLoading;
   const error = activeTab === "global" ? globalError : userError;
-  
+
   return (
     <div className="min-h-[100dvh] px-3 py-6 md:px-5 md:py-8" style={bgStyleSplash}>
       <div className="w-full max-w-5xl mx-auto">
@@ -44,13 +44,21 @@ export default function HighscoreScreenV2() {
               {lang("HIGHSCORE_TITLE")}
             </h1>
             <button
-              onClick={() => window.history.back()}
+              onClick={() => {
+                // If we have a hint that we came from final-score, return there with skipAnimation
+                if (typeof window !== 'undefined' && window.location.hash.includes('from=final-score')) {
+                  // We use window.location.hash manually to ensure skipAnimation is preserved
+                  window.location.hash = "/final-score?skipAnimation=true";
+                } else {
+                  window.history.back();
+                }
+              }}
               className="rounded-xl px-3 py-2 bg-white/10 hover:bg-white/15 text-white text-sm"
             >
               {lang("HIGHSCORE_BACK")}
             </button>
           </div>
-          
+
           {/* Tab Navigation */}
           <div className="flex gap-2 p-1 bg-white/5 rounded-xl border border-white/10">
             <button
@@ -76,14 +84,14 @@ export default function HighscoreScreenV2() {
               👤 {lang("HIGHSCORE_TAB_LOCAL")}
             </button>
           </div>
-          
+
           {/* Subtitle */}
           <p className="text-white/60 text-xs md:text-sm mt-2">
-            {activeTab === "global" 
+            {activeTab === "global"
               ? lang("HIGHSCORE_SUBTITLE_GLOBAL")
               : lang("HIGHSCORE_SUBTITLE_LOCAL")}
           </p>
-          
+
           {/* Local tab: Show personal best */}
           {activeTab === "local" && bestScore > 0 && (
             <div className="mt-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
