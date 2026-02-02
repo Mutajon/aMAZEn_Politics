@@ -77,6 +77,7 @@ AXES:
 RULES:
 - Situations: Personal, Social, National, International. Rotate Axis and Scope.
 - Tone: Dramatic, short sentences, direct address.
+- **Narrative Evolution**: Explore the core "Emphasis" through different lenses (e.g., personal impact, institutional failure, public perception) rather than repeating the same theme. Variety is key.
 - Constraints: Dilemma max 3 sentences. Generate exactly 3 UNIQUE and distinct actions per dilemma.
 - Action Variety: Each action must lead in a different thematic or ideological direction.
 - Forbidden: DO NOT number the actions (no "(1)", "(2)", etc. in titles). DO NOT repeat the same option.
@@ -110,7 +111,7 @@ CRITICAL: The "axisPills" array MUST only contain the English IDs: "democracy", 
 // ----------------------------------------------------------------------------
 // 3. USER PROMPT (Turn Inputs)
 // ----------------------------------------------------------------------------
-export function buildFreePlayUserPrompt(day, playerChoice, lastTopic, consecutiveDays) {
+export function buildFreePlayUserPrompt(day, playerChoice, lastTopic, consecutiveDays, emphasis) {
   if (day === 1) {
     return `Establish the physical scene and present a concrete problem requiring an immediate decision.
 Based on the Role and Setting, identify which philosophical poles (democracy, autonomy, etc.) would be established as the foundation or reinforced by this initial situation.
@@ -121,7 +122,9 @@ Include these in the "axisPills" array.`;
     ? `MANDATORY: Switch the topic completely (Previous: ${lastTopic}).`
     : `Continue or evolve the topic: ${lastTopic}.`;
 
-  return `DAY ${day}.
+  const emphasisAnchor = emphasis ? `\n\n**DILEMMA ANCHOR**: For most turns, keep the story grounded in the core theme: "${emphasis}". Find a new angle or specific tension related to this to anchor today's dilemma. If the story naturally dictates a temporary shift away from this theme, you may do so, but return to it frequently.` : "";
+
+  return `DAY ${day}.${emphasisAnchor}
 Last choice: "${playerChoice.title}"
 
 1. **BRIDGE**: Show the consequence of the player's choice.
