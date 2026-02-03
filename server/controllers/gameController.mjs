@@ -781,7 +781,9 @@ export async function freePlayTurn(req, res) {
             // Build System Prompt
             const context = { role, setting, playerName, emphasis, gender, language, supportEntities };
             const systemPrompt = buildFreePlaySystemPrompt(context);
-            const userPrompt = buildFreePlayUserPrompt(1, null, null, 0);
+            const languageCode = String(language || "en").toLowerCase();
+            const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
+            const userPrompt = buildFreePlayUserPrompt(1, null, null, 0, emphasis, languageCode, languageName);
 
             const messages = [
                 { role: "system", content: systemPrompt },
@@ -879,7 +881,9 @@ export async function freePlayTurn(req, res) {
                 else break;
             }
 
-            const userPrompt = buildFreePlayUserPrompt(day, playerChoice, lastTopic, consecutiveDays, conversation.meta.emphasis);
+            const languageCode = String(conversation.meta.language || "en").toLowerCase();
+            const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
+            const userPrompt = buildFreePlayUserPrompt(day, playerChoice, lastTopic, consecutiveDays, conversation.meta.emphasis, languageCode, languageName);
 
             const systemPrompt = buildFreePlaySystemPrompt({
                 role: conversation.meta.role,

@@ -62,9 +62,10 @@ export function buildFreePlaySystemPrompt(context) {
   const genderGrammar = gender === 'female' ? 'FEMALE' : (gender === 'other' ? 'MALE PLURAL' : 'MALE');
   const entities = supportEntities ? supportEntities.map(e => `- ${e.name} (${e.type}): ${e.summary}`).join('\n') : "";
 
-  return `MISSION:
+  return `STRICT: ALL GENERATED CONTENT (except JSON keys) MUST BE IN ${lang.toUpperCase()}.
+Translate any English context or instructions provided below into ${lang}.\n\nMISSION:
 Game Master for ${playerName}. Role: ${role}, Setting: ${setting}. ${emphasis ? `Focus: ${emphasis}.` : ""}
-Deliver fast, dramatic dilemmas. Output ONLY JSON in ${lang}. Use ${genderGrammar} grammar.
+Deliver fast, dramatic dilemmas. Output ONLY JSON. Use ${genderGrammar} grammar.
 
 ENTITIES:
 ${entities}
@@ -111,7 +112,12 @@ CRITICAL: The "axisPills" array MUST only contain the English IDs: "democracy", 
 // ----------------------------------------------------------------------------
 // 3. USER PROMPT (Turn Inputs)
 // ----------------------------------------------------------------------------
-export function buildFreePlayUserPrompt(day, playerChoice, lastTopic, consecutiveDays, emphasis) {
+export function buildFreePlayUserPrompt(day, playerChoice, lastTopic, consecutiveDays, emphasis, languageCode = 'en', languageName = 'English') {
+  let prompt = "";
+  if (languageCode !== 'en') {
+    prompt += `STRICT: ALL GENERATED CONTENT MUST BE IN ${languageName.toUpperCase()}.\n\n`;
+  }
+
   if (day === 1) {
     return `Establish the physical scene and present a concrete problem requiring an immediate decision.
 Based on the Role and Setting, identify which philosophical poles (democracy, autonomy, etc.) would be established as the foundation or reinforced by this initial situation.

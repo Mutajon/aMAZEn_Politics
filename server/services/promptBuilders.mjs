@@ -128,7 +128,15 @@ export function buildSuggestionValidatorUserPrompt({
 
 export function buildGameMasterUserPrompt(day, playerChoice = null, currentCompassTopValues = null, mirrorMode = 'dilemma', languageCode = 'en', languageName = 'English', dilemmaEmphasis = null, previousValueTargeted = null, consecutiveDaysOnTopic = 0, lastTopic = null) {
   // General instruction for all days
-  let prompt = `First, carefully review the entire system prompt to understand all context and rules.\n\n`;
+  let prompt = "";
+
+  // Add mandatory language instruction at the absolute beginning
+  if (languageCode !== 'en') {
+    prompt += `STRICT: ALL GENERATED CONTENT (title, description, bridge, actions, mirrorAdvice, shortLine) MUST BE IN ${languageName.toUpperCase()}.
+Translate any English context or instructions provided below into ${languageName}.\n\n`;
+  }
+
+  prompt += `First, carefully review the entire system prompt to understand all context and rules.\n\n`;
 
   if (day === 1) {
     prompt += `This is DAY 1 of 7.
@@ -216,11 +224,7 @@ STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically af
     }
   }
 
-  // Add language instruction if not English
-  if (languageCode !== 'en') {
-    prompt += `\n\nWrite your response in ${languageName}.`;
-  }
-
+  // Removed localized language instruction from end to avoid duplication/confusion
   return prompt;
 }
 
@@ -239,7 +243,15 @@ export function buildGameMasterSystemPromptUnifiedV3(gameContext, languageCode =
   const top5PowerHolders = powerHolders.slice(0, 5);
   // Removed playerCompassTopValues processing - switching to value-oriented approach
 
-  const prompt = `0. YOUR MISSION: THE COLD NARRATOR
+  let prompt = "";
+
+  // Add mandatory language instruction at the absolute beginning
+  if (languageCode !== 'en') {
+    prompt += `STRICT: ALL GENERATED CONTENT (except JSON keys) MUST BE IN ${languageName.toUpperCase()}.
+Translate all English concepts, names, and instructions below into native, dramatic ${languageName}.\n\n`;
+  }
+
+  prompt += `0. YOUR MISSION: THE COLD NARRATOR
 
 You are the cold narrator of a political drama (Game of Thrones, House of Cards).
 Speak directly to the player as "you". 
@@ -278,8 +290,6 @@ HEBREW STYLE & GRAMMAR (MANDATORY):
 ` : ''}
 
 NAMING RULES: Refer to people by their ROLE: "The General", "Your wife", "The Priest".
-
-${languageCode !== 'en' ? `\n\nWrite in ${languageName}. Use natural, dramatic phrasing. ${languageCode === 'he' ? 'FORBIDDEN: Do not use Nikud in any word.' : ''}` : ''}
 
 1. PLAYER CONTEXT
 
