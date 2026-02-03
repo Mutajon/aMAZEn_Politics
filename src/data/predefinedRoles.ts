@@ -44,6 +44,7 @@ export interface PredefinedRoleData {
   characters: RoleCharacters;          // Character name options (male/female/any)
   scoreGoal: number;                   // Target score to mark role as completed
   defaultGoalStatus: RoleGoalStatus;   // Initial completion status
+  aftermathEmphasis?: string;          // NEW: Specific instructions for the aftermath summary paragraph
   defaultHighScore?: number;           // Default high score (optional)
 }
 
@@ -66,6 +67,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     storyThemes: ["paradox_of_freedom", "liberalism_vs_aesthetics", "personal_autonomy", "charisma_vs_law"],
     scoreGoal: 200,
     defaultGoalStatus: "uncompleted",
+    aftermathEmphasis: "סכם את המסע: מה למדנו על הדמוקרטיה ועל המתח בין דמוקרטיה לאומנות וחופש ביטוי. תתאר לשחקן את המצב של הדמוקרטיה האתונאית, את המצב של המחזאי קאליאס, ואת המצב של השחקן – אילו ערכים קידם ואיזו מציאות יצר.",
     powerDistribution: {
       systemName: "ATHENS_SYSTEM_NAME",
       systemDesc: "ATHENS_SYSTEM_DESC",
@@ -1062,6 +1064,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     storyThemes: ["justice_vs_amnesty", "public_safety", "institutional_trust"],
     scoreGoal: 275,
     defaultGoalStatus: "uncompleted",
+    aftermathEmphasis: "סכם את המסע: תאר למשתמשת מה למדנו על המתח שבין הישרדות קהילתית למצפון אישי, ובין רווח כלכלי ואסטרטגי לבין שחיקה מוסרית ואנושיות.",
     powerDistribution: {
       systemName: "Autocratizing (Executive)",
       systemDesc: "Late-apartheid South Africa: executive-led minority rule with strong security forces and rising mass opposition.",

@@ -228,12 +228,6 @@ export default function PowerDistributionContent({
                           </div>
                           {h.note && <p className="text-xs sm:text-sm text-white/60 mt-0.5 line-clamp-2">{lang(h.note)}</p>}                        </div>
 
-                        {/* Percentage Badge */}
-                        <div className="shrink-0 ml-1 sm:ml-2">
-                          <div className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg sm:rounded-xl bg-white/8 border border-white/10 text-white/90 text-xs sm:text-sm font-semibold">
-                            {h.percent}
-                          </div>
-                        </div>
                       </div>
 
                       {/* Slider */}

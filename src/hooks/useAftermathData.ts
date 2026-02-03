@@ -13,6 +13,7 @@ import { useDilemmaStore } from "../store/dilemmaStore";
 import { useCompassStore } from "../store/compassStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { COMPONENTS, type PropKey } from "../data/compass-data";
+import { PREDEFINED_ROLES_ARRAY } from "../data/predefinedRoles";
 import type { AftermathRequest, AftermathResponse, TopCompassValue } from "../lib/aftermath";
 import { calculateOverallRatings } from "../lib/aftermath";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -81,6 +82,9 @@ function buildAftermathRequest(language: string): AftermathRequest {
   const { gameId, dilemmaHistory, supportPeople, supportMiddle, supportMom, aiModelOverride } = useDilemmaStore.getState();
   const { debugMode } = useSettingsStore.getState();
 
+  // Find activeRoleData from predefined roles using selectedRole (legacyKey)
+  const activeRoleData = PREDEFINED_ROLES_ARRAY.find(r => r.legacyKey === selectedRole);
+
   return {
     gameId: gameId || undefined,
     playerName: character?.name || "Leader",
@@ -96,7 +100,8 @@ function buildAftermathRequest(language: string): AftermathRequest {
     topCompassValues: extractTopCompassValues(),
     debug: debugMode,
     model: aiModelOverride,
-    language
+    language,
+    aftermathEmphasis: activeRoleData?.aftermathEmphasis || null
   };
 }
 

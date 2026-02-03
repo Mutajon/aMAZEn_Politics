@@ -35,6 +35,7 @@ type Props = {
   avatarUrl?: string;
   top3ByDimension: Record<PropKey, TopValue[]>;
   onRevealScoreClick: () => void;
+  deathDetails: string;
 };
 
 export default function AftermathContent({
@@ -98,7 +99,7 @@ export default function AftermathContent({
       />
 
       {/* Tombstone Section */}
-      <TombstoneSection haiku={data.haiku} />
+      <TombstoneSection haiku={data.haiku} deathDetails={data.deathDetails} />
 
       {/* Reveal Final Score Button */}
       <div className="pt-4">

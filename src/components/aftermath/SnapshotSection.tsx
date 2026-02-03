@@ -20,7 +20,7 @@ import { TTS_VOICE } from "../../lib/ttsConfig";
 import { useSettingsStore } from "../../store/settingsStore";
 
 type Props = {
-  intro: string; // Death text ("After X years, [leader] died of Z.")
+  intro: string; // Reign Summary: short paragraph on new state, values, and reality
   snapshot: SnapshotEvent[]; // 6-10 extreme events
   avatarUrl?: string; // Player avatar
   legacy: string; // How the player will be remembered ("You will be remembered as...")

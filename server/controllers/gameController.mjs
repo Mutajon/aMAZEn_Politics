@@ -1104,7 +1104,8 @@ export async function generateAftermath(req, res) {
             topCompassValues,
             debug,
             model: modelOverride = null, // LAB MODE OVERRIDE
-            language = 'en' // Get language from client (default: English)
+            language = 'en', // Get language from client (default: English)
+            aftermathEmphasis = null // NEW: Role-specific emphasis for summary
         } = req.body || {};
 
         if (debug) {
@@ -1132,6 +1133,10 @@ Write in clear, vivid, reflective language; no jargon or game terms.
 Tone: ironic-cinematic, like a historical epilogue (Reigns, Frostpunk, Democracy 3).
 Accessible for teens; mix wit with weight.
 Use roles/descriptions, not obscure names.
+
+${aftermathEmphasis ? `SCENARIO-SPECIFIC SUMMARY EMPHASIS:
+${aftermathEmphasis}
+` : ''}
 ${languageCode === 'he' ? `
 ───────────────────────────────────────────────────────────────────────────────
 CRITICAL - HEBREW LANGUAGE RULES (PLURAL FORM ONLY)
@@ -1172,7 +1177,9 @@ CONTENT
 Generate an in-world epilogue for the leader based on their decisions, outcomes, supports, and values.
 Follow this structure:
 
-Intro: Write an opening sentence about the player's death. Use their actual name and role. Vary the time span realistically (NOT always 7 years)—could be months, years, or decades depending on the setting and events. Choose a fitting cause of death based on the role, era, and story.
+Intro (Reign Summary): Write a short, evocative paragraph (3-4 sentences) summarizing the "new state" the player lead the entity to during their reign. Focus on what we learned about the core tensions of the role, the specific values the player demonstrated through their choices, and the reality they helped shape. Avoid generic praise; be analytical and narrative. Address the player as "You" (or "אתם" in Hebrew).
+
+Death Details: A single, vivid sentence describing how and when the player passed away. Vary the time span realistically (could be months, years, or decades after the 7 days)—based on the role, era, and events.
 
 Snapshot: Analyze all 7 decisions for EXTREME consequences. Generate 6-10 dramatic events representing the most significant impacts (both positive and negative). For each event:
 - type: "positive" or "negative"
@@ -1245,13 +1252,15 @@ OUTPUT (STRICT JSON)
 Return only:
 
 {
-  "intro": "",
+  "intro": "The Reign Summary paragraph described above",
+  "deathDetails": "The single sentence about death described above",
   "snapshot": [{"type": "positive|negative", "icon": "emoji", "text": "", "estimate": number_optional, "context": ""}],
   "decisions": [{"title": "", "reflection": "", "autonomy": "", "liberalism": "", "democracy": ""}],
   "valuesSummary": "",
   "legacy": "",
   "haiku": ""
-}`;
+}
+`;
 
         // Build user prompt with game data
         const compassSummary = (topCompassValues || [])

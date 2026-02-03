@@ -32,6 +32,7 @@ export type AftermathRequest = {
   topCompassValues: TopCompassValue[]; // top 2 per dimension (8 total)
   debug?: boolean;
   language?: string; // language code (e.g., 'en', 'he')
+  aftermathEmphasis?: string | null; // NEW: Role-specific emphasis for summary
   model?: string | null; // AI model override (Lab Mode)
 };
 
@@ -59,7 +60,8 @@ export type DecisionAnalysis = {
 /** Response from /api/aftermath */
 export type AftermathResponse = {
   isFallback?: boolean; // true when AI generation failed and fallback data is used
-  intro: string; // "After X years, [leader] died of Z."
+  intro: string; // Reign Summary: short paragraph on new state, values, and reality
+  deathDetails: string; // NEW: Single sentence on how and when the player passed away
   snapshot: SnapshotEvent[]; // 6-10 extreme events (both positive and negative)
   decisions: DecisionAnalysis[]; // one per day (7 decisions with per-decision ratings)
   ratings: {

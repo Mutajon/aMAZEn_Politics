@@ -14,6 +14,7 @@ import { useLanguage } from "../../i18n/LanguageContext";
 
 type Props = {
   haiku: string;
+  deathDetails: string;
 };
 
 const FADE_DURATION_S = 0.5;
@@ -39,15 +40,13 @@ export default function TombstoneSection({ haiku }: Props) {
         {/* Name and Haiku Overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-center px-8">
           {characterName && (
-            <p className={`text-gray-900 text-center font-serif font-semibold mb-2 ${
-              isHebrew ? 'text-base' : 'text-sm'
-            }`}>
+            <p className={`text-gray-900 text-center font-serif font-semibold mb-2 ${isHebrew ? 'text-base' : 'text-sm'
+              }`}>
               {characterName}
             </p>
           )}
-          <p className={`text-gray-900 text-center font-serif italic whitespace-pre-line max-w-[140px] ${
-            isHebrew ? 'text-sm' : 'text-xs'
-          }`}>
+          <p className={`text-gray-900 text-center font-serif italic whitespace-pre-line max-w-[140px] ${isHebrew ? 'text-sm' : 'text-xs'
+            }`}>
             {haiku}
           </p>
         </div>
