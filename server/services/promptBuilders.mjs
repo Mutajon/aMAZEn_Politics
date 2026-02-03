@@ -258,6 +258,16 @@ LANGUAGE RULES (STRICT):
 4. NO numbering for actions in titles.
 5. Generate exactly 3 UNIQUE and distinct actions per dilemma.
 
+SUPPORT SHIFT LOGIC (CRITICAL):
+For EVERY turn (except Day 8), you MUST perform a REALISTIC situational analysis: Given the player's Role, the Setting, and their last Decision, how would these specific entities react?
+1. "people": The general public/demos.
+2. "holders": The main institutional power holders/opposition.
+3. "mom": The personal anchor/family.
+
+Allowed attitudeLevel: "strongly_supportive", "moderately_supportive", "slightly_supportive", "slightly_opposed", "moderately_opposed", "strongly_opposed".
+For "mom", you may also set "momDied": true if the situation is extreme.
+Include a "shortLine" explaining the sentiment for each entity.
+
 ${languageCode === 'he' ? `
 HEBREW STYLE & GRAMMAR (MANDATORY):
 - USE PLAIN, SPOKEN HEBREW (SAFA PSHUTA). Immediate, rough, direct.

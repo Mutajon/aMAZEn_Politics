@@ -13,7 +13,7 @@ import { useFragmentsStore } from "./fragmentsStore";
 // EXPERIMENT ROUND VERSION
 // Increment this when starting a new experiment round to reset all player progress.
 // ============================================================================
-const CURRENT_EXPERIMENT_ROUND = 2;
+const CURRENT_EXPERIMENT_ROUND = 3;
 
 type RoleGoal = {
   goal: number;

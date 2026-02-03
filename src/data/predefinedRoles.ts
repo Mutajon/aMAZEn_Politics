@@ -166,7 +166,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     avatarPrompt: "19th century American railroad worker, worn overalls, determined expression",
     roleScope: "You are a worker thrust into leadership. You can rally crowds, call meetings, and negotiate, but you cannot command troops or enact laws.",
     storyThemes: ["labor_rights", "class_solidarity", "violence_vs_nonviolence", "survival_vs_principle"],
-    scoreGoal: 1000,
+    scoreGoal: 212,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
       systemName: "Plutocratic Republic",
@@ -367,7 +367,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     avatarPrompt: "scholar-advisor in ancient Alexandria",
     roleScope: "Serves as a city scholar-advisor mediating between palace factions and Roman commanders; can sway civic policy, archives, and urban defenses but not direct legions.",
     storyThemes: ["cultural_survival", "foreign_domination", "knowledge_vs_power"],
-    scoreGoal: 1000,
+    scoreGoal: 212,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
       systemName: "Autocratizing (Military)",
@@ -765,7 +765,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     avatarPrompt: "plantation overseer in colonial Haiti during the slave revolt",
     roleScope: "Acts as a plantation overseer-turned-liaison among rebel factions; can influence local militia deployments, justice for captives, and resource distribution but cannot dictate colony-wide treaties.",
     storyThemes: ["emancipation", "justice_vs_vengeance", "unity_vs_fragmentation"],
-    scoreGoal: 1200,
+    scoreGoal: 225,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
       systemName: "Hard-Power Oligarchy — Stratocracy",
@@ -963,7 +963,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     avatarPrompt: "district officer during India's partition",
     roleScope: "District officer coordinating police, relief, and political liaisons along the partition line; manages curfews, convoys, and investigations but cannot redraw national borders.",
     storyThemes: ["communal_trust", "order_vs_liberty", "refugee_protection"],
-    scoreGoal: 1300,
+    scoreGoal: 250,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
       systemName: "Hard-Power Oligarchy — Stratocracy",
@@ -1162,7 +1162,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     avatarPrompt: "governor of a Mars colony in the future",
     roleScope: "Elected Mars colony governor balancing survival systems and autonomy petitions; can adjust habitat policy, rationing, and negotiations with Earth but cannot conjure unlimited supplies.",
     storyThemes: ["autonomy_vs_dependency", "survival_ethics", "science_vs_populism"],
-    scoreGoal: 1400,
+    scoreGoal: 275,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
       systemName: "MARS_SYSTEM_NAME",
@@ -1262,7 +1262,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     avatarPrompt: "Sci-fi citizen journalist with holographic press badge, futuristic cityscape behind",
     roleScope: "A citizen-journalist on Planet Namek; can publish stories, cast votes on AgoraNet, and influence public opinion but cannot pass laws or command security forces.",
     storyThemes: ["direct_democracy", "information_ethics", "democratic_fatigue", "truth_vs_responsibility"],
-    scoreGoal: 1100,
+    scoreGoal: 212,
     defaultGoalStatus: "uncompleted",
     defaultHighScore: 0,
     powerDistribution: {

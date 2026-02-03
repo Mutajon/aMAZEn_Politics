@@ -566,7 +566,7 @@ export default function FinalScoreScreen({ push }: Props) {
                   {formatNumber.format(finalScoreDisplay)}
                 </div>
                 <div className="text-xs text-yellow-100/70">
-                  / {formatNumber.format(breakdown.maxFinal)}
+                  / {formatNumber.format(roleProgress?.goal ?? breakdown.maxFinal)}
                 </div>
               </div>
             </div>
