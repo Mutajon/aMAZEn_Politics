@@ -514,7 +514,7 @@ export default function DreamScreen({ push }: { push: PushFn }) {
       setShowPreferenceButtons(true);
     } else if (justFinishedGame && lastGameScore !== null) {
       // Just finished a game - show score-based message
-      const goalScore = 1000; // Target score for comparison
+      const goalScore = 225; // Target score for comparison (Normal difficulty baseline)
       const percentage = (lastGameScore / goalScore) * 100;
 
       if (percentage <= 30) dialogueKey = "GRANDPA_SCORE_TERRIBLE";

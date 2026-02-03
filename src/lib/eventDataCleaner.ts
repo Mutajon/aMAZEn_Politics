@@ -123,54 +123,55 @@ export async function cleanAndAdvanceDay(
   // STEP 3.5: Fetch and apply compass deltas IMMEDIATELY (Day 1+ with gameId)
   // This ensures compass values are updated BEFORE day advances
   // SKIP THIS ENTIRELY FOR FREE PLAY (We use core philosophical axes instead)
+  //
+  // MODIFICATION: This is now NON-BLOCKING! The analysis runs in the background
+  // while the day advances, speeding up the transition.
   // ========================================================================
   const { day, gameId } = useDilemmaStore.getState();
   const { isFreePlay } = useSettingsStore.getState();
 
   if (day >= 1 && gameId && !isFreePlay) {
-    console.log('[Cleaner] Fetching compass deltas for current action...');
+    // Fire and forget - updates store state asynchronously
+    (async () => {
+      console.log('[Cleaner] [BG] Fetching compass deltas for current action...');
+      try {
+        // Fetch compass pills for the action just taken (with trap context for value-aware analysis)
+        const pills = await fetchCompassHintsForAction(gameId, {
+          title: selectedAction.title,
+          summary: selectedAction.summary || selectedAction.title
+        }, trapContext, language);
 
-    try {
-      // Fetch compass pills for the action just taken (with trap context for value-aware analysis)
-      console.log(`[Cleaner] Fetching compass hints with trapContext: ${trapContext?.valueTargeted || 'none'}`);
-      const pills = await fetchCompassHintsForAction(gameId, {
-        title: selectedAction.title,
-        summary: selectedAction.summary || selectedAction.title
-      }, trapContext, language);
+        if (pills.length > 0) {
+          console.log(`[Cleaner] [BG] Applying ${pills.length} compass deltas`);
 
-      if (pills.length > 0) {
-        console.log(`[Cleaner] Applying ${pills.length} compass deltas immediately`);
+          // Apply deltas to compass store
+          const compassStore = useCompassStore.getState();
+          const effects = pills.map(pill => ({
+            prop: pill.prop,
+            idx: pill.idx,
+            delta: pill.delta
+          }));
 
-        // Apply deltas to compass store RIGHT NOW (while still on Day N)
-        const compassStore = useCompassStore.getState();
-        const effects = pills.map(pill => ({
-          prop: pill.prop,
-          idx: pill.idx,
-          delta: pill.delta
-        }));
+          const appliedEffects = compassStore.applyEffects(effects);
 
-        const appliedEffects = compassStore.applyEffects(effects);
+          // Log each applied delta for debugging
+          appliedEffects.forEach(eff => {
+            console.log(`[Cleaner] [BG] Applied compass delta: ${eff.prop}[${eff.idx}] (${eff.delta >= 0 ? '+' : ''}${eff.delta})`);
+          });
 
-        // Log each applied delta
-        appliedEffects.forEach(eff => {
-          console.log(`[Cleaner] Applied compass delta: ${eff.prop}[${eff.idx}] (${eff.delta >= 0 ? '+' : ''}${eff.delta})`);
-        });
-
-        // Store pills in dilemmaStore for visual display (EventScreen3 will show overlay)
-        useDilemmaStore.setState({ pendingCompassPills: pills });
-
-        console.log('[Cleaner] Compass deltas applied successfully, pills stored for display');
-      } else {
-        console.log('[Cleaner] No compass changes detected for this action');
+          // Store pills in dilemmaStore for visual display (EventScreen3 will show overlay)
+          useDilemmaStore.setState({ pendingCompassPills: pills });
+        } else {
+          console.log('[Cleaner] [BG] No compass changes detected');
+          useDilemmaStore.setState({ pendingCompassPills: null });
+        }
+      } catch (error) {
+        console.error('[Cleaner] [BG] ⚠️ Failed to fetch/apply compass deltas:', error);
         useDilemmaStore.setState({ pendingCompassPills: null });
       }
-    } catch (error) {
-      console.error('[Cleaner] ⚠️ Failed to fetch/apply compass deltas:', error);
-      // Non-critical error - game continues without compass feedback
-      useDilemmaStore.setState({ pendingCompassPills: null });
-    }
+    })();
   } else {
-    // No gameId - skip compass pills
+    // No gameId or Free Play - skip compass pills
     useDilemmaStore.setState({ pendingCompassPills: null });
   }
 

@@ -25,6 +25,7 @@ export default function RoleIntroScreen({ push }: { push: PushFn }) {
   const logger = useLogger();
   const narrator = useNarrator();
   const narrationEnabled = useSettingsStore((s) => s.narrationEnabled);
+  const experimentMode = useSettingsStore((s) => s.experimentMode);
   const preparedTTSRef = useRef<PreparedTTS | null>(null);
 
   const selectedRole = useRoleStore((s) => s.selectedRole);
@@ -76,7 +77,7 @@ export default function RoleIntroScreen({ push }: { push: PushFn }) {
       preparedTTSRef.current?.dispose();
       narrator.stop();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [introText, narrationEnabled]);
 
   // Continue handler
@@ -96,15 +97,15 @@ export default function RoleIntroScreen({ push }: { push: PushFn }) {
   const goalColorClass = (() => {
     if (!roleData.scoreGoal) return "text-white";
     switch (roleData.scoreGoal) {
-      case 1000:
+      case 200:
         return "text-white";
-      case 1100:
+      case 212:
         return "text-yellow-200";
-      case 1200:
+      case 225:
         return "text-orange-200";
-      case 1300:
+      case 250:
         return "text-orange-300";
-      case 1400:
+      case 275:
         return "text-rose-200";
       default:
         return "text-white";
@@ -167,7 +168,7 @@ export default function RoleIntroScreen({ push }: { push: PushFn }) {
               </div>
 
               {/* User's Personal Best */}
-              {userBestScore && userBestScore > 0 && (
+              {userBestScore && userBestScore > 0 && !experimentMode && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gradient-to-r from-amber-500/20 via-yellow-400/20 to-amber-500/20 border border-amber-400/30">
                   <Trophy className="w-3 h-3 flex-shrink-0 text-amber-300" />
                   <span className="text-white/70">{lang("ROLE_YOUR_BEST")}</span>
@@ -178,7 +179,7 @@ export default function RoleIntroScreen({ push }: { push: PushFn }) {
               )}
 
               {/* Global Best */}
-              {globalBestScore && globalBestScore > 0 && (
+              {globalBestScore && globalBestScore > 0 && !experimentMode && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-gradient-to-r from-purple-500/20 via-violet-400/20 to-purple-500/20 border border-purple-400/30">
                   <Crown className="w-3 h-3 flex-shrink-0 text-purple-300" />
                   <span className="text-white/70">{lang("ROLE_GLOBAL_BEST")}</span>

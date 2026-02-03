@@ -33,11 +33,11 @@ export default function RoleListItem({
     const goalColorClass = (() => {
         if (!item.scoreGoal) return "text-white";
         switch (item.scoreGoal) {
-            case 1000: return "text-white";
-            case 1100: return "text-yellow-200";
-            case 1200: return "text-orange-200";
-            case 1300: return "text-orange-300";
-            case 1400: return "text-rose-200";
+            case 200: return "text-white";
+            case 212: return "text-yellow-200";
+            case 225: return "text-orange-200";
+            case 250: return "text-orange-300";
+            case 275: return "text-rose-200";
             default: return "text-white";
         }
     })();

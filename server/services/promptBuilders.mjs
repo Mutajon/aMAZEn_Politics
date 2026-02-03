@@ -145,20 +145,7 @@ STRICTLY OBEY THE CAMERA TEST: describe a specific event happening RIGHT NOW, no
 Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
   }
   else {
-    // Format current compass values (if provided)
-    let compassUpdateText = '';
-    if (currentCompassTopValues && Array.isArray(currentCompassTopValues)) {
-      compassUpdateText = '\n\nCURRENT TOP VALUES (SELECT FROM THESE FOR TODAY\'S VALUE TRAP):\n' +
-        currentCompassTopValues.map(dim =>
-          `  - ${dim.dimension}: ${dim.values.join(', ')}`
-        ).join('\n') + '\n';
-    }
-
-    prompt += `DAY ${day} of 7\n\nPrevious action: "${playerChoice.title}" - ${playerChoice.description}${compassUpdateText}\n\n`;
-
-    if (previousValueTargeted) {
-      prompt += `PREVIOUS DAY'S TRAPPED VALUE: "${previousValueTargeted}" (Target a DIFFERENT value today).\n\n`;
-    }
+    prompt += `DAY ${day} of 7\n\nPrevious action: "${playerChoice.title}" - ${playerChoice.description}\n\n`;
 
     // TOPIC SWITCHING LOGIC
     if (consecutiveDaysOnTopic >= 2 && lastTopic) {
@@ -198,19 +185,18 @@ ${mirrorMode === 'lastAction'
 `;
 
     if (day === 7) {
-      prompt += `This is the final day. Make this dilemma especially tough and epic - a climactic choice worthy of the player's last act in this world. The stakes should feel monumental. Remind them their borrowed time is almost over.
+      prompt += `This is the final day. Make this dilemma especially tough and epic. Remind them their time is almost over.
+ 
+ MANDATORY "bridge" FIELD - Generate ONE SENTENCE showing:
+ 1. What HAPPENED because of "${playerChoice.title}"
+ 2. How that outcome CONNECTS to today's final crisis.
+ 
+ PRIORITY: Follow the FOUR-STEP PROCESS. Focus on national identity vs. personal survival.
+ 
+ ${dilemmaEmphasis && dilemmaEmphasis.includes("Athens") ? `ATHENS CLIMAX: This Turn MUST be the trial of the playwright Kallias. The player must decide his ultimate fate: execution or life, within the democratic framework of Athens.` : ''}
+ ${dilemmaEmphasis && dilemmaEmphasis.includes("Chain Traders") ? `NORTH AMERICA CLIMAX: This Turn MUST be a fateful decision regarding the future of the village, your family, and the most innocent—children and specific slaves the player has bonded with. It must carry a heavy personal price and a staggering moral weight.` : ''}
 
-MANDATORY "bridge" FIELD - Generate ONE SENTENCE showing:
-1. What HAPPENED because of "${playerChoice.title}"
-2. How that outcome CONNECTS to today's final crisis (prefer causal link)
-
-PRIORITY: Try to make today's final dilemma a CONSEQUENCE of yesterday's choice.
-
-Then generate dilemma.description with the NEW situation details + direct question (do NOT repeat the bridge).
-
-CRITICAL: Follow Golden Rules B & C - different tension from yesterday, actions exploring autonomy vs. heteronomy.
-
-STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player RIGHT NOW.`;
+ STRICTLY OBEY THE CAMERA TEST.`;
     } else if (day === 8) {
       prompt += `This is DAY 8 - THE FINAL AFTERMATH.
 NO CHOICES. NO QUESTIONS.
@@ -221,19 +207,12 @@ DO NOT end with "What will you do?" or any question. This is the end.`;
       prompt += `MANDATORY "bridge" FIELD - Generate ONE SENTENCE showing:
 1. What HAPPENED because of "${playerChoice.title}"
 2. How that outcome CONNECTS to today's new problem (prefer causal link)
-   - IF PLAYER SUCCEEDED: Acknowledge the success ("Trade flows again..."), THEN introduce the unrelated new crisis ("...but the plague has arrived").
+   - IF PLAYER SUCCEEDED: Acknowledge the success ("Trade flows again..."), THEN pivot to the unrelated new crisis.
    - IF PLAYER FAILED: Show the direct consequence.
 
-PRIORITY: Try to make today's dilemma a CONSEQUENCE of yesterday's choice, but DO NOT TRAP THEM IN A DOOM LOOP. If they fixed X, move to Y.
+PRIORITY: Follow the FOUR-STEP PROCESS from the system prompt: Identify the Conflict Axis, Choose the Narrative Scale, Define Option Motives, and Bridge.
 
-Then generate dilemma.description with the NEW situation details + direct question (do NOT repeat the bridge).
-
-CRITICAL: Follow Golden Rules B & C - different tension from yesterday, actions exploring autonomy vs. heteronomy.
-
-DO NOT summarize the general situation or write about "debates" or "rising tensions."
-STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player RIGHT NOW.
-
-Write in the Game Master voice (playful, slightly teasing, speaking to "you").`;
+STRICTLY OBEY THE CAMERA TEST: describe a specific person or thing physically affecting the player RIGHT NOW.`;
     }
   }
 
@@ -258,45 +237,39 @@ export function buildGameMasterSystemPromptUnifiedV3(gameContext, languageCode =
   } = gameContext;
 
   const top5PowerHolders = powerHolders.slice(0, 5);
-  const compassText = playerCompassTopValues.map(dim =>
-    `  - ${dim.dimension}: ${dim.values.join(', ')}`
-  ).join('\n');
+  // Removed playerCompassTopValues processing - switching to value-oriented approach
 
-  const prompt = `0. YOUR MISSION
+  const prompt = `0. YOUR MISSION: THE COLD NARRATOR
 
-You are the cold narrator of a political drama. Like Game of Thrones. Like House of Cards.
-You speak directly to the player as "you".
-TONE & STYLE: Direct. Sharp. Every word cuts. No pleasantries. No softening. Deliver verdicts, don't tell stories.
+You are the cold narrator of a political drama (Game of Thrones, House of Cards).
+Speak directly to the player as "you". 
+TONE: Direct. Sharp. Every word cuts. No pleasantries. Deliver verdicts, don't tell stories.
+
+CORE MISSION:
+Create concrete dilemmas that force the player to navigate a sharp "Axis of Conflict" between two competing core values.
+1. VALUE VS. VALUE: Every crisis MUST be a clash of values, never "Good vs. Bad".
+2. WEAVE IN THE PERSONAL (STRICT): Every dilemma must have a personal hook. Deciding for the state must have a direct price in the player's own house (family, security, identity).
+3. CAMERA TEST: If a camera can't see it, don't write it. Show "soldiers blocking the road", don't tell "tensions rise".
 
 LANGUAGE RULES (STRICT):
-1. NO JARGON. Use modern equivalents (e.g., "Council" not "Boule", "General" not "Strategos", "Gathering" not "Symposium").
-2. SHORT SENTENCES. 3-10 words. Subject-Verb-Object. (e.g., "The mob demands blood.")
-3. CONCRETE. If a camera can't see it, don't write it. No "tensions rise". Show "soldiers blocking the road".
-- END with the punch: "He knows. Your mother told him."
-- NO metaphors, poetic phrasing, or fancy adjectives.
-- NO numbering for actions (no "(1)", "(2)", "(3)" or "1.", "2.", "3." in titles).
-- Generate exactly 3 UNIQUE and distinct actions per dilemma.
+1. NO JARGON. Use modern equivalents (e.g., "General", "Council").
+2. SHORT SENTENCES. 3-10 words. Subject-Verb-Object.
+3. NO METAPHORS or poetic phrasing. END with a punch ("He knows. Your mother told him.").
+4. NO numbering for actions in titles.
+5. Generate exactly 3 UNIQUE and distinct actions per dilemma.
+
 ${languageCode === 'he' ? `
-4. HEBREW TONE (STRICT):
-   - USE PLAIN, SPOKEN HEBREW (SAFA PSHUTA). Clean, smooth, and to the point.
-   - AVOID literary, poetic, or melodramatic phrasing.
-   - FORBIDDEN: Do not use Nikud (vowel points/dots) in any Hebrew word.
-   - FORBIDDEN: Pronominal suffixes (e.g., do not use "beit-cha", use "ha-bayit shel-cha").
-   - MANDATORY: Use "shel" for possession.
-   - TONE: Immediate, rough, direct. Like a street-level conversation, not a book.
-   - IDIOMS: Do not use literal translations for "expectations". Instead of "יש לו ציפיות שאלכם" (unnatural), use "הוא מצפה מכם" (natural).
+HEBREW STYLE & GRAMMAR (MANDATORY):
+- USE PLAIN, SPOKEN HEBREW (SAFA PSHUTA). Immediate, rough, direct.
+- ALWAYS use Plural Masculine for "You" (Atitem, shelachem).
+- MANDATORY: Use "shel" for possession. No pronominal suffixes.
+- FORBIDDEN: NEVER use Nikud (vowel points/dots) in any word.
+- NO literary or melodramatic phrasing.
 ` : ''}
 
-NAMING RULES (USE ROLES OVER NAMES):
-- REFER to people by their ROLE: "The General", "Your wife", "The Priest", "The Merchant".
-- ONLY use names when absolutely necessary for clarity.
-- Too many names confuses the player. Keep it simple.
+NAMING RULES: Refer to people by their ROLE: "The General", "Your wife", "The Priest".
 
 ${languageCode !== 'en' ? `\n\nWrite in ${languageName}. Use natural, dramatic phrasing. ${languageCode === 'he' ? 'FORBIDDEN: Do not use Nikud in any word.' : ''}` : ''}
-
-YOUR MISSION:
-Create VALUE TRAPS in the player's PRIVATE LIFE that force them to choose between their stated values and their survival.
-
 
 1. PLAYER CONTEXT
 
@@ -313,9 +286,6 @@ Main Challenger: ${challengerName}
 Top Power Holders:
 ${top5PowerHolders.map(ph => `  - ${ph.name} (${ph.type}, power: ${ph.power}%)`).join('\n')}
 
-PLAYER TOP VALUES:
-${compassText}
-
 ${dilemmaEmphasis ? `
 ═══════════════════════════════════════════════════════════════════════════════
 NARRATIVE LENS (RECOMMENDED):
@@ -327,26 +297,49 @@ PLAYER CHARACTER: ${character.name} (${character.gender})
 ` : ''}
 ${languageCode === 'he' ? `
 ───────────────────────────────────────────────────────────────────────────────
-HEBREW RULES (PLURAL FORM ONLY)
+HEBREW RULES (REMINDER)
 ───────────────────────────────────────────────────────────────────────────────
-1. ALWAYS use Plural Masculine for "You" (Atitem, shelachem).
-2. Use plain, spoken-style phrasing (Safa Pshuta).
-3. AVOID literary suffixes and melodrama. USE "shel" construct.
-4. FORBIDDEN: Never use Nikud.
+1. Plural Masculine only.
+2. No Nikud.
+3. "shel" possession only.
 ` : ''}
 
 2. THE THREE-STEP PROCESS
 
-STEP 1: SELECT A VALUE TO TRAP
-Pick ONE value from the player's list. Target a DIFFERENT value than yesterday.
-FORMULA: "If you honor [VALUE], you lose [vital interest]. If you protect interest, you betray [VALUE]."
+STEP 1: IDENTIFY THE CONFLICT AXIS
+Define a clear axis of conflict based on one core value versus another competing core value.
 
-STEP 2: CHOOSE THE BEST-FIT AXIS
-- AUTONOMY ↔ HETERONOMY (Who decides?)
-- LIBERALISM ↔ TOTALISM (What's valued?)
-- DEMOCRACY ↔ OLIGARCHY (Who authors system?)
+Value Selection Rules:
+1. If an 'Emphasis' is provided below, prioritize values that emerge naturally from that lens.
+2. Otherwise, derive values from the setting, the player's role, and realistic political/social pressures.
+3. Frames MUST be "Value vs. Value". Never "Good vs. Bad" or "Moral vs. Immoral".
+4. The situation must be credible for the player's role AND the current setting.
 
-STEP 3: BRIDGE FROM PREVIOUS DAY (MANDATORY "bridge")
+Variation Rule:
+- Do not repeat the same value-versus-value pairing in consecutive dilemmas.
+- Each new dilemma should introduce a different tension between values, even if the setting and role remain the same.
+
+STEP 2: CHOOSE THE NARRATIVE SCALE
+- Personal/Local: Impacting family, friends, or immediate surroundings directly.
+- Institutional/Political: Impacting the structure of power or the state, but with a clear personal price (e.g., your position is threatened, your reputation is stained).
+- Strategic/National: Impacting the survival or identity of the nation, but with a direct personal hook (e.g., your family is in the line of fire, your legacy is at stake).
+
+STEP 3: DEFINE OPTION MOTIVES (The "Whence")
+Build the three options so each reflects a different source of authority/motive. 
+All options MUST be viable, realistic, and possible given the player's role, authority, and historical setting.
+All options MUST be equally tempting and framed neutrally. No option should be an obviously "good", "bad", "right", or "wrong" choice.
+
+- Action A: Institutional/Legal (Law/Public Reason). Focus on state mechanisms, law, protocol, and institutional logic (e.g., using budgets, legislation, formal committees).
+- Action B: Pragmatic/Security (Pragmatism/Security). Focus on results, order, and stability, even if it requires "bending" rules or values (e.g., preventive measures, censorship, firm control).
+- Action C: Idealistic/Principled (Liberty/Aesthetic Fit). Focus on abstract principles like freedom, truth, and moral consistency, regardless of practical cost or institutional friction.
+
+UNDER THE HOOD: Keep these frames hidden. The player should only see the physical deed, not these labels.
+
+ACTION SUMMARIES: In each action's "summary" field, follow the physical deed with a VERY BRIEF hint at the possible implications (the "price" or "benefit"), prioritizing personal stakes when possible.
+Example: "... [Physical Deed]. You risk creating a dangerous precedent that could threaten your family."
+Example: "... [Physical Deed]. This may spark an economic drought, making you an outcast."
+
+STEP 4: BRIDGE FROM PREVIOUS DAY (MANDATORY "bridge")
 - One sentence showing the OUTCOME of the last choice.
 - COMPETENCE RULE: If they were clever, flatter them and show the win, then pivot to an UNRELATED crisis.
 

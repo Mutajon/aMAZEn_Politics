@@ -59,12 +59,12 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     subtitleKey: "ATHENS_SUBTITLE",
     introKey: "ATHENS_INTRO",
     youAreKey: "ATHENS_YOU_ARE",
-    year: "-431",
+    year: "-411",
     imageId: "greece",
     avatarPrompt: "Ancient Greek citizen in simple chiton tunic, standing in the Athenian assembly",
     roleScope: "You are a citizen of Athens with full rights in the Assembly. You can vote on war, peace, ostracism, laws, and leadership. You can speak before thousands, propose decrees, and serve on juries—but you are one voice among many.",
-    storyThemes: ["democracy_vs_empire", "glory_vs_pragmatism", "citizen_vs_expert"],
-    scoreGoal: 1000,
+    storyThemes: ["paradox_of_freedom", "liberalism_vs_aesthetics", "personal_autonomy", "charisma_vs_law"],
+    scoreGoal: 200,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
       systemName: "ATHENS_SYSTEM_NAME",
@@ -128,13 +128,13 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       },
       grounding: {
         settingType: "real",
-        era: "431 BCE Athens (outbreak of Peloponnesian War)"
+        era: "411 BCE Athens (The Oligarchic Revolution)"
       },
       supportProfiles: ROLE_SUPPORT_PROFILES["Athens — Shadows of War (-431)"] ?? null,
       roleScope: "An influential Citizen-Juror and head of a prominent household. You hold a vote in the Assembly and possess the social capital to influence public opinion, but you are also legally and socially responsible for your family's behavior.",
-      storyThemes: ["free_speech_vs_security", "private_vs_public_duty", "tradition_vs_innovation", "family_vs_ideology"],
+      storyThemes: ["paradox_of_freedom", "liberalism_vs_aesthetics", "personal_autonomy", "charisma_vs_law", "private_vs_public_duty"],
       authorityLevel: "low",
-      dilemmaEmphasis: "NARRATIVE LENS (Athens -431): The city is polarized by a famous poet whose verses mock Democracy and Women. Core tension: Free Speech vs. Dignity. Dilemmas should explore: silencing dangerous art vs. liberty, family honour vs. civic duty, and the creeping threat of Sparta weaponizing internal discord.",
+      dilemmaEmphasis: "NARRATIVE LENS (Athens -411): The threat is not a foreign sword, but the golden tongue of Kallias—a brilliant artist weaponizing democratic freedom (art, speech, persuasion) to dismantle democracy from within. CORE TENSION: Liberalism vs. 'Aesthetic Excellence' and natural hierarchy. THE PARADOX: Does freedom include the right to abolish freedom? MANDATORY TEST: Every dilemma must scrutinize the player’s Personal Autonomy—can they maintain independent judgment against social pressure, emotional manipulation, and the intoxicating beauty of Kallias’s vision?",
     },
     characters: {
       male: {
@@ -264,7 +264,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     avatarPrompt: "Israeli university student in casual clothes, clipboard in hand, standing at a voting booth on campus",
     roleScope: "A student supervisor selected by lottery to oversee strike referendum procedures; can set ballot language, validate petitions, and announce results but cannot dictate how people vote or override Assembly decisions.",
     storyThemes: ["direct_democracy", "institutional_neutrality", "crisis_definition", "collective_vs_individual"],
-    scoreGoal: 1100,
+    scoreGoal: 212,
     defaultGoalStatus: "uncompleted",
     defaultHighScore: 0,
     powerDistribution: {
@@ -464,7 +464,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     avatarPrompt: "council member in Renaissance Florence",
     roleScope: "Sits on Florence's Great Council, balancing guild and patrician interests; can propose civic edicts, policing orders, and cultural protections but cannot command Papal or French armies.",
     storyThemes: ["faith_vs_freedom", "economic_stability", "civic_identity"],
-    scoreGoal: 1100,
+    scoreGoal: 212,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
       systemName: "Mental-Might Oligarchy — Theocracy",
@@ -553,7 +553,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
 
   {
     id: "north_america_1607",
-    legacyKey: "Central America — The Triple Alliance (1519)",
+    legacyKey: "The Chain Traders",
     titleKey: "NORTH_AMERICA_TITLE",
     subtitleKey: "NORTH_AMERICA_SUBTITLE",
     introKey: "NORTH_AMERICA_INTRO",
@@ -561,9 +561,9 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     year: "1519",
     imageId: "northAmerica",
     avatarPrompt: "Aztec nobleman or Tlatoani in traditional regalia with quetzal feather headdress",
-    roleScope: "The Successor/Manager of a hereditary family enterprise within the Aztec Empire. You have inherited the 'Trade of the Bound' (tlatlacotin). You are responsible for providing the labor force that builds the Great Temple of Tenochtitlan and maintains the city's economic dominance.",
-    storyThemes: ["ancestral_debt_vs_conscience", "sacred_vs_profane", "economic_stability_vs_reform", "human_cost_of_civilization"],
-    scoreGoal: 1100,
+    roleScope: "The Head of the Bloodline clan, managing the village's survival through the Trade of the Bound (slaves). You balance the demands of the Shamans and War-Captains against the weight of your own conscience and the future of your family.",
+    storyThemes: ["moral_erosion", "survival_vs_conscience", "mercy_vs_necessity", "personal_autonomy", "tribal_pressure"],
+    scoreGoal: 212,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
       systemName: "NORTH_AMERICA_SYSTEM_NAME",
@@ -571,50 +571,50 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
       flavor: "NORTH_AMERICA_SYSTEM_FLAVOR",
       holders: [
         {
-          name: "NORTH_AMERICA_HOLDER_1_NAME",
-          percent: 42,
+          name: "NORTH_AMERICA_HOLDER_CLAN_NAME",
+          percent: 38,
           icon: "👑",
-          note: "NORTH_AMERICA_HOLDER_1_NOTE",
+          note: "NORTH_AMERICA_HOLDER_CLAN_NOTE",
           role: { A: true, E: true },
           stype: { t: "Dictator", i: "+" }
         },
         {
-          name: "NORTH_AMERICA_HOLDER_2_NAME",
-          percent: 23,
-          icon: "⚔️",
-          note: "NORTH_AMERICA_HOLDER_2_NOTE",
+          name: "NORTH_AMERICA_HOLDER_SHAMANS_NAME",
+          percent: 24,
+          icon: "✨",
+          note: "NORTH_AMERICA_HOLDER_SHAMANS_NOTE",
           role: { A: true, E: false },
           stype: { t: "Author", i: "•" }
         },
         {
-          name: "NORTH_AMERICA_HOLDER_3_NAME",
-          percent: 14,
+          name: "NORTH_AMERICA_HOLDER_WARCAPTAINS_NAME",
+          percent: 18,
+          icon: "⚔️",
+          note: "NORTH_AMERICA_HOLDER_WARCAPTAINS_NOTE",
+          role: { A: false, E: true },
+          stype: { t: "Eraser", i: "•" }
+        },
+        {
+          name: "NORTH_AMERICA_HOLDER_RIVALS_NAME",
+          percent: 12,
           icon: "👥",
-          note: "NORTH_AMERICA_HOLDER_3_NOTE",
+          note: "NORTH_AMERICA_HOLDER_RIVALS_NOTE",
           role: { A: false, E: true },
           stype: { t: "Eraser", i: "•" }
         },
         {
-          name: "NORTH_AMERICA_HOLDER_4_NAME",
-          percent: 11,
-          icon: "✨",
-          note: "NORTH_AMERICA_HOLDER_4_NOTE",
-          role: { A: false, E: true },
-          stype: { t: "Eraser", i: "•" }
-        },
-        {
-          name: "NORTH_AMERICA_HOLDER_5_NAME",
-          percent: 10,
-          icon: "🌾",
-          note: "NORTH_AMERICA_HOLDER_5_NOTE",
+          name: "NORTH_AMERICA_HOLDER_BOUND_NAME",
+          percent: 8,
+          icon: "⛓️",
+          note: "NORTH_AMERICA_HOLDER_BOUND_NOTE",
           role: { A: true, E: false },
           stype: { t: "Agent", i: "•" }
         }
       ],
       playerIndex: 0,
       challengerSeat: {
-        name: "NORTH_AMERICA_HOLDER_2_NAME",
-        percent: 23,
+        name: "NORTH_AMERICA_HOLDER_SHAMANS_NAME",
+        percent: 24,
         index: 1
       },
       e12: {
@@ -623,17 +623,17 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
         tierIII: ["Infrastructure", "Curricula", "Healthcare", "Immigration", "Environment"],
         stopA: false,
         stopB: true,
-        decisive: ["NORTH_AMERICA_HOLDER_1_NAME", "NORTH_AMERICA_HOLDER_2_NAME"]
+        decisive: ["NORTH_AMERICA_HOLDER_CLAN_NAME", "NORTH_AMERICA_HOLDER_SHAMANS_NAME"]
       },
       grounding: {
         settingType: "real",
-        era: "Tenochtitlan, Aztec Empire, 1519 (pre-Conquest)"
+        era: "A tribal settlement by the Mud River, era of the Chain Traders"
       },
-      supportProfiles: ROLE_SUPPORT_PROFILES["North America — The First Encounter (1607)"] ?? null,
-      roleScope: "The Successor/Manager of a hereditary family enterprise. You have inherited the 'Trade of the Bound' (slavery). You are responsible for providing the labor force that builds the Great Temple and maintains the village's economic dominance.",
-      storyThemes: ["ancestral_debt_vs_conscience", "sacred_vs_profane", "economic_stability_vs_reform", "human_cost_of_civilization"],
+      supportProfiles: ROLE_SUPPORT_PROFILES["The Chain Traders"] ?? null,
+      roleScope: "The Head of the Bloodline clan, managing the village's survival through the Trade of the Bound (slaves). You balance the demands of the Shamans and War-Captains against the weight of your own conscience and the future of your family.",
+      storyThemes: ["moral_erosion", "survival_vs_conscience", "mercy_vs_necessity", "personal_autonomy", "tribal_pressure"],
       authorityLevel: "medium",
-      dilemmaEmphasis: "NARRATIVE LENS (Tenochtitlan 1519): You manage the 'Trade of the Bound' (slaves) for the Empire. [Language Instruction]: When writing in Hebrew, strictly use the term 'עבדים' for slaves. Core tension: Sacred Duty vs. Human Cost. Dilemmas should focus on the brutal economics of human tribute, the threat of revolt from within, and the ominous pressure from the Alliance to deliver more bodies. Survival depends on satisfying the gods and the market, often at the cost of your conscience.",
+      dilemmaEmphasis: "NARRATIVE LENS (The Chain Traders): The slave trade is the lifeblood and the poison of your village—a law of nature and necessity, not a choice to be debated. CORE TENSION: Internal moral erosion vs. survival. The trade buys safety and alliances, but at what cost to the village's soul? THE SCALE: Will you expand the empire of chains or contract it to a 'necessary evil'? MANDATORY TEST: Every dilemma must test the player’s Personal Autonomy—can they forge an independent moral path against the terrifying demands of the Shamans, the cruelty of rival tribes, and the heavy chains of family duty? [Hebrew Rule]: Strictly use 'עבדים' for slaves.",
 
     },
     characters: {
@@ -664,7 +664,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     avatarPrompt: "samurai clan leader in feudal Japan",
     roleScope: "Heads a mid-level samurai clan caught between warring coalitions; can commit retainers, negotiate allegiances, and manage village protections but cannot dictate national strategy.",
     storyThemes: ["loyalty_vs_survival", "clan_honor", "centralization"],
-    scoreGoal: 1200,
+    scoreGoal: 225,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
       systemName: "Hard-Power Oligarchy — Stratocracy",
@@ -862,7 +862,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     avatarPrompt: "Tsar of Imperial Russia",
     roleScope: "Embattled Tsar managing imperial decrees, military appointments, and court negotiations; can reshuffle ministers, issue manifestos, or seek truces but cannot personally command every garrison simultaneously.",
     storyThemes: ["autocracy_vs_revolution", "bread_land_peace", "loyalty_crisis"],
-    scoreGoal: 1300,
+    scoreGoal: 250,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
       systemName: "Personalist Monarchy / Autocracy",
@@ -1060,7 +1060,7 @@ export const PREDEFINED_ROLES_ARRAY: PredefinedRoleData[] = [
     avatarPrompt: "police commander in apartheid-era South Africa",
     roleScope: "Senior police commander overseeing citywide operations during the transition; can set deployment protocols, liaise with reform negotiators, and manage crowd-control policy but cannot pass national laws.",
     storyThemes: ["justice_vs_amnesty", "public_safety", "institutional_trust"],
-    scoreGoal: 1400,
+    scoreGoal: 275,
     defaultGoalStatus: "uncompleted",
     powerDistribution: {
       systemName: "Autocratizing (Executive)",
