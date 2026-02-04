@@ -704,3 +704,63 @@ export async function aiTextXAI({ system, user, model = MODEL_DILEMMA_XAI, tempe
         throw e;
     }
 }
+/**
+ * callGeminiTTS - Uses Gemini's native audio capabilities (multimodal output)
+ * to generate audio from text.
+ * @param {string} text - The text to speak
+ * @param {string} voice - The voice ID (e.g., 'en-GB-Standard-O', 'en-US-Studio-O' or native names like 'Puck')
+ * @returns {Promise<Buffer>} - Audio buffer (WAV)
+ */
+export async function callGeminiTTS(text, voice) {
+    const model = "gemini-2.5-flash-native-audio-preview-12-2025";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+
+    console.log(`[GEMINI-TTS] Generating audio for text (${text.length} chars) with voice: ${voice}`);
+
+    // We use a specific instruction to ensure the model outputs audio
+    // and attempt to map the requested voice. 
+    // NOTE: If the special voice names aren't directly supported by the multimodal model's voice_config,
+    // we use them in the instruction to influence the model's performance.
+
+    const body = {
+        contents: [{
+            parts: [{ text: `Speak the following text: "${text}"` }]
+        }],
+        generationConfig: {
+            response_mime_type: "audio/wav"
+        }
+    };
+
+    // If it's a known Gemini native voice or a requested Cloud TTS voice ID, 
+    // we can try to pass it in speechConfig if supported, or via instruction.
+    // For now, we'll use the instruction to set the tone/voice characteristics.
+    if (voice) {
+        body.contents[0].parts[0].text = `Voice ID: ${voice}. Speak the following text: "${text}"`;
+    }
+
+    const response = await fetch(url, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        throw new Error(`Gemini TTS error ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+
+    // The response for multimodal audio contains the audio in the parts
+    // { candidates: [ { content: { parts: [ { inlineData: { mimeType: "audio/wav", data: "..." } } ] } } ] }
+    const audioData = data?.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+
+    if (!audioData) {
+        console.error("[GEMINI-TTS] No audio data returned in response", JSON.stringify(data, null, 2));
+        throw new Error("No audio data returned from Gemini");
+    }
+
+    return Buffer.from(audioData, 'base64');
+}

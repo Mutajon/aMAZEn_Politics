@@ -165,7 +165,8 @@ async function fetchGameTurn(
     setSupportMom,
     updateSubjectStreak,
     initializeGame,
-    aiModelOverride
+    aiModelOverride,
+    tone
   } = useDilemmaStore.getState();
 
   const { values: compassValues } = useCompassStore.getState();
@@ -189,7 +190,8 @@ async function fetchGameTurn(
     totalDays,
     isFirstDilemma: day === 1,
     isFollowUp: day > 1,
-    model: aiModelOverride
+    model: aiModelOverride,
+    tone: tone
   };
 
   // Day 1: Send full game context

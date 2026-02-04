@@ -1,4 +1,3 @@
-
 /**
  * server/services/freePlayPrompts.mjs
  * 
@@ -9,7 +8,7 @@
 // ----------------------------------------------------------------------------
 // 1. INTRO GENERATION
 // ----------------------------------------------------------------------------
-export function buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender) {
+export function buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender, tone = "serious") {
   const roleLine = role || "Unknown Role";
   const settingLine = setting || "Unknown Setting";
   const emphasisLine = emphasis ? `EMPHASIS: Focus the atmosphere on "${emphasis}".` : "";
@@ -43,6 +42,10 @@ INSTRUCTIONS:
   - Choose a relevant emoji icon for each.
   - Provide a short "summary" (1 sentence) of their current stance/mood toward the player.
 
+- Tone Selection: ${tone.toUpperCase()}.
+${tone === 'satirical'
+      ? "- Style: SATIRICAL POLITICAL COMEDY. Be cynical, absurdist, and funny. Highlight the ridiculousness of the situation. Use sharp, witty, and slightly mean humor. Narration should feel like a mockery of power."
+      : "- Style: DRAMATIC POLITICAL DRAMA. Be serious, atmospheric, and weighty. Focus on the high stakes and the burden of leadership."}
 - Tone: Spoken, natural, engaging. NO flowery academic language.
 - Output JSON: 
 { 
@@ -57,7 +60,7 @@ INSTRUCTIONS:
 }
 
 export function buildFreePlaySystemPrompt(context) {
-  const { role, setting, playerName, emphasis, language, gender, supportEntities } = context;
+  const { role, setting, playerName, emphasis, language, gender, tone = "serious", supportEntities } = context;
   const lang = language === 'he' ? "Hebrew (Natural/Spoken)" : "English";
   const genderGrammar = gender === 'female' ? 'FEMALE' : (gender === 'other' ? 'MALE PLURAL' : 'MALE');
   const entities = supportEntities ? supportEntities.map(e => `- ${e.name} (${e.type}): ${e.summary}`).join('\n') : "";
@@ -77,6 +80,10 @@ AXES:
 
 RULES:
 - Situations: Personal, Social, National, International. Rotate Axis and Scope.
+- Tone Selection: ${tone.toUpperCase()}.
+${tone === 'satirical'
+      ? "- Persona: The Satirical Oracle / Cynical Joker. Be snappy, cynical, and use dark humor. Emphasize the absurdity of political choices and the predictable greed/folly of all involved."
+      : "- Persona: Cold Narrator of a political drama. Be direct, sharp, and weighty."}
 - Tone: Dramatic, short sentences, direct address.
 - **Narrative Evolution**: Explore the core "Emphasis" through different lenses (e.g., personal impact, institutional failure, public perception) rather than repeating the same theme. Variety is key.
 - Constraints: Dilemma max 3 sentences. Generate exactly 3 UNIQUE and distinct actions per dilemma.

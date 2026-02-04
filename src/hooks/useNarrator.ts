@@ -14,6 +14,7 @@ import { getCurrentLanguage } from "../i18n/lang";
 
 type SpeakOptions = {
   voiceName?: string;           // Gemini voice name; default from VITE_TTS_VOICE env var
+  tone?: "serious" | "satirical"; // Optional: Force a specific tone (useful for intro)
   format?: "mp3" | "opus" | "aac" | "flac" | "wav";
   volume?: number;              // 0..1
   instructions?: string;        // Optional: Style/tone instructions (prepended to text for Gemini)
@@ -38,7 +39,8 @@ let globalAbortRef: AbortController | null = null;
 let globalIsPlayingRef = false;
 
 export function useNarrator() {
-  const { narrationEnabled } = useSettingsStore();
+  const { narrationEnabled, isFreePlay } = useSettingsStore();
+  const { tone } = useDilemmaStore();
   const [speaking, setSpeaking] = useState(false);
 
   const _cleanup = useCallback(() => {
@@ -97,6 +99,15 @@ export function useNarrator() {
         };
       }
 
+      // RESTRICT NARATION TO FREE PLAY MODE ONLY
+      if (!isFreePlay) {
+        return {
+          start: async () => { },
+          dispose: () => { },
+          disposed: () => true,
+        };
+      }
+
       // Disable TTS if narration is off OR if language is Hebrew (TTS not supported)
       if (!narrationEnabled || getCurrentLanguage() === 'he') {
         // narration off or Hebrew → don't block UI; provide a no-op that is "ready"
@@ -111,7 +122,14 @@ export function useNarrator() {
       _cleanup();
       globalAbortRef = new AbortController();
 
-      const voice = opts.voiceName || TTS_VOICE;
+      // VOICE MAPPING based on tone (prefer opts.tone, fallback to store tone)
+      const activeTone = opts.tone || tone;
+      let voice = opts.voiceName || TTS_VOICE;
+      if (activeTone === 'satirical') {
+        voice = 'en-GB-Standard-O';
+      } else if (activeTone === 'serious') {
+        voice = 'en-US-Studio-O';
+      }
       const format = opts.format || "mp3";
       const volume = typeof opts.volume === "number" ? Math.max(0, Math.min(1, opts.volume)) : 1;
       const instructions = opts.instructions;

@@ -25,6 +25,8 @@ import TombstoneSection from "./TombstoneSection";
 import { useLogger } from "../../hooks/useLogger";
 import { audioManager } from "../../lib/audioManager";
 import { useLang } from "../../i18n/lang";
+import { useSettingsStore } from "../../store/settingsStore";
+import { useDilemmaStore } from "../../store/dilemmaStore";
 
 type TopValue = {
   short: string;
@@ -46,6 +48,8 @@ export default function AftermathContent({
 }: Props) {
   const lang = useLang();
   const logger = useLogger();
+  const isFreePlay = useSettingsStore((s) => s.isFreePlay);
+  const philosophicalAxes = useDilemmaStore((s) => s.philosophicalAxes);
 
   // Log when snapshot pills are displayed
   useEffect(() => {
@@ -96,6 +100,8 @@ export default function AftermathContent({
       <ReflectionSection
         top3ByDimension={top3ByDimension}
         valuesSummary={data.valuesSummary}
+        isFreePlay={isFreePlay}
+        philosophicalAxes={philosophicalAxes}
       />
 
       {/* Tombstone Section */}

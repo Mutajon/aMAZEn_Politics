@@ -19,6 +19,8 @@ import { mirrorBubbleTheme as T } from "../../theme/mirrorBubbleTheme";
 import { PALETTE, type PropKey } from "../../data/compass-data";
 import { useLang } from "../../i18n/lang";
 import { translateCompassValue } from "../../i18n/translateGameData";
+import { type PhilosophicalPole } from "../../store/dilemmaStore";
+import PhilosophicalRadarChart from "../event/PhilosophicalRadarChart";
 
 type TopValue = {
   short: string;
@@ -27,6 +29,8 @@ type TopValue = {
 type Props = {
   top3ByDimension: Record<PropKey, TopValue[]>;
   valuesSummary: string;
+  isFreePlay?: boolean;
+  philosophicalAxes?: Record<PhilosophicalPole, number>;
 };
 
 // Mirror styling constants from MirrorCard
@@ -40,41 +44,47 @@ const TYPEWRITER_DURATION_S = 2.0;
 
 const FADE_DURATION_S = 0.5;
 
-export default function ReflectionSection({ top3ByDimension, valuesSummary }: Props) {
+export default function ReflectionSection({
+  top3ByDimension,
+  valuesSummary,
+  isFreePlay,
+  philosophicalAxes
+}: Props) {
   const lang = useLang();
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: FADE_DURATION_S }}
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: FADE_DURATION_S }}
+    >
+      <div
+        className="relative overflow-hidden"
+        style={{
+          background: T.bg,
+          color: T.textColor,
+          fontFamily: T.fontFamily,
+          padding: `${T.paddingY}px ${T.paddingX}px`,
+          boxShadow: T.shadow,
+          borderTopLeftRadius: T.cornerTL,
+          borderTopRightRadius: T.cornerTR,
+          borderBottomLeftRadius: T.cornerBL,
+          borderBottomRightRadius: T.cornerBR,
+        }}
       >
+        {/* Content (above mirror image) */}
         <div
-          className="relative overflow-hidden"
+          className="relative z-10"
           style={{
-            background: T.bg,
-            color: T.textColor,
-            fontFamily: T.fontFamily,
-            padding: `${T.paddingY}px ${T.paddingX}px`,
-            boxShadow: T.shadow,
-            borderTopLeftRadius: T.cornerTL,
-            borderTopRightRadius: T.cornerTR,
-            borderBottomLeftRadius: T.cornerBL,
-            borderBottomRightRadius: T.cornerBR,
+            paddingLeft: TEXT_INSET_LEFT_PX,
+            paddingRight: TEXT_INSET_RIGHT_PX,
           }}
         >
-          {/* Content (above mirror image) */}
-          <div
-            className="relative z-10"
-            style={{
-              paddingLeft: TEXT_INSET_LEFT_PX,
-              paddingRight: TEXT_INSET_RIGHT_PX,
-            }}
-          >
-            <h2 className="text-xl font-bold text-amber-400 mb-4">
-              {lang("AFTERMATH_REFLECTION_TITLE")}
-            </h2>
+          <h2 className="text-xl font-bold text-amber-400 mb-4">
+            {lang("AFTERMATH_REFLECTION_TITLE")}
+          </h2>
 
-            {/* Compass Value Pills - Show top value per dimension */}
+          {/* Compass Value Pills - Show top value per dimension */}
+          {!isFreePlay && (
             <div className="grid grid-cols-2 gap-3 mb-4">
               {(["what", "whence", "how", "whither"] as PropKey[]).map(dimension => {
                 const dimensionName = {
@@ -120,18 +130,25 @@ export default function ReflectionSection({ top3ByDimension, valuesSummary }: Pr
                 );
               })}
             </div>
+          )}
 
-            {/* Values Summary with typewriter */}
+          {/* Values Summary with typewriter or Radar Chart for Free Play */}
+          {isFreePlay && philosophicalAxes ? (
+            <div className="flex justify-center py-2 -mx-4">
+              <PhilosophicalRadarChart values={philosophicalAxes} size={280} />
+            </div>
+          ) : (
             <p className="text-base leading-relaxed italic">
               <TypewriterText text={valuesSummary} />
             </p>
-          </div>
-
-          {/* Mirror image BEHIND the text */}
-          <MirrorImage />
+          )}
         </div>
-      </motion.div>
-    );
+
+        {/* Mirror image BEHIND the text */}
+        <MirrorImage />
+      </div>
+    </motion.div>
+  );
 }
 
 /** Mirror image overlay component */

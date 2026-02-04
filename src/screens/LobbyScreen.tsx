@@ -141,6 +141,7 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
     emphasis: string;
     gender: string;
     difficulty: string;
+    tone: "serious" | "satirical";
     avatar: string | null;
     introText?: string;
     supportEntities?: Array<{ name: string; icon: string; type: string }>;
@@ -164,6 +165,9 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
 
       // Enable Free Play mode
       useSettingsStore.getState().setFreePlayMode(true);
+
+      // Set tone in store
+      useDilemmaStore.getState().setTone(data.tone);
 
       // Set treatment to semiAutonomy (standard gameplay)
       setTreatment('semiAutonomy');

@@ -208,12 +208,17 @@ export default function ActionDeckContent({
                     layoutId={`card-${c.id}`}
                     ref={attachCardRef(c.id)}
                     animate={othersDown && c.id !== confirmingId ? othersCtrl : undefined}
+                    whileHover={!disabled ? {
+                      y: -8,
+                      rotate: -1.2,
+                      transition: { type: "spring", stiffness: 400, damping: 25 }
+                    } : {}}
                     transition={springJuice}
                     className={[
                       CARD_BASE,
                       CARD_PAD,
                       c.cardGradientClass,
-                      "text-start relative transition-transform",
+                      "text-start relative",
                       disabled ? "opacity-50 saturate-75 cursor-not-allowed" : "cursor-pointer hover:brightness-[1.03]",
                       isSelected ? "ring-2 ring-white/30" : "",
                     ].join(" ")}
@@ -302,6 +307,11 @@ export default function ActionDeckContent({
                   layout
                   ref={suggestRef}
                   animate={othersDown ? suggestCtrl : undefined}
+                  whileHover={{
+                    backgroundColor: "rgba(34, 211, 238, 1)", // cyan-400
+                    color: "#020617", // blue-950
+                  }}
+                  transition={{ duration: 0 }} // Immediate for hover
                   className={SUGGEST_BTN_CLASS}
                   onClick={handleOpenSuggest}
                   disabled={Boolean(confirmingId) || validatingSuggest || !canAffordSuggestion}
@@ -309,10 +319,10 @@ export default function ActionDeckContent({
                   <span className="text-[12.5px] font-semibold">{lang("SUGGEST_YOUR_ACTION")}</span>
                   {showBudget && (
                     <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-black/35 ring-1 ring-white/25">
-                      <span className={`text-[11px] font-semibold ${suggestCost < 0 ? "text-rose-100" : "text-emerald-100"}`}>
+                      <span className={`text-[11px] font-semibold ${suggestCost < 0 ? "text-rose-100" : "text-emerald-100"} group-hover:text-inherit`}>
                         {suggestCost >= 0 ? `+${suggestCost}` : `${suggestCost}`}
                       </span>
-                      <Coins className="w-3.5 h-3.5 text-amber-300" />
+                      <Coins className="w-3.5 h-3.5 text-amber-300 group-hover:text-amber-600" />
                     </span>
                   )}
                 </motion.button>

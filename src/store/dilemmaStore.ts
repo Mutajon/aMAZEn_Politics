@@ -169,6 +169,10 @@ type DilemmaState = {
   aiModelOverride: string | null;
   setAiModelOverride: (model: string | null) => void;
 
+  // Tone state (serious or satirical)
+  tone: "serious" | "satirical";
+  setTone: (tone: "serious" | "satirical") => void;
+
   nextDay: () => void;
   setTotalDays: (n: number) => void;
   applyChoice: (id: "a" | "b" | "c") => void;
@@ -392,6 +396,12 @@ export const useDilemmaStore = create<DilemmaState>()(
         set({ aiModelOverride: model });
       },
 
+      tone: "serious",
+      setTone: (tone) => {
+        dlog("setTone ->", tone);
+        set({ tone });
+      },
+
 
       nextDay() {
         const { day } = get();
@@ -499,6 +509,7 @@ export const useDilemmaStore = create<DilemmaState>()(
           lastGameScore: null,
           freePlayHistory: [],
           aiModelOverride: null, // Reset override on full reset
+          tone: "serious",       // Reset tone on full reset
         });
       },
 

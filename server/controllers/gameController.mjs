@@ -718,11 +718,11 @@ export async function gameTurnV2(req, res) {
  */
 export async function freePlayIntro(req, res) {
     try {
-        const { role, setting, playerName, emphasis, gender, model: modelOverride = null } = req.body;
+        const { role, setting, playerName, emphasis, gender, tone = "serious", model: modelOverride = null } = req.body;
 
-        console.log(`[FREE-PLAY-INTRO] Generating intro for ${role} in ${setting} (gender: ${gender}, model: ${modelOverride || 'default'})...`);
+        console.log(`[FREE-PLAY-INTRO] Generating intro for ${role} in ${setting} (gender: ${gender}, tone: ${tone}, model: ${modelOverride || 'default'})...`);
 
-        const systemPrompt = buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender);
+        const systemPrompt = buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender, tone);
         // Using "intro" as a dummy user prompt to trigger generation
         const messages = [
             { role: "system", content: systemPrompt },
@@ -761,6 +761,7 @@ export async function freePlayTurn(req, res) {
             playerName,
             emphasis,
             gender,
+            tone = "serious",
             gameId,
             playerChoice, // Day 2+ only
             language = 'en',
@@ -779,7 +780,7 @@ export async function freePlayTurn(req, res) {
             console.log(`[FREE-PLAY] Day 1: Starting new game for ${playerName} (${role}, gender: ${gender})`);
 
             // Build System Prompt
-            const context = { role, setting, playerName, emphasis, gender, language, supportEntities };
+            const context = { role, setting, playerName, emphasis, gender, tone, language, supportEntities };
             const systemPrompt = buildFreePlaySystemPrompt(context);
             const languageCode = String(language || "en").toLowerCase();
             const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;

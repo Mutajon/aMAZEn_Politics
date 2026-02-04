@@ -7,6 +7,7 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { MirrorReflection } from "./MirrorWithReflection";
 import { useSettingsStore } from "../store/settingsStore";
+import { useNarrator } from "../hooks/useNarrator";
 
 const MODEL_OPTIONS = [
     { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
@@ -26,6 +27,7 @@ interface LobbyPlayPopupProps {
         emphasis: string;
         gender: string;
         difficulty: string; // NEW: Difficulty level
+        tone: "serious" | "satirical"; // NEW: Tone selection
         avatar: string | null;
         introText?: string;
         supportEntities?: Array<{ name: string; icon: string; type: string }>;
@@ -80,6 +82,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     const isRTL = language === 'he';
     const debugMode = useSettingsStore(s => s.debugMode);
     const { aiModelOverride, setAiModelOverride } = useDilemmaStore();
+    const narrator = useNarrator();
 
     const [characterName, setCharacterName] = useState("");
     const [setting, setSetting] = useState("");
@@ -87,6 +90,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     const [emphasis, setEmphasis] = useState("");
     const [gender, setGender] = useState("male");
     const [difficulty, setDifficulty] = useState("easy");
+    const [tone, setTone] = useState<"serious" | "satirical">("serious");
     const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
     const [showDiceOverlay, setShowDiceOverlay] = useState(() => {
         if (typeof window !== 'undefined') {
@@ -139,6 +143,15 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         }
     }, [isOpen]);
 
+    // Narration for intro
+    useEffect(() => {
+        if (step === 'intro' && introData?.intro) {
+            console.log("[LobbyPlayPopup] Triggering narration for intro");
+            narrator.speak(introData.intro, { tone });
+        }
+        return () => narrator.stop();
+    }, [step, introData?.intro, tone]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!characterName || !setting || !role || isLoading || isGeneratingIntro) return;
@@ -158,6 +171,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                         emphasis,
                         gender,
                         difficulty,
+                        tone,
                         model: useDilemmaStore.getState().aiModelOverride
                     })
                 });
@@ -167,11 +181,11 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                     setStep('intro');
                 } else {
                     // Fallback if failed - just start game
-                    onSubmit({ characterName, setting, role, emphasis, gender, difficulty, avatar: selectedAvatar });
+                    onSubmit({ characterName, setting, role, emphasis, gender, difficulty, tone, avatar: selectedAvatar });
                 }
             } catch (err) {
                 console.error("Failed to generate intro:", err);
-                onSubmit({ characterName, setting, role, emphasis, gender, difficulty, avatar: selectedAvatar });
+                onSubmit({ characterName, setting, role, emphasis, gender, difficulty, tone, avatar: selectedAvatar });
             } finally {
                 setIsGeneratingIntro(false);
             }
@@ -185,6 +199,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                 emphasis,
                 gender,
                 difficulty,
+                tone,
                 avatar: selectedAvatar,
                 introText: introData?.intro,
                 supportEntities: introData?.supportEntities
@@ -232,6 +247,10 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         // Random Difficulty
         const difficulties = ['easy', 'normal', 'hard'];
         setDifficulty(difficulties[Math.floor(Math.random() * difficulties.length)]);
+
+        // Random Tone
+        const tones: Array<"serious" | "satirical"> = ['serious', 'satirical'];
+        setTone(tones[Math.floor(Math.random() * tones.length)]);
 
         // Random Setting
         const randomSetting = SETTING_PRESETS[Math.floor(Math.random() * SETTING_PRESETS.length)];
@@ -463,6 +482,32 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                                             }`}
                                                     >
                                                         {lang(level.label) || level.default}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Tone Selection */}
+                                        <div className="space-y-2 relative">
+                                            <label className="text-xs font-semibold text-amber-300/80 uppercase tracking-wider ml-1">
+                                                {lang("LOBBY_TONE_LABEL") || "Tone"}
+                                            </label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {[
+                                                    { id: 'serious', label: 'LOBBY_TONE_SERIOUS', default: 'Serious Drama', icon: '🎭', bg: 'bg-indigo-500/10 border-indigo-500/30', color: 'text-indigo-300' },
+                                                    { id: 'satirical', label: 'LOBBY_TONE_SATIRICAL', default: 'Satirical Comedy', icon: '🃏', bg: 'bg-orange-500/10 border-orange-500/30', color: 'text-orange-300' }
+                                                ].map((t) => (
+                                                    <button
+                                                        key={t.id}
+                                                        type="button"
+                                                        onClick={() => setTone(t.id as "serious" | "satirical")}
+                                                        className={`h-12 rounded-2xl border font-medium transition-all flex items-center justify-center gap-2 ${tone === t.id
+                                                            ? `${t.bg} ${t.color} ring-1 ring-offset-0 ring-${t.bg.split(' ')[0].replace('bg-', '')}`
+                                                            : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white'
+                                                            }`}
+                                                    >
+                                                        <span>{t.icon}</span>
+                                                        <span>{lang(t.label) || t.default}</span>
                                                     </button>
                                                 ))}
                                             </div>
