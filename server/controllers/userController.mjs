@@ -203,7 +203,7 @@ export async function generateIntroParagraph(req, res) {
         // tiny retry wrapper (handles occasional upstream 503s)
         const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         async function getParagraphOnce() {
-            return (await aiTextGemini({ system, user, model: modelOverride || "gemini-2.5-flash" }))?.trim() || "";
+            return (await aiTextGemini({ system, user, model: modelOverride || "gemini-3-flash-preview" }))?.trim() || "";
         }
 
         let paragraph = "";
@@ -276,7 +276,7 @@ export async function validateRole(req, res) {
 
     const user = `Input: ${raw || ""}`;
 
-    const out = await aiJSONGemini({ system, user, model: modelOverride || "gemini-2.5-flash", temperature: 0, fallback: null });
+    const out = await aiJSONGemini({ system, user, model: modelOverride || "gemini-3-flash-preview", temperature: 0, fallback: null });
     if (!out || typeof out.valid !== "boolean") {
         return res.status(503).json({ error: "AI validator unavailable" });
     }
@@ -316,7 +316,7 @@ Examples:
         const result = await aiJSONGemini({
             system,
             user: description,
-            model: modelOverride || "gemini-2.5-flash",
+            model: modelOverride || "gemini-3-flash-preview",
             temperature: 0.2,
             fallback: { trait: description }
         });

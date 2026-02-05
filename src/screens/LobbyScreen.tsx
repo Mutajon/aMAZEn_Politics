@@ -166,7 +166,15 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       // Enable Free Play mode
       useSettingsStore.getState().setFreePlayMode(true);
 
-      // Set tone in store
+      // Reset all game stores for fresh start
+      useCompassStore.getState().reset();
+      useDilemmaStore.getState().reset();
+      useRoleStore.getState().reset();
+      useMirrorQuizStore.getState().resetAll();
+      clearAllSnapshots();
+
+      // Set tone in store (AFTER reset)
+      console.log(`[LobbyScreen] Setting tone to: "${data.tone}"`);
       useDilemmaStore.getState().setTone(data.tone);
 
       // Set treatment to semiAutonomy (standard gameplay)
@@ -178,13 +186,6 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
 
       // Start new logging session
       await loggingService.startSession();
-
-      // Reset all game stores for fresh start
-      useCompassStore.getState().reset();
-      useDilemmaStore.getState().reset();
-      useRoleStore.getState().reset();
-      useMirrorQuizStore.getState().resetAll();
-      clearAllSnapshots();
 
       // --- Custom Scenario Setup ---
       const roleStore = useRoleStore.getState();
@@ -214,6 +215,7 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       // Determine Support Entities (Dynamic)
       const population = data.supportEntities?.find(e => e.type === 'population') || { name: "The People", icon: "👥" };
       const opposition = data.supportEntities?.find(e => e.type === 'opposition') || { name: "The Establishment", icon: "🏛️" };
+      const momEntity = data.supportEntities?.find(e => e.type === 'mom') || { name: "Mom", icon: "❤️" };
 
       // Prepare analysis for a custom scenario
       roleStore.setAnalysis({
@@ -233,7 +235,8 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
         },
         dilemmaEmphasis: data.emphasis || `Role: ${data.role} in ${data.setting}.`,
         roleScope: `As ${data.role} in ${data.setting}, you must navigate the complex political landscape to ensure your faction's survival and goals.`,
-        authorityLevel: "medium"
+        authorityLevel: "medium",
+        momIcon: momEntity.icon
       });
 
       // Use the splash screen maze image as background for custom scenarios

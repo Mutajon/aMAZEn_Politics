@@ -294,7 +294,7 @@ export function buildSupportItems(
       delta: momAlive ? momEffect.delta : null, // No delta if dead
       trend: momAlive ? momEffect.trend : null, // No trend if dead
       note: momAlive ? momEffect.note : null, // No note if dead
-      icon: null as any, // Filled in by EventScreen3
+      icon: analysis?.momIcon as any, // AI-generated icon for Mom in Free Play
       accentClass: "bg-rose-600",
       moodVariant: "empathetic" as const,
       isDeceased: !momAlive, // NEW: Pass deceased flag to UI

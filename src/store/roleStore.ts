@@ -45,6 +45,7 @@ export type AnalysisResult = {
     era: string;
   };
   targetScore?: number; // NEW: Custom difficulty target score (for Free Play)
+  momIcon?: string; // NEW: Icon for Mom from Free Play intro
 };
 
 export type Character = {

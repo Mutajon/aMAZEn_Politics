@@ -493,7 +493,7 @@ export async function callGeminiImageGeneration(prompt, model) {
  * aiTextGemini - Call Gemini API and return raw text response
  * Similar to aiJSONGemini but returns text instead of parsed JSON
  */
-export async function aiTextGemini({ system, user, model = "gemini-2.5-flash", temperature = 0.7, maxTokens = 2048 }) {
+export async function aiTextGemini({ system, user, model = "gemini-3-flash-preview", temperature = 0.7, maxTokens = 2048 }) {
     try {
         console.log(`[GEMINI-TEXT] Calling Gemini API with model: ${model}`);
 
@@ -712,7 +712,7 @@ export async function aiTextXAI({ system, user, model = MODEL_DILEMMA_XAI, tempe
  * @returns {Promise<Buffer>} - Audio buffer (WAV)
  */
 export async function callGeminiTTS(text, voice) {
-    const model = "gemini-2.5-flash-native-audio-preview-12-2025";
+    const model = "gemini-3-flash-preview-native-audio-preview-12-2025";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
 
     console.log(`[GEMINI-TTS] Generating audio for text (${text.length} chars) with voice: ${voice}`);

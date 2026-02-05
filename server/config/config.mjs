@@ -29,8 +29,8 @@ export const MODEL_DILEMMA_PREMIUM = process.env.MODEL_DILEMMA_PREMIUM || "gpt-5
 export const MODEL_DILEMMA_ANTHROPIC = process.env.MODEL_DILEMMA_ANTHROPIC || "";
 export const MODEL_DILEMMA_XAI = process.env.MODEL_DILEMMA_XAI || "";
 export const MODEL_DILEMMA_GEMINI = process.env.MODEL_DILEMMA_GEMINI || "";
-export const MODEL_VALIDATE_GEMINI = process.env.MODEL_VALIDATE_GEMINI || "gemini-2.5-flash";
-export const MODEL_COMPASS_HINTS = process.env.MODEL_COMPASS_HINTS || "gemini-2.5-flash";
+export const MODEL_VALIDATE_GEMINI = process.env.MODEL_VALIDATE_GEMINI || "gemini-3-flash-preview";
+export const MODEL_COMPASS_HINTS = process.env.MODEL_COMPASS_HINTS || "gemini-3-flash-preview";
 
 // Image model
 export const IMAGE_MODEL_OPENAI = process.env.IMAGE_MODEL_OPENAI || "gpt-image-1";
@@ -40,5 +40,5 @@ export const IMAGE_SIZE = process.env.IMAGE_SIZE || "1024x1024";
 export const IMAGE_QUALITY = process.env.IMAGE_QUALITY || "low";
 
 // --- Gemini TTS Configuration --------------------------
-export const TTS_MODEL = process.env.TTS_MODEL || "gemini-2.5-flash-preview-tts";
+export const TTS_MODEL = process.env.TTS_MODEL || "gemini-3-flash-preview-preview-tts";
 export const TTS_VOICE = process.env.TTS_VOICE || "Enceladus";

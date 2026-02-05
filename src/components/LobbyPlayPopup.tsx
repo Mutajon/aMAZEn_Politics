@@ -147,7 +147,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     useEffect(() => {
         if (step === 'intro' && introData?.intro) {
             console.log("[LobbyPlayPopup] Triggering narration for intro");
-            narrator.speak(introData.intro, { tone });
+            narrator.speak(introData.intro);
         }
         return () => narrator.stop();
     }, [step, introData?.intro, tone]);
@@ -321,17 +321,19 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.9, y: 20 }}
                             transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                            className="relative w-full max-w-lg bg-neutral-900/90 border border-white/10 rounded-[32px] shadow-2xl overflow-hidden"
+                            className={`relative w-full ${step === 'intro' ? 'max-w-4xl' : 'max-w-lg'} bg-neutral-900/90 border border-white/10 rounded-[32px] shadow-2xl overflow-hidden`}
                             onClick={(e) => e.stopPropagation()}
                         >
                             {/* Header */}
                             <div className="px-8 pt-8 pb-4 text-center">
                                 <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-200 via-purple-300 to-purple-500 bg-clip-text text-transparent">
-                                    {lang("CREATE_YOUR_STORY")}
+                                    {step === 'intro' ? "Your Story" : lang("CREATE_YOUR_STORY")}
                                 </h2>
-                                <p className="text-white/60 text-sm mt-1">
-                                    {lang("LOBBY_PLAY_SUBTITLE")}
-                                </p>
+                                {step !== 'intro' && (
+                                    <p className="text-white/60 text-sm mt-1">
+                                        {lang("LOBBY_PLAY_SUBTITLE")}
+                                    </p>
+                                )}
                             </div>
 
                             {/* Form or Intro View */}
@@ -641,7 +643,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                                     DEBUG: AI Model Override
                                                 </label>
                                                 <select
-                                                    value={aiModelOverride || "gemini-2.5-flash"}
+                                                    value={aiModelOverride || "gemini-3-flash-preview"}
                                                     onChange={(e) => setAiModelOverride(e.target.value)}
                                                     className="w-full h-11 px-4 bg-slate-900/50 border border-amber-500/30 rounded-xl text-amber-200 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all"
                                                 >
@@ -659,6 +661,18 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                     </>
                                 ) : (
                                     <div className="space-y-6">
+                                        {/* PLACE AND ROLE INFO */}
+                                        <div className="flex flex-wrap gap-x-8 gap-y-2 px-1 text-sm font-medium">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-white/40 uppercase tracking-widest text-[10px] font-bold">The place:</span>
+                                                <span className="text-purple-300">{setting}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-white/40 uppercase tracking-widest text-[10px] font-bold">Your role:</span>
+                                                <span className="text-purple-300">{role}</span>
+                                            </div>
+                                        </div>
+
                                         {/* INTRO TEXT */}
                                         <div className={`relative p-6 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 shadow-inner group ${isRTL ? 'text-right' : 'text-left'}`}>
                                             <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/40 rounded-full" />

@@ -39,7 +39,7 @@ export async function suggestBackground(req, res) {
         const ai = await aiJSONGemini({
             system,
             user,
-            model: modelOverride || "gemini-2.5-flash",
+            model: modelOverride || "gemini-3-flash-preview",
             temperature: 0.2,
             fallback: { object: backgroundHeuristic(role) },
         });
@@ -90,7 +90,7 @@ export async function analyzeCompass(req, res) {
         const items = await aiJSONGemini({
             system,
             user,
-            model: modelOverride || "gemini-2.5-flash",
+            model: modelOverride || "gemini-3-flash-preview",
             temperature: 0.2,
             fallback: [],
         });
@@ -170,7 +170,7 @@ export async function generateNewsTicker(req, res) {
         const items = await aiJSONGemini({
             system,
             user,
-            model: modelOverride || "gemini-2.5-flash",
+            model: modelOverride || "gemini-3-flash-preview",
             fallback: null, // No fallbacks - always generate based on actual context
         });
 
@@ -266,7 +266,7 @@ export async function validateSuggestion(req, res) {
             roleScope
         });
 
-        // Use Gemini for validation (gemini-2.5-flash)
+        // Use Gemini for validation (gemini-3-flash-preview)
         console.log(`[validate-suggestion] Using Gemini model: ${MODEL_VALIDATE_GEMINI}`);
         const raw = await aiJSONGemini({
             system,
@@ -451,7 +451,7 @@ Based on this political decision, generate 1-3 specific dynamic parameters that 
             const result = await aiJSONGemini({
                 system,
                 user,
-                model: modelOverride || "gemini-2.5-flash",
+                model: modelOverride || "gemini-3-flash-preview",
                 temperature: 0.8,
                 fallback: { parameters: [] }
             });
@@ -708,7 +708,7 @@ Return STRICT JSON ONLY.`;
         const result = await aiJSONGemini({
             system: systemPrompt,
             user: userPrompt,
-            model: modelOverride || "gemini-2.5-flash",
+            model: modelOverride || "gemini-3-flash-preview",
             temperature: 0.7, // Slightly more creative for narrative generation
             fallback
         });

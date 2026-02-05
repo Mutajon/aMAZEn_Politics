@@ -169,6 +169,8 @@ async function fetchGameTurn(
     tone
   } = useDilemmaStore.getState();
 
+  console.log(`[fetchGameTurn] 🛡️ Current store tone: "${tone}", day: ${day}, gameId: ${gameId}`);
+
   const { values: compassValues } = useCompassStore.getState();
   const { isFreePlay } = useSettingsStore.getState();
 
@@ -184,14 +186,21 @@ async function fetchGameTurn(
   }
 
   // Build request payload
+  const currentDilemmaState = useDilemmaStore.getState();
+  const currentTone = currentDilemmaState.tone;
+  const currentModel = currentDilemmaState.aiModelOverride;
+  const currentId = currentDilemmaState.gameId;
+
+  console.log(`[fetchGameTurn] 🛡️ Using store data: tone="${currentTone}", model="${currentModel}", gameId="${currentId}"`);
+
   const payload: any = {
-    gameId: currentGameId,
+    gameId: currentId,
     day,
     totalDays,
     isFirstDilemma: day === 1,
     isFollowUp: day > 1,
-    model: aiModelOverride,
-    tone: tone
+    model: currentModel,
+    tone: currentTone
   };
 
   // Day 1: Send full game context

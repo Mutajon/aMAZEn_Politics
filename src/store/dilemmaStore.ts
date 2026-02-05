@@ -390,7 +390,7 @@ export const useDilemmaStore = create<DilemmaState>()(
       },
       freePlayHistory: [],
 
-      aiModelOverride: null,
+      aiModelOverride: "gemini-3-flash-preview",
       setAiModelOverride: (model) => {
         dlog("setAiModelOverride ->", model);
         set({ aiModelOverride: model });
@@ -508,8 +508,8 @@ export const useDilemmaStore = create<DilemmaState>()(
           justFinishedGame: false,
           lastGameScore: null,
           freePlayHistory: [],
-          aiModelOverride: null, // Reset override on full reset
-          tone: "serious",       // Reset tone on full reset
+          // Note: we DON'T reset aiModelOverride or tone here, 
+          // as they are usually set during lobby and need to persist into Day 1
         });
       },
 

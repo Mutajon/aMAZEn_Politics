@@ -6,8 +6,8 @@ import { PREDEFINED_ROLES_ARRAY } from "../data/predefinedRoles";
 
 // Model Pricing Data (Per 1 Million Tokens)
 const MODEL_OPTIONS = [
-    { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
-    { value: "gemini-2.5-flash-preview-09-2025", label: "Gemini 2.5 Flash Preview (09-2025)", price: "$0.15 / $0.60" },
+    { value: "gemini-3-flash-preview", label: "Gemini 2.5 Flash", price: "$0.15 / $0.60" },
+    { value: "gemini-3-flash-preview-preview-09-2025", label: "Gemini 2.5 Flash Preview (09-2025)", price: "$0.15 / $0.60" },
     { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro", price: "$1.25 / $10.00" },
     { value: "gemini-3-flash-preview", label: "Gemini 3 Flash Preview", price: "$0.50 / $3.00" },
     { value: "gemini-3-pro-preview", label: "Gemini 3 Pro Preview", price: "Preview Pricing" },

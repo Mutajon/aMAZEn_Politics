@@ -618,7 +618,7 @@ IMPORTANT:
 ALLOWED_POLITIES: ${JSON.stringify(ALLOWED_POLITIES)}
 Return JSON ONLY. Use de facto practice for E-12. If ROLE describes a real setting, rely on actual historical context; if fictional/unclear, infer plausibly.`;
 
-    const out = await aiJSONGemini({ system, user, model: modelOverride || "gemini-2.5-flash", temperature: 0.2, fallback: FALLBACK });
+    const out = await aiJSONGemini({ system, user, model: modelOverride || "gemini-3-flash-preview", temperature: 0.2, fallback: FALLBACK });
 
     // Normalize holders
     let holders = Array.isArray(out?.holders) ? out.holders.slice(0, 5) : FALLBACK.holders;
@@ -786,7 +786,7 @@ app.post("/api/mirror-light", async (req, res) => {
 
     console.log("[mirror-light] Calling Gemini with personality prompt...");
 
-    const text = await aiTextGemini({ system, user, model: modelOverride || "gemini-2.5-flash" });
+    const text = await aiTextGemini({ system, user, model: modelOverride || "gemini-3-flash-preview" });
 
     // Sanitizer: enforce one sentence, remove digits, tame slashes/quotes, cap words
     const raw = (text || "The mirror squints… then grins mischievously.").trim();
@@ -920,7 +920,7 @@ NEVER use singular addressing (NO "אתה" or "את").`
     console.log("[mirror-quiz-light] User prompt sent to AI:", user);
 
     const modelOverride = req.body?.model || null;
-    const text = await aiTextGemini({ system, user, model: modelOverride || "gemini-2.5-flash" });
+    const text = await aiTextGemini({ system, user, model: modelOverride || "gemini-3-flash-preview" });
 
     // Log raw AI response
     console.log("[mirror-quiz-light] Raw AI response:", text);
