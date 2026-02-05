@@ -720,7 +720,8 @@ export async function freePlayIntro(req, res) {
     try {
         const { role, setting, playerName, emphasis, gender, tone = "serious", model: modelOverride = null } = req.body;
 
-        console.log(`[FREE-PLAY-INTRO] Generating intro for ${role} in ${setting} (gender: ${gender}, tone: ${tone}, model: ${modelOverride || 'default'})...`);
+        console.log(`[FREE-PLAY-INTRO] Generating intro for ${playerName} (${role}, gender: ${gender}, tone: ${tone}, model: ${modelOverride || 'default'})...`);
+        console.log(`[FREE-PLAY-INTRO] 🎭 Selected Tone: ${tone}`);
 
         const systemPrompt = buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender, tone);
         // Using "intro" as a dummy user prompt to trigger generation
@@ -909,6 +910,7 @@ export async function freePlayTurn(req, res) {
             if (!playerChoice) return res.status(400).json({ error: "Missing playerChoice" });
 
             console.log(`[FREE-PLAY] Day ${day}: Processing follow-up`);
+            console.log(`[FREE-PLAY] 🎭 Active Tone: ${conversation.meta.tone || "serious"}`);
 
             // Topic Logic
             const history = conversation.meta.topicHistory || [];

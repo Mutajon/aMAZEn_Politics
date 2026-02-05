@@ -666,6 +666,9 @@ async function fetchGameTurn(
   const scopeUsed = data.scopeUsed || undefined;
 
   console.log(`[fetchGameTurn] ✅ Unified response received: ${data.actions.length} actions, ${data.axisPills?.length || 0} axisPills, ${dynamicParams.length} params, valueTargeted=${valueTargeted || 'N/A'}, axisExplored=${axisExplored || 'N/A'}`);
+  if (data.axisPills && data.axisPills.length > 0) {
+    console.log('[fetchGameTurn] 🎯 Axis Pills detected:', data.axisPills);
+  }
 
   return {
     dilemma,

@@ -22,7 +22,7 @@ export function buildFreePlayIntroSystemPrompt(role, setting, playerName, emphas
 
   return `MISSION:
 You are the narrator of a political drama. 
-Generate a short, atmospheric introductory paragraph (2-3 sentences max) to set the mood for the player.
+Generate a short, atmospheric introductory paragraph (EXACTLY 2 short sentences) to set the mood for the player.
 
 CONTEXT:
 - Player Name: ${playerName || "Player"}
@@ -86,7 +86,9 @@ RULES:
 ${tone === 'satirical'
       ? "- Persona: The Satirical Oracle / Cynical Joker. Be snappy, cynical, and use dark humor. Emphasize the absurdity of political choices and the predictable greed/folly of all involved."
       : "- Persona: Cold Narrator of a political drama. Be direct, sharp, and weighty."}
-- Tone: Dramatic, short sentences, direct address.
+${tone === 'satirical'
+      ? "- Tone: Witty, biting, cynical, short sentences."
+      : "- Tone: Dramatic, short sentences, direct address."}
 - **Narrative Evolution**: Explore the core "Emphasis" through different lenses (e.g., personal impact, institutional failure, public perception) rather than repeating the same theme. Variety is key.
 - Constraints: Dilemma max 2-3 sentences. Generate exactly 3 UNIQUE and distinct actions per dilemma.
 - Action Variety: Each action must lead in a different thematic or ideological direction.
@@ -129,7 +131,7 @@ export function buildFreePlayUserPrompt(day, playerChoice, lastTopic, consecutiv
   }
 
   const toneInstruction = tone === 'satirical'
-    ? "PERSONA: Satirical Political Comedy. Maintain a cynical, witty, and slightly mocking tone."
+    ? "PERSONA: Satirical Political Comedy. CRITICAL: Be cynical, mock power, and use dark humor in every sentence. Avoid being 'Dramatic' or 'Serious'."
     : "PERSONA: Dramatic Political Drama. Maintain a serious, weighty, and atmospheric tone.";
 
   if (day === 1) {

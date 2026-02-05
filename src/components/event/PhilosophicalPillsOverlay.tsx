@@ -43,12 +43,19 @@ export default function PhilosophicalPillsOverlay({
     const [pillSteps, setPillSteps] = useState<Record<number, 'spawn' | 'hover' | 'fly' | 'done'>>({});
 
     useEffect(() => {
+        console.log(`[PillsOverlay] useEffect check: loading=${loading}, pills.length=${pills.length}, hasStarted=${hasStarted}`);
         if (!loading && pills.length > 0 && !hasStarted) {
-            console.log('[PillsOverlay] 💊 New pills received for animation:', pills);
+            console.log('[PillsOverlay] 💊 🚀 BLAST OFF! Triggering animation for:', pills);
             setHasStarted(true);
             setActivePills(pills);
-            playSfx('achievement'); // Play sound once per batch, similar to compass overlay
-        } else if (loading || pills.length === 0) {
+            playSfx('achievement');
+        } else if (loading) {
+            console.log('[PillsOverlay] 🔄 Resetting state (loading=true)');
+            setHasStarted(false);
+            setActivePills([]);
+            setPillSteps({});
+        } else if (pills.length === 0 && hasStarted) {
+            console.log('[PillsOverlay] ⏹️ Clearing state (pills=0)');
             setHasStarted(false);
             setActivePills([]);
             setPillSteps({});
