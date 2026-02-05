@@ -346,10 +346,6 @@ async function fetchGameTurn(
 
   console.log(`[fetchGameTurn] Calling ${isFreePlay ? '/api/free-play/turn' : '/api/game-turn-v2'} for Day ${day}, gameId=${currentGameId}, treatment=${treatment}, generateActions=${payload.generateActions}, useXAI=${useXAI}, useGemini=${useGemini}, language=${language}`);
 
-  // Log compass values being sent for mirror advice debugging
-  if (payload.gameContext?.playerCompassTopValues) {
-    console.log("[fetchGameTurn] Player compass top values:", payload.gameContext.playerCompassTopValues);
-  }
 
   // --- FREE PLAY MODE SWITCH ---
   let response;

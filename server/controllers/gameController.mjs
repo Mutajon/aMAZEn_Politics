@@ -777,25 +777,68 @@ export async function freePlayTurn(req, res) {
         // DAY 1: Start New Game
         // --------------------------------------------------------
         if (day === 1) {
-            console.log(`[FREE-PLAY] Day 1: Starting new game for ${playerName} (${role}, gender: ${gender})`);
+            console.log(`[FREE-PLAY] Day 1: Starting new game for ${playerName} (${role}, gender: ${gender}, tone: ${tone})`);
 
             // Build System Prompt
             const context = { role, setting, playerName, emphasis, gender, tone, language, supportEntities };
             const systemPrompt = buildFreePlaySystemPrompt(context);
             const languageCode = String(language || "en").toLowerCase();
             const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
-            const userPrompt = buildFreePlayUserPrompt(1, null, null, 0, emphasis, languageCode, languageName);
+            const userPrompt = buildFreePlayUserPrompt(1, null, null, 0, emphasis, tone, languageCode, languageName);
 
             const messages = [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userPrompt }
             ];
 
-            // Call Gemini
-            const aiResponse = await callGeminiChat(messages, modelOverride || "gemini-2.5-flash");
-            const parsed = safeParseJSON(aiResponse.content, { debugTag: "FREE-PLAY-DAY1" });
+            // Call AI with retry logic for JSON parsing failures (matching Day 2+ logic)
+            let parsed;
+            let aiContent;
+            const maxRetries = 1;
 
-            if (!parsed) throw new Error("Failed to parse Day 1 response");
+            for (let retryCount = 0; retryCount <= maxRetries; retryCount++) {
+                // Add correction message on retry
+                if (retryCount > 0) {
+                    console.log(`[FREE-PLAY] Day 1 JSON parse failed, retrying (attempt ${retryCount + 1}/${maxRetries + 1})...`);
+                    messages.push({
+                        role: "user",
+                        content: "Your response was not valid JSON. Please respond ONLY with the raw JSON object, no markdown code blocks (no ```), no explanations - just the JSON starting with { and ending with }."
+                    });
+                }
+
+                const aiResponse = await callGeminiChat(messages, modelOverride || "gemini-2.5-flash");
+                aiContent = aiResponse?.content;
+
+                if (!aiContent) {
+                    if (retryCount === maxRetries) throw new Error("No content in AI response after retries");
+                    continue;
+                }
+
+                // Debug logging (Day 1 AI response)
+                console.log(`[FREE-PLAY] Day 1 Raw AI Response (attempt ${retryCount + 1}):`, aiContent.substring(0, 100) + "...");
+
+                // Parse JSON response with robust error handling
+                parsed = safeParseJSON(aiContent, { debugTag: `FREE-PLAY-DAY1-ATTEMPT${retryCount + 1}` });
+
+                // If safeParseJSON fails, try custom comma repair
+                if (!parsed) {
+                    console.log(`[FREE-PLAY] Day 1 safeParseJSON failed, attempting comma repair...`);
+                    try {
+                        const strippedContent = stripMarkdownCodeBlocks(aiContent);
+                        const commaFixed = strippedContent.replace(/("\s*)\n(\s*"[^"]+"\s*:)/g, '$1,\n$2');
+                        parsed = JSON.parse(commaFixed);
+                        console.log('[FREE-PLAY] ✅ Day 1 Comma repair successful');
+                    } catch (commaError) {
+                        console.error(`[FREE-PLAY] Day 1 Comma repair failed:`, commaError.message);
+                    }
+                }
+
+                if (parsed) break;
+
+                if (retryCount === maxRetries && !parsed) {
+                    throw new Error(`Failed to parse Day 1 response after ${maxRetries + 1} attempts`);
+                }
+            }
 
             const updatedAxes = {
                 democracy: 0, oligarchy: 0,
@@ -806,25 +849,33 @@ export async function freePlayTurn(req, res) {
             // Day 1: No pills yet as no choices made
             const axisPills = [];
 
-            // Store Conversation with zeroed axes
+            // Store Conversation with zeroed axes and preserved tone
             const meta = {
-                type: 'free-play',
-                aiModel: modelOverride, // Store for turn generation
-                role, setting, playerName, emphasis, gender, language,
-                supportEntities: supportEntities || [],
-                support: { people: 50, holders: 50 },
-                philosophicalAxes: updatedAxes,
-                systemPrompt,
-                messages: [
-                    { role: "user", content: userPrompt },
-                    { role: "assistant", content: aiResponse.content }
+                gameId,
+                day: 1,
+                role: role || parsed.role || "Leader",
+                setting: setting || parsed.setting || "Unknown Setting",
+                playerName: playerName || parsed.playerName || "Player",
+                emphasis: emphasis || parsed.emphasis || "Political Tension",
+                gender: gender || parsed.gender || "male",
+                language: language || languageCode || "en",
+                tone, // Preserved tone for persistence
+                supportEntities: parsed.supportEntities || [],
+                support: { people: 50, holders: 50, mom: 50 },
+                philosophicalAxes: {
+                    democracy: 0, oligarchy: 0, autonomy: 0, heteronomy: 0, liberalism: 0, totalism: 0
+                },
+                topicHistory: [
+                    {
+                        day: 1,
+                        topic: parsed.dilemma?.topic || "Unknown",
+                        scope: parsed.dilemma?.scopeUsed || parsed.dilemma?.scope || "National",
+                        axis: parsed.dilemma?.axisUsed || parsed.dilemma?.axis || "Unknown"
+                    }
                 ],
-                topicHistory: [{
-                    day: 1,
-                    topic: parsed.dilemma?.topic || "Unknown",
-                    scope: parsed.dilemma?.scopeUsed || parsed.dilemma?.scope || "Unknown",
-                    axis: parsed.dilemma?.axisUsed || parsed.dilemma?.axis || "Unknown"
-                }]
+                messages: [
+                    { role: "assistant", content: aiContent }
+                ]
             };
 
             storeConversation(gameId, gameId, 'gemini', meta);
@@ -835,17 +886,6 @@ export async function freePlayTurn(req, res) {
                 title: (a.title || "").replace(/^\d+[\.\)\-]\s*/, '').replace(/\s*\(\d+\)$/, '').trim()
             }));
 
-            // Basic deduplication
-            const seenTitles = new Set();
-            processedActions = processedActions.filter(a => {
-                const normalized = (a.title || "").toLowerCase();
-                if (seenTitles.has(normalized)) return false;
-                seenTitles.add(normalized);
-                return true;
-            });
-
-            console.log('[freePlayTurn] Day 1: axisPills empty, axes zeroed');
-
             return res.json({
                 title: parsed.dilemma?.title || "Dilemma",
                 description: parsed.dilemma?.description || "Something happens...",
@@ -853,7 +893,7 @@ export async function freePlayTurn(req, res) {
                 mirrorAdvice: parsed.mirrorAdvice,
                 dynamicParams: [], // Empty for Free Play
                 supportShift: null,
-                currentSupport: { people: 50, holders: 50 },
+                currentSupport: { people: 50, holders: 50, mom: 50 },
                 axisPills: [],
                 philosophicalAxes: updatedAxes,
                 axisUsed: parsed.dilemma?.axisUsed || parsed.dilemma?.axis || "Unknown",
@@ -884,7 +924,8 @@ export async function freePlayTurn(req, res) {
 
             const languageCode = String(conversation.meta.language || "en").toLowerCase();
             const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
-            const userPrompt = buildFreePlayUserPrompt(day, playerChoice, lastTopic, consecutiveDays, conversation.meta.emphasis, languageCode, languageName);
+            const contextTone = conversation.meta.tone || "serious";
+            const userPrompt = buildFreePlayUserPrompt(day, playerChoice, lastTopic, consecutiveDays, conversation.meta.emphasis, contextTone, languageCode, languageName);
 
             const systemPrompt = buildFreePlaySystemPrompt({
                 role: conversation.meta.role,
@@ -893,6 +934,7 @@ export async function freePlayTurn(req, res) {
                 emphasis: conversation.meta.emphasis,
                 language: conversation.meta.language,
                 gender: conversation.meta.gender,
+                tone: contextTone,
                 supportEntities: conversation.meta.supportEntities
             });
 
@@ -927,7 +969,9 @@ export async function freePlayTurn(req, res) {
 
             // Update philosophical axes based on axisPills
             const axisPillsRaw = parsed.axisPills || [];
+            console.log(`[FREE-PLAY] Day ${day} Raw axisPills:`, axisPillsRaw);
             const axisPills = axisPillsRaw.map(mapPhilosophicalAxis).filter(Boolean);
+            console.log(`[FREE-PLAY] Day ${day} Mapped axisPills:`, axisPills);
 
             const updatedAxes = {
                 ...(conversation.meta.philosophicalAxes || {

@@ -110,7 +110,7 @@ export const useSettingsStore = create<SettingsState>()(
       toggleGenerateImages: () => set({ generateImages: !get().generateImages }),
 
       // Narration
-      narrationEnabled: true,
+      narrationEnabled: false,
       narrationVoice: null,
       setNarrationEnabled: (v) => set({ narrationEnabled: v }),
       toggleNarrationEnabled: () => set({ narrationEnabled: !get().narrationEnabled }),
@@ -205,7 +205,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       // Bump key so no stale objects hide the new fields
-      name: "settings-v15",
+      name: "settings-v16",
       partialize: (s) => ({
         generateImages: s.generateImages,
         narrationEnabled: s.narrationEnabled,

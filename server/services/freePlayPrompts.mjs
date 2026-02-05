@@ -66,7 +66,9 @@ export function buildFreePlaySystemPrompt(context) {
   const entities = supportEntities ? supportEntities.map(e => `- ${e.name} (${e.type}): ${e.summary}`).join('\n') : "";
 
   return `STRICT: ALL GENERATED CONTENT (except JSON keys) MUST BE IN ${lang.toUpperCase()}.
-Translate any English context or instructions provided below into ${lang}.\n\nMISSION:
+Translate any English context or instructions provided below into ${lang}.
+
+MISSION:
 Game Master for ${playerName}. Role: ${role}, Setting: ${setting}. ${emphasis ? `Focus: ${emphasis}.` : ""}
 Deliver fast, dramatic dilemmas. Output ONLY JSON. Use ${genderGrammar} grammar.
 
@@ -86,10 +88,11 @@ ${tone === 'satirical'
       : "- Persona: Cold Narrator of a political drama. Be direct, sharp, and weighty."}
 - Tone: Dramatic, short sentences, direct address.
 - **Narrative Evolution**: Explore the core "Emphasis" through different lenses (e.g., personal impact, institutional failure, public perception) rather than repeating the same theme. Variety is key.
-- Constraints: Dilemma max 3 sentences. Generate exactly 3 UNIQUE and distinct actions per dilemma.
+- Constraints: Dilemma max 2-3 sentences. Generate exactly 3 UNIQUE and distinct actions per dilemma.
 - Action Variety: Each action must lead in a different thematic or ideological direction.
 - Forbidden: DO NOT number the actions (no "(1)", "(2)", etc. in titles). DO NOT repeat the same option.
 - **Support Shift Logic**: Do NOT use pre-baked attitudes. Instead, perform a REALISTIC situational analysis: Given the player's Role, the Setting, and their last Decision, how would these specific entities (Population/Opposition/Personal Anchor) react?
+- **Support توضیحات (shortLine)**: Use natural, spoken, and fluent phrasing. Max 1 short sentence (10-12 words). No fluff.
 - Allowed attitudeLevel: "strongly_supportive", "moderately_supportive", "slightly_supportive", "slightly_opposed", "moderately_opposed", "strongly_opposed".
 - Support: Identify "axisPills" (the poles boosted by the player's last choice).
 
@@ -112,23 +115,28 @@ SCHEMA:
   "mirrorAdvice": "One witty sentence.",
   "axisPills": ["democracy", "totalism", "etc"]
 }
-CRITICAL: The "axisPills" array MUST only contain the English IDs: "democracy", "autonomy", "totalism", "oligarchy", "heteronomy", "liberalism". DO NOT translate these keys.
+CRITICAL: The "axisPills" array MUST only contain the English IDs: "democracy", "autonomy", "totalism", "oligarchy", "heteronomy", "liberalism". DO NOT translate these keys. Leave "axisPills" empty on Day 1.
 `;
 }
 
 // ----------------------------------------------------------------------------
 // 3. USER PROMPT (Turn Inputs)
 // ----------------------------------------------------------------------------
-export function buildFreePlayUserPrompt(day, playerChoice, lastTopic, consecutiveDays, emphasis, languageCode = 'en', languageName = 'English') {
+export function buildFreePlayUserPrompt(day, playerChoice, lastTopic, consecutiveDays, emphasis, tone = "serious", languageCode = 'en', languageName = 'English') {
   let prompt = "";
   if (languageCode !== 'en') {
     prompt += `STRICT: ALL GENERATED CONTENT MUST BE IN ${languageName.toUpperCase()}.\n\n`;
   }
 
+  const toneInstruction = tone === 'satirical'
+    ? "PERSONA: Satirical Political Comedy. Maintain a cynical, witty, and slightly mocking tone."
+    : "PERSONA: Dramatic Political Drama. Maintain a serious, weighty, and atmospheric tone.";
+
   if (day === 1) {
-    return `Establish the physical scene and present a concrete problem requiring an immediate decision.
-Based on the Role and Setting, identify which philosophical poles (democracy, autonomy, etc.) would be established as the foundation or reinforced by this initial situation.
-Include these in the "axisPills" array.`;
+    return `${toneInstruction}
+Establish the physical scene and present a concrete problem requiring an immediate decision.
+Length: Max 2 sentences.
+Do NOT include any "axisPills" (return empty array []).`;
   }
 
   const topicInstruction = consecutiveDays >= 2
@@ -137,13 +145,16 @@ Include these in the "axisPills" array.`;
 
   const emphasisAnchor = emphasis ? `\n\n**DILEMMA ANCHOR**: For most turns, keep the story grounded in the core theme: "${emphasis}". Find a new angle or specific tension related to this to anchor today's dilemma. If the story naturally dictates a temporary shift away from this theme, you may do so, but return to it frequently.` : "";
 
-  return `DAY ${day}.${emphasisAnchor}
+  return `${toneInstruction}
+
+DAY ${day}.${emphasisAnchor}
 Last choice: "${playerChoice.title}"
 
-1. **BRIDGE**: Show the consequence of the player's choice.
-2. **TOPIC**: ${topicInstruction}
-3. **MIRROR**: Add a witty judgment.
-4. **AXIS**: Analyze the player's last choice ("${playerChoice.title}") and identify which poles (1-2 max) it reinforced. Include these in "axisPills".
+1. **BRIDGE**: Show the consequence of the player's choice in 1 short sentence.
+2. **DILEMMA**: Present a new situation in 1-2 short sentences. End with a question.
+3. **TOPIC**: ${topicInstruction}
+4. **MIRROR**: Add a witty judgment.
+5. **AXIS**: Analyze the player's last choice ("${playerChoice.title}") and identify which poles (1-2 max) it reinforced. Include these in "axisPills".
 
-Generate the next dilemma with exactly 3 UNIQUE and non-numbered actions.`;
+Generate the next dilemma with exactly 3 UNIQUE and non-numbered actions. Use fluent, natural phrasing. Avoid long paragraphs.`;
 }

@@ -7,20 +7,8 @@
 // - All requests go to /api/tts on your server; the API key never touches the client.
 
 import { useCallback, useState } from "react";
-import { useSettingsStore } from "../store/settingsStore";
-import { useDilemmaStore } from "../store/dilemmaStore";
-import { TTS_VOICE } from "../lib/ttsConfig";
-import { getCurrentLanguage } from "../i18n/lang";
 
-type SpeakOptions = {
-  voiceName?: string;           // Gemini voice name; default from VITE_TTS_VOICE env var
-  tone?: "serious" | "satirical"; // Optional: Force a specific tone (useful for intro)
-  format?: "mp3" | "opus" | "aac" | "flac" | "wav";
-  volume?: number;              // 0..1
-  instructions?: string;        // Optional: Style/tone instructions (prepended to text for Gemini)
-};
-
-export type PreparedTTS = {
+type PreparedTTS = {
   /** starts playback; resolves when play() settles (may throw if blocked) */
   start: () => Promise<void>;
   /** stops playback immediately and frees resources */
@@ -39,8 +27,6 @@ let globalAbortRef: AbortController | null = null;
 let globalIsPlayingRef = false;
 
 export function useNarrator() {
-  const { narrationEnabled, isFreePlay } = useSettingsStore();
-  const { tone } = useDilemmaStore();
   const [speaking, setSpeaking] = useState(false);
 
   const _cleanup = useCallback(() => {
@@ -89,7 +75,7 @@ export function useNarrator() {
    * If narration is disabled, returns a no-op Prepared that resolves immediately.
    */
   const prepare = useCallback(
-    async (text: string, opts: SpeakOptions = {}): Promise<PreparedTTS> => {
+    async (text: string): Promise<PreparedTTS> => {
       if (!text?.trim()) {
         // return a no-op that behaves like "already ready"
         return {
@@ -99,149 +85,20 @@ export function useNarrator() {
         };
       }
 
-      // RESTRICT NARATION TO FREE PLAY MODE ONLY
-      if (!isFreePlay) {
-        return {
-          start: async () => { },
-          dispose: () => { },
-          disposed: () => true,
-        };
-      }
-
-      // Disable TTS if narration is off OR if language is Hebrew (TTS not supported)
-      if (!narrationEnabled || getCurrentLanguage() === 'he') {
-        // narration off or Hebrew → don't block UI; provide a no-op that is "ready"
-        return {
-          start: async () => { },
-          dispose: () => { },
-          disposed: () => true,
-        };
-      }
-
-      // Any previous in-flight fetch/audio is canceled
-      _cleanup();
-      globalAbortRef = new AbortController();
-
-      // VOICE MAPPING based on tone (prefer opts.tone, fallback to store tone)
-      const activeTone = opts.tone || tone;
-      let voice = opts.voiceName || TTS_VOICE;
-      if (activeTone === 'satirical') {
-        voice = 'en-GB-Standard-O';
-      } else if (activeTone === 'serious') {
-        voice = 'en-US-Studio-O';
-      }
-      const format = opts.format || "mp3";
-      const volume = typeof opts.volume === "number" ? Math.max(0, Math.min(1, opts.volume)) : 1;
-      const instructions = opts.instructions;
-
-      log("prepare() fetch /api/tts … voice =", voice, "format =", format, instructions ? `instructions = "${instructions}"` : "");
-
-      // Build request body - only include instructions if defined
-      const { aiModelOverride } = useDilemmaStore.getState();
-      const requestBody: { text: string; voice: string; format: string; instructions?: string; model?: string | null } = {
-        text,
-        voice,
-        format,
-        model: aiModelOverride
+      // ALL TTS TEMPORARILY DISABLED PER USER REQUEST
+      return {
+        start: async () => { },
+        dispose: () => { },
+        disposed: () => true,
       };
-      if (instructions) {
-        requestBody.instructions = instructions;
-      }
-
-      const r = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-        signal: globalAbortRef.signal,
-      });
-      if (!r.ok) {
-        const t = await r.text().catch(() => "");
-        throw new Error(`Server TTS error ${r.status}: ${t}`);
-      }
-
-      const buf = await r.arrayBuffer();
-      const type =
-        format === "wav" ? "audio/wav" :
-          format === "aac" ? "audio/aac" :
-            format === "flac" ? "audio/flac" :
-              format === "opus" ? "audio/ogg" :
-                format === "mp3" ? "audio/mpeg" :
-                  "audio/wav";  // Default to WAV for Gemini TTS
-      const blob = new Blob([buf], { type });
-      const url = URL.createObjectURL(blob);
-
-      globalObjectUrlRef = url;
-      const audio = new Audio(url);
-      audio.preload = "auto";
-      audio.volume = volume;
-
-      // Wait for 'canplay' (not 'canplaythrough') for faster start - allows playback to begin sooner
-      await new Promise<void>((resolve, reject) => {
-        const onReady = () => {
-          audio.removeEventListener("canplay", onReady);
-          audio.removeEventListener("error", onErr);
-          resolve();
-        };
-        const onErr = () => {
-          audio.removeEventListener("canplay", onReady);
-          audio.removeEventListener("error", onErr);
-          reject(new Error("Audio element error"));
-        };
-        audio.addEventListener("canplay", onReady, { once: true });
-        audio.addEventListener("error", onErr, { once: true });
-        // Nudge the decoder on some browsers
-        audio.load();
-      });
-
-      let disposed = false;
-
-      const start = async () => {
-        if (disposed) return;
-        // register as the active audio in global ref
-        globalAudioRef = audio;
-        audio.onplay = () => {
-          globalIsPlayingRef = true;
-          setSpeaking(true);
-          log("play start");
-        };
-        audio.onended = () => {
-          globalIsPlayingRef = false;
-          setSpeaking(false);
-          log("play end");
-        };
-        audio.onpause = () => {
-          globalIsPlayingRef = false;
-          log("play paused");
-        };
-        audio.onerror = (e) => {
-          globalIsPlayingRef = false;
-          setSpeaking(false);
-          console.warn("[Narrator/OAI] audio error", e);
-        };
-        await audio.play();
-      };
-
-      const dispose = () => {
-        if (disposed) return;
-        disposed = true;
-        globalIsPlayingRef = false;
-        try { audio.pause(); } catch { }
-        audio.src = "";
-        if (globalObjectUrlRef) {
-          URL.revokeObjectURL(globalObjectUrlRef);
-          globalObjectUrlRef = null;
-        }
-      };
-
-      return { start, dispose, disposed: () => disposed };
     },
-    [narrationEnabled, _cleanup]
+    [_cleanup]
   );
 
   // Convenience: prepare + start immediately (no strict sync with UI)
   const speak = useCallback(
-    async (text: string, opts: SpeakOptions = {}) => {
-      const p = await prepare(text, opts);
+    async (text: string) => {
+      const p = await prepare(text);
       try {
         await p.start();
       } catch (e) {
