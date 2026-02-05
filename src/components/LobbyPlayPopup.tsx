@@ -9,6 +9,7 @@ import { MirrorReflection } from "./MirrorWithReflection";
 import { useSettingsStore } from "../store/settingsStore";
 import { useNarrator } from "../hooks/useNarrator";
 import SystemSelection from "./lobby/SystemSelection";
+import SystemDetailsPopup from "./lobby/SystemDetailsPopup";
 import type { FreePlaySystem } from "../data/freePlaySystems";
 import { bgStyleSplash } from "../lib/ui";
 
@@ -106,6 +107,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     const [step, setStep] = useState<'selection' | 'form' | 'intro'>('selection');
     const [introData, setIntroData] = useState<{ intro: string, mirrorMsg: string, supportEntities?: any[] } | null>(null);
     const [isGeneratingIntro, setIsGeneratingIntro] = useState(false);
+    const [selectedSystem, setSelectedSystem] = useState<FreePlaySystem | null>(null);
 
     const [showNamePresets, setShowNamePresets] = useState(false);
     const [showSettingPresets, setShowSettingPresets] = useState(false);
@@ -157,20 +159,23 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
 
     const handleSystemSelect = (system: FreePlaySystem) => {
         audioManager.playSfx("click-soft");
-        setSetting(system.scenario);
-        setRole(system.governanceSystem); // Use the system name as the role for consistency
-        setEmphasis(system.intro); // Use the intro as emphasis for generation grounding
+        setSelectedSystem(system);
+    };
 
-        // Auto-randomize name and avatar
-        const names = [lang("LOBBY_NAME_ALEX"), lang("LOBBY_NAME_CASEY"), lang("LOBBY_NAME_JORDAN"), lang("LOBBY_NAME_TAYLOR")];
-        setCharacterName(names[Math.floor(Math.random() * names.length)]);
+    const handleDetailsConfirm = (data: { characterName: string, role: string, avatar: string }) => {
+        if (!selectedSystem) return;
 
-        const randomAvatar = AVATAR_LIST[Math.floor(Math.random() * AVATAR_LIST.length)];
-        setSelectedAvatar(randomAvatar);
+        audioManager.playSfx("click-soft");
+        setCharacterName(data.characterName);
+        setRole(data.role === 'leader' ? selectedSystem.governanceSystem : 'Citizen');
+        setSetting(selectedSystem.scenario);
+        setEmphasis(selectedSystem.intro);
+        setSelectedAvatar(data.avatar);
+        setGender('male'); // Reset to default or handle in data
 
-        // Transition directly to intro generation
-        // But we need to ensure the variables are set, so we'll use a local function or wait for state
-        generateIntroFromSettings(system.scenario, system.governanceSystem);
+        // Close details and trigger generation
+        setSelectedSystem(null);
+        generateIntroFromSettings(selectedSystem.scenario, selectedSystem.governanceSystem);
     };
 
     const generateIntroFromSettings = async (selectedSetting: string, selectedRole: string) => {
@@ -391,8 +396,20 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                             audioManager.playSfx("click-soft");
                                             setStep('form');
                                         }}
+                                        disabled={!!selectedSystem}
                                     />
                                 </div>
+
+                                {/* Custom Details Zoom-In */}
+                                <AnimatePresence>
+                                    {selectedSystem && (
+                                        <SystemDetailsPopup
+                                            system={selectedSystem}
+                                            onClose={() => setSelectedSystem(null)}
+                                            onContinue={handleDetailsConfirm}
+                                        />
+                                    )}
+                                </AnimatePresence>
                             </div>
                         ) : (
                             <motion.div
