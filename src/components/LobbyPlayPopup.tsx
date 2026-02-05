@@ -10,6 +10,7 @@ import { useSettingsStore } from "../store/settingsStore";
 import { useNarrator } from "../hooks/useNarrator";
 import SystemSelection from "./lobby/SystemSelection";
 import SystemDetailsPopup from "./lobby/SystemDetailsPopup";
+import GameSettingsPopup from "./lobby/GameSettingsPopup";
 import type { FreePlaySystem } from "../data/freePlaySystems";
 import { bgStyleSplash } from "../lib/ui";
 
@@ -104,7 +105,8 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     });
 
     // New state for Intro flow
-    const [step, setStep] = useState<'selection' | 'form' | 'intro'>('selection');
+    const [step, setStep] = useState<'selection' | 'form' | 'intro' | 'spice'>('selection');
+    const [bonusObjective, setBonusObjective] = useState("");
     const [introData, setIntroData] = useState<{ intro: string, mirrorMsg: string, supportEntities?: any[] } | null>(null);
     const [isGeneratingIntro, setIsGeneratingIntro] = useState(false);
     const [selectedSystem, setSelectedSystem] = useState<FreePlaySystem | null>(null);
@@ -169,13 +171,34 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         setCharacterName(data.characterName);
         setRole(data.role === 'leader' ? selectedSystem.governanceSystem : 'Citizen');
         setSetting(selectedSystem.scenario);
-        setEmphasis(selectedSystem.intro);
         setSelectedAvatar(data.avatar);
-        setGender('male'); // Reset to default or handle in data
 
-        // Close details and trigger generation
-        setSelectedSystem(null);
-        generateIntroFromSettings(selectedSystem.scenario, selectedSystem.governanceSystem);
+        // Pull the correct bonus objective based on role
+        const objective = data.role === 'leader'
+            ? selectedSystem.bonusObjectiveLeader
+            : selectedSystem.bonusObjectiveCitizen;
+        setBonusObjective(objective);
+
+        // Move to spice step
+        setStep('spice');
+    };
+
+    const handleSpiceConfirm = (settings: {
+        difficulty: string,
+        tone: string,
+        emphasis: string,
+        useBonusObjective: boolean
+    }) => {
+        audioManager.playSfx("click-soft");
+        setDifficulty(settings.difficulty as any);
+        setTone(settings.tone === 'comedy' ? 'satirical' : 'serious');
+
+        // If bonus objective is enabled, use it as the emphasis
+        const finalEmphasis = settings.useBonusObjective ? bonusObjective : settings.emphasis;
+        setEmphasis(finalEmphasis || selectedSystem?.intro || "");
+
+        // Finally trigger generation
+        generateIntroFromSettings(selectedSystem?.scenario || setting, selectedSystem?.governanceSystem || role);
     };
 
     const generateIntroFromSettings = async (selectedSetting: string, selectedRole: string) => {
@@ -375,7 +398,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                         {/* Backdrop click to close */}
                         <div className="absolute inset-0" onClick={onClose} />
 
-                        {step === 'selection' ? (
+                        {['selection', 'spice'].includes(step) ? (
                             <div className="relative z-10 w-full h-full flex flex-col items-center justify-center pointer-events-none">
                                 {/* Screen Title - truly outside any container */}
                                 <motion.div
@@ -402,11 +425,19 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
 
                                 {/* Custom Details Zoom-In */}
                                 <AnimatePresence>
-                                    {selectedSystem && (
+                                    {selectedSystem && step !== 'spice' && (
                                         <SystemDetailsPopup
                                             system={selectedSystem}
                                             onClose={() => setSelectedSystem(null)}
                                             onContinue={handleDetailsConfirm}
+                                        />
+                                    )}
+
+                                    {step === 'spice' && (
+                                        <GameSettingsPopup
+                                            bonusObjective={bonusObjective}
+                                            onClose={() => setStep('selection')}
+                                            onStart={handleSpiceConfirm}
                                         />
                                     )}
                                 </AnimatePresence>

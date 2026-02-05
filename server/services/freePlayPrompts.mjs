@@ -35,6 +35,7 @@ INSTRUCTIONS:
 - Directly address the player as "you". 
 - Place them physically in the scene (sights, sounds).
 - Establish the weight of their specific position.
+- **Grounding**: Seamlessly integrate the provided EMPHASIS/OBJECTIVE into the narrative. It should feel like a core, grounded part of the situation, not a tagged-on instruction.
 - **Support Entities**: Identify exactly 3 key entities for this specific role:
   1. "Population": The general public/subjects relevant to the role (e.g., "The Peasantry", "Voters", "The Colony").
   2. "Opposition": The primary institutional or social antagonist/monitor (e.g., "The Church", "The Board", "Military High Command").
@@ -89,7 +90,7 @@ ${tone === 'satirical'
 ${tone === 'satirical'
       ? "- Tone: Witty, biting, cynical, short sentences."
       : "- Tone: Dramatic, short sentences, direct address."}
-- **Narrative Evolution**: Explore the core "Emphasis" through different lenses (e.g., personal impact, institutional failure, public perception) rather than repeating the same theme. Variety is key.
+- **Narrative Evolution**: Explore the core "Emphasis" through different lenses (e.g., personal impact, institutional failure, public perception). Ground the choice of dilemmas in this theme so the story feels coherent and focused on the player's initial goals.
 - Constraints: Dilemma max 2-3 sentences. Generate exactly 3 UNIQUE and distinct actions per dilemma.
 - Action Variety: Each action must lead in a different thematic or ideological direction.
 - Forbidden: DO NOT number the actions (no "(1)", "(2)", etc. in titles). DO NOT repeat the same option.
