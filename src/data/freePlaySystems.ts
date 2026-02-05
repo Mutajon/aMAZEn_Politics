@@ -9,6 +9,8 @@ export interface FreePlaySystem {
     intro: string;
     leaderExperience: string;
     citizenExperience: string;
+    bonusObjectiveLeader: string;
+    bonusObjectiveCitizen: string;
     image: string;
 }
 
@@ -22,6 +24,8 @@ export const FREE_PLAY_SYSTEMS: FreePlaySystem[] = [
         intro: "Noisy plazas; shifting public opinion; politics as a daily chore.",
         leaderExperience: "NA",
         citizenExperience: "You are empowered but exhausted; fear of \"tyranny of the majority.\"",
+        bonusObjectiveLeader: "NA",
+        bonusObjectiveCitizen: "Gather enough popular support to convict a corrupt high-ranking official.",
         image: "/assets/images/freePlay/athensCircle.webp"
     },
     {
@@ -33,6 +37,8 @@ export const FREE_PLAY_SYSTEMS: FreePlaySystem[] = [
         intro: "Legalistic; power flows through institutions and precedent.",
         leaderExperience: "You are influential but \"boxed in\" by procedural limits and rivals.",
         citizenExperience: "You are protected by stable institutions that outlast individuals.",
+        bonusObjectiveLeader: "Successfully pass a specific, controversial law through the Senate.",
+        bonusObjectiveCitizen: "Pressure the Senate into creating a new legal right for the common people.",
         image: "/assets/images/freePlay/romanCircle.webp"
     },
     {
@@ -44,6 +50,8 @@ export const FREE_PLAY_SYSTEMS: FreePlaySystem[] = [
         intro: "Hierarchical; built on personal bonds and loyalty.",
         leaderExperience: "Your word is law, but depends on health, heirs, and vassal loyalty.",
         citizenExperience: "You are secure under a strong ruler, but vulnerable to their whims.",
+        bonusObjectiveLeader: "Survive an attempt to overthrow the throne",
+        bonusObjectiveCitizen: "Coordinate a secret resistance movement without being discovered by the crown.",
         image: "/assets/images/freePlay/englandCircle.webp"
     },
     {
@@ -55,6 +63,8 @@ export const FREE_PLAY_SYSTEMS: FreePlaySystem[] = [
         intro: "Sacred; politics, morality, and faith are inseparable.",
         leaderExperience: "You have Immense legitimacy, provided you uphold sacred doctrine.",
         citizenExperience: "Your Life feels meaningful and structured, but dissent is dangerous.",
+        bonusObjectiveLeader: "Successfully declare a controversial figure a \"Saint\" to unify the faithful.",
+        bonusObjectiveCitizen: "Successfully leak a \"Forbidden Document\" to the outside world.",
         image: "/assets/images/freePlay/vaticanCircle.webp"
     },
     {
@@ -66,6 +76,8 @@ export const FREE_PLAY_SYSTEMS: FreePlaySystem[] = [
         intro: "Vast and orderly; governed by paperwork and examinations.",
         leaderExperience: "You are supreme in theory, but constrained by systems that resist change.",
         citizenExperience: "You are distant from power, yet protected by a predictable system.",
+        bonusObjectiveLeader: "Root out a \"shadow government\" of corrupt officials without collapsing the system.",
+        bonusObjectiveCitizen: "Get your personal written grievance physically into the hands of the Emperor.",
         image: "/assets/images/freePlay/chinaCircle.webp"
     },
     {
@@ -77,6 +89,8 @@ export const FREE_PLAY_SYSTEMS: FreePlaySystem[] = [
         intro: "Clean and efficient; decisions are optimized rather than debated.",
         leaderExperience: "You are a supervisor of systems with little room for personal vision.",
         citizenExperience: "You are materially satisfied but alienated from the decision-making logic.",
+        bonusObjectiveLeader: "Stop a radical group from taking manual control of the colony's Life Support AI.",
+        bonusObjectiveCitizen: "Successfully live \"off the grid\" by tricking the AI into thinking you no longer exist",
         image: "/assets/images/freePlay/marsCircle.webp"
     }
 ];

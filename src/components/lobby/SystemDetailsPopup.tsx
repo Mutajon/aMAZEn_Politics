@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Shield, Info } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Shield, Info, Target } from 'lucide-react';
 import type { FreePlaySystem } from '../../data/freePlaySystems';
 import { audioManager } from '../../lib/audioManager';
 
@@ -25,7 +25,9 @@ const AVATARS = [
 const SystemDetailsPopup: React.FC<SystemDetailsPopupProps> = ({ system, onClose, onContinue }) => {
     const [characterName, setCharacterName] = useState("");
     const [avatarIndex, setAvatarIndex] = useState(0);
-    const [role, setRole] = useState<'Leader' | 'Commoner'>('Leader');
+    const [role, setRole] = useState<'Leader' | 'Commoner'>(() =>
+        system.governanceSystem === "Direct Democracy" ? 'Commoner' : 'Leader'
+    );
 
     const nextAvatar = () => {
         audioManager.playSfx("click-soft");
@@ -156,15 +158,17 @@ const SystemDetailsPopup: React.FC<SystemDetailsPopupProps> = ({ system, onClose
                                 Your Status in Society
                             </label>
                             <div className="flex gap-3">
-                                <button
-                                    onClick={() => handleRoleSelect('Leader')}
-                                    className={`flex-1 py-4 rounded-2xl font-bold uppercase tracking-widest text-[10px] transition-all border ${role === 'Leader'
-                                        ? 'bg-amber-500 border-amber-400 text-black shadow-lg shadow-amber-500/20'
-                                        : 'bg-white/5 border-white/10 text-white/40 hover:border-white/20'
-                                        }`}
-                                >
-                                    Leader
-                                </button>
+                                {system.governanceSystem !== "Direct Democracy" && (
+                                    <button
+                                        onClick={() => handleRoleSelect('Leader')}
+                                        className={`flex-1 py-4 rounded-2xl font-bold uppercase tracking-widest text-[10px] transition-all border ${role === 'Leader'
+                                            ? 'bg-amber-500 border-amber-400 text-black shadow-lg shadow-amber-500/20'
+                                            : 'bg-white/5 border-white/10 text-white/40 hover:border-white/20'
+                                            }`}
+                                    >
+                                        Leader
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => handleRoleSelect('Commoner')}
                                     className={`flex-1 py-4 rounded-2xl font-bold uppercase tracking-widest text-[10px] transition-all border ${role === 'Commoner'
@@ -191,6 +195,29 @@ const SystemDetailsPopup: React.FC<SystemDetailsPopupProps> = ({ system, onClose
                                     {role === 'Leader' ? system.leaderExperience : system.citizenExperience}
                                 </p>
                             </motion.div>
+
+                            {/* Bonus Objective Blurb */}
+                            {(role === 'Leader' ? system.bonusObjectiveLeader : system.bonusObjectiveCitizen) !== 'NA' && (
+                                <motion.div
+                                    key={`obj-${role}`}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className={`rounded-2xl p-5 border flex gap-4 transition-colors duration-300 ${role === 'Leader'
+                                        ? 'bg-amber-500/5 border-amber-500/10'
+                                        : 'bg-purple-600/5 border-purple-600/10'
+                                        }`}
+                                >
+                                    <Target className={`w-5 h-5 shrink-0 mt-0.5 transition-colors ${role === 'Leader' ? 'text-amber-500/40' : 'text-purple-500/40'}`} />
+                                    <div className="flex flex-col gap-1">
+                                        <span className={`text-[10px] uppercase tracking-widest font-black ${role === 'Leader' ? 'text-amber-500/50' : 'text-purple-500/50'}`}>
+                                            Secret Objective
+                                        </span>
+                                        <p className={`text-xs leading-relaxed transition-colors ${role === 'Leader' ? 'text-amber-100/70' : 'text-purple-100/70'}`}>
+                                            {role === 'Leader' ? system.bonusObjectiveLeader : system.bonusObjectiveCitizen}
+                                        </p>
+                                    </div>
+                                </motion.div>
+                            )}
                         </div>
                     </div>
 
