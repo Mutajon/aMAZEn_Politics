@@ -9,6 +9,7 @@ import { MirrorReflection } from "./MirrorWithReflection";
 import { useSettingsStore } from "../store/settingsStore";
 import { useNarrator } from "../hooks/useNarrator";
 import SystemSelection from "./lobby/SystemSelection";
+import { useLogger } from "../hooks/useLogger";
 import SystemDetailsPopup from "./lobby/SystemDetailsPopup";
 import GameSettingsPopup from "./lobby/GameSettingsPopup";
 import type { FreePlaySystem } from "../data/freePlaySystems";
@@ -91,6 +92,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     const { language } = useLanguage();
     const isRTL = language === 'he';
     const debugMode = useSettingsStore(s => s.debugMode);
+    const logger = useLogger();
     const { aiModelOverride, setAiModelOverride } = useDilemmaStore();
     const narrator = useNarrator();
 
@@ -151,6 +153,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
 
     const handleSystemSelect = (system: FreePlaySystem) => {
         audioManager.playSfx("click-soft");
+        logger.log('freeplay_system_selected', { system: system.governanceSystem, scenario: system.scenario }, 'User selected a political system');
         setSelectedSystem(system);
     };
 
@@ -160,7 +163,8 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         audioManager.playSfx("click-soft");
         setCharacterName(data.characterName);
         const isLeader = data.role === 'leader';
-        setRole(isLeader ? selectedSystem.governanceSystem : 'Citizen');
+        logger.log('freeplay_details_confirmed', { characterName: data.characterName, role: data.role, avatar: data.avatar }, 'User confirmed character details');
+        setRole(isLeader ? 'Leader' : 'Commoner');
         setRoleCategory(isLeader ? 'leader' : 'commoner');
         setSetting(selectedSystem.scenario);
         setSelectedAvatar(data.avatar);
@@ -187,6 +191,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         useBonusObjective: boolean
     }) => {
         audioManager.playSfx("click-soft");
+        logger.log('freeplay_spice_confirmed', settings, 'User confirmed spice settings');
         setDifficulty(settings.difficulty as any);
         setTone(settings.tone === 'comedy' ? 'satirical' : 'serious');
         setUseBonusObjective(settings.useBonusObjective);
@@ -196,7 +201,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         setEmphasis(finalEmphasis || selectedSystem?.intro || "");
 
         // Finally trigger generation
-        generateIntroFromSettings(selectedSystem?.scenario || setting, selectedSystem?.governanceSystem || role);
+        generateIntroFromSettings(setting, role);
     };
 
     const generateIntroWithRetry = async (selectedSetting: string, selectedRole: string, attempts = 3) => {
@@ -206,7 +211,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                 // Determine persistent fields
                 const systemName = selectedSystem?.governanceSystem || "Custom System";
                 const year = selectedSystem?.year || "Present Day";
-                const roleExperience = role === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
+                const roleExperience = roleCategory === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
 
                 // Final emphasis (either user choice or bonus objective)
                 const finalEmphasis = useBonusObjective ? bonusObjective : (emphasis || selectedSystem?.intro || "A new era begins.");
@@ -255,7 +260,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
             // Fallback: Proceed without custom intro if all retries fail
             const systemName = selectedSystem?.governanceSystem || "Custom System";
             const year = selectedSystem?.year || "Present Day";
-            const roleExperience = role === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
+            const roleExperience = roleCategory === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
             const finalEmphasis = useBonusObjective ? bonusObjective : (emphasis || selectedSystem?.intro || "A new era begins.");
 
             onSubmit({
@@ -308,7 +313,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                     // Fallback if failed - just start game
                     const systemName = selectedSystem?.governanceSystem || "Custom System";
                     const year = selectedSystem?.year || "Present Day";
-                    const roleExperience = role === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
+                    const roleExperience = roleCategory === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
                     const finalEmphasis = useBonusObjective ? bonusObjective : (emphasis || selectedSystem?.intro || "A new era begins.");
 
                     onSubmit({
@@ -330,7 +335,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                 console.error("Failed to generate intro:", err);
                 const systemName = selectedSystem?.governanceSystem || "Custom System";
                 const year = selectedSystem?.year || "Present Day";
-                const roleExperience = role === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
+                const roleExperience = roleCategory === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
                 const finalEmphasis = useBonusObjective ? bonusObjective : (emphasis || selectedSystem?.intro || "A new era begins.");
 
                 onSubmit({
@@ -357,13 +362,13 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
 
             const systemName = selectedSystem?.governanceSystem || "Custom System";
             const year = selectedSystem?.year || "Present Day";
-            const roleExperience = role === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
+            const roleExperience = roleCategory === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
             const finalEmphasis = useBonusObjective ? bonusObjective : (emphasis || selectedSystem?.intro || "A new era begins.");
 
             onSubmit({
                 characterName,
                 setting: selectedSystem?.scenario || setting,
-                role: selectedSystem?.governanceSystem || role,
+                role: role,
                 emphasis: finalEmphasis,
                 gender,
                 difficulty,
@@ -419,24 +424,39 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
 
         // Random Difficulty
         const difficulties = ['easy', 'normal', 'hard'];
-        setDifficulty(difficulties[Math.floor(Math.random() * difficulties.length)]);
+        const randomDifficulty = difficulties[Math.floor(Math.random() * difficulties.length)];
+        setDifficulty(randomDifficulty as any);
 
         // Random Tone
         const tones: Array<"serious" | "satirical"> = ['serious', 'satirical'];
-        setTone(tones[Math.floor(Math.random() * tones.length)]);
+        const randomTone = tones[Math.floor(Math.random() * tones.length)];
+        setTone(randomTone);
 
         // Random Setting
         const randomSetting = SETTING_PRESETS[Math.floor(Math.random() * SETTING_PRESETS.length)];
-        setSetting(lang(randomSetting.key));
+        const settingName = lang(randomSetting.key);
+        setSetting(settingName);
 
         // Random Role
         const randomRoleKey = ROLE_PRESETS[Math.floor(Math.random() * ROLE_PRESETS.length)];
-        setRole(lang(randomRoleKey));
+        const roleName = lang(randomRoleKey);
+        setRole(roleName);
         setRoleCategory(randomRoleKey === "LOBBY_ROLE_LEADER" ? "leader" : "commoner");
 
         // Random Name
         const randomNameKey = NAME_PRESETS[Math.floor(Math.random() * NAME_PRESETS.length)];
-        setCharacterName(lang(randomNameKey));
+        const name = lang(randomNameKey);
+        setCharacterName(name);
+
+        logger.log('freeplay_randomized', {
+            gender: newGender,
+            avatar: randomAvatar,
+            difficulty: randomDifficulty,
+            tone: randomTone,
+            setting: settingName,
+            role: roleName,
+            characterName: name
+        }, 'User clicked randomize in Free Play setup');
     };
 
     return (

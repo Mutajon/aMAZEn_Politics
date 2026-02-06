@@ -956,7 +956,7 @@ export async function freePlayTurn(req, res) {
             const languageCode = String(conversation.meta.language || "en").toLowerCase();
             const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
             const contextTone = conversation.meta.tone || "serious";
-            const userPrompt = buildFreePlayUserPrompt(day, playerChoice, lastTopic, consecutiveDays, conversation.meta.emphasis, contextTone, languageCode, languageName);
+            const userPrompt = buildFreePlayUserPrompt(day, playerChoice, lastTopic, consecutiveDays, conversation.meta.emphasis, contextTone, languageCode, languageName, conversation.meta.messenger);
 
             const systemPrompt = buildFreePlaySystemPrompt({
                 role: conversation.meta.role,
@@ -1254,15 +1254,13 @@ STRICT RULES:
 - "התוצאות תלויות בכם." (The results depend on you.)
 
 ❌ INCORRECT EXAMPLES:
-- "אתה עומד..." (Singular - DO NOT USE)
-- "את עומדת..." (Singular - DO NOT USE)
-` : (languageCode !== 'en' ? `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.` : '')}
+` : `\n\nWrite your response in ${languageName}. Use proper grammar and natural phrasing appropriate for ${languageName} speakers.`}
 
 CONTENT
 Generate an in-world epilogue for the leader based on their decisions, outcomes, supports, and values.
 Follow this structure:
 
-Intro (Reign Summary): Write a short, evocative paragraph (3-4 sentences) summarizing the "new state" the player lead the entity to during their reign. Focus on what we learned about the core tensions of the role, the specific values the player demonstrated through their choices, and the reality they helped shape. Avoid generic praise; be analytical and narrative. Address the player as "You" (or "אתם" in Hebrew).
+Intro (Reign Summary): Write an evocative, reflective paragraph (Exactly 3-4 sentences). The FIRST paragraph of the summary MUST focus on how Liberalism, Autonomy, and Democracy (or their opposites) manifested in your reign. Analyze the player's choices and legacy through these specific philosophical axes. Explain what kind of society they built based on these values. Avoid generic praise; be analytical and narrative. Address the player as "You" (or "אתם" in Hebrew).
 
 Death Details: A single, vivid sentence describing how and when the player passed away. Vary the time span realistically (could be months, years, or decades after the 7 days)—based on the role, era, and events.
 
@@ -1401,7 +1399,7 @@ ${compassSummary || "None"}
 DECISION HISTORY:
 ${historySummary || "No decisions recorded"}${conversationContext}
 
-Generate the aftermath epilogue following the structure above. Return STRICT JSON ONLY.${languageCode !== 'en' ? `\n\nWrite your response in ${languageName}.` : ''}`;
+Generate the aftermath epilogue following the structure above. Return STRICT JSON ONLY. Write your response in ${languageName}.`;
 
         // Call AI with Gemini model
         // Add retry logic for JSON parsing (similar to gameTurnV2)

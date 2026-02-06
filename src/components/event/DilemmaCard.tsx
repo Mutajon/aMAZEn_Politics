@@ -84,7 +84,7 @@ export default function DilemmaCard({ title, description, variant = 'default', o
           {isBubble ? (
             <TypewriterText
               text={description}
-              speed={20}
+              speed={10}
               onComplete={onTypewriterComplete}
             />
           ) : (

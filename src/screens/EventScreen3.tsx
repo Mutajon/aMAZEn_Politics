@@ -37,7 +37,6 @@ import { useCoinFlights, CoinFlightOverlay } from "../components/event/CoinFligh
 import { AnimatePresence } from "framer-motion";
 import { bgStyleWithRoleImage } from "../lib/ui";
 import { calculateLiveScoreBreakdown } from "../lib/scoring";
-import { Building2, Heart, Users } from "lucide-react";
 import type { CompassEffectPing } from "../components/MiniCompass";
 import { loadEventScreenSnapshot, clearEventScreenSnapshot } from "../lib/eventScreenSnapshot";
 import { useLang } from "../i18n/lang";
@@ -1007,17 +1006,7 @@ export default function EventScreen3({ push }: Props) {
     const isGameEnd = collectedData.dilemma.isGameEnd === true;
 
     // Build support items with deltas and previous values for animation
-    const rawSupportItems = buildSupportItems(presentationStep, collectedData, previousSupportRef.current);
-
-    // Add icons to support items
-    const supportItems = rawSupportItems.map(item => ({
-      ...item,
-      icon: item.id === 'people'
-        ? <Users className="w-4 h-4" />
-        : item.id === 'middle'
-          ? <Building2 className="w-4 h-4" />
-          : <Heart className="w-4 h-4" />
-    }));
+    const supportItems = buildSupportItems(presentationStep, collectedData, previousSupportRef.current);
 
     // Build action cards
     const actionsForDeck: ActionCard[] = collectedData.dilemma

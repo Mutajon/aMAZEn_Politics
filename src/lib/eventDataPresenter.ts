@@ -288,7 +288,7 @@ export function buildSupportItems(
     },
     {
       id: "mom",
-      name: lang("MOM"),
+      name: (isFreePlay && analysis?.momName) ? analysis.momName : lang("MOM"),
       percent: momAlive ? supportMom : 0, // Force 0 if dead
       initialPercent: initialValues?.mom, // Animation starts from this value
       delta: momAlive ? momEffect.delta : null, // No delta if dead

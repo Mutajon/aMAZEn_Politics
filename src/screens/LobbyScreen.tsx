@@ -22,7 +22,7 @@ import LobbyPlayPopup from "../components/LobbyPlayPopup";
 
 // localStorage key for tracking lobby games played
 const LOBBY_GAMES_PLAYED_KEY = 'lobby-games-played';
-const MAX_LOBBY_GAMES = 3;
+const MAX_LOBBY_GAMES = 2;
 
 /**
  * Get the number of games played from lobby mode
@@ -192,6 +192,22 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       // Start new logging session
       await loggingService.startSession();
 
+      // Log Free Play setup parameters
+      logger.logSystem('freeplay_setup_complete', {
+        characterName: data.characterName,
+        setting: data.setting,
+        role: data.role,
+        emphasis: data.emphasis,
+        gender: data.gender,
+        difficulty: data.difficulty,
+        tone: data.tone,
+        systemName: data.systemName,
+        year: data.year,
+        roleExperience: data.roleExperience,
+        bonusObjective: data.bonusObjective,
+        messenger: data.messenger,
+      }, 'Free Play session initialized with custom parameters');
+
       // --- Custom Scenario Setup ---
       const roleStore = useRoleStore.getState();
 
@@ -213,9 +229,9 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       roleStore.setRoleDescription(data.role);
 
       // Determine Target Score (Difficulty)
-      let targetScore = 225; // Normal
-      if (data.difficulty === 'easy') targetScore = 200;
-      if (data.difficulty === 'hard') targetScore = 250;
+      let targetScore = 190; // Normal
+      if (data.difficulty === 'easy') targetScore = 170;
+      if (data.difficulty === 'hard') targetScore = 220;
 
       // Determine Support Entities (Dynamic)
       const population = data.supportEntities?.find(e => e.type === 'population') || { name: "The People", icon: "👥" };
@@ -242,6 +258,7 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
         roleScope: data.roleExperience || `As ${data.role} in ${data.setting}, you must navigate the complex political landscape to ensure your faction's survival and goals.`,
         authorityLevel: "medium",
         momIcon: momEntity.icon,
+        momName: momEntity.name,
         bonusObjective: data.bonusObjective,
         messenger: data.messenger,
         tone: data.tone

@@ -188,7 +188,7 @@ const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart,
                                         audioManager.playSfx("click-soft");
                                         setUseBonusObjective(!useBonusObjective);
                                     }}
-                                    className={`group flex items-center gap-4 p-4 rounded-2xl border transition-all h-24 text-left ${useBonusObjective
+                                    className={`group flex items-center gap-4 p-4 rounded-2xl border transition-all min-h-[6rem] text-left ${useBonusObjective
                                         ? 'bg-purple-600/20 border-purple-500/50'
                                         : 'bg-white/5 border-white/10 hover:border-white/20'
                                         }`}
@@ -200,7 +200,7 @@ const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart,
                                         <span className={`block text-[8px] uppercase tracking-widest font-black mb-1 ${useBonusObjective ? 'text-purple-400' : 'text-white/20'}`}>
                                             Enabled
                                         </span>
-                                        <p className={`text-[10px] leading-snug line-clamp-2 ${useBonusObjective ? 'text-white/90' : 'text-white/40'}`}>
+                                        <p className={`text-[10px] leading-snug ${useBonusObjective ? 'text-white/90' : 'text-white/40'}`}>
                                             {bonusObjective || "N/A for this path"}
                                         </p>
                                     </div>
