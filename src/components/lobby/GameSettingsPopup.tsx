@@ -45,6 +45,9 @@ const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart,
 
     const handleSelectTone = (selectedTone: 'drama' | 'comedy') => {
         audioManager.playSfx("click-soft");
+        if (selectedTone === 'comedy') {
+            audioManager.playSfx("laugh-cartoon" as any);
+        }
         setTone(selectedTone);
     };
 
@@ -122,17 +125,16 @@ const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart,
                             {/* Drama Card */}
                             <button
                                 onClick={() => handleSelectTone('drama')}
-                                className={`group relative aspect-square rounded-full overflow-hidden border transition-all duration-500 ${tone === 'drama'
-                                    ? 'border-amber-500/50 ring-4 ring-amber-500/20 scale-[1.02]'
-                                    : 'border-white/10 opacity-40 grayscale blur-[1px] hover:opacity-60 hover:grayscale-0 hover:blur-0'
+                                className={`group relative aspect-square transition-all duration-500 ${tone === 'drama'
+                                    ? 'scale-[1.05]'
+                                    : 'opacity-30 grayscale blur-[1px] hover:opacity-60 hover:grayscale-0 hover:blur-0'
                                     }`}
                             >
-                                <img src="/assets/images/freePlay/drama.webp" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Drama" />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                                <img src="/assets/images/freePlay/drama.webp" className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110" alt="Drama" />
                                 <div className="absolute inset-0 flex items-center justify-center">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-white text-center px-4">Political Drama</span>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-white text-center px-4 shadow-black drop-shadow-md">Political Drama</span>
                                 </div>
-                                {tone === 'drama' && <div className="absolute top-1/4 right-1/4"><Sparkles className="w-4 h-4 text-amber-500" /></div>}
+                                {tone === 'drama' && <div className="absolute top-1/4 right-1/4"><Sparkles className="w-4 h-4 text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]" /></div>}
                             </button>
 
                             {/* Comedy Card */}
@@ -140,17 +142,16 @@ const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart,
                                 onClick={() => handleSelectTone('comedy')}
                                 animate={{ rotate: isComedyFlipped ? 180 : 0 }}
                                 transition={{ type: "spring", damping: 15, stiffness: 100 }}
-                                className={`group relative aspect-square rounded-full overflow-hidden border transition-all duration-500 ${tone === 'comedy'
-                                    ? 'border-purple-500/50 ring-4 ring-purple-500/20 scale-[1.02]'
-                                    : 'border-white/10 opacity-40 grayscale blur-[1px] hover:opacity-60 hover:grayscale-0 hover:blur-0'
+                                className={`group relative aspect-square transition-all duration-500 ${tone === 'comedy'
+                                    ? 'scale-[1.05]'
+                                    : 'opacity-30 grayscale blur-[1px] hover:opacity-60 hover:grayscale-0 hover:blur-0'
                                     }`}
                             >
-                                <img src="/assets/images/freePlay/comedy.webp" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Comedy" />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                                <img src="/assets/images/freePlay/comedy.webp" className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-110" alt="Comedy" />
                                 <div className="absolute inset-0 flex items-center justify-center">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-white text-center px-4">Political Comedy</span>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-white text-center px-4 shadow-black drop-shadow-md">Political Comedy</span>
                                 </div>
-                                {tone === 'comedy' && <div className="absolute top-1/4 right-1/4"><Zap className="w-4 h-4 text-purple-400" /></div>}
+                                {tone === 'comedy' && <div className="absolute top-1/4 right-1/4"><Zap className="w-4 h-4 text-purple-400 drop-shadow-[0_0_8px_rgba(192,132,252,0.5)]" /></div>}
                             </motion.button>
                         </div>
                     </div>
@@ -223,7 +224,7 @@ const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart,
                 {/* Top Back Arrow */}
                 <button
                     onClick={onClose}
-                    className="absolute top-8 left-8 p-2 rounded-full bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all shadow-lg"
+                    className="absolute top-6 left-6 p-2 rounded-full bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all shadow-lg z-50"
                     title="Go Back"
                 >
                     <ArrowLeft className="w-4 h-4" />

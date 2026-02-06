@@ -67,10 +67,18 @@ const SystemDetailsPopup: React.FC<SystemDetailsPopupProps> = ({ system, onClose
 
                 {/* Left Side: Background Preview */}
                 <div className="w-full md:w-2/5 relative h-48 md:h-auto overflow-hidden">
-                    <img
+                    <motion.img
                         src={bkgImage}
                         alt={system.scenario}
-                        className="w-full h-full object-cover opacity-60 scale-105"
+                        className="w-full h-full object-cover opacity-60"
+                        animate={{
+                            scale: [1.05, 1.15, 1.05],
+                        }}
+                        transition={{
+                            duration: 20,
+                            repeat: Infinity,
+                            ease: "easeInOut"
+                        }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-[#0f1115] via-transparent to-transparent md:to-transparent" />
 

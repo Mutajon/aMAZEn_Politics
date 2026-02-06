@@ -24,7 +24,6 @@ const SystemSelection: React.FC<SystemSelectionProps> = ({ onSelect, onSuggestOw
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
                         whileHover={disabled ? {} : {
-                            scale: 1.05,
                             boxShadow: "0 0 30px rgba(251, 191, 36, 0.2)",
                             zIndex: 20
                         }}
@@ -39,11 +38,11 @@ const SystemSelection: React.FC<SystemSelectionProps> = ({ onSelect, onSuggestOw
                         <div className={`relative flex items-center gap-5 bg-gradient-to-br from-[#0c1a33] to-[#050c1a] p-4 sm:p-5 rounded-[23px] h-full w-full backdrop-blur-xl transition-all duration-300 ${disabled ? '' : 'group-hover:bg-gradient-to-br group-hover:from-[#11254a] group-hover:to-[#0a1833]'}`}>
 
                             {/* Circle Image */}
-                            <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-amber-400/20 group-hover:border-amber-400/60 transition-colors shadow-2xl shrink-0">
+                            <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-amber-400/20 group-hover:border-amber-400/60 transition-all duration-500 shadow-2xl shrink-0 group-hover:scale-110">
                                 <img
                                     src={system.image}
                                     alt={system.governanceSystem}
-                                    className="w-full h-full object-cover scale-110 grayscale-[0.3] group-hover:grayscale-0 transition-all duration-500"
+                                    className="w-full h-full object-cover grayscale-[0.3] group-hover:grayscale-0 transition-all duration-500 scale-110"
                                     onError={() => {
                                         console.error("Image failed to load:", system.image);
                                     }}
