@@ -718,12 +718,23 @@ export async function gameTurnV2(req, res) {
  */
 export async function freePlayIntro(req, res) {
     try {
-        const { role, setting, playerName, emphasis, gender, tone = "serious", model: modelOverride = null } = req.body;
+        const {
+            role,
+            setting,
+            playerName,
+            emphasis,
+            gender,
+            tone = "serious",
+            model: modelOverride = null,
+            systemName,
+            year,
+            roleExperience
+        } = req.body;
 
         console.log(`[FREE-PLAY-INTRO] Generating intro for ${playerName} (${role}, gender: ${gender}, tone: ${tone}, model: ${modelOverride || 'default'})...`);
         console.log(`[FREE-PLAY-INTRO] 🎭 Selected Tone: ${tone}`);
 
-        const systemPrompt = buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender, tone);
+        const systemPrompt = buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender, tone, systemName, year, roleExperience);
         // Using "intro" as a dummy user prompt to trigger generation
         const messages = [
             { role: "system", content: systemPrompt },
@@ -767,7 +778,11 @@ export async function freePlayTurn(req, res) {
             playerChoice, // Day 2+ only
             language = 'en',
             model: modelOverride = null, // LAB MODE OVERRIDE
-            supportEntities // For Day 1 initialization
+            supportEntities, // For Day 1 initialization
+            bonusObjective,
+            systemName,
+            year,
+            roleExperience
         } = req.body;
 
         console.log(`[FREE-PLAY] 📥 Body data: day=${day}, tone=${req.body.tone}, model=${req.body.model}, gameId=${gameId}`);
@@ -784,7 +799,7 @@ export async function freePlayTurn(req, res) {
             console.log(`[FREE-PLAY] Day 1 Body Tone check: "${req.body.tone}"`);
 
             // Build System Prompt
-            const context = { role, setting, playerName, emphasis, gender, tone, language, supportEntities };
+            const context = { role, setting, playerName, emphasis, gender, tone, language, supportEntities, bonusObjective, systemName, year, roleExperience };
             const systemPrompt = buildFreePlaySystemPrompt(context);
             const languageCode = String(language || "en").toLowerCase();
             const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
@@ -870,6 +885,11 @@ export async function freePlayTurn(req, res) {
                 philosophicalAxes: {
                     democracy: 0, oligarchy: 0, autonomy: 0, heteronomy: 0, liberalism: 0, totalism: 0
                 },
+                bonusObjective: bonusObjective || parsed.bonusObjective || "",
+                objectiveStatus: "incomplete",
+                systemName: systemName || parsed.systemName || "",
+                year: year || parsed.year || "",
+                roleExperience: roleExperience || parsed.roleExperience || "",
                 topicHistory: [
                     {
                         day: 1,
@@ -902,7 +922,8 @@ export async function freePlayTurn(req, res) {
                 axisPills: [],
                 philosophicalAxes: updatedAxes,
                 axisUsed: parsed.dilemma?.axisUsed || parsed.dilemma?.axis || "Unknown",
-                scopeUsed: parsed.dilemma?.scopeUsed || parsed.dilemma?.scope || "Unknown"
+                scopeUsed: parsed.dilemma?.scopeUsed || parsed.dilemma?.scope || "Unknown",
+                objectiveStatus: "incomplete"
             });
         }
 
@@ -942,7 +963,12 @@ export async function freePlayTurn(req, res) {
                 language: conversation.meta.language,
                 gender: conversation.meta.gender,
                 tone: contextTone,
-                supportEntities: conversation.meta.supportEntities
+                supportEntities: conversation.meta.supportEntities,
+                bonusObjective: conversation.meta.bonusObjective,
+                objectiveStatus: conversation.meta.objectiveStatus || "incomplete",
+                systemName: conversation.meta.systemName,
+                year: conversation.meta.year,
+                roleExperience: conversation.meta.roleExperience
             });
 
             const messages = [
@@ -998,6 +1024,7 @@ export async function freePlayTurn(req, res) {
                 messages: [...conversation.meta.messages, ...newMessages],
                 support: updatedSupport,
                 philosophicalAxes: updatedAxes,
+                objectiveStatus: parsed.objectiveStatus || conversation.meta.objectiveStatus || "incomplete",
                 topicHistory: [
                     ...history,
                     {
@@ -1038,7 +1065,8 @@ export async function freePlayTurn(req, res) {
                 philosophicalAxes: updatedAxes,
                 isGameEnd: day >= 8,
                 axisUsed: parsed.dilemma?.axisUsed || parsed.dilemma?.axis || "Unknown",
-                scopeUsed: parsed.dilemma?.scopeUsed || parsed.dilemma?.scope || "Unknown"
+                scopeUsed: parsed.dilemma?.scopeUsed || parsed.dilemma?.scope || "Unknown",
+                objectiveStatus: parsed.objectiveStatus || conversation.meta.objectiveStatus || "incomplete"
             });
         }
 

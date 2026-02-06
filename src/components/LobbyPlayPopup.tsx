@@ -31,11 +31,15 @@ interface LobbyPlayPopupProps {
         role: string;
         emphasis: string;
         gender: string;
-        difficulty: string; // NEW: Difficulty level
-        tone: "serious" | "satirical"; // NEW: Tone selection
+        difficulty: string;
+        tone: "serious" | "satirical";
         avatar: string | null;
         introText?: string;
         supportEntities?: Array<{ name: string; icon: string; type: string }>;
+        systemName: string;
+        year: string;
+        roleExperience?: string;
+        bonusObjective?: string;
     }) => void;
     isLoading?: boolean;
 }
@@ -110,6 +114,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     const [introData, setIntroData] = useState<{ intro: string, mirrorMsg: string, supportEntities?: any[] } | null>(null);
     const [isGeneratingIntro, setIsGeneratingIntro] = useState(false);
     const [selectedSystem, setSelectedSystem] = useState<FreePlaySystem | null>(null);
+    const [useBonusObjective, setUseBonusObjective] = useState(false);
 
     const [showNamePresets, setShowNamePresets] = useState(false);
     const [showSettingPresets, setShowSettingPresets] = useState(false);
@@ -192,6 +197,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         audioManager.playSfx("click-soft");
         setDifficulty(settings.difficulty as any);
         setTone(settings.tone === 'comedy' ? 'satirical' : 'serious');
+        setUseBonusObjective(settings.useBonusObjective);
 
         // If bonus objective is enabled, use it as the emphasis
         const finalEmphasis = settings.useBonusObjective ? bonusObjective : settings.emphasis;
@@ -201,33 +207,78 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         generateIntroFromSettings(selectedSystem?.scenario || setting, selectedSystem?.governanceSystem || role);
     };
 
+    const generateIntroWithRetry = async (selectedSetting: string, selectedRole: string, attempts = 3) => {
+        let lastError: any;
+        for (let i = 0; i < attempts; i++) {
+            try {
+                // Determine persistent fields
+                const systemName = selectedSystem?.governanceSystem || "Custom System";
+                const year = selectedSystem?.year || "Present Day";
+                const roleExperience = role === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
+
+                // Final emphasis (either user choice or bonus objective)
+                const finalEmphasis = useBonusObjective ? bonusObjective : (emphasis || selectedSystem?.intro || "A new era begins.");
+
+                const res = await fetch("/api/free-play/intro", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        role: selectedRole,
+                        setting: selectedSetting,
+                        playerName: characterName || "Leader",
+                        emphasis: finalEmphasis,
+                        gender,
+                        difficulty,
+                        tone,
+                        systemName,
+                        year,
+                        roleExperience,
+                        model: useDilemmaStore.getState().aiModelOverride
+                    })
+                });
+
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                const data = await res.json();
+                if (data.intro) return data;
+                throw new Error("Missing intro in response");
+            } catch (err) {
+                console.warn(`Attempt ${i + 1} failed:`, err);
+                lastError = err;
+                // Wait a bit before retry (exponential backoff)
+                if (i < attempts - 1) await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+            }
+        }
+        throw lastError;
+    };
+
     const generateIntroFromSettings = async (selectedSetting: string, selectedRole: string) => {
         setIsGeneratingIntro(true);
-        setStep('intro'); // Move to intro screen (loading state)
+        setStep('intro');
         try {
-            const res = await fetch("/api/free-play/intro", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    role: selectedRole,
-                    setting: selectedSetting,
-                    playerName: characterName || "Leader",
-                    emphasis: emphasis || "A new era begins.",
-                    gender,
-                    difficulty,
-                    tone,
-                    model: useDilemmaStore.getState().aiModelOverride
-                })
-            });
-            const data = await res.json();
-            if (data.intro) {
-                setIntroData(data);
-            } else {
-                onSubmit({ characterName, setting: selectedSetting, role: selectedRole, emphasis, gender, difficulty, tone, avatar: selectedAvatar });
-            }
+            const data = await generateIntroWithRetry(selectedSetting, selectedRole);
+            setIntroData(data);
         } catch (err) {
-            console.error("Failed to generate intro:", err);
-            onSubmit({ characterName, setting: selectedSetting, role: selectedRole, emphasis, gender, difficulty, tone, avatar: selectedAvatar });
+            console.error("All attempts to generate intro failed:", err);
+            // Fallback: Proceed without custom intro if all retries fail
+            const systemName = selectedSystem?.governanceSystem || "Custom System";
+            const year = selectedSystem?.year || "Present Day";
+            const roleExperience = role === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
+            const finalEmphasis = useBonusObjective ? bonusObjective : (emphasis || selectedSystem?.intro || "A new era begins.");
+
+            onSubmit({
+                characterName,
+                setting: selectedSetting,
+                role: selectedRole,
+                emphasis: finalEmphasis,
+                gender,
+                difficulty,
+                tone,
+                avatar: selectedAvatar,
+                systemName,
+                year,
+                roleExperience,
+                bonusObjective: useBonusObjective ? bonusObjective : undefined
+            });
         } finally {
             setIsGeneratingIntro(false);
         }
@@ -262,28 +313,74 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                     setStep('intro');
                 } else {
                     // Fallback if failed - just start game
-                    onSubmit({ characterName, setting, role, emphasis, gender, difficulty, tone, avatar: selectedAvatar });
+                    const systemName = selectedSystem?.governanceSystem || "Custom System";
+                    const year = selectedSystem?.year || "Present Day";
+                    const roleExperience = role === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
+                    const finalEmphasis = useBonusObjective ? bonusObjective : (emphasis || selectedSystem?.intro || "A new era begins.");
+
+                    onSubmit({
+                        characterName,
+                        setting,
+                        role,
+                        emphasis: finalEmphasis,
+                        gender,
+                        difficulty,
+                        tone,
+                        avatar: selectedAvatar,
+                        systemName,
+                        year,
+                        roleExperience,
+                        bonusObjective: useBonusObjective ? bonusObjective : undefined
+                    });
                 }
             } catch (err) {
                 console.error("Failed to generate intro:", err);
-                onSubmit({ characterName, setting, role, emphasis, gender, difficulty, tone, avatar: selectedAvatar });
+                const systemName = selectedSystem?.governanceSystem || "Custom System";
+                const year = selectedSystem?.year || "Present Day";
+                const roleExperience = role === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
+                const finalEmphasis = useBonusObjective ? bonusObjective : (emphasis || selectedSystem?.intro || "A new era begins.");
+
+                onSubmit({
+                    characterName,
+                    setting,
+                    role,
+                    emphasis: finalEmphasis,
+                    gender,
+                    difficulty,
+                    tone,
+                    avatar: selectedAvatar,
+                    systemName,
+                    year,
+                    roleExperience,
+                    bonusObjective: useBonusObjective ? bonusObjective : undefined
+                });
             } finally {
                 setIsGeneratingIntro(false);
             }
         } else {
             // Step 2: Start Game
             audioManager.playSfx("click-soft");
+
+            const systemName = selectedSystem?.governanceSystem || "Custom System";
+            const year = selectedSystem?.year || "Present Day";
+            const roleExperience = role === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
+            const finalEmphasis = useBonusObjective ? bonusObjective : (emphasis || selectedSystem?.intro || "A new era begins.");
+
             onSubmit({
                 characterName,
-                setting,
-                role,
-                emphasis,
+                setting: selectedSystem?.scenario || setting,
+                role: selectedSystem?.governanceSystem || role,
+                emphasis: finalEmphasis,
                 gender,
                 difficulty,
                 tone,
                 avatar: selectedAvatar,
                 introText: introData?.intro,
-                supportEntities: introData?.supportEntities
+                supportEntities: introData?.supportEntities,
+                systemName,
+                year,
+                roleExperience,
+                bonusObjective: useBonusObjective ? bonusObjective : undefined
             });
         }
     };

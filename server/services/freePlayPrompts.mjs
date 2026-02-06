@@ -8,9 +8,12 @@
 // ----------------------------------------------------------------------------
 // 1. INTRO GENERATION
 // ----------------------------------------------------------------------------
-export function buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender, tone = "serious") {
+export function buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender, tone = "serious", systemName, year, roleExperience) {
   const roleLine = role || "Unknown Role";
   const settingLine = setting || "Unknown Setting";
+  const sysLine = systemName ? `SYSTEM: Ground the story in the "${systemName}" political framework.` : "";
+  const yearLine = year ? `ERA: The year is ${year}.` : "";
+  const expLine = roleExperience ? `ROLE FEEL: ${roleExperience}` : "";
   const emphasisLine = emphasis ? `EMPHASIS: Focus the atmosphere on "${emphasis}".` : "";
 
   // Gender instruction for grammar
@@ -28,13 +31,16 @@ CONTEXT:
 - Player Name: ${playerName || "Player"}
 - Role: ${roleLine}
 - Setting: ${settingLine}
+${sysLine}
+${yearLine}
+${expLine}
 ${emphasisLine}
 ${genderLine}
 
 INSTRUCTIONS:
 - Directly address the player as "you". 
 - Place them physically in the scene (sights, sounds).
-- Establish the weight of their specific position.
+- Establish the weight of their specific position based on the ROLE FEEL and ERA.
 - **Grounding**: Seamlessly integrate the provided EMPHASIS/OBJECTIVE into the narrative. It should feel like a core, grounded part of the situation, not a tagged-on instruction.
 - **Support Entities**: Identify exactly 3 key entities for this specific role:
   1. "Population": The general public/subjects relevant to the role (e.g., "The Peasantry", "Voters", "The Colony").
@@ -61,10 +67,19 @@ ${tone === 'satirical'
 }
 
 export function buildFreePlaySystemPrompt(context) {
-  const { role, setting, playerName, emphasis, language, gender, tone = "serious", supportEntities } = context;
+  const { role, setting, playerName, emphasis, language, gender, tone = "serious", supportEntities, bonusObjective, objectiveStatus } = context;
   const lang = language === 'he' ? "Hebrew (Natural/Spoken)" : "English";
   const genderGrammar = gender === 'female' ? 'FEMALE' : (gender === 'other' ? 'MALE PLURAL' : 'MALE');
   const entities = supportEntities ? supportEntities.map(e => `- ${e.name} (${e.type}): ${e.summary}`).join('\n') : "";
+
+  const objectiveSection = bonusObjective ? `
+BONUS OBJECTIVE: "${bonusObjective}" (Current Status: ${objectiveStatus || 'incomplete'})
+If the objective is "incomplete": 
+1. Raising tension: Start or evolve dilemmas that make achieving this objective difficult. 
+2. Real Opposition: Ground the resistance in the ${setting} setting and political system.
+3. Clever Progress: If the player chooses a clever or strategic action that aligns with the objective, acknowledge it and allow significant progress.
+4. Completion Check: If the player's last choice finally achieves the objective, you MUST set "objectiveStatus": "completed" in your JSON response and celebrate it in the narrative before moving to a new topic.
+` : "";
 
   return `STRICT: ALL GENERATED CONTENT (except JSON keys) MUST BE IN ${lang.toUpperCase()}.
 Translate any English context or instructions provided below into ${lang}.
@@ -72,6 +87,7 @@ Translate any English context or instructions provided below into ${lang}.
 MISSION:
 Game Master for ${playerName}. Role: ${role}, Setting: ${setting}. ${emphasis ? `Focus: ${emphasis}.` : ""}
 Deliver fast, dramatic dilemmas. Output ONLY JSON. Use ${genderGrammar} grammar.
+${objectiveSection}
 
 ENTITIES:
 ${entities}
@@ -90,14 +106,14 @@ ${tone === 'satirical'
 ${tone === 'satirical'
       ? "- Tone: Witty, biting, cynical, short sentences."
       : "- Tone: Dramatic, short sentences, direct address."}
-- **Narrative Evolution**: Explore the core "Emphasis" through different lenses (e.g., personal impact, institutional failure, public perception). Ground the choice of dilemmas in this theme so the story feels coherent and focused on the player's initial goals.
+- **Narrative Evolution**: Explore the core "Emphasis" through different lenses. Ground the choice of dilemmas in this theme.
 - Constraints: Dilemma max 2-3 sentences. Generate exactly 3 UNIQUE and distinct actions per dilemma.
 - Action Variety: Each action must lead in a different thematic or ideological direction.
-- Forbidden: DO NOT number the actions (no "(1)", "(2)", etc. in titles). DO NOT repeat the same option.
-- **Support Shift Logic**: Do NOT use pre-baked attitudes. Instead, perform a REALISTIC situational analysis: Given the player's Role, the Setting, and their last Decision, how would these specific entities (Population/Opposition/Personal Anchor) react?
-- **Support توضیحات (shortLine)**: Use natural, spoken, and fluent phrasing. Max 1 short sentence (10-12 words). No fluff.
+- Forbidden: DO NOT number the actions. DO NOT repeat the same option.
+- **Support Shift Logic**: Real-time situational analysis.
+- **Support توضیحات (shortLine)**: Natural phrasing, max 1 short sentence.
 - Allowed attitudeLevel: "strongly_supportive", "moderately_supportive", "slightly_supportive", "slightly_opposed", "moderately_opposed", "strongly_opposed".
-- Support: Identify "axisPills" (the poles boosted by the player's last choice).
+- Support: Identify "axisPills" (poles boosted by choice).
 
 SCHEMA:
 {
@@ -116,9 +132,10 @@ SCHEMA:
     "topic": "...", "scopeUsed": "...", "axisUsed": "..."
   },
   "mirrorAdvice": "One witty sentence.",
-  "axisPills": ["democracy", "totalism", "etc"]
+  "axisPills": ["democracy", "totalism", "etc"],
+  "objectiveStatus": "incomplete" | "completed"
 }
-CRITICAL: The "axisPills" array MUST only contain the English IDs: "democracy", "autonomy", "totalism", "oligarchy", "heteronomy", "liberalism". DO NOT translate these keys. Leave "axisPills" empty on Day 1.
+CRITICAL: The "axisPills" array MUST only contain the English IDs. Leave empty on Day 1.
 `;
 }
 

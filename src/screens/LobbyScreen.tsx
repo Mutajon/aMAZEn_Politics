@@ -145,6 +145,10 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
     avatar: string | null;
     introText?: string;
     supportEntities?: Array<{ name: string; icon: string; type: string }>;
+    systemName: string;
+    year: string;
+    roleExperience?: string;
+    bonusObjective?: string;
   }) => {
     setIsLoading(true);
     setShowPlayPopup(false);
@@ -219,7 +223,7 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
 
       // Prepare analysis for a custom scenario
       roleStore.setAnalysis({
-        systemName: data.setting,
+        systemName: data.systemName || data.setting,
         systemDesc: `A unique scenario in ${data.setting} focusing on ${data.role}.`,
         flavor: `The weights of power in ${data.setting} are shifting.`,
         holders: [
@@ -231,12 +235,13 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
         playerIndex: 0,
         grounding: {
           settingType: "real",
-          era: data.setting
+          era: data.year || data.setting
         },
         dilemmaEmphasis: data.emphasis || `Role: ${data.role} in ${data.setting}.`,
-        roleScope: `As ${data.role} in ${data.setting}, you must navigate the complex political landscape to ensure your faction's survival and goals.`,
+        roleScope: data.roleExperience || `As ${data.role} in ${data.setting}, you must navigate the complex political landscape to ensure your faction's survival and goals.`,
         authorityLevel: "medium",
-        momIcon: momEntity.icon
+        momIcon: momEntity.icon,
+        bonusObjective: data.bonusObjective
       });
 
       // Use the splash screen maze image as background for custom scenarios

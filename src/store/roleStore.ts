@@ -46,6 +46,7 @@ export type AnalysisResult = {
   };
   targetScore?: number; // NEW: Custom difficulty target score (for Free Play)
   momIcon?: string; // NEW: Icon for Mom from Free Play intro
+  bonusObjective?: string; // NEW: Specific player-chosen bonus objective (Free Play)
 };
 
 export type Character = {

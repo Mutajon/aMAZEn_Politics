@@ -9,8 +9,8 @@ import PlayerCardModal from "./PlayerCardModal";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useRoleStore } from "../../store/roleStore";
 import { useLang } from "../../i18n/lang";
-import type { RoleGoalStatus } from "../../data/predefinedRoles";
 import { AudioButtonsInline } from "../AudioControls";
+import { ObjectivePill } from "./ObjectivePill";
 
 export type ResourceBarScoreDetails = {
   total: number;
@@ -30,7 +30,6 @@ type Props = {
   showBudget?: boolean; // defaults to true
   score: number;
   scoreGoal?: number | null;
-  goalStatus?: RoleGoalStatus;
   scoreDetails: ResourceBarScoreDetails;
   avatarSrc?: string | null; // Player avatar image
   // Tutorial props
@@ -41,6 +40,8 @@ type Props = {
   tutorialValueRef?: (element: HTMLElement | null) => void;
   avatarButtonRef?: (element: HTMLElement | null) => void;
   avatarPopCount?: number;
+  bonusObjective?: string;
+  objectiveStatus?: "incomplete" | "completed";
 };
 
 export default function ResourceBar({
@@ -49,7 +50,6 @@ export default function ResourceBar({
   showBudget = true,
   score,
   scoreGoal = null,
-  goalStatus = "uncompleted",
   scoreDetails,
   avatarSrc = null,
   tutorialMode = false,
@@ -59,6 +59,8 @@ export default function ResourceBar({
   tutorialValueRef,
   avatarButtonRef,
   avatarPopCount = 0,
+  bonusObjective,
+  objectiveStatus = "incomplete",
 }: Props) {
   // Check if modifiers (difficulty + goals) are enabled
   const enableModifiers = useSettingsStore((s) => s.enableModifiers);
@@ -152,9 +154,6 @@ export default function ResourceBar({
   }, [score]);
 
   const normalizedGoal = typeof scoreGoal === "number" && Number.isFinite(scoreGoal) ? scoreGoal : null;
-  const statusValueText = lang(goalStatus === "completed" ? "ROLE_GOAL_COMPLETED" : "ROLE_GOAL_UNCOMPLETED");
-  const statusLabelText = lang("ROLE_GOAL_STATUS_LABEL");
-  const goalLabelText = lang("ROLE_GOAL_TARGET_LABEL");
 
   return (
     <>
@@ -164,39 +163,42 @@ export default function ResourceBar({
           <div className="text-[10px] text-white/50 uppercase tracking-wide px-1">
             {lang("RESOURCES")}
           </div>
-          <div className="flex items-stretch gap-2">
-            <ResourcePill
-              icon={<Hourglass className="w-4 h-4" />}
-              label={lang("DAYS_LEFT")}
-              value={String(daysLeft)}
-              iconBgClass="bg-sky-600"
-              iconTextClass="text-cyan-200"
-              width={120}
-              bgClass="bg-[rgba(15,23,42,0.8)] border border-cyan-400/40"
-            />
-            {showBudget && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
               <ResourcePill
-                icon={
-                  <span data-budget-anchor="true" id="budget-anchor" className="inline-flex">
-                    <Coins className="w-4 h-4" />
-                  </span>
-                }
-                label={lang("BUDGET")}
-                value={formatMoney(displayBudget)}
-                iconBgClass="bg-amber-500/25"
-                iconTextClass="text-amber-200"
-                width={140}
+                icon={<Hourglass className="w-4 h-4" />}
+                label={lang("DAYS_LEFT")}
+                value={String(daysLeft)}
+                iconBgClass="bg-sky-600"
+                iconTextClass="text-cyan-200"
+                width={120}
+                bgClass="bg-[rgba(15,23,42,0.8)] border border-cyan-400/40"
               />
+              {showBudget && (
+                <ResourcePill
+                  icon={
+                    <span data-budget-anchor="true" id="budget-anchor" className="inline-flex">
+                      <Coins className="w-4 h-4" />
+                    </span>
+                  }
+                  label={lang("BUDGET")}
+                  value={formatMoney(displayBudget)}
+                  iconBgClass="bg-amber-500/25"
+                  iconTextClass="text-amber-200"
+                  width={140}
+                />
+              )}
+              <ScorePill
+                score={displayScore}
+                goal={normalizedGoal}
+                details={scoreDetails}
+              />
+            </div>
+            {bonusObjective && (
+              <div className="w-full">
+                <ObjectivePill objective={bonusObjective} isCompleted={objectiveStatus === "completed"} />
+              </div>
             )}
-            <ScorePill
-              score={displayScore}
-              goal={normalizedGoal}
-              statusState={goalStatus}
-              statusLabel={statusLabelText}
-              statusValue={statusValueText}
-              goalLabel={goalLabelText}
-              details={scoreDetails}
-            />
           </div>
         </div>
 
@@ -343,18 +345,10 @@ function formatMoney(n: number) {
 function ScorePill({
   score,
   goal,
-  statusState,
-  statusLabel,
-  statusValue,
-  goalLabel,
   details,
 }: {
   score: number;
   goal: number | null;
-  statusState: RoleGoalStatus;
-  statusLabel: string;
-  statusValue: string;
-  goalLabel: string;
   details: ResourceBarScoreDetails;
 }) {
   const lang = useLang();

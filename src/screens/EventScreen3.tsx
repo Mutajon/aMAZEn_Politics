@@ -210,7 +210,7 @@ export default function EventScreen3({ push }: Props) {
 
   // Compass pills state (for visual display during Step 4A)
   const [showCompassPills, setShowCompassPills] = useState(false);
-
+  const [objectiveStatus, setObjectiveStatus] = useState<"incomplete" | "completed">("incomplete");
   // Snapshot restoration flag (prevents collection when restored)
   const [restoredFromSnapshot, setRestoredFromSnapshot] = useState(false);
 
@@ -429,6 +429,11 @@ export default function EventScreen3({ push }: Props) {
 
     if (isReady && canShowDilemma && !isCollecting && phase === 'collecting' && collectedData) {
       setPhase('presenting');
+
+      // Update objective status if provided by AI
+      if (collectedData.objectiveStatus) {
+        setObjectiveStatus(collectedData.objectiveStatus as any);
+      }
 
       // Run presentation sequence with narration callback
       presentEventData(
@@ -1057,7 +1062,6 @@ export default function EventScreen3({ push }: Props) {
               daysLeft={daysLeft}
               showBudget={showBudget}
               scoreGoal={roleProgress?.goal ?? analysis?.targetScore ?? null}
-              goalStatus={roleProgress?.status ?? "uncompleted"}
               score={score}
               scoreDetails={scoreDetails}
               avatarSrc={character?.avatarUrl || null}
@@ -1074,6 +1078,8 @@ export default function EventScreen3({ push }: Props) {
                 tutorial.onModalClosed(() => tutorialPillsRef !== null);
               }}
               tutorialValueRef={(el) => setTutorialValueRef(el)}
+              bonusObjective={analysis?.bonusObjective}
+              objectiveStatus={objectiveStatus}
             />
           )}
 

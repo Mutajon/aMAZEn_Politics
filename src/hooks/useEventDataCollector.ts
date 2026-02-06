@@ -56,6 +56,7 @@ export type Phase1Data = {
   valueTargeted?: string; // The compass value being tested by this dilemma (for trap context)
   axisExplored?: string;  // The political axis being explored
   scopeUsed?: string;     // The situation scope being used
+  objectiveStatus?: "incomplete" | "completed";
 };
 
 // PHASE 2: Secondary data - loads in background while user reads
@@ -151,6 +152,7 @@ async function fetchGameTurn(
   scopeUsed?: string;      // The situation scope being used
   axisPills?: PhilosophicalPole[]; // Philosophical poles supported by action
   philosophicalAxes?: Record<PhilosophicalPole, number>;
+  objectiveStatus?: string;
 }> {
   const {
     gameId,
@@ -690,7 +692,8 @@ async function fetchGameTurn(
     axisExplored,
     scopeUsed,
     axisPills: data.axisPills || [],
-    philosophicalAxes: data.philosophicalAxes
+    philosophicalAxes: data.philosophicalAxes,
+    objectiveStatus: data.objectiveStatus
   };
 }
 

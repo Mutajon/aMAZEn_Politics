@@ -19,13 +19,11 @@ import { useLogger } from '../hooks/useLogger';
 import { lang } from '../i18n/lang';
 
 export default function AudioControls() {
-  const musicEnabled = useSettingsStore((s) => s.musicEnabled);
   const musicVolume = useSettingsStore((s) => s.musicVolume);
   const setMusicVolume = useSettingsStore((s) => s.setMusicVolume);
   const sfxEnabled = useSettingsStore((s) => s.sfxEnabled);
   const toggleSfxEnabled = useSettingsStore((s) => s.toggleSfxEnabled);
   const setNarrationEnabled = useSettingsStore((s) => s.setNarrationEnabled);
-  const isMobile = useSettingsStore((s) => s.isMobileDevice);
 
   const [showMusicSlider, setShowMusicSlider] = useState(false);
   const sliderRef = useRef<HTMLDivElement>(null);
@@ -93,7 +91,7 @@ export default function AudioControls() {
   };
 
   return (
-    <div className="fixed bottom-4 ltr:left-4 rtl:right-4 z-50 flex flex-row items-center gap-2" ref={sliderRef}>
+    <div className="fixed bottom-4 ltr:left-4 rtl:right-4 z-[1000] flex flex-row items-center gap-2" ref={sliderRef}>
       {/* Music Volume Slider - positioned to the left of buttons */}
       <AnimatePresence>
         {showMusicSlider && (
