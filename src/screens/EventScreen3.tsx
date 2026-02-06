@@ -32,6 +32,7 @@ import ActionDeck, { type ActionCard } from "../components/event/ActionDeck";
 import CrisisWarningBanner, { type CrisisInfo } from "../components/event/CrisisWarningBanner";
 import { actionsToDeckCards } from "../components/event/actionVisuals";
 import { PALETTE, type PropKey } from "../data/compass-data";
+import { AdvisorPortrait } from "../components/event/AdvisorPortrait";
 import { useCoinFlights, CoinFlightOverlay } from "../components/event/CoinFlightSystem";
 import { AnimatePresence } from "framer-motion";
 import { bgStyleWithRoleImage } from "../lib/ui";
@@ -1128,12 +1129,23 @@ export default function EventScreen3({ push }: Props) {
                 </div>
               ) : (
                 // Normal dilemma card
-                <DilemmaCard
-                  title={collectedData.dilemma.title}
-                  description={collectedData.dilemma.description}
-                  speaker={collectedData.dilemma.speaker}
-                  speakerDescription={collectedData.dilemma.speakerDescription}
-                />
+                <div className="flex flex-row items-end justify-center gap-4 w-full max-w-5xl mx-auto">
+                  <div className="flex-1 max-w-2xl">
+                    <DilemmaCard
+                      title={collectedData.dilemma.title}
+                      description={collectedData.dilemma.description}
+                      variant={isFreePlay ? 'bubble' : 'default'}
+                    />
+                  </div>
+                  {isFreePlay && analysis?.messenger && (
+                    <AdvisorPortrait
+                      scenario={collectedData.systemName || analysis.systemName || ""}
+                      tone={collectedData.tone || analysis.tone || "serious"}
+                      name={analysis.messenger}
+                      className="mb-4"
+                    />
+                  )}
+                </div>
               )}
             </>
           )}

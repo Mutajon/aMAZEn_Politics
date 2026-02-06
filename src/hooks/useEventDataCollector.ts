@@ -57,6 +57,8 @@ export type Phase1Data = {
   axisExplored?: string;  // The political axis being explored
   scopeUsed?: string;     // The situation scope being used
   objectiveStatus?: "incomplete" | "completed";
+  systemName?: string;
+  tone?: 'serious' | 'satirical';
 };
 
 // PHASE 2: Secondary data - loads in background while user reads
@@ -153,6 +155,8 @@ async function fetchGameTurn(
   axisPills?: PhilosophicalPole[]; // Philosophical poles supported by action
   philosophicalAxes?: Record<PhilosophicalPole, number>;
   objectiveStatus?: string;
+  systemName?: string;
+  tone?: 'serious' | 'satirical';
 }> {
   const {
     gameId,
@@ -693,7 +697,9 @@ async function fetchGameTurn(
     scopeUsed,
     axisPills: data.axisPills || [],
     philosophicalAxes: data.philosophicalAxes,
-    objectiveStatus: data.objectiveStatus
+    objectiveStatus: data.objectiveStatus,
+    systemName: data.systemName,
+    tone: data.tone || useDilemmaStore.getState().tone
   };
 }
 
@@ -1057,7 +1063,9 @@ export function useEventDataCollector() {
           newsItems: [], // Disabled
           axisExplored,
           scopeUsed,
-          valueTargeted
+          valueTargeted,
+          systemName: turnData.systemName,
+          tone: turnData.tone
         };
 
         // Set Phase 1 data immediately - triggers UI render!

@@ -728,13 +728,14 @@ export async function freePlayIntro(req, res) {
             model: modelOverride = null,
             systemName,
             year,
-            roleExperience
+            roleExperience,
+            messenger
         } = req.body;
 
         console.log(`[FREE-PLAY-INTRO] Generating intro for ${playerName} (${role}, gender: ${gender}, tone: ${tone}, model: ${modelOverride || 'default'})...`);
         console.log(`[FREE-PLAY-INTRO] 🎭 Selected Tone: ${tone}`);
 
-        const systemPrompt = buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender, tone, systemName, year, roleExperience);
+        const systemPrompt = buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender, tone, systemName, year, roleExperience, messenger);
         // Using "intro" as a dummy user prompt to trigger generation
         const messages = [
             { role: "system", content: systemPrompt },
@@ -782,7 +783,8 @@ export async function freePlayTurn(req, res) {
             bonusObjective,
             systemName,
             year,
-            roleExperience
+            roleExperience,
+            messenger
         } = req.body;
 
         console.log(`[FREE-PLAY] 📥 Body data: day=${day}, tone=${req.body.tone}, model=${req.body.model}, gameId=${gameId}`);
@@ -799,7 +801,7 @@ export async function freePlayTurn(req, res) {
             console.log(`[FREE-PLAY] Day 1 Body Tone check: "${req.body.tone}"`);
 
             // Build System Prompt
-            const context = { role, setting, playerName, emphasis, gender, tone, language, supportEntities, bonusObjective, systemName, year, roleExperience };
+            const context = { role, setting, playerName, emphasis, gender, tone, language, supportEntities, bonusObjective, systemName, year, roleExperience, messenger };
             const systemPrompt = buildFreePlaySystemPrompt(context);
             const languageCode = String(language || "en").toLowerCase();
             const languageName = LANGUAGE_NAMES[languageCode] || LANGUAGE_NAMES.en;
@@ -890,6 +892,7 @@ export async function freePlayTurn(req, res) {
                 systemName: systemName || parsed.systemName || "",
                 year: year || parsed.year || "",
                 roleExperience: roleExperience || parsed.roleExperience || "",
+                messenger: messenger || parsed.messenger || "",
                 topicHistory: [
                     {
                         day: 1,
@@ -963,12 +966,10 @@ export async function freePlayTurn(req, res) {
                 language: conversation.meta.language,
                 gender: conversation.meta.gender,
                 tone: contextTone,
-                supportEntities: conversation.meta.supportEntities,
-                bonusObjective: conversation.meta.bonusObjective,
-                objectiveStatus: conversation.meta.objectiveStatus || "incomplete",
                 systemName: conversation.meta.systemName,
                 year: conversation.meta.year,
-                roleExperience: conversation.meta.roleExperience
+                roleExperience: conversation.meta.roleExperience,
+                messenger: conversation.meta.messenger
             });
 
             const messages = [

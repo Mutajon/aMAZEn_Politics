@@ -31,9 +31,13 @@ export type DilemmaProps = {
   description: string; // keep it ~2–3 sentences
   speaker?: string; // Speaker name from AI or predefined (unused, kept for API compatibility)
   speakerDescription?: string; // AI-generated description (unused, kept for API compatibility)
+  variant?: 'default' | 'bubble';
+  onTypewriterComplete?: () => void;
 };
 
-export default function DilemmaCard({ title, description }: DilemmaProps) {
+import { TypewriterText } from "./TypewriterText";
+
+export default function DilemmaCard({ title, description, variant = 'default', onTypewriterComplete }: DilemmaProps) {
   const lang = useLang();
   const treatment = useSettingsStore(state => state.treatment) as TreatmentType;
   const config = getTreatmentConfig(treatment);
@@ -58,18 +62,35 @@ export default function DilemmaCard({ title, description }: DilemmaProps) {
   const showInquiryButton = config.inquiryTokensPerDilemma > 0 && !isFreePlay;
   const hasCredits = inquiryCreditsRemaining > 0;
 
+  const isBubble = variant === 'bubble';
+
   return (
     <>
       <motion.div
-        className={`relative ${CARD_TONE} ${CARD_PAD}`}
+        className={`relative ${CARD_TONE} ${CARD_PAD} ${isBubble ? 'mb-4' : ''}`}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "tween", duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         aria-label="Current dilemma"
       >
+        {/* Comic Bubble Tail */}
+        {isBubble && (
+          <div className="absolute top-1/2 -right-2 -translate-y-1/2 w-4 h-4 bg-black/60 rotate-45 border-t border-r border-slate-700/50 backdrop-blur-sm ring-1 ring-amber-400/20" />
+        )}
 
         <div className={TITLE_CLASS}>{title}</div>
-        <p className={`mt-1 ${DESC_CLASS}`}>{description}</p>
+
+        <div className={`mt-1 ${DESC_CLASS}`}>
+          {isBubble ? (
+            <TypewriterText
+              text={description}
+              speed={20}
+              onComplete={onTypewriterComplete}
+            />
+          ) : (
+            description
+          )}
+        </div>
 
         {/* Inquiry Button - positioned at bottom of card */}
         {showInquiryButton && (

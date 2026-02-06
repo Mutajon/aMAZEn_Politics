@@ -149,6 +149,7 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
     year: string;
     roleExperience?: string;
     bonusObjective?: string;
+    messenger?: string;
   }) => {
     setIsLoading(true);
     setShowPlayPopup(false);
@@ -241,11 +242,24 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
         roleScope: data.roleExperience || `As ${data.role} in ${data.setting}, you must navigate the complex political landscape to ensure your faction's survival and goals.`,
         authorityLevel: "medium",
         momIcon: momEntity.icon,
-        bonusObjective: data.bonusObjective
+        bonusObjective: data.bonusObjective,
+        messenger: data.messenger,
+        tone: data.tone
       });
 
-      // Use the splash screen maze image as background for custom scenarios
-      roleStore.setRoleBackgroundImage("/assets/images/BKGs/mainBKG.jpg");
+      // Determine background image based on setting
+      const getBkgImage = (setting: string) => {
+        const s = setting.toLowerCase();
+        if (s.includes("athens")) return "/assets/images/freePlay/athensBKG.webp";
+        if (s.includes("roman")) return "/assets/images/freePlay/romanBKG.webp";
+        if (s.includes("england")) return "/assets/images/freePlay/englandBKG.webp";
+        if (s.includes("vatican")) return "/assets/images/freePlay/vaticanBKG.webp";
+        if (s.includes("china")) return "/assets/images/freePlay/chinaBKG.webp";
+        if (s.includes("mars")) return "/assets/images/freePlay/marsBKG.webp";
+        return "/assets/images/BKGs/mainBKG.jpg";
+      };
+
+      roleStore.setRoleBackgroundImage(getBkgImage(data.setting));
 
       // Set role context
       roleStore.setRoleContext(data.setting, data.introText || `The story of ${data.characterName} in ${data.setting}.`, "N/A");

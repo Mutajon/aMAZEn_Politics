@@ -11,6 +11,8 @@ export interface FreePlaySystem {
     citizenExperience: string;
     bonusObjectiveLeader: string;
     bonusObjectiveCitizen: string;
+    messengerLeader: string;
+    messengerCommoner: string;
     image: string;
 }
 
@@ -26,6 +28,8 @@ export const FREE_PLAY_SYSTEMS: FreePlaySystem[] = [
         citizenExperience: "You are empowered but exhausted; fear of \"tyranny of the majority.\"",
         bonusObjectiveLeader: "NA",
         bonusObjectiveCitizen: "Gather enough popular support to convict a corrupt high-ranking official.",
+        messengerLeader: "NA",
+        messengerCommoner: "The Neighbor",
         image: "/assets/images/freePlay/athensCircle.webp"
     },
     {
@@ -39,6 +43,8 @@ export const FREE_PLAY_SYSTEMS: FreePlaySystem[] = [
         citizenExperience: "You are protected by stable institutions that outlast individuals.",
         bonusObjectiveLeader: "Successfully pass a specific, controversial law through the Senate.",
         bonusObjectiveCitizen: "Pressure the Senate into creating a new legal right for the common people.",
+        messengerLeader: "The Secretary",
+        messengerCommoner: "The Envoy",
         image: "/assets/images/freePlay/romanCircle.webp"
     },
     {
@@ -52,6 +58,8 @@ export const FREE_PLAY_SYSTEMS: FreePlaySystem[] = [
         citizenExperience: "You are secure under a strong ruler, but vulnerable to their whims.",
         bonusObjectiveLeader: "Survive an attempt to overthrow the throne",
         bonusObjectiveCitizen: "Coordinate a secret resistance movement without being discovered by the crown.",
+        messengerLeader: "The Page",
+        messengerCommoner: "The Kin",
         image: "/assets/images/freePlay/englandCircle.webp"
     },
     {
@@ -65,6 +73,8 @@ export const FREE_PLAY_SYSTEMS: FreePlaySystem[] = [
         citizenExperience: "Your Life feels meaningful and structured, but dissent is dangerous.",
         bonusObjectiveLeader: "Successfully declare a controversial figure a \"Saint\" to unify the faithful.",
         bonusObjectiveCitizen: "Successfully leak a \"Forbidden Document\" to the outside world.",
+        messengerLeader: "The Chancellor",
+        messengerCommoner: "The Confessor",
         image: "/assets/images/freePlay/vaticanCircle.webp"
     },
     {
@@ -78,6 +88,8 @@ export const FREE_PLAY_SYSTEMS: FreePlaySystem[] = [
         citizenExperience: "You are distant from power, yet protected by a predictable system.",
         bonusObjectiveLeader: "Root out a \"shadow government\" of corrupt officials without collapsing the system.",
         bonusObjectiveCitizen: "Get your personal written grievance physically into the hands of the Emperor.",
+        messengerLeader: "The Scribe",
+        messengerCommoner: "The Courier",
         image: "/assets/images/freePlay/chinaCircle.webp"
     },
     {
@@ -91,6 +103,8 @@ export const FREE_PLAY_SYSTEMS: FreePlaySystem[] = [
         citizenExperience: "You are materially satisfied but alienated from the decision-making logic.",
         bonusObjectiveLeader: "Stop a radical group from taking manual control of the colony's Life Support AI.",
         bonusObjectiveCitizen: "Successfully live \"off the grid\" by tricking the AI into thinking you no longer exist",
+        messengerLeader: "The Interface",
+        messengerCommoner: "The Liaison",
         image: "/assets/images/freePlay/marsCircle.webp"
     }
 ];

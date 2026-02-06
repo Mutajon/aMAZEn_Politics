@@ -8,7 +8,7 @@
 // ----------------------------------------------------------------------------
 // 1. INTRO GENERATION
 // ----------------------------------------------------------------------------
-export function buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender, tone = "serious", systemName, year, roleExperience) {
+export function buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender, tone = "serious", systemName, year, roleExperience, messenger) {
   const roleLine = role || "Unknown Role";
   const settingLine = setting || "Unknown Setting";
   const sysLine = systemName ? `SYSTEM: Ground the story in the "${systemName}" political framework.` : "";
@@ -42,12 +42,14 @@ INSTRUCTIONS:
 - Place them physically in the scene (sights, sounds).
 - Establish the weight of their specific position based on the ROLE FEEL and ERA.
 - **Grounding**: Seamlessly integrate the provided EMPHASIS/OBJECTIVE into the narrative. It should feel like a core, grounded part of the situation, not a tagged-on instruction.
-- **Support Entities**: Identify exactly 3 key entities for this specific role:
-  1. "Population": The general public/subjects relevant to the role (e.g., "The Peasantry", "Voters", "The Colony").
-  2. "Opposition": The primary institutional or social antagonist/monitor (e.g., "The Church", "The Board", "Military High Command").
-  3. "Personal Anchor": This MUST be the player's Mother ("Mom"). She represents personal empathy, family stakes, and the weight of conscience.
+  3. "Personal Anchor": This should be the player's ${messenger && messenger !== 'NA' ? messenger : 'Mother ("Mom")'}. ${messenger && messenger !== 'NA' ? `They represent the player's primary point of contact and confidant.` : `She represents personal empathy, family stakes, and the weight of conscience.`}
   - Choose a relevant emoji icon for each.
   - Provide a short "summary" (1 sentence) of their current stance/mood toward the player.
+
+POV & STYLE:
+- The narrator is the "Personal Anchor" (${messenger && messenger !== 'NA' ? messenger : 'Mom'}).
+- Address the player directly (e.g., "My Liege," "Hello neighbor," "Dear child") based on the role and messenger type.
+- Maintain the selected tone (${tone.toUpperCase()}) throughout.
 
 - Tone Selection: ${tone.toUpperCase()}.
 ${tone === 'satirical'
@@ -67,7 +69,7 @@ ${tone === 'satirical'
 }
 
 export function buildFreePlaySystemPrompt(context) {
-  const { role, setting, playerName, emphasis, language, gender, tone = "serious", supportEntities, bonusObjective, objectiveStatus } = context;
+  const { role, setting, playerName, emphasis, language, gender, tone = "serious", supportEntities, bonusObjective, objectiveStatus, messenger } = context;
   const lang = language === 'he' ? "Hebrew (Natural/Spoken)" : "English";
   const genderGrammar = gender === 'female' ? 'FEMALE' : (gender === 'other' ? 'MALE PLURAL' : 'MALE');
   const entities = supportEntities ? supportEntities.map(e => `- ${e.name} (${e.type}): ${e.summary}`).join('\n') : "";
@@ -99,10 +101,11 @@ AXES:
 
 RULES:
 - Situations: Personal, Social, National, International. Rotate Axis and Scope.
-- Tone Selection: ${tone.toUpperCase()}.
+- Persona: ${messenger && messenger !== 'NA' ? messenger : (tone === 'satirical' ? 'The Satirical Oracle' : 'Cold Narrator')}.
+- Address the player directly (e.g., "My Liege," "Hello neighbor") based on the role and messenger type.
 ${tone === 'satirical'
-      ? "- Persona: The Satirical Oracle / Cynical Joker. Be snappy, cynical, and use dark humor. Emphasize the absurdity of political choices and the predictable greed/folly of all involved."
-      : "- Persona: Cold Narrator of a political drama. Be direct, sharp, and weighty."}
+      ? "- Style: SNAPPY, cynically funny, absurdist. Use dark humor. Highlight the ridiculousness of political choices."
+      : "- Style: DRAMATIC, direct, sharp, and weighty."}
 ${tone === 'satirical'
       ? "- Tone: Witty, biting, cynical, short sentences."
       : "- Tone: Dramatic, short sentences, direct address."}
@@ -120,7 +123,7 @@ SCHEMA:
   "supportShift": {
     "people": {"attitudeLevel": "...", "shortLine": "..."},
     "holders": {"attitudeLevel": "...", "shortLine": "..."},
-    "mom": {"attitudeLevel": "...", "shortLine": "..."}
+    "mom": {"attitudeLevel": "...", "shortLine": "... (Note: this is from ${messenger && messenger !== 'NA' ? messenger : 'Mom'})"}
   },
   "dilemma": {
     "title": "...", "description": "Situation + Bridge. End with question.",
