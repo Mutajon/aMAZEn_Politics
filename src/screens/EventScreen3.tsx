@@ -1096,24 +1096,34 @@ export default function EventScreen3({ push }: Props) {
             <>
               {isGameEnd ? (
                 // Game conclusion - show aftermath card
-                <div className="bg-gray-900/70 backdrop-blur-sm border border-amber-500/30 rounded-lg p-6 shadow-xl">
-                  <h2 className="text-2xl font-bold text-amber-400 mb-4">
-                    {lang("THE_LAST_DAY")}
-                  </h2>
-                  <p className="text-lg text-gray-200 leading-relaxed mb-6 whitespace-pre-wrap">
-                    {collectedData.dilemma.description}
-                  </p>
-                  {phase === 'interacting' && (
-                    <button
-                      onClick={() => {
-                        stopNarration(); // Stop any playing narration before opening modal
-                        startAftermathPrefetch(); // Start fetching aftermath data in background
-                        setShowSelfJudgmentModal(true);
-                      }}
-                      className="w-full px-6 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-amber-500/50"
-                    >
-                      {lang("VIEW_AFTERMATH")}
-                    </button>
+                <div className="flex flex-row items-end justify-center gap-4 w-full max-w-5xl mx-auto">
+                  <div className="flex-1 max-w-2xl bg-gray-900/70 backdrop-blur-sm border border-amber-500/30 rounded-lg p-6 shadow-xl">
+                    <h2 className="text-2xl font-bold text-amber-400 mb-4">
+                      {lang("THE_LAST_DAY")}
+                    </h2>
+                    <p className="text-lg text-gray-200 leading-relaxed mb-6 whitespace-pre-wrap">
+                      {collectedData.dilemma.description}
+                    </p>
+                    {phase === 'interacting' && (
+                      <button
+                        onClick={() => {
+                          stopNarration(); // Stop any playing narration before opening modal
+                          startAftermathPrefetch(); // Start fetching aftermath data in background
+                          setShowSelfJudgmentModal(true);
+                        }}
+                        className="w-full px-6 py-3 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-amber-500/50"
+                      >
+                        {lang("VIEW_AFTERMATH")}
+                      </button>
+                    )}
+                  </div>
+                  {isFreePlay && analysis?.messenger && (
+                    <AdvisorPortrait
+                      scenario={collectedData.systemName || analysis.systemName || ""}
+                      tone={collectedData.tone || analysis.tone || "serious"}
+                      name={analysis.messenger}
+                      className="mb-4"
+                    />
                   )}
                 </div>
               ) : (

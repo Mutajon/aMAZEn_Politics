@@ -24,8 +24,8 @@ export function buildFreePlayIntroSystemPrompt(role, setting, playerName, emphas
   const genderLine = `GENDER: Use ${genderGrammar} grammar for the player (especially in gendered languages like Hebrew).`;
 
   return `MISSION:
-You are the narrator of a political drama. 
-Generate a short, atmospheric introductory paragraph (EXACTLY 2 short sentences) to set the mood for the player.
+You are the ${messenger && messenger !== 'NA' ? messenger : 'Messenger'}. 
+Generate a short, atmospheric introductory greeting and spoken report (EXACTLY 2 short sentences).
 
 CONTEXT:
 - Player Name: ${playerName || "Player"}
@@ -37,30 +37,33 @@ ${expLine}
 ${emphasisLine}
 ${genderLine}
 
+POV & STYLE:
+- You ARE the ${messenger && messenger !== 'NA' ? messenger : 'Messenger'}. YOU ARE NOT A NARRATOR.
+- You are speaking directly to the player. 
+- Address the player directly (e.g., "My Liege," "Hello neighbor," "Dear child") based on your role and relationship.
+- NO "book-like" or third-person omniscient narration (e.g., avoid "Rain lashes the window"). Instead, describe the scene as something YOU are observing or reporting (e.g., "The rain is coming down hard as I bring you this news...").
+- Maintain the selected tone (${tone.toUpperCase()}) throughout.
+
 INSTRUCTIONS:
-- Directly address the player as "you". 
-- Place them physically in the scene (sights, sounds).
+- Directly address the player.
+- Place them physically in the scene through your eyes as their advisor.
 - Establish the weight of their specific position based on the ROLE FEEL and ERA.
-- **Grounding**: Seamlessly integrate the provided EMPHASIS/OBJECTIVE into the narrative. It should feel like a core, grounded part of the situation, not a tagged-on instruction.
-- **Support Entities**: Generate EXACTLY 3 support entities that reflect the setting:
+- **Grounding**: Seamlessly integrate the provided EMPHASIS/OBJECTIVE into your report.
+- **Support Entities**: Identify EXACTLY 3 support entities that reflect the setting:
   1. "Population": A group representing the common people (e.g., "The Mob", "The Peasants").
   2. "Opposition": A group or institution representing the status quo or rival power (e.g., "The Senate", "The Church").
   3. "Mom": ALWAYS include the player's Mother ("Mom"). She represents personal empathy, family stakes, and the weight of conscience.
-- CRITICAL: DO NOT include the ${messenger && messenger !== 'NA' ? messenger : 'Messenger'} in the supportEntities list. They are the Narrator delivering the dilemma, not one of the political observers. The third observer MUST be "Mom".
+- CRITICAL: DO NOT include yourself (${messenger}) in the supportEntities list. You are the one speaking. The third observer MUST be "Mom".
 - Choose a relevant emoji icon for each entity.
 - Provide a short "summary" (1 sentence) of their current stance/mood toward the player.
 
-POV & STYLE:
-- The narrator/POV is the ${messenger && messenger !== 'NA' ? messenger : 'Messenger'}.
-- Address the player directly (e.g., "My Liege," "Hello neighbor," "Dear child") based on the role and messenger type.
-- Maintain the selected tone (${tone.toUpperCase()}) throughout.
-
-- Tone Selection: ${tone.toUpperCase()}.
+TONE SETTINGS:
 ${tone === 'satirical'
-      ? "- Style: SATIRICAL POLITICAL COMEDY. Be cynical, absurdist, and funny. Highlight the ridiculousness of the situation. Use sharp, witty, and slightly mean humor. Narration should feel like a mockery of power."
+      ? "- Style: SATIRICAL POLITICAL COMEDY. Be cynical, absurdist, and funny. Highlight the ridiculousness of the situation. Use sharp, witty, and slightly mean humor. Speak like a weary advisor who has seen it all."
       : "- Style: DRAMATIC POLITICAL DRAMA. Be serious, atmospheric, and weighty. Focus on the high stakes and the burden of leadership."}
 - Tone: Spoken, natural, engaging. NO flowery academic language.
-- Output JSON: 
+
+Output JSON: 
 { 
   "intro": "...", 
   "supportEntities": [
@@ -92,10 +95,11 @@ If the objective is "incomplete":
 Translate any English context or instructions provided below into ${lang}.
 
 MISSION:
-Game Master for ${playerName}. Role: ${role}, Setting: ${setting}. ${emphasis ? `Focus: ${emphasis}.` : ""}
-Deliver fast, dramatic dilemmas. Output ONLY JSON. Use ${genderGrammar} grammar.
+You are the ${narrator} speaking to ${playerName}. Role: ${role}, Setting: ${setting}. ${emphasis ? `Focus: ${emphasis}.` : ""}
+Deliver fast, dramatic dilemmas as spoken reports. Output ONLY JSON. Use ${genderGrammar} grammar.
+
 **Role Awareness**: Strictly generate dilemmas that match the player's actual point of view and influence. 
-- If the player is a "Citizen" or "Commoner", focus on personal struggles, community impact, or horizontal choices. They should NOT be making high-level systemic decisions (like budget allocation or national laws) unless it's a Direct Democracy.
+- If the player is a "Citizen" or "Commoner", focus on personal struggles, community impact, or horizontal choices.
 - If the player is a "Leader", focus on high-level systemic tradeoffs and the burden of power.
 ${objectiveSection}
 
@@ -108,24 +112,18 @@ AXES:
 3. Democracy (Broad power) vs Oligarchy (Elite power).
 
 RULES:
-- Situations: Personal, Social, National, International. Rotate Axis and Scope. Reframe National scope for Citizens as "How do you react to this event?"
-- Persona: ${narrator}. 
+- Persona: You ARE ${narrator}. You are NOT an omniscient book narrator.
+- Report POV: Do NOT describe scenes like a novelist. Instead, announce news, report rumors, or describe what you are seeing right now to the player.
+- Addressing the Player: Start or end your description by addressing the player (e.g., "My Liege," "Neighbor," "Your Excellency") naturally.
 - CRITICAL: You are speaking as ${narrator}. You are NOT "Mom". "Mom" is a separate character (support entity).
-- Address the player directly (e.g., "My Liege," "Hello neighbor") based on the role and messenger type.
+- Situations: Personal, Social, National, International. Rotate Axis and Scope. 
 ${tone === 'satirical'
-      ? "- Style: SNAPPY, cynically funny, absurdist. Use dark humor. Highlight the ridiculousness of political choices."
-      : "- Style: DRAMATIC, direct, sharp, and weighty."}
-${tone === 'satirical'
-      ? "- Tone: Witty, biting, cynical, short sentences."
-      : "- Tone: Dramatic, short sentences, direct address."}
-- **Narrative Evolution**: Explore the core "Emphasis" through different lenses. Ground the choice of dilemmas in this theme.
-- Constraints: Dilemma max 2-3 sentences. Generate exactly 3 UNIQUE and distinct actions per dilemma.
-- Action Variety: Each action must lead in a different thematic or ideological direction.
-- Forbidden: DO NOT number the actions. DO NOT repeat the same option.
-- **Support Shift Logic**: Real-time situational analysis.
+      ? "- Style: SNAPPY, cynically funny, absurdist. dark humor. SPEAK like a weary, biting advisor."
+      : "- Style: DRAMATIC, direct, sharp, and weighty advisor report."}
+- Length: Dilemma description max 2-3 sentences. 
+- Actions: Generate exactly 3 UNIQUE and distinct actions per dilemma.
+- Support Shift Logic: Real-time situational analysis.
 - **Support Explanation (shortLine)**: Natural phrasing, max 1 short sentence.
-- Allowed attitudeLevel: "strongly_supportive", "moderately_supportive", "slightly_supportive", "slightly_opposed", "moderately_opposed", "strongly_opposed".
-- Support: Identify "axisPills" (poles boosted by choice).
 
 SCHEMA:
 {
@@ -135,7 +133,7 @@ SCHEMA:
     "mom": {"attitudeLevel": "...", "shortLine": "... (Regarding the character 'Mom')"}
   },
   "dilemma": {
-    "title": "...", "description": "Situation + Bridge. End with question.",
+    "title": "...", "description": "Spoken report from your POV. End with question.",
     "actions": [
       { "title": "...", "summary": "...", "icon": "..." },
       { "title": "...", "summary": "...", "icon": "..." },
@@ -147,7 +145,6 @@ SCHEMA:
   "axisPills": ["democracy", "totalism", "etc"],
   "objectiveStatus": "incomplete" | "completed"
 }
-CRITICAL: The "axisPills" array MUST only contain the English IDs. Leave empty on Day 1.
 `;
 }
 
@@ -161,13 +158,16 @@ export function buildFreePlayUserPrompt(day, playerChoice, lastTopic, consecutiv
   }
 
   const toneInstruction = tone === 'satirical'
-    ? "PERSONA: Satirical Political Comedy. CRITICAL: Be cynical, mock power, and use dark humor in every sentence. Avoid being 'Dramatic' or 'Serious'."
-    : "PERSONA: Dramatic Political Drama. Maintain a serious, weighty, and atmospheric tone.";
+    ? "PERSONA: Satirical Advisor. Be cynical, mock power, and use dark humor. Avoid being a 'Narrator'."
+    : "PERSONA: Dramatic Advisor. Maintain a serious, weighty, and atmospheric tone. You are reporting a situation.";
 
   if (day === 1) {
     return `${toneInstruction}
-Establish the physical scene and present a concrete problem requiring an immediate decision. 
-Anchor the dilemma in the player's specific Role and their influence level within the setting.
+Deliver a DIRECT SPOKEN REPORT as the ${messenger && messenger !== 'NA' ? messenger : 'Messenger'}.
+1. GREET the player immediately (e.g. "My Liege,").
+2. Present a concrete problem you are observing or have just heard about.
+3. NO book-like descriptions (no omniscient weather reports unless you are complaining about it).
+Anchor the dilemma in the player's specific Role and influence level.
 Length: Max 2 sentences.
 Do NOT include any "axisPills" (return empty array []).`;
   }
@@ -178,8 +178,8 @@ Do NOT include any "axisPills" (return empty array []).`;
 DAY 7: THE CLIMAX. 
 Last choice: "${playerChoice.title}"
 
-1. **BRIDGE**: Consequence of last choice.
-2. **DILEMMA**: Present a high-stakes CLIMAX dilemma. It MUST tie in previous story threads or themes encountered during days 1-6. This is the ultimate test of the player's values. End with a weighty question.
+1. **BRIDGE**: Report the immediate consequence of their last choice as their advisor.
+2. **DILEMMA**: Present a high-stakes CLIMAX dilemma. It MUST tie in previous story threads. End with a weighty question to the player.
 3. **MIRROR**: A sharp judgment on the stakes.
 4. **AXIS**: Identify poles reinforced.
 Generate exactly 3 UNIQUE actions.`;
@@ -191,37 +191,37 @@ Generate exactly 3 UNIQUE actions.`;
 DAY 8: THE RESOLUTION (ADVISOR SUMMARY).
 Last choice: "${playerChoice.title}"
 
-MISSION: Generate a final summary from the specific perspective of the advisor/messenger ("${messenger && messenger !== 'NA' ? messenger : 'Mom'}").
+MISSION: Generate a final, personal summary from your specific perspective as the advisor ("${messenger && messenger !== 'NA' ? messenger : 'Messenger'}").
 Place the entire summary in the "description" field of the JSON.
 
 1. **TITLE**: A title reflecting the end of the journey (e.g., "The Final Reflection").
 2. **DESCRIPTION**: 
-   - **NARRATIVE**: Reflect on the player's journey, their biggest choices, and the current state of the setting.
-   - **TRUE FEELINGS**: The advisor should now drop any professional facade and confide their true feelings to the player about what has transpired and how they personally feel about the player's character.
-   - **LEGACY**: Explicitly state what the player's legacy will be in this world. 
+   - **NARRATIVE**: Reflect on the player's journey and your time as their advisor.
+   - **LIMIT**: Length: EXACTLY 2 short sentences. No more.
+   - **STRICT POV**: You are NOT a parent. Do NOT use family language like "my son", "my boy", or "my child" unless you are specifically designated as a family member. 
 3. **NO ACTIONS**: You MUST return an empty array [] for "actions".
 4. **MIRROR**: A final, deep judgment.
 5. **AXIS**: Leave empty.
 
-Format the description to be evocative and atmospheric. Do NOT include any action options (actions: []).`;
+Format the description to be evocative, deeply personal, and extremely concise.`;
   }
 
   const topicInstruction = consecutiveDays >= 2
     ? `MANDATORY: Switch the topic completely (Previous: ${lastTopic}).`
     : `Continue or evolve the topic: ${lastTopic}.`;
 
-  const emphasisAnchor = emphasis ? `\n\n**DILEMMA ANCHOR**: For most turns, keep the story grounded in the core theme: "${emphasis}". Find a new angle or specific tension related to this to anchor today's dilemma. If the story naturally dictates a temporary shift away from this theme, you may do so, but return to it frequently.` : "";
+  const emphasisAnchor = emphasis ? `\n\n**DILEMMA ANCHOR**: For most turns, keep your report grounded in the core theme: "${emphasis}". Report a new angle or tension related to this.` : "";
 
   return `${toneInstruction}
 
 DAY ${day}.${emphasisAnchor}
 Last choice: "${playerChoice.title}"
 
-1. **BRIDGE**: Show the consequence of the player's choice in 1 short sentence.
-2. **DILEMMA**: Present a new situation in 1-2 short sentences. End with a question.
+1. **BRIDGE**: As their advisor, report the fallout of their last choice in 1 short sentence.
+2. **DILEMMA**: Present a new situation you've encountered or are reporting. End with a question.
 3. **TOPIC**: ${topicInstruction}
 4. **MIRROR**: Add a witty judgment.
-5. **AXIS**: Analyze the player's last choice ("${playerChoice.title}") and identify which poles (1-2 max) it reinforced. Include these in "axisPills".
+5. **AXIS**: Analyze the player's last choice ("${playerChoice.title}") and identify poles reinforced.
 
-Generate the next dilemma with exactly 3 UNIQUE and non-numbered actions. Use fluent, natural phrasing. Avoid long paragraphs.`;
+Deliver this as a natural spoken report. NO book-like prose.`;
 }
