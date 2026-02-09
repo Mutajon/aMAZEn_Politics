@@ -249,16 +249,17 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         role: selectedRole,
-                        setting: selectedSetting,
+                        setting: lang(selectedSetting),  // Translate setting
                         playerName: characterName || "Leader",
-                        emphasis: finalEmphasis,
+                        emphasis: finalEmphasis ? lang(finalEmphasis) : "",  // Translate emphasis if it's a key
                         gender,
                         difficulty,
                         tone,
-                        systemName,
-                        year,
-                        roleExperience,
-                        messenger,
+                        systemName: lang(systemName),  // Translate system name
+                        year: lang(year),  // Translate year
+                        roleExperience: roleExperience ? lang(roleExperience) : "",  // Translate role experience
+                        messenger: messenger ? lang(messenger) : "",  // Translate messenger
+                        language,  // Pass the current language
                         model: useDilemmaStore.getState().aiModelOverride
                     })
                 });
@@ -548,7 +549,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                             <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-xs sm:text-sm font-bold uppercase tracking-[0.2em] text-purple-300/80">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-white/40">{lang("LOBBY_THE_PLACE")}</span>
-                                                    <span>{setting}</span>
+                                                    <span>{lang(setting)}</span>
                                                 </div>
                                                 <div className="w-1.5 h-1.5 rounded-full bg-white/20" />
                                                 <div className="flex items-center gap-2">
