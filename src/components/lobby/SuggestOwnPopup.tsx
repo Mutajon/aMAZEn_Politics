@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Shield, Info } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronLeft, ChevronRight, Wand2, Info, Loader2 } from 'lucide-react';
 import { useLang } from "../../i18n/lang";
-import type { FreePlaySystem } from '../../data/freePlaySystems';
 import { audioManager } from '../../lib/audioManager';
 
-interface SystemDetailsPopupProps {
-    system: FreePlaySystem;
+interface SuggestOwnPopupProps {
     onClose: () => void;
     onContinue: (data: {
         characterName: string;
+        setting: string;
         role: string;
         avatar: string;
+        year: string;
+        roleExperience: string;
     }) => void;
 }
 
@@ -23,13 +24,14 @@ const AVATARS = [
     "politician_woman", "elder_woman", "young_activist"
 ];
 
-const SystemDetailsPopup: React.FC<SystemDetailsPopupProps> = ({ system, onClose, onContinue }) => {
+const SuggestOwnPopup: React.FC<SuggestOwnPopupProps> = ({ onClose, onContinue }) => {
     const lang = useLang();
     const [characterName, setCharacterName] = useState("");
     const [avatarIndex, setAvatarIndex] = useState(0);
-    const [role, setRole] = useState<'Leader' | 'Commoner'>(() =>
-        system.governanceSystem === "FREE_PLAY_SYSTEM_DIRECT_DEMOCRACY" ? 'Commoner' : 'Leader'
-    );
+    const [setting, setSetting] = useState("");
+    const [role, setRole] = useState("");
+    const [isValidating, setIsValidating] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const nextAvatar = () => {
         audioManager.playSfx("click-soft");
@@ -45,12 +47,44 @@ const SystemDetailsPopup: React.FC<SystemDetailsPopupProps> = ({ system, onClose
         onClose();
     };
 
-    const handleRoleSelect = (r: 'Leader' | 'Commoner') => {
-        audioManager.playSfx("click-soft");
-        setRole(r);
-    };
+    const handleContinue = async () => {
+        if (!characterName.trim() || !setting.trim() || !role.trim()) return;
 
-    const bkgImage = system.image.replace('Circle', 'BKG');
+        setIsValidating(true);
+        setError(null);
+        audioManager.playSfx("click-soft");
+
+        try {
+            const res = await fetch("/api/free-play/validate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    setting,
+                    role,
+                    language: document.documentElement.lang === 'he' ? 'he' : 'en'
+                })
+            });
+
+            const data = await res.json();
+            if (data.isValid) {
+                onContinue({
+                    characterName,
+                    setting: data.setting || setting,
+                    role: data.role || role,
+                    avatar: AVATARS[avatarIndex],
+                    year: data.year || "",
+                    roleExperience: data.roleExperience || ""
+                });
+            } else {
+                setError(data.message || "Input rejected. Try something more descriptive.");
+            }
+        } catch (e) {
+            console.error(e);
+            setError("Connection error. Please try again.");
+        } finally {
+            setIsValidating(false);
+        }
+    };
 
     return (
         <motion.div
@@ -67,17 +101,17 @@ const SystemDetailsPopup: React.FC<SystemDetailsPopupProps> = ({ system, onClose
                 onClick={(e) => e.stopPropagation()}
             >
 
-                {/* Left Side: Background Preview */}
+                {/* Left Side: Image Preview */}
                 <div className="w-full md:w-2/5 relative h-48 md:h-auto overflow-hidden">
                     <motion.img
-                        src={bkgImage}
-                        alt={system.scenario}
+                        src="/assets/images/freeplay/chooseOwn.webp"
+                        alt="Custom Scenario"
                         className="w-full h-full object-cover opacity-60"
                         animate={{
-                            scale: [1.05, 1.15, 1.05],
+                            scale: [1, 1.05, 1],
                         }}
                         transition={{
-                            duration: 20,
+                            duration: 15,
                             repeat: Infinity,
                             ease: "easeInOut"
                         }}
@@ -85,12 +119,12 @@ const SystemDetailsPopup: React.FC<SystemDetailsPopupProps> = ({ system, onClose
                     <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-[#0f1115] via-transparent to-transparent md:to-transparent" />
 
                     <div className="absolute bottom-6 left-6 right-6">
-                        <div className="text-[10px] uppercase tracking-[0.3em] text-amber-500/60 font-black mb-1">{lang("LOBBY_EXAMPLE_VENUE")}</div>
+                        <div className="text-[10px] uppercase tracking-[0.3em] text-amber-500/60 font-black mb-1">UNLIMITED HORIZON</div>
                         <h3 className="text-2xl font-black text-white leading-tight">
-                            {lang(system.scenario)} <span className="text-white/30 text-lg ml-1">({lang(system.year)})</span>
+                            Suggest Your Own
                         </h3>
                         <p className="mt-3 text-sm text-white/50 leading-relaxed italic border-l-2 border-amber-500/20 pl-4">
-                            "{lang(system.intro)}"
+                            "The story is limited only by your imagination. Define your era, choose your role, and let the mirror reflect your destiny."
                         </p>
                     </div>
                 </div>
@@ -101,30 +135,20 @@ const SystemDetailsPopup: React.FC<SystemDetailsPopupProps> = ({ system, onClose
                     <div className="mb-8">
                         <div className="flex items-center gap-3 mb-2">
                             <span className="p-2 rounded-lg bg-amber-500/10 text-amber-500">
-                                <Shield className="w-4 h-4" />
+                                <Wand2 className="w-4 h-4" />
                             </span>
                             <h2 className="text-3xl font-black uppercase tracking-tighter text-amber-400">
-                                {lang(system.governanceSystem)}
+                                CUSTOM SCENARIO
                             </h2>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 mt-4">
-                            <div className="space-y-1 bg-blue-900/20 border border-blue-500/30 p-3 rounded-xl">
-                                <span className="text-[9px] uppercase tracking-[0.2em] text-blue-300 font-bold block">{lang("LOBBY_SOURCE_OF_POWER")}</span>
-                                <span className="text-xs text-blue-100/80 font-medium leading-tight block">{lang(system.sourceOfAuthority)}</span>
-                            </div>
-                            <div className="space-y-1 bg-red-900/20 border border-red-500/30 p-3 rounded-xl">
-                                <span className="text-[9px] uppercase tracking-[0.2em] text-red-300 font-bold block">{lang("LOBBY_PRIMARY_WEAKNESS")}</span>
-                                <span className="text-xs text-red-100/80 font-medium leading-tight block">{lang(system.primaryWeakness)}</span>
-                            </div>
                         </div>
                     </div>
 
                     <div className="h-px bg-white/5 mb-8" />
 
                     {/* Setup Form */}
-                    <div className="space-y-8 flex-1">
+                    <div className="space-y-6 flex-1">
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             {/* Name Input */}
                             <div className="space-y-3">
                                 <label className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold ml-1">
@@ -134,7 +158,7 @@ const SystemDetailsPopup: React.FC<SystemDetailsPopupProps> = ({ system, onClose
                                     autoFocus
                                     type="text"
                                     placeholder={lang("LOBBY_ENTER_NAME_PLACEHOLDER")}
-                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all font-medium"
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all font-medium text-sm"
                                     value={characterName}
                                     onChange={(e) => setCharacterName(e.target.value)}
                                 />
@@ -163,66 +187,70 @@ const SystemDetailsPopup: React.FC<SystemDetailsPopupProps> = ({ system, onClose
                             </div>
                         </div>
 
-                        {/* Role Selection */}
-                        <div className="space-y-4">
+                        {/* Setting Input */}
+                        <div className="space-y-3">
                             <label className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold ml-1">
-                                {lang("LOBBY_SOCIETY_STATUS")}
+                                {lang("LOBBY_SETTING_LABEL")}
                             </label>
-                            <div className="flex gap-3">
-                                {system.governanceSystem !== "FREE_PLAY_SYSTEM_DIRECT_DEMOCRACY" && (
-                                    <button
-                                        onClick={() => handleRoleSelect('Leader')}
-                                        className={`flex-1 py-4 rounded-2xl font-bold uppercase tracking-widest text-[10px] transition-all border ${role === 'Leader'
-                                            ? 'bg-amber-500 border-amber-400 text-black shadow-lg shadow-amber-500/20'
-                                            : 'bg-white/5 border-white/10 text-white/40 hover:border-white/20'
-                                            }`}
-                                    >
-                                        {lang("LOBBY_ROLE_LEADER")}
-                                    </button>
-                                )}
-                                <button
-                                    onClick={() => handleRoleSelect('Commoner')}
-                                    className={`flex-1 py-4 rounded-2xl font-bold uppercase tracking-widest text-[10px] transition-all border ${role === 'Commoner'
-                                        ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-600/20'
-                                        : 'bg-white/5 border-white/10 text-white/40 hover:border-white/20'
-                                        }`}
-                                >
-                                    {lang("LOBBY_ROLE_COMMONER")}
-                                </button>
-                            </div>
-
-                            {/* Experience Blurb */}
-                            <motion.div
-                                key={role}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className={`rounded-2xl p-5 border flex gap-4 transition-colors duration-300 ${role === 'Leader'
-                                    ? 'bg-amber-500/10 border-amber-500/20'
-                                    : 'bg-purple-600/10 border-purple-600/20'
-                                    }`}
-                            >
-                                <Info className={`w-5 h-5 shrink-0 mt-0.5 transition-colors ${role === 'Leader' ? 'text-amber-500/40' : 'text-purple-500/40'}`} />
-                                <p className={`text-xs leading-relaxed transition-colors ${role === 'Leader' ? 'text-amber-100/70' : 'text-purple-100/70'}`}>
-                                    {role === 'Leader' ? lang(system.leaderExperience) : lang(system.citizenExperience)}
-                                </p>
-                            </motion.div>
+                            <input
+                                type="text"
+                                placeholder={lang("LOBBY_PLACEHOLDER_SETTING")}
+                                className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all font-medium text-sm"
+                                value={setting}
+                                onChange={(e) => setSetting(e.target.value)}
+                            />
                         </div>
+
+                        {/* Role Input */}
+                        <div className="space-y-3">
+                            <label className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold ml-1">
+                                {lang("LOBBY_ROLE_LABEL")}
+                            </label>
+                            <input
+                                type="text"
+                                placeholder={lang("LOBBY_PLACEHOLDER_ROLE")}
+                                className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all font-medium text-sm"
+                                value={role}
+                                onChange={(e) => setRole(e.target.value)}
+                            />
+                        </div>
+
+                        {/* Error Message */}
+                        <AnimatePresence>
+                            {error && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex gap-3 items-start"
+                                >
+                                    <Info className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                                    <p className="text-xs text-red-200/70 italic leading-relaxed">
+                                        {error}
+                                    </p>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
 
                     {/* Footer Actions */}
                     <div className="mt-10 flex justify-center w-full">
                         <button
-                            disabled={!characterName.trim()}
-                            onClick={() => {
-                                audioManager.playSfx("click-soft");
-                                onContinue({ characterName, role: role.toLowerCase(), avatar: AVATARS[avatarIndex] });
-                            }}
-                            className={`w-full max-w-sm py-4 rounded-2xl font-black uppercase tracking-[0.3em] text-[11px] transition-all shadow-xl ${characterName.trim()
-                                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:scale-[1.02] shadow-purple-500/20'
-                                : 'bg-white/5 text-white/10 cursor-not-allowed'
+                            disabled={!characterName.trim() || !setting.trim() || !role.trim() || isValidating}
+                            onClick={handleContinue}
+                            className={`w-full max-w-sm py-4 rounded-2xl font-black uppercase tracking-[0.3em] text-[11px] transition-all shadow-xl flex items-center justify-center gap-3 ${characterName.trim() && setting.trim() && role.trim() && !isValidating
+                                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:scale-[1.02] shadow-purple-500/20'
+                                    : 'bg-white/5 text-white/10 cursor-not-allowed'
                                 }`}
                         >
-                            {lang("LOBBY_CONTINUE_BUTTON")}
+                            {isValidating ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span>Validating...</span>
+                                </>
+                            ) : (
+                                <span>{lang("LOBBY_CONTINUE_BUTTON")}</span>
+                            )}
                         </button>
                     </div>
                 </div>
@@ -241,4 +269,4 @@ const SystemDetailsPopup: React.FC<SystemDetailsPopupProps> = ({ system, onClose
     );
 };
 
-export default SystemDetailsPopup;
+export default SuggestOwnPopup;

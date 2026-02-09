@@ -1,17 +1,25 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { Lock } from 'lucide-react';
+import { useLang } from "../../i18n/lang";
 import { FREE_PLAY_SYSTEMS } from '../../data/freePlaySystems';
 import type { FreePlaySystem } from '../../data/freePlaySystems';
+import { audioManager } from '../../lib/audioManager';
+import { usePastGamesStore } from '../../store/pastGamesStore';
 
 interface SystemSelectionProps {
     onSelect: (system: FreePlaySystem) => void;
-    onSuggestOwn: () => void;
+    onSelectCustom: () => void;
+    onLockedClick?: () => void;
     disabled?: boolean;
 }
 
-const SystemSelection: React.FC<SystemSelectionProps> = ({ onSelect, onSuggestOwn, disabled }) => {
+const SystemSelection: React.FC<SystemSelectionProps> = ({ onSelect, onSelectCustom, onLockedClick, disabled }) => {
+    const lang = useLang();
+    const hasPlayed = usePastGamesStore((s) => s.games.length > 0);
+
     return (
-        <div className={`fixed inset-0 flex flex-col items-center w-full px-4 pt-[24vh] pb-12 space-y-10 overflow-y-auto scrollbar-hide z-10 transition-all duration-500 ${disabled ? 'blur-sm pointer-events-none opacity-40' : 'opacity-100'}`}>
+        <div className={`fixed inset-0 flex flex-col items-center w-full px-4 pt-[24vh] pb-12 space-y-10 overflow-y-auto scrollbar-hide z-10 transition-all duration-500 opacity-100`}>
             {/* Background Decorative Glow (subtle) */}
             <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-600/5 blur-[120px] rounded-full -z-10" />
 
@@ -55,15 +63,15 @@ const SystemSelection: React.FC<SystemSelectionProps> = ({ onSelect, onSuggestOw
                             {/* Name and Setting info */}
                             <div className="flex flex-col flex-1 min-w-0">
                                 <span className="text-amber-400 font-black uppercase tracking-[0.2em] text-[11px] sm:text-xs group-hover:text-amber-300 transition-colors truncate">
-                                    {system.governanceSystem}
+                                    {lang(system.governanceSystem)}
                                 </span>
                                 <div className="flex items-center gap-2 mt-1.5">
                                     <span className="text-white/60 text-[9px] uppercase tracking-widest font-bold">
-                                        {system.scenario}
+                                        {lang(system.scenario)}
                                     </span>
                                     <span className="text-white/20 text-[9px] font-bold">•</span>
                                     <span className="text-white/60 text-[9px] uppercase tracking-widest font-bold">
-                                        {system.year}
+                                        {lang(system.year)}
                                     </span>
                                 </div>
                             </div>
@@ -87,13 +95,27 @@ const SystemSelection: React.FC<SystemSelectionProps> = ({ onSelect, onSuggestOw
                 className="pt-2 pb-6"
             >
                 <motion.button
-                    whileHover={{ scale: 1.08, boxShadow: "0 0 60px rgba(139, 92, 246, 0.6)" }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={onSuggestOwn}
-                    className="px-14 py-5 rounded-3xl bg-gradient-to-br from-purple-600 to-indigo-700 text-white font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl transition-all border border-white/20 hover:from-purple-500 hover:to-indigo-600 relative overflow-hidden group"
+                    whileHover={!hasPlayed ? { scale: 1.02 } : { scale: 1.08, boxShadow: "0 0 60px rgba(139, 92, 246, 0.6)" }}
+                    whileTap={!hasPlayed ? {} : { scale: 0.95 }}
+                    onClick={() => {
+                        if (!hasPlayed) {
+                            audioManager.playSfx('click-soft');
+                            if (onLockedClick) onLockedClick();
+                            else alert(lang('LOBBY_SUGGEST_OWN_LOCKED_DESC'));
+                            return;
+                        }
+                        onSelectCustom();
+                    }}
+                    className={`px-14 py-5 rounded-3xl bg-gradient-to-br transition-all border border-white/20 relative overflow-hidden group flex items-center gap-3 ${hasPlayed
+                        ? 'from-purple-600 to-indigo-700 text-white font-black hover:from-purple-500 hover:to-indigo-600 shadow-2xl'
+                        : 'from-gray-700 to-gray-800 text-white/40 cursor-default opacity-80'
+                        }`}
                 >
-                    <span className="relative z-10">Suggest Your Own</span>
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-shimmer" />
+                    {!hasPlayed && <Lock className="w-4 h-4 text-white/40" />}
+                    <span className={`relative z-10 uppercase tracking-[0.3em] text-[10px] ${!hasPlayed ? 'font-bold' : 'font-black'}`}>
+                        {lang('SUGGEST_YOUR_OWN')}
+                    </span>
                 </motion.button>
             </motion.div>
         </div>

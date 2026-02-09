@@ -51,7 +51,7 @@ import {
 } from "./services/promptBuilders.mjs";
 
 import { registerUser, generateIntroParagraph, validateRole, extractTrait } from "./controllers/userController.mjs";
-import { reserveGameSlot, gameTurnV2, gameTurnCleanup, generateAftermath, answerInquiry, freePlayIntro, freePlayTurn } from "./controllers/gameController.mjs";
+import { reserveGameSlot, gameTurnV2, gameTurnCleanup, generateAftermath, answerInquiry, freePlayIntro, freePlayTurn, validateFreePlayInput } from "./controllers/gameController.mjs";
 import { suggestBackground, analyzeCompass, generateNewsTicker, validateSuggestion, generateDynamicParameters, suggestScenario, seedNarrative } from "./controllers/contentController.mjs";
 import { textToSpeech } from "./controllers/voiceController.mjs";
 import { testEmailConfiguration, sendThresholdAlert, resetEmailFlag } from "./services/emailService.mjs";
@@ -122,6 +122,7 @@ app.post("/api/users/register", registerUser);
 
 // -------------------- Free Play Mode --------------------
 app.post("/api/free-play/intro", freePlayIntro);
+app.post("/api/free-play/validate", validateFreePlayInput);
 app.post("/api/free-play/turn", freePlayTurn);
 
 // -------------------- Power Distribution Questionnaire --------------------
@@ -254,14 +255,14 @@ app.post("/api/reserve-game-slot", reserveGameSlot);
 app.get("/api/test-email-config", async (req, res) => {
   try {
     const isValid = await testEmailConfiguration();
-    res.json({ 
+    res.json({
       success: isValid,
       message: isValid ? "Email configuration is valid" : "Email configuration test failed"
     });
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });
@@ -271,14 +272,14 @@ app.post("/api/test-threshold-email", async (req, res) => {
   try {
     const { gamesRemaining = 50 } = req.body;
     await sendThresholdAlert(gamesRemaining, 50);
-    res.json({ 
+    res.json({
       success: true,
       message: `Test email sent for ${gamesRemaining} games remaining`
     });
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });
@@ -286,7 +287,7 @@ app.post("/api/test-threshold-email", async (req, res) => {
 // Reset email flag (for testing)
 app.post("/api/reset-email-flag", (req, res) => {
   resetEmailFlag();
-  res.json({ 
+  res.json({
     success: true,
     message: "Email flag reset successfully"
   });

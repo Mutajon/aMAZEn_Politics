@@ -8,7 +8,7 @@
 // ----------------------------------------------------------------------------
 // 1. INTRO GENERATION
 // ----------------------------------------------------------------------------
-export function buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender, tone = "serious", systemName, year, roleExperience, messenger) {
+export function buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender, tone = "serious", systemName, year, roleExperience, messenger, language = 'en') {
   const roleLine = role || "Unknown Role";
   const settingLine = setting || "Unknown Setting";
   const sysLine = systemName ? `SYSTEM: Ground the story in the "${systemName}" political framework.` : "";
@@ -22,8 +22,12 @@ export function buildFreePlayIntroSystemPrompt(role, setting, playerName, emphas
   if (gender === 'other') genderGrammar = "MALE PLURAL (Neutral/Inclusive)";
 
   const genderLine = `GENDER: Use ${genderGrammar} grammar for the player (especially in gendered languages like Hebrew).`;
+  const langName = language === 'he' ? "HEBREW (Natural/Spoken)" : "ENGLISH";
 
-  return `MISSION:
+  return `STRICT: ALL GENERATED CONTENT (except JSON keys) MUST BE IN ${langName}.
+Translate any English context or instructions provided below into ${langName}.
+
+MISSION:
 You are the ${messenger && messenger !== 'NA' ? messenger : 'Messenger'}. 
 Generate a short, atmospheric introductory greeting and spoken report (EXACTLY 2 short sentences).
 
@@ -52,7 +56,7 @@ INSTRUCTIONS:
 - **Support Entities**: Identify EXACTLY 3 support entities that reflect the setting:
   1. "Population": A group representing the common people (e.g., "The Mob", "The Peasants").
   2. "Opposition": A group or institution representing the status quo or rival power (e.g., "The Senate", "The Church").
-  3. "Mom": ALWAYS include the player's Mother ("Mom"). She represents personal empathy, family stakes, and the weight of conscience.
+  3. "Mom": ALWAYS include the player's Mother ("Mom" in English, or "אמא" in Hebrew). She represents personal empathy, family stakes, and the weight of conscience.
 - CRITICAL: DO NOT include yourself (${messenger}) in the supportEntities list. You are the one speaking. The third observer MUST be "Mom".
 - Choose a relevant emoji icon for each entity.
 - Provide a short "summary" (1 sentence) of their current stance/mood toward the player.
@@ -80,6 +84,7 @@ export function buildFreePlaySystemPrompt(context) {
   const narrator = messenger && messenger !== 'NA' ? messenger : (tone === 'satirical' ? 'The Satirical Oracle' : 'Cold Narrator');
   const lang = language === 'he' ? "Hebrew (Natural/Spoken)" : "English";
   const genderGrammar = gender === 'female' ? 'FEMALE' : (gender === 'other' ? 'MALE PLURAL' : 'MALE');
+  const momName = language === 'he' ? "אמא" : "Mom";
   const entities = supportEntities ? supportEntities.map(e => `- ${e.name} (${e.type}): ${e.summary}`).join('\n') : "";
 
   const objectiveSection = bonusObjective ? `
@@ -115,7 +120,7 @@ RULES:
 - Persona: You ARE ${narrator}. You are NOT an omniscient book narrator.
 - Report POV: Do NOT describe scenes like a novelist. Instead, announce news, report rumors, or describe what you are seeing right now to the player.
 - Addressing the Player: Start or end your description by addressing the player (e.g., "My Liege," "Neighbor," "Your Excellency") naturally.
-- CRITICAL: You are speaking as ${narrator}. You are NOT "Mom". "Mom" is a separate character (support entity).
+- CRITICAL: You are speaking as ${narrator}. You are NOT "${momName}". "${momName}" is a separate character (support entity).
 - Situations: Personal, Social, National, International. Rotate Axis and Scope. 
 ${tone === 'satirical'
       ? "- Style: SNAPPY, cynically funny, absurdist. dark humor. SPEAK like a weary, biting advisor."
@@ -130,7 +135,7 @@ SCHEMA:
   "supportShift": {
     "people": {"attitudeLevel": "...", "shortLine": "..."},
     "holders": {"attitudeLevel": "...", "shortLine": "..."},
-    "mom": {"attitudeLevel": "...", "shortLine": "... (Regarding the character 'Mom')"}
+    "mom": {"attitudeLevel": "...", "shortLine": "... (Regarding the character '${momName}')"}
   },
   "dilemma": {
     "title": "...", "description": "Spoken report from your POV. End with question.",
@@ -224,4 +229,49 @@ Last choice: "${playerChoice.title}"
 5. **AXIS**: Analyze the player's last choice ("${playerChoice.title}") and identify poles reinforced.
 
 Deliver this as a natural spoken report. NO book-like prose.`;
+}
+// ----------------------------------------------------------------------------
+// 4. CUSTOM SCENARIO VALIDATION
+// ----------------------------------------------------------------------------
+export function buildFreePlayValidationPrompt(setting, role, language = 'en') {
+  const langName = language === 'he' ? "HEBREW (Natural/Spoken)" : "ENGLISH";
+
+  return `STRICT: ALL GENERATED CONTENT (except JSON keys) MUST BE IN ${langName}.
+Translate any English context or instructions provided below into ${langName}.
+
+MISSION:
+Verify if the provided SETTING and ROLE are coherent, appropriate (not pornographic or gibberish), and sufficient to build a political story.
+If valid, infer a probable YEAR/ERA if one is missing from the setting, and provide a short description of the ROLE EXPERIENCE (what it feels like to be this person in this time/place).
+
+CONTEXT:
+- Setting: ${setting}
+- Role: ${role}
+
+VALDIATION RULES:
+1. Permissive: Allow creative, sci-fi, or historical combinations.
+2. Reasonable: Must not be random keyboard mashing (gibberish).
+3. Safe: Reject pornographic or highly offensive content.
+4. Coherent: The role should make some sense within the setting (even if unusual).
+
+INSTRUCTIONS:
+- If INVALID: 
+  - Set "isValid": false.
+  - Provide a "message" that is natural, slightly amusing, and explains why it's rejected (e.g., "That sounds like a fever dream, not a role!", "We're building a drama, not a manual for... whatever that is.").
+- If VALID:
+  - Set "isValid": true.
+  - Provide the "setting" (refined if needed).
+  - Provide the "role" (refined if needed).
+  - Provide a "year" (infer if missing).
+  - Provide "roleExperience" (Max 1 short sentence describing the feel of the role).
+
+Output JSON:
+{
+  "isValid": boolean,
+  "message": "...", 
+  "setting": "...",
+  "role": "...",
+  "year": "...",
+  "roleExperience": "..."
+}
+`;
 }

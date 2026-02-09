@@ -15,7 +15,8 @@ import {
 import {
     buildFreePlayIntroSystemPrompt,
     buildFreePlaySystemPrompt,
-    buildFreePlayUserPrompt
+    buildFreePlayUserPrompt,
+    buildFreePlayValidationPrompt
 } from "../services/freePlayPrompts.mjs";
 import { getTheoryPrompt } from "../theory-loader.mjs";
 import { sendThresholdAlert } from "../services/emailService.mjs";
@@ -729,13 +730,14 @@ export async function freePlayIntro(req, res) {
             systemName,
             year,
             roleExperience,
-            messenger
+            messenger,
+            language = 'en'
         } = req.body;
 
         console.log(`[FREE-PLAY-INTRO] Generating intro for ${playerName} (${role}, gender: ${gender}, tone: ${tone}, model: ${modelOverride || 'default'})...`);
         console.log(`[FREE-PLAY-INTRO] 🎭 Selected Tone: ${tone}`);
 
-        const systemPrompt = buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender, tone, systemName, year, roleExperience, messenger);
+        const systemPrompt = buildFreePlayIntroSystemPrompt(role, setting, playerName, emphasis, gender, tone, systemName, year, roleExperience, messenger, language);
         // Using "intro" as a dummy user prompt to trigger generation
         const messages = [
             { role: "system", content: systemPrompt },
@@ -753,6 +755,36 @@ export async function freePlayIntro(req, res) {
     } catch (e) {
         console.error("[FREE-PLAY-INTRO] Error:", e);
         res.status(500).json({ error: "Failed to generate intro" });
+    }
+}
+
+/**
+ * POST /api/free-play/validate
+ * Validate custom setting and role
+ */
+export async function validateFreePlayInput(req, res) {
+    try {
+        const { setting, role, language = 'en', model: modelOverride = null } = req.body;
+
+        console.log(`[FREE-PLAY-VALIDATE] Validating: ${role} in ${setting} (${language})`);
+
+        const systemPrompt = buildFreePlayValidationPrompt(setting, role, language);
+        const messages = [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: "Validate these inputs." }
+        ];
+
+        const aiResponse = await callGeminiChat(messages, modelOverride || "gemini-3-flash-preview");
+        const parsed = safeParseJSON(aiResponse.content, { debugTag: "FREE-PLAY-VALIDATE" });
+
+        if (!parsed) {
+            throw new Error("Failed to parse validation response");
+        }
+
+        return res.json(parsed);
+    } catch (e) {
+        console.error("[FREE-PLAY-VALIDATE] Error:", e);
+        res.status(500).json({ error: "Validation failed" });
     }
 }
 

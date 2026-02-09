@@ -11,7 +11,9 @@ import { useNarrator } from "../hooks/useNarrator";
 import SystemSelection from "./lobby/SystemSelection";
 import { useLogger } from "../hooks/useLogger";
 import SystemDetailsPopup from "./lobby/SystemDetailsPopup";
+import SuggestOwnPopup from "./lobby/SuggestOwnPopup";
 import GameSettingsPopup from "./lobby/GameSettingsPopup";
+import LobbyLockedPopup from "./lobby/LobbyLockedPopup";
 import type { FreePlaySystem } from "../data/freePlaySystems";
 import { bgStyleSplash } from "../lib/ui";
 
@@ -106,7 +108,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
 
     // New state for Intro flow
-    const [step, setStep] = useState<'selection' | 'form' | 'intro' | 'spice'>('selection');
+    const [step, setStep] = useState<'selection' | 'form' | 'intro' | 'spice' | 'custom'>('selection');
     const [bonusObjective, setBonusObjective] = useState("");
     const [introData, setIntroData] = useState<{ intro: string, mirrorMsg: string, supportEntities?: any[] } | null>(null);
     const [isGeneratingIntro, setIsGeneratingIntro] = useState(false);
@@ -114,10 +116,13 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     const [useBonusObjective, setUseBonusObjective] = useState(false);
     const [messenger, setMessenger] = useState("");
     const [roleCategory, setRoleCategory] = useState<"leader" | "commoner" | null>(null);
+    const [inferredYear, setInferredYear] = useState("");
+    const [inferredExperience, setInferredExperience] = useState("");
 
     const [showNamePresets, setShowNamePresets] = useState(false);
     const [showSettingPresets, setShowSettingPresets] = useState(false);
     const [showRolePresets, setShowRolePresets] = useState(false);
+    const [showLockedPopup, setShowLockedPopup] = useState(false);
 
     const nameDropdownRef = useRef<HTMLDivElement>(null);
     const settingDropdownRef = useRef<HTMLDivElement>(null);
@@ -140,6 +145,9 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    const isIntroReady = step === 'intro' && !isGeneratingIntro;
+    const isFullScreenStep = ['selection', 'spice', 'custom'].includes(step) || isIntroReady;
 
 
     // Narration for intro
@@ -184,6 +192,26 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         setStep('spice');
     };
 
+    const handleCustomConfirm = (data: {
+        characterName: string,
+        setting: string,
+        role: string,
+        avatar: string,
+        year: string,
+        roleExperience: string
+    }) => {
+        audioManager.playSfx("click-soft");
+        setCharacterName(data.characterName);
+        setSetting(data.setting);
+        setRole(data.role);
+        setSelectedAvatar(data.avatar);
+        setInferredYear(data.year);
+        setInferredExperience(data.roleExperience);
+        setRoleCategory(null);
+        setMessenger(""); // Custom roles default to no specific messenger (will fallback to "Mom" in system prompt)
+        setStep('spice');
+    };
+
     const handleSpiceConfirm = (settings: {
         difficulty: string,
         tone: string,
@@ -209,9 +237,9 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         for (let i = 0; i < attempts; i++) {
             try {
                 // Determine persistent fields
-                const systemName = selectedSystem?.governanceSystem || "Custom System";
-                const year = selectedSystem?.year || "Present Day";
-                const roleExperience = roleCategory === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
+                const systemName = selectedSystem?.governanceSystem || "Custom Scenario";
+                const year = inferredYear || selectedSystem?.year || "Present Day";
+                const roleExperience = inferredExperience || (roleCategory === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience);
 
                 // Final emphasis (either user choice or bonus objective)
                 const finalEmphasis = useBonusObjective ? bonusObjective : (emphasis || selectedSystem?.intro || "A new era begins.");
@@ -464,8 +492,8 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
             {isOpen && (
                 <motion.div
                     key="lobby-popup-main"
-                    className="fixed inset-0 z-[100] grid place-items-center p-4 backdrop-blur-md"
-                    style={step === 'selection' ? bgStyleSplash : { backgroundColor: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 backdrop-blur-md"
+                    style={isFullScreenStep ? bgStyleSplash : { backgroundColor: 'rgba(0,0,0,0.84)', backdropFilter: 'blur(12px)' }}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -473,47 +501,196 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                     {/* Backdrop click to close */}
                     <div className="absolute inset-0" onClick={onClose} />
 
-                    {['selection', 'spice'].includes(step) ? (
-                        <div className="relative z-10 w-full h-full flex flex-col items-center justify-center pointer-events-none">
-                            {/* Screen Title - truly outside any container */}
-                            <motion.div
-                                initial={{ opacity: 0, y: -40 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="absolute top-[12%] text-center pointer-events-auto"
-                            >
-                                <h1 className="text-3xl sm:text-6xl font-black text-white drop-shadow-[0_0_30px_rgba(168,85,247,0.4)] tracking-tighter uppercase leading-none">
-                                    What would you like to<br />
-                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-400">experience</span> today?
-                                </h1>
-                            </motion.div>
+                    {isFullScreenStep ? (
+                        <div className="relative z-10 w-full h-full flex flex-col items-center pointer-events-none">
+                            {/* Screen Title (Selection only) */}
+                            {step === 'selection' && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: -40 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="absolute top-[12%] text-center pointer-events-auto"
+                                >
+                                    <h1 className="text-3xl sm:text-6xl font-black text-white drop-shadow-[0_0_30px_rgba(168,85,247,0.4)] tracking-tighter uppercase leading-none">
+                                        {lang("LOBBY_EXPERIENCE_PROMPT_PRE")}<br />
+                                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-400">{lang("LOBBY_EXPERIENCE_PROMPT_HIGHLIGHT")}</span> {lang("LOBBY_EXPERIENCE_PROMPT_POST")}
+                                    </h1>
+                                </motion.div>
+                            )}
 
-                            <div className="w-full h-full flex items-center justify-center pointer-events-auto">
-                                <SystemSelection
-                                    onSelect={handleSystemSelect}
-                                    onSuggestOwn={() => {
-                                        audioManager.playSfx("click-soft");
-                                        setStep('form');
-                                    }}
-                                    disabled={!!selectedSystem}
-                                />
+                            <div className="w-full h-full overflow-y-auto overflow-x-hidden pointer-events-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
+                                {!isIntroReady && (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                        <SystemSelection
+                                            key="system-selection"
+                                            onSelect={handleSystemSelect}
+                                            onSelectCustom={() => {
+                                                audioManager.playSfx("click-soft");
+                                                setStep('custom');
+                                            }}
+                                            onLockedClick={() => setShowLockedPopup(true)}
+                                            disabled={!!selectedSystem}
+                                        />
+                                    </div>
+                                )}
+
+                                {isIntroReady && (
+                                    <motion.div
+                                        key="intro-content"
+                                        initial={{ opacity: 0, y: 40 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12 flex flex-col items-center space-y-8 sm:space-y-12 min-h-full"
+                                    >
+                                        {/* Intro Header */}
+                                        <div className="text-center space-y-4">
+                                            <h2 className="text-3xl sm:text-4xl md:text-6xl font-black text-white uppercase tracking-tighter drop-shadow-lg">
+                                                {lang("YOUR_STORY_TITLE") || "Your Story"}
+                                            </h2>
+                                            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-xs sm:text-sm font-bold uppercase tracking-[0.2em] text-purple-300/80">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-white/40">{lang("LOBBY_THE_PLACE")}</span>
+                                                    <span>{setting}</span>
+                                                </div>
+                                                <div className="w-1.5 h-1.5 rounded-full bg-white/20" />
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-white/40">{lang("LOBBY_YOUR_ROLE_LABEL")}</span>
+                                                    <span>
+                                                        {selectedSystem && roleCategory
+                                                            ? (roleCategory === 'leader' ? lang("LOBBY_ROLE_LEADER") : lang("LOBBY_ROLE_COMMONER"))
+                                                            : role
+                                                        }
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Main Intro Text */}
+                                        <div className={`relative w-full max-w-3xl p-6 sm:p-10 rounded-[24px] sm:rounded-[40px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl ${isRTL ? 'text-right' : 'text-left'}`}>
+                                            <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-purple-500 to-indigo-600 rounded-full" />
+                                            <p className="text-lg sm:text-2xl md:text-3xl leading-relaxed text-slate-100 font-serif italic opacity-95">
+                                                "{introData?.intro}"
+                                            </p>
+                                        </div>
+
+                                        {/* Parameters Grid */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
+                                            {/* Judges & Observers */}
+                                            <div className="space-y-4">
+                                                <div className={`text-xs uppercase tracking-[0.3em] text-white/40 font-black px-2 ${isRTL ? 'text-right' : 'text-left'}`}>
+                                                    {lang("LOBBY_JUDGES_LABEL") || "The Observers"}
+                                                </div>
+                                                <div className="flex flex-wrap gap-3">
+                                                    {(introData?.supportEntities || [
+                                                        { name: lang("LOBBY_ENTITY_PEOPLE"), icon: "👥" },
+                                                        { name: lang("LOBBY_ENTITY_ESTABLISHMENT"), icon: "🏛️" }
+                                                    ]).map((entity, i) => (
+                                                        <motion.div
+                                                            key={i}
+                                                            initial={{ opacity: 0, scale: 0.9 }}
+                                                            animate={{ opacity: 1, scale: 1 }}
+                                                            transition={{ delay: 0.2 + i * 0.1 }}
+                                                            className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-white/5 border border-white/10 shadow-xl hover:bg-white/10 transition-all cursor-default group"
+                                                        >
+                                                            <span className="text-2xl group-hover:scale-110 transition-transform">{entity.icon}</span>
+                                                            <span className="text-sm font-bold text-white group-hover:text-purple-300 transition-colors uppercase tracking-wider">{entity.name}</span>
+                                                        </motion.div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Objective & Target */}
+                                            <div className="space-y-4">
+                                                <div className={`text-xs uppercase tracking-[0.3em] text-white/40 font-black px-2 ${isRTL ? 'text-right' : 'text-left'}`}>
+                                                    {lang("LOBBY_GOAL_LABEL") || "The Objective"}
+                                                </div>
+                                                <motion.div
+                                                    initial={{ opacity: 0, scale: 0.9 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    transition={{ delay: 0.4 }}
+                                                    className="flex items-center gap-5 px-6 py-4 rounded-3xl bg-amber-500/10 border border-amber-500/30 shadow-2xl group hover:border-amber-500/50 transition-all"
+                                                >
+                                                    <div className="p-3 rounded-2xl bg-amber-500/20 group-hover:bg-amber-500/30 transition-colors">
+                                                        <Target className="w-8 h-8 text-amber-500" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-amber-500/70 font-black uppercase tracking-widest mb-1">{lang("LOBBY_TARGET_SCORE_SHORT") || "Score Target"}</div>
+                                                        <div className="text-3xl font-black text-amber-500 leading-none tracking-tighter">
+                                                            {difficulty === 'easy' ? 200 : difficulty === 'hard' ? 250 : 225}
+                                                        </div>
+                                                    </div>
+                                                    <Trophy className="w-6 h-6 text-amber-500/30 ml-auto group-hover:text-amber-500/60 transition-colors" />
+                                                </motion.div>
+                                            </div>
+                                        </div>
+
+                                        {/* Mirror / Reflections Section */}
+                                        <div className="w-full max-w-2xl px-8 py-8 rounded-[40px] bg-neutral-900/60 border border-amber-500/20 shadow-2xl relative overflow-hidden group">
+                                            <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/5 via-transparent to-amber-500/5 pointer-events-none" />
+                                            <div className="flex flex-col sm:flex-row items-center gap-8 relative z-10">
+                                                <div className="w-28 h-32 relative flex-shrink-0">
+                                                    <img
+                                                        src="/assets/images/mirror.png"
+                                                        alt="Mirror"
+                                                        className="w-full h-full object-contain filter drop-shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-transform group-hover:scale-105 duration-700"
+                                                    />
+                                                    <MirrorReflection
+                                                        mirrorSize={100}
+                                                        avatarUrl={selectedAvatar ? `/assets/images/avatars/${selectedAvatar}.png` : undefined}
+                                                    />
+                                                </div>
+                                                <div className="flex-1 text-center sm:text-left">
+                                                    <div className="text-[10px] uppercase tracking-[0.4em] text-amber-500/50 font-black mb-3">{lang("LOBBY_REFLECTIONS")}</div>
+                                                    <p className="text-2xl text-amber-100/90 italic font-serif leading-relaxed">
+                                                        "{lang(introData?.mirrorMsg || "LOBBY_MIRROR_FREEPLAY_MSG")}"
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+
+                                        {/* Start Game Action */}
+                                        <motion.button
+                                            whileHover={{ scale: 1.02 }}
+                                            whileTap={{ scale: 0.98 }}
+                                            onClick={handleSubmit as any}
+                                            className="w-full max-w-sm h-14 sm:h-16 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-800 text-white font-black text-lg sm:text-xl uppercase tracking-widest shadow-[0_20px_50px_rgba(79,70,229,0.3)] hover:shadow-[0_20px_60px_rgba(79,70,229,0.5)] transition-all mb-4"
+                                        >
+                                            {lang("LOBBY_BEGIN_GAME")}
+                                        </motion.button>
+                                    </motion.div>
+                                )}
                             </div>
 
-                            {/* Custom Details Zoom-In */}
+                            {/* Overlays for selection/spice steps */}
                             <AnimatePresence>
-                                {selectedSystem && step !== 'spice' && (
+                                {!isIntroReady && selectedSystem && step !== 'spice' && (
                                     <SystemDetailsPopup
+                                        key="details-popup"
                                         system={selectedSystem}
                                         onClose={() => setSelectedSystem(null)}
                                         onContinue={handleDetailsConfirm}
                                     />
                                 )}
 
-                                {step === 'spice' && (
+                                {!isIntroReady && step === 'custom' && (
+                                    <SuggestOwnPopup
+                                        key="custom-popup"
+                                        onClose={() => setStep('selection')}
+                                        onContinue={handleCustomConfirm}
+                                    />
+                                )}
+
+                                {!isIntroReady && step === 'spice' && (
                                     <GameSettingsPopup
+                                        key="spice-popup"
+                                        isCustom={!selectedSystem}
                                         bonusObjective={bonusObjective}
                                         onClose={() => setStep('selection')}
                                         onStart={handleSpiceConfirm}
                                     />
+                                )}
+
+                                {showLockedPopup && (
+                                    <LobbyLockedPopup key="locked-popup" onClose={() => setShowLockedPopup(false)} />
                                 )}
                             </AnimatePresence>
                         </div>
@@ -523,19 +700,17 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.9, y: 20 }}
                             transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                            className={`relative w-full ${step === 'intro' ? 'max-w-4xl' : 'max-w-lg'} bg-neutral-900/90 border border-white/10 rounded-[32px] shadow-2xl overflow-hidden`}
+                            className="relative w-full max-w-lg bg-neutral-900/90 border border-white/10 rounded-[32px] shadow-2xl overflow-hidden pointer-events-auto"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            {/* Header (only for Form/Intro) */}
-                            <div className="px-8 pt-8 pb-4 text-center">
-                                <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-200 via-purple-300 to-purple-500 bg-clip-text text-transparent">
-                                    {step === 'intro' ? "Your Story" : lang("CREATE_YOUR_STORY")}
+                            {/* Header (form only) */}
+                            <div className="px-8 pt-8 pb-4 text-center border-b border-white/5 bg-white/5">
+                                <h2 className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-purple-200 via-blue-200 to-purple-400 bg-clip-text text-transparent uppercase tracking-tight">
+                                    {lang("CREATE_YOUR_STORY")}
                                 </h2>
-                                {step !== 'intro' && (
-                                    <p className="text-white/60 text-sm mt-1">
-                                        {lang("LOBBY_PLAY_SUBTITLE")}
-                                    </p>
-                                )}
+                                <p className="text-white/40 text-xs font-bold uppercase tracking-widest mt-1">
+                                    {lang("LOBBY_PLAY_SUBTITLE")}
+                                </p>
                             </div>
 
                             {/* Form or Intro View */}
@@ -862,120 +1037,15 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                             </div>
                                         )}
                                     </>
-                                ) : (
-                                    <div className="space-y-6">
-                                        {/* PLACE AND ROLE INFO */}
-                                        <div className="flex flex-wrap gap-x-8 gap-y-2 px-1 text-sm font-medium">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-white/40 uppercase tracking-widest text-[10px] font-bold">The place:</span>
-                                                <span className="text-purple-300">{setting}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-white/40 uppercase tracking-widest text-[10px] font-bold">Your role:</span>
-                                                <span className="text-purple-300">
-                                                    {selectedSystem && roleCategory
-                                                        ? (roleCategory === 'leader' ? lang("LOBBY_ROLE_LEADER") : lang("LOBBY_ROLE_COMMONER"))
-                                                        : role
-                                                    }
-                                                </span>
-                                            </div>
-                                        </div>
+                                ) : null}
 
-                                        {/* INTRO TEXT */}
-                                        <div className={`relative p-6 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 shadow-inner group ${isRTL ? 'text-right' : 'text-left'}`}>
-                                            <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/40 rounded-full" />
-                                            <p className="text-xl leading-relaxed text-indigo-100 italic font-serif opacity-90 group-hover:opacity-100 transition-opacity">
-                                                "{introData?.intro}"
-                                            </p>
-                                        </div>
-
-                                        {/* GAME PARAMETERS PILLS */}
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            {/* JUDGES */}
-                                            <div className="space-y-2.5">
-                                                <div className={`text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold px-1 ${isRTL ? 'text-right' : 'text-left'}`}>
-                                                    {lang("LOBBY_JUDGES_LABEL") || "The Observers"}
-                                                </div>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {(introData?.supportEntities || [
-                                                        { name: lang("LOBBY_ENTITY_PEOPLE"), icon: "👥" },
-                                                        { name: lang("LOBBY_ENTITY_ESTABLISHMENT"), icon: "🏛️" }
-                                                    ]).map((entity, i) => (
-                                                        <motion.div
-                                                            key={i}
-                                                            initial={{ opacity: 0, scale: 0.9 }}
-                                                            animate={{ opacity: 1, scale: 1 }}
-                                                            transition={{ delay: 0.2 + i * 0.1 }}
-                                                            className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-white/5 border border-white/10 shadow-lg hover:bg-white/10 transition-all cursor-default group"
-                                                        >
-                                                            <span className="text-xl group-hover:scale-110 transition-transform">{entity.icon}</span>
-                                                            <span className="text-xs font-bold text-white/80 group-hover:text-white transition-colors">{entity.name}</span>
-                                                        </motion.div>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            {/* GOAL */}
-                                            <div className="space-y-2.5">
-                                                <div className={`text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold px-1 ${isRTL ? 'text-right' : 'text-left'}`}>
-                                                    {lang("LOBBY_GOAL_LABEL") || "The Objective"}
-                                                </div>
-                                                <motion.div
-                                                    initial={{ opacity: 0, scale: 0.9 }}
-                                                    animate={{ opacity: 1, scale: 1 }}
-                                                    transition={{ delay: 0.4 }}
-                                                    className="flex items-center gap-3.5 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 shadow-lg group hover:border-amber-500/50 transition-all"
-                                                >
-                                                    <div className="p-2 rounded-lg bg-amber-500/20 group-hover:bg-amber-500/30 transition-colors">
-                                                        <Target className="w-5 h-5 text-amber-500" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-[10px] text-amber-500/60 leading-none mb-1.5 font-bold uppercase tracking-wider">{lang("LOBBY_TARGET_SCORE_SHORT") || "Score Target"}</div>
-                                                        <div className="text-xl font-black text-amber-500 leading-none tracking-tight">
-                                                            {difficulty === 'easy' ? 200 : difficulty === 'hard' ? 250 : 225}
-                                                        </div>
-                                                    </div>
-                                                    <Trophy className="w-4 h-4 text-amber-500/30 ml-auto group-hover:text-amber-500/50 transition-colors" />
-                                                </motion.div>
-                                            </div>
-                                        </div>
-
-                                        {/* MIRROR CONTAINER */}
-                                        <div className="relative p-6 rounded-2xl bg-neutral-900/80 border border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.1)] overflow-hidden">
-                                            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-amber-500/5 to-transparent pointer-events-none" />
-
-                                            <div className="flex flex-col items-center gap-5 text-center relative z-10">
-                                                {/* Mirror Icon/Title */}
-                                                <div className="w-24 h-28 relative">
-                                                    <img
-                                                        src="/assets/images/mirror.png"
-                                                        alt="Mirror"
-                                                        className="w-full h-full object-contain filter drop-shadow-[0_0_15px_rgba(245,158,11,0.4)]"
-                                                    />
-                                                    <MirrorReflection
-                                                        mirrorSize={90}
-                                                        avatarUrl={selectedAvatar ? `/assets/images/avatars/${selectedAvatar}.png` : undefined}
-                                                    />
-                                                </div>
-
-                                                <div className="space-y-1">
-                                                    <div className="text-[10px] uppercase tracking-[0.3em] text-amber-500/40 font-black">Reflections</div>
-                                                    <p className="text-amber-200/90 italic font-serif text-xl leading-relaxed max-w-md">
-                                                        "{lang(introData?.mirrorMsg || "LOBBY_MIRROR_FREEPLAY_MSG")}"
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Submit Button */}
-                                {!isGeneratingIntro && (
-                                    <div className="pt-4 pb-2">
+                                {/* Submit Button (Form only) */}
+                                {!isGeneratingIntro && step === 'form' && (
+                                    <div className="pt-4 pb-2 px-1">
                                         <button
                                             type="submit"
                                             disabled={!isFormValid || isLoading || isGeneratingIntro}
-                                            className={`w-full h-14 rounded-2xl font-bold text-lg shadow-lg transition-all active:scale-[0.98] ${isFormValid && !isLoading && !isGeneratingIntro
+                                            className={`w-full h-14 rounded-2xl font-black text-lg uppercase tracking-widest shadow-lg transition-all active:scale-[0.98] ${isFormValid && !isLoading && !isGeneratingIntro
                                                 ? "bg-gradient-to-r from-purple-500 via-indigo-600 to-purple-700 text-white hover:scale-[1.01] shadow-purple-900/40"
                                                 : "bg-white/5 text-white/20 cursor-not-allowed"
                                                 }`}
@@ -983,7 +1053,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                             {isLoading || isGeneratingIntro ? (
                                                 <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
                                             ) : (
-                                                step === 'form' ? lang("LOBBY_BEGIN_GAME_INTRO") : lang("LOBBY_BEGIN_GAME")
+                                                lang("LOBBY_BEGIN_GAME_INTRO")
                                             )}
                                         </button>
                                     </div>
