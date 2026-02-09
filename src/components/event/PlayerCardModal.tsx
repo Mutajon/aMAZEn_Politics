@@ -389,7 +389,7 @@ export default function PlayerCardModal({
                                 }}
                               >
                                 <ShieldCheck className="w-3 h-3" style={{ color }} />
-                                <span>{lang(`PHILOSOPHICAL_POLE_${pill.toUpperCase()}`)}</span>
+                                <span>{lang(`PHILOSOPHICAL_POLE_${pill.toUpperCase()}_TITLE`)}</span>
                               </div>
                             );
                           })}

@@ -273,7 +273,8 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
         if (s.includes("vatican")) return "/assets/images/freePlay/vaticanBKG.webp";
         if (s.includes("china")) return "/assets/images/freePlay/chinaBKG.webp";
         if (s.includes("mars")) return "/assets/images/freePlay/marsBKG.webp";
-        return "/assets/images/BKGs/mainBKG.jpg";
+        // Fallback for custom scenarios
+        return "/assets/images/freePlay/chooseOwn.webp";
       };
 
       roleStore.setRoleBackgroundImage(getBkgImage(data.setting));
@@ -322,14 +323,38 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
           </motion.div>
         ) : (
           <>
-            <motion.h1
-              initial={{ opacity: 0, y: 20, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: "spring", stiffness: 200, damping: 18 }}
-              className="text-4xl sm:text-5xl font-extrabold leading-tight tracking-tight bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]"
-            >
-              aMAZE'n Politics
-            </motion.h1>
+            {/* Logo Section */}
+            <div className="flex flex-col items-center mb-6">
+              {/* Logo Faces with hovering animation */}
+              <motion.img
+                src="/assets/images/logoFaces.webp"
+                alt="Logo Faces"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{
+                  opacity: 1,
+                  y: [0, -15, 0],
+                }}
+                transition={{
+                  opacity: { duration: 0.8 },
+                  y: {
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }
+                }}
+                className="w-60 sm:w-80 drop-shadow-[0_5px_15px_rgba(0,0,0,0.3)] mb-2"
+              />
+
+              {/* Text Logo Image */}
+              <motion.img
+                src="/assets/images/logo.webp"
+                alt="aMAZE'n Politics"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ type: "spring", stiffness: 200, damping: 18, delay: 0.2 }}
+                className="w-[21rem] sm:w-[26rem] h-auto drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]"
+              />
+            </div>
 
             {/* Animated subtitle */}
             <div className="relative min-h-[80px] flex flex-col items-center justify-start pt-4">

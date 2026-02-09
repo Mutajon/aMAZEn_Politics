@@ -104,7 +104,7 @@ const SuggestOwnPopup: React.FC<SuggestOwnPopupProps> = ({ onClose, onContinue }
                 {/* Left Side: Image Preview */}
                 <div className="w-full md:w-2/5 relative h-48 md:h-auto overflow-hidden">
                     <motion.img
-                        src="/assets/images/freeplay/chooseOwn.webp"
+                        src="/assets/images/freePlay/chooseOwn.webp"
                         alt="Custom Scenario"
                         className="w-full h-full object-cover opacity-60"
                         animate={{
@@ -239,8 +239,8 @@ const SuggestOwnPopup: React.FC<SuggestOwnPopupProps> = ({ onClose, onContinue }
                             disabled={!characterName.trim() || !setting.trim() || !role.trim() || isValidating}
                             onClick={handleContinue}
                             className={`w-full max-w-sm py-4 rounded-2xl font-black uppercase tracking-[0.3em] text-[11px] transition-all shadow-xl flex items-center justify-center gap-3 ${characterName.trim() && setting.trim() && role.trim() && !isValidating
-                                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:scale-[1.02] shadow-purple-500/20'
-                                    : 'bg-white/5 text-white/10 cursor-not-allowed'
+                                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:scale-[1.02] shadow-purple-500/20'
+                                : 'bg-white/5 text-white/10 cursor-not-allowed'
                                 }`}
                         >
                             {isValidating ? (

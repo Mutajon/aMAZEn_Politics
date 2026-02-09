@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useLang } from '../../i18n/lang';
 
 interface AdvisorPortraitProps {
     scenario: string;
@@ -14,6 +15,8 @@ export const AdvisorPortrait: React.FC<AdvisorPortraitProps> = ({
     name,
     className = ""
 }) => {
+    const lang = useLang();
+
     // Normalize scenario name according to naming convention (e.g., "Ancient Athens" -> "athens")
     const getNormalizedScenario = (s: string) => {
         const lowerS = s.toLowerCase();
@@ -29,6 +32,9 @@ export const AdvisorPortrait: React.FC<AdvisorPortraitProps> = ({
     const normalizedScenario = getNormalizedScenario(scenario);
     const toneSuffix = tone === 'satirical' ? 'Comedy' : 'Drama';
     const imagePath = `/assets/images/advisors/${normalizedScenario}${toneSuffix}.webp`;
+
+    // Translate the messenger name (it may be a localization key like "FREE_PLAY_MESSENGER_SCRIBE")
+    const translatedName = lang(name);
 
     return (
         <motion.div
@@ -49,7 +55,7 @@ export const AdvisorPortrait: React.FC<AdvisorPortraitProps> = ({
             >
                 <img
                     src={imagePath}
-                    alt={name}
+                    alt={translatedName}
                     className="w-24 h-auto md:w-32 drop-shadow-2xl scale-x-[-1]"
                     onError={(e) => {
                         // Fallback if image not found
@@ -65,7 +71,7 @@ export const AdvisorPortrait: React.FC<AdvisorPortraitProps> = ({
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
             >
                 <span className="text-[10px] md:text-xs font-black text-white/40 tracking-[0.3em] uppercase">
-                    {name}
+                    {translatedName}
                 </span>
             </motion.div>
         </motion.div>

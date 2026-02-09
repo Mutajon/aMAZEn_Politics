@@ -16,7 +16,21 @@ interface SystemSelectionProps {
 
 const SystemSelection: React.FC<SystemSelectionProps> = ({ onSelect, onSelectCustom, onLockedClick, disabled }) => {
     const lang = useLang();
-    const hasPlayed = usePastGamesStore((s) => s.games.length > 0);
+    const [hasPlayedLobby, setHasPlayedLobby] = React.useState(false);
+    const hasPastGames = usePastGamesStore((s) => s.games.length > 0);
+
+    React.useEffect(() => {
+        try {
+            const stored = localStorage.getItem('lobby-games-played');
+            if (stored && parseInt(stored, 10) > 0) {
+                setHasPlayedLobby(true);
+            }
+        } catch (e) {
+            // Ignore storage errors
+        }
+    }, []);
+
+    const hasPlayed = hasPastGames || hasPlayedLobby;
 
     return (
         <div className={`fixed inset-0 flex flex-col items-center w-full px-4 pt-[24vh] pb-12 space-y-10 overflow-y-auto scrollbar-hide z-10 transition-all duration-500 opacity-100`}>

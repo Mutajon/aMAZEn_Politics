@@ -147,7 +147,7 @@ export default function PhilosophicalPillsOverlay({
                             onAnimationComplete={() => advanceStep(index)}
                         >
                             <ShieldCheck className="w-3.5 h-3.5" />
-                            <span>+{lang(`PHILOSOPHICAL_POLE_${pole.toUpperCase()}`)}</span>
+                            <span>+{lang(`PHILOSOPHICAL_POLE_${pole.toUpperCase()}_TITLE`)}</span>
                         </motion.div>
                     );
                 })}
