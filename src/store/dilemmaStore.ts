@@ -390,7 +390,7 @@ export const useDilemmaStore = create<DilemmaState>()(
       },
       freePlayHistory: [],
 
-      aiModelOverride: "gemini-3-flash-preview",
+      aiModelOverride: null, // Default to null (backend decides - usually 2.5 Flash for Experiment, 3.0 Preview for Free Play)
       setAiModelOverride: (model) => {
         dlog("setAiModelOverride ->", model);
         set({ aiModelOverride: model });
@@ -508,6 +508,11 @@ export const useDilemmaStore = create<DilemmaState>()(
           justFinishedGame: false,
           lastGameScore: null,
           freePlayHistory: [],
+          philosophicalAxes: {
+            democracy: 0, oligarchy: 0,
+            autonomy: 0, heteronomy: 0,
+            liberalism: 0, totalism: 0
+          },
           // Note: we DON'T reset aiModelOverride or tone here, 
           // as they are usually set during lobby and need to persist into Day 1
         });

@@ -269,8 +269,8 @@ export async function gameTurnV2(req, res) {
                 }
 
                 const aiStart = Date.now();
-                const aiResponse = await callGeminiChat(messages, modelOverride || "gemini-3-flash-preview");
-                console.log(`[TIMING] Day 1 AI call took ${Date.now() - aiStart}ms (model: ${modelOverride || 'gemini-3-flash-preview'})`);
+                const aiResponse = await callGeminiChat(messages, modelOverride || "gemini-2.5-flash");
+                console.log(`[TIMING] Day 1 AI call took ${Date.now() - aiStart}ms (model: ${modelOverride || 'gemini-2.5-flash'})`);
 
                 content = aiResponse?.content;
                 if (!content) {
@@ -516,7 +516,7 @@ export async function gameTurnV2(req, res) {
                 }
 
                 const aiStart = Date.now();
-                const chosenModel = modelOverride || conversation.meta.aiModel || "gemini-3-flash-preview";
+                const chosenModel = modelOverride || conversation.meta.aiModel || "gemini-2.5-flash";
                 const aiResponse = await callGeminiChat(messages, chosenModel);
                 console.log(`[TIMING] Day ${day} AI call took ${Date.now() - aiStart}ms (model: ${chosenModel})`);
 

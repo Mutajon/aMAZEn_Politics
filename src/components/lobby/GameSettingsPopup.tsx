@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Flame, Zap, Target, ArrowLeft, Sparkles } from 'lucide-react';
 import { useLang } from "../../i18n/lang";
 import { audioManager } from '../../lib/audioManager';
+import { useLanguage } from "../../i18n/LanguageContext";
 
 interface GameSettingsPopupProps {
     onClose: () => void;
@@ -18,6 +19,8 @@ interface GameSettingsPopupProps {
 
 const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart, bonusObjective, isCustom }) => {
     const lang = useLang();
+    const { language } = useLanguage();
+    const isRTL = language === 'he';
     const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
     const [tone, setTone] = useState<'drama' | 'comedy'>('drama');
     const [emphasis, setEmphasis] = useState("");
@@ -85,8 +88,15 @@ const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart,
                         className="flex items-center justify-center gap-3 mb-2"
                     >
                         <Flame className="w-5 h-5 text-amber-500" />
-                        <h2 className="text-2xl font-black uppercase tracking-widest text-white italic">
-                            {lang("LOBBY_SPICE_PROMPT")}
+                        <h2
+                            className="text-2xl font-black uppercase tracking-widest text-white italic"
+                            dir={isRTL ? "rtl" : "ltr"}
+                        >
+                            {lang("LOBBY_SPICE_PROMPT_PRE")}{" "}
+                            <span className="bg-gradient-to-r from-amber-500 to-orange-600 bg-clip-text text-transparent">
+                                {lang("LOBBY_SPICE_PROMPT_HIGHLIGHT")}
+                            </span>
+                            {lang("LOBBY_SPICE_PROMPT_POST")}
                         </h2>
                     </motion.div>
                 </div>
