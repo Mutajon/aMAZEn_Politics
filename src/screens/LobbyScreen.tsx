@@ -19,6 +19,8 @@ import LanguageSelector from "../components/LanguageSelector";
 import { useLogger } from "../hooks/useLogger";
 import { audioManager } from "../lib/audioManager";
 import LobbyPlayPopup from "../components/LobbyPlayPopup";
+import CreditsPopup from "../components/lobby/CreditsPopup";
+import { Trophy } from "lucide-react";
 
 // localStorage key for tracking lobby games played
 const LOBBY_GAMES_PLAYED_KEY = 'lobby-games-played';
@@ -60,6 +62,7 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
   const [gamesPlayed, setGamesPlayed] = useState(0);
   const [isLimitReached, setIsLimitReached] = useState(false);
   const [showPlayPopup, setShowPlayPopup] = useState(false);
+  const [showCreditsPopup, setShowCreditsPopup] = useState(false);
 
   // Narrator and audio
   const narrator = useNarrator();
@@ -446,16 +449,56 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
                   {lang("FREE_PLAY_BUTTON") || "Play Now"}
                 </motion.button>
               )}
+
+              {/* Hall of Fame Button */}
+              {!isLoading && (
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: showButton ? 1 : 0 }}
+                  whileHover={{ scale: 1.05, backgroundColor: "rgba(255,255,255,0.1)" }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    audioManager.playSfx('click-soft');
+                    push("/highscores");
+                  }}
+                  className="flex items-center gap-2 px-6 py-2 rounded-xl text-amber-300/80 text-sm font-bold uppercase tracking-widest transition-all border border-amber-300/20 hover:border-amber-300/40"
+                >
+                  <Trophy className="w-4 h-4" />
+                  {lang("LOBBY_HALL_OF_FAME")}
+                </motion.button>
+              )}
             </div>
           </>
         )}
       </div>
+
+      {/* Credits Button (Bottom) */}
+      {!isLoading && (
+        <div className="absolute bottom-8 left-0 right-0 flex justify-center pointer-events-none">
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: showButton ? 1 : 0 }}
+            whileHover={{ opacity: 1, scale: 1.05 }}
+            onClick={() => setShowCreditsPopup(true)}
+            className="pointer-events-auto px-4 py-2 text-white/30 hover:text-white/60 text-xs font-bold uppercase tracking-[0.3em] transition-all"
+          >
+            {lang("LOBBY_CREDITS")}
+          </motion.button>
+        </div>
+      )}
+
       {/* Custom play popup */}
       <LobbyPlayPopup
         isOpen={showPlayPopup}
         onClose={() => setShowPlayPopup(false)}
         onSubmit={handlePopupSubmit}
         isLoading={isLoading}
+      />
+
+      {/* Credits popup */}
+      <CreditsPopup
+        isOpen={showCreditsPopup}
+        onClose={() => setShowCreditsPopup(false)}
       />
     </div>
   );
