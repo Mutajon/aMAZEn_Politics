@@ -998,6 +998,9 @@ export async function freePlayTurn(req, res) {
                 language: conversation.meta.language,
                 gender: conversation.meta.gender,
                 tone: contextTone,
+                supportEntities: conversation.meta.supportEntities,
+                bonusObjective: conversation.meta.bonusObjective,
+                objectiveStatus: conversation.meta.objectiveStatus,
                 systemName: conversation.meta.systemName,
                 year: conversation.meta.year,
                 roleExperience: conversation.meta.roleExperience,
@@ -1023,15 +1026,21 @@ export async function freePlayTurn(req, res) {
             ];
 
             // Process support shift
-            const currentSupport = conversation.meta.support || { people: 50, holders: 50 };
+            const currentSupport = conversation.meta.support || { people: 50, holders: 50, mom: 50 };
+            console.log(`[FREE-PLAY] Day ${day} Current Support (from meta):`, currentSupport);
+
             const supportShift = parsed.supportShift ? convertSupportShiftToDeltas(parsed.supportShift, currentSupport) : null;
+            console.log(`[FREE-PLAY] Day ${day} Support Shift (deltas):`, supportShift);
 
             // Updated support
             const updatedSupport = { ...currentSupport };
             if (supportShift) {
                 if (supportShift.people) updatedSupport.people = Math.max(0, Math.min(100, (updatedSupport.people || 50) + (supportShift.people.delta || 0)));
                 if (supportShift.holders) updatedSupport.holders = Math.max(0, Math.min(100, (updatedSupport.holders || 50) + (supportShift.holders.delta || 0)));
+                if (supportShift.mom) updatedSupport.mom = Math.max(0, Math.min(100, (updatedSupport.mom || 50) + (supportShift.mom.delta || 0)));
+                if (supportShift.momDied) updatedSupport.momAlive = false;
             }
+            console.log(`[FREE-PLAY] Day ${day} Updated Support (calculated):`, updatedSupport);
 
             // Update philosophical axes based on axisPills
             const axisPillsRaw = parsed.axisPills || [];

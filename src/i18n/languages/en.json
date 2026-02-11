@@ -179,6 +179,7 @@
   "LOBBY_PLACEHOLDER_SETTING": "e.g., WWII Submarine",
   "LOBBY_PLACEHOLDER_ROLE": "e.g., Telecom Officer",
   "LOBBY_PLACEHOLDER_EMPHASIS": "e.g., focus on military tensions, family honor",
+  "LOBBY_PLACEHOLDER_EMPHASIS_LONG": "e.g., focus on economic decline, judicial independence...",
   "LOBBY_RANDOMIZE": "Randomize",
   "LOBBY_SETTING_ATHENS": "Ancient Athens",
   "LOBBY_SETTING_NORTH_AMERICA": "Aztec Empire",

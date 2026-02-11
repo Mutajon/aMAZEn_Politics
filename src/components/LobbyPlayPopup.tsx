@@ -38,7 +38,7 @@ interface LobbyPlayPopupProps {
         tone: "serious" | "satirical";
         avatar: string | null;
         introText?: string;
-        supportEntities?: Array<{ name: string; icon: string; type: string }>;
+        supportEntities?: Array<{ name: string; icon: string; summary: string; type: string }>;
         systemName: string;
         year: string;
         roleExperience?: string;

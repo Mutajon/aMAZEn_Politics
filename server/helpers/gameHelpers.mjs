@@ -256,16 +256,27 @@ export function convertSupportShiftToDeltas(supportShift, currentSupport) {
 
     // Convert each entity's reaction to a random delta within range
     for (const [entity, shift] of Object.entries(supportShift)) {
-        // Skip unexpected entity keys from AI response
-        if (!deltas[entity]) {
+        const lowerKey = entity.toLowerCase();
+        let targetKey = null;
+
+        // Fuzzy mapping for entity keys
+        if (lowerKey === 'people' || lowerKey.includes('population') || lowerKey.includes('public')) {
+            targetKey = 'people';
+        } else if (lowerKey === 'holders' || lowerKey.includes('establishment') || lowerKey.includes('middle') || lowerKey.includes('council') || lowerKey.includes('opposition')) {
+            targetKey = 'holders';
+        } else if (lowerKey === 'mom' || lowerKey.includes('mother') || lowerKey.includes('family')) {
+            targetKey = 'mom';
+        }
+
+        if (!targetKey) {
             continue;
         }
 
         // Check if mom died
-        if (entity === 'mom') {
+        if (targetKey === 'mom') {
             const isDead = shift.attitudeLevel === 'dead' || shift.momDied === true;
             if (isDead) {
-                deltas.mom.delta = -100; // Force to 0 (assuming support is 0-100)
+                deltas.mom.delta = -100;
                 deltas.momDied = true;
                 deltas.mom.why = shift.shortLine || "Deceased";
                 continue;
@@ -276,12 +287,9 @@ export function convertSupportShiftToDeltas(supportShift, currentSupport) {
         const range = REACTION_RANGES[level];
 
         if (range) {
-            // Random integer between min and max (inclusive)
             const randomDelta = Math.floor(Math.random() * (range.max - range.min + 1)) + range.min;
-            deltas[entity].delta = randomDelta;
-            deltas[entity].why = shift.shortLine;
-        } else {
-            deltas[entity].delta = 0; // Unknown level
+            deltas[targetKey].delta = randomDelta;
+            deltas[targetKey].why = shift.shortLine;
         }
     }
 

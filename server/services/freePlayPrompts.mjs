@@ -127,7 +127,8 @@ ${tone === 'satirical'
       : "- Style: DRAMATIC, direct, sharp, and weighty advisor report."}
 - Length: Dilemma description max 2-3 sentences. 
 - Actions: Generate exactly 3 UNIQUE and distinct actions per dilemma.
-- Support Shift Logic: Real-time situational analysis.
+- Support Shift Logic: Real-time situational analysis. Determine how each entity reacts to the player's last choice.
+- **Allowed attitudeLevel**: "strongly_supportive", "moderately_supportive", "slightly_supportive", "slightly_opposed", "moderately_opposed", "strongly_opposed".
 - **Support Explanation (shortLine)**: Natural phrasing, max 1 short sentence.
 
 SCHEMA:

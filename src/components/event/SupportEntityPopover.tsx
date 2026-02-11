@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronUp, X, Users, Landmark, Scale, Shield, TrendingUp, Gavel, Users2, Globe } from "lucide-react";
+import { ChevronDown, ChevronUp, X, Users, Landmark, Scale, Shield, TrendingUp, Gavel, Users2, Globe, Heart } from "lucide-react";
 import type { SupportProfile } from "../../data/supportProfiles";
 import { useLang } from "../../i18n/lang";
 import { translateSupportSummary, translateSupportStances } from "../../i18n/translateSupportStances";
@@ -13,7 +13,7 @@ import { useRoleStore } from "../../store/roleStore";
 import { getPredefinedRole } from "../../data/predefinedRoles";
 
 type Props = {
-  entityType: "people" | "challenger";
+  entityType: "people" | "challenger" | "mom";
   entityName: string;
   supportProfile: SupportProfile;
   currentSupport: number;
@@ -52,7 +52,7 @@ export default function SupportEntityPopover({
 }: Props) {
   const lang = useLang();
   const [expanded, setExpanded] = useState(false);
-  
+
   // Get current role ID for translation
   const selectedRole = useRoleStore((s) => s.selectedRole);
   const roleData = selectedRole ? getPredefinedRole(selectedRole) : null;
@@ -78,8 +78,8 @@ export default function SupportEntityPopover({
   );
 
   // Determine icon and color based on entity type (matching support list)
-  const Icon = entityType === "people" ? Users : Landmark;
-  const iconColorClass = entityType === "people" ? "bg-emerald-600" : "bg-amber-600";
+  const Icon = entityType === "mom" ? Heart : (entityType === "people" ? Users : Landmark);
+  const iconColorClass = entityType === "mom" ? "bg-rose-600" : (entityType === "people" ? "bg-emerald-600" : "bg-amber-600");
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto">

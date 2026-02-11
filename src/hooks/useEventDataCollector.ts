@@ -532,6 +532,14 @@ async function fetchGameTurn(
       isFreePlay,
     });
 
+    console.log('[fetchGameTurn] 🎯 NEW SCORE CALCULATED:', {
+      people: latestPeople,
+      middle: latestMiddle,
+      mom: latestMom,
+      finalScore: breakdown.final,
+      targetScore: useRoleStore.getState().analysis?.targetScore
+    });
+
     setScore(breakdown.final);
   }
 

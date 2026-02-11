@@ -147,7 +147,7 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
     tone: "serious" | "satirical";
     avatar: string | null;
     introText?: string;
-    supportEntities?: Array<{ name: string; icon: string; type: string }>;
+    supportEntities?: Array<{ name: string; icon: string; summary: string; type: string }>;
     systemName: string;
     year: string;
     roleExperience?: string;
@@ -237,9 +237,9 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       if (data.difficulty === 'hard') targetScore = 220;
 
       // Determine Support Entities (Dynamic)
-      const population = data.supportEntities?.find(e => e.type === 'population') || { name: "The People", icon: "👥" };
-      const opposition = data.supportEntities?.find(e => e.type === 'opposition') || { name: "The Establishment", icon: "🏛️" };
-      const momEntity = data.supportEntities?.find(e => e.type === 'mom') || { name: "Mom", icon: "❤️" };
+      const population = data.supportEntities?.find(e => e.type === 'population') || { name: "The People", icon: "👥", summary: "The diverse public." };
+      const opposition = data.supportEntities?.find(e => e.type === 'opposition') || { name: "The Establishment", icon: "🏛️", summary: "The primary institutional power." };
+      const momEntity = data.supportEntities?.find(e => e.type === 'mom') || { name: "Mom", icon: "❤️", summary: "Your moral anchor." };
 
       // Prepare analysis for a custom scenario
       roleStore.setAnalysis({
@@ -247,10 +247,27 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
         systemDesc: `A unique scenario in ${data.setting} focusing on ${data.role}.`,
         flavor: `The weights of power in ${data.setting} are shifting.`,
         holders: [
-          { name: "Your Faction", percent: 40, icon: "👤" },
-          { name: opposition.name, percent: 30, icon: opposition.icon }, // "Middle" / Antagonist
-          { name: population.name, percent: 30, icon: population.icon }, // "People" / Population
+          { name: "Your Faction", percent: 40, icon: "👤", note: "The group you lead." },
+          { name: opposition.name, percent: 30, icon: opposition.icon, note: opposition.summary || "The primary institutional power." }, // "Middle" / Antagonist
+          { name: population.name, percent: 30, icon: population.icon, note: population.summary || "The diverse public." }, // "People" / Population
         ],
+        supportProfiles: {
+          people: {
+            summary: population.summary || "The public interest.",
+            stances: {},
+            origin: "ai"
+          },
+          challenger: {
+            summary: opposition.summary || "The institutional opposition.",
+            stances: {},
+            origin: "ai"
+          },
+          mother: {
+            summary: momEntity.summary || "Your moral anchor.",
+            stances: {},
+            origin: "ai"
+          }
+        },
         targetScore, // Pass difficulty target to store
         playerIndex: 0,
         grounding: {

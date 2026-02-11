@@ -33,7 +33,7 @@ const STANCE_KEY_MAP: Record<IssueKey, string> = {
  */
 export function translateSupportSummary(
   roleId: string,
-  entityType: "people" | "challenger",
+  entityType: "people" | "challenger" | "mom",
   summaryValue: string,
   lang: (key: string) => string
 ): string {
@@ -54,7 +54,7 @@ export function translateSupportSummary(
  */
 export function translateSupportStances(
   roleId: string,
-  entityType: "people" | "challenger",
+  entityType: "people" | "challenger" | "mom",
   stances: Partial<Record<IssueKey, string>>,
   lang: (key: string) => string
 ): Partial<Record<IssueKey, string>> {
@@ -69,7 +69,7 @@ export function translateSupportStances(
   for (const [key, value] of Object.entries(stances)) {
     const issueKey = key as IssueKey;
     const stanceKey = STANCE_KEY_MAP[issueKey];
-    
+
     if (!stanceKey || !value) {
       translatedStances[issueKey] = value;
       continue;
@@ -88,7 +88,7 @@ export function translateSupportStances(
  */
 export function translateSupportProfile(
   roleId: string,
-  entityType: "people" | "challenger",
+  entityType: "people" | "challenger" | "mom",
   profile: SupportProfile,
   lang: (key: string) => string
 ): SupportProfile {

@@ -19,6 +19,7 @@ export type SupportProfile = {
 export type RoleSupportProfiles = {
   people: SupportProfile | null;
   challenger: SupportProfile | null;
+  mother?: SupportProfile | null;
 };
 
 export const ROLE_SUPPORT_PROFILES: Record<string, RoleSupportProfiles> = {
