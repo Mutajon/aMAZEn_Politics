@@ -11,6 +11,7 @@
 // - Robust transport (keepalive fetch)
 
 import { useLoggingStore, ensureUserId } from '../store/loggingStore';
+import { useSettingsStore } from '../store/settingsStore';
 import type { LogEntry, BatchLogRequest, SessionStartRequest, LoggingStatusResponse } from '../types/logging';
 import packageJson from '../../package.json';
 import { PersistentQueue } from './persistentQueue';
@@ -101,6 +102,7 @@ class LoggingService {
    */
   async startSession(): Promise<string | null> {
     const { userId, gameVersion, treatment } = useLoggingStore.getState();
+    const { gameMode } = useSettingsStore.getState();
 
     if (!userId) {
       console.log('[Logging] Session start skipped (no userId)');
@@ -111,7 +113,8 @@ class LoggingService {
       const request: SessionStartRequest = {
         userId,
         gameVersion,
-        treatment
+        treatment,
+        gameMode
       };
 
       const response = await fetch('/api/log/session/start', {
@@ -222,6 +225,7 @@ class LoggingService {
       currentScreen: metadata?.screen,
       day: metadata?.day,
       role: metadata?.role,
+      gameMode: useSettingsStore.getState().gameMode,
       comments
     };
 

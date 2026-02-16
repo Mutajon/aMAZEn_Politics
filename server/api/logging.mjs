@@ -99,6 +99,7 @@ function validateLogEntry(entry) {
   if (!entry.treatment) errors.push('Missing treatment');
   if (!entry.source) errors.push('Missing source');
   if (!entry.action) errors.push('Missing action');
+  if (!entry.gameMode) errors.push('Missing gameMode');
 
   // Type validation
   if (entry.timestamp && !(entry.timestamp instanceof Date) && typeof entry.timestamp !== 'string') {
@@ -289,7 +290,7 @@ router.post('/session/start', async (req, res) => {
       });
     }
 
-    const { userId, gameVersion, treatment } = req.body;
+    const { userId, gameVersion, treatment, gameMode } = req.body;
 
     // Validate request
     if (!userId) {
@@ -325,6 +326,7 @@ router.post('/session/start', async (req, res) => {
       source: 'system',
       action: 'session_start',
       value: sessionId,  // sessionId value (no need for object wrapper)
+      gameMode: gameMode || 'experiment', // Fallback to experiment if not provided
       comments: 'User started new game session'
     }, {
       writeConcern: { w: 'majority', j: true, wtimeout: 10000 }
@@ -373,11 +375,12 @@ router.post('/summary', async (req, res) => {
     const summary = req.body;
 
     // Basic validation - ensure required fields exist
-    if (!summary.userId || !summary.sessionId || !summary.gameVersion) {
+    if (!summary.userId || !summary.sessionId || !summary.gameVersion || !summary.gameMode) {
       const missing = [];
       if (!summary.userId) missing.push('userId');
       if (!summary.sessionId) missing.push('sessionId');
       if (!summary.gameVersion) missing.push('gameVersion');
+      if (!summary.gameMode) missing.push('gameMode');
 
       console.error('[Logging] ❌ Summary validation failed: Missing fields:', missing.join(', '));
       console.error('[Logging] Received summary:', {

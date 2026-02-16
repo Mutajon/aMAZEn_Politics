@@ -1,4 +1,5 @@
 import { ensureUserId } from "../store/loggingStore";
+import { useSettingsStore } from "../store/settingsStore";
 import { COMPONENTS } from "../data/compass-data";
 import { useCompassStore } from "../store/compassStore";
 
@@ -26,7 +27,8 @@ export async function saveMotivations(
                 userId,
                 timestamp: Date.now(),
                 type,
-                motivations: motivationsLog
+                motivations: motivationsLog,
+                gameMode: useSettingsStore.getState().gameMode
             })
         });
 

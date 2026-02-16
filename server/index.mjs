@@ -151,7 +151,7 @@ app.post("/api/free-play/turn", freePlayTurn);
  */
 app.post("/api/power-questionnaire", async (req, res) => {
   try {
-    const { userId, timestamp, type, entities, currentReasoning, idealReasoning } = req.body;
+    const { userId, timestamp, type, entities, currentReasoning, idealReasoning, gameMode } = req.body;
 
     // Validate input
     if (!userId || !entities || !Array.isArray(entities)) {
@@ -171,6 +171,7 @@ app.post("/api/power-questionnaire", async (req, res) => {
       timestamp: timestamp || Date.now(),
       type: type || "initial",  // "initial" or "post-game"
       entities,
+      gameMode: gameMode || 'experiment',
       createdAt: new Date()
     };
 
@@ -212,7 +213,7 @@ app.post("/api/power-questionnaire", async (req, res) => {
  */
 app.post("/api/motivations-questionnaire", async (req, res) => {
   try {
-    const { userId, timestamp, type, motivations } = req.body;
+    const { userId, timestamp, type, motivations, gameMode } = req.body;
 
     if (!userId || !motivations || !Array.isArray(motivations)) {
       return res.status(400).json({
@@ -229,6 +230,7 @@ app.post("/api/motivations-questionnaire", async (req, res) => {
       timestamp: timestamp || Date.now(),
       type: type || "initial",
       motivations,
+      gameMode: gameMode || 'experiment',
       createdAt: new Date()
     };
 

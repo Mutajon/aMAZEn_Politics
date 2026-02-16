@@ -20,6 +20,7 @@ export interface LogEntry {
   currentScreen?: string;                  // Where action occurred (e.g., "/role", "/event")
   day?: number;                            // Game day (if in gameplay)
   role?: string;                           // Player's selected role (if applicable)
+  gameMode?: string;                       // Experiment vs Free Play
   comments?: string;                       // Human-readable description
 }
 
@@ -58,6 +59,7 @@ export interface SessionStartRequest {
   userId: string;
   gameVersion: string;
   treatment?: string;
+  gameMode?: string;
 }
 
 /**

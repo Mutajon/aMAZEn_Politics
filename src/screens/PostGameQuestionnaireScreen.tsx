@@ -11,6 +11,7 @@ import { useLang } from "../i18n/lang";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useQuestionnaireStore } from "../store/questionnaireStore";
 import { useLoggingStore } from "../store/loggingStore";
+import { useSettingsStore } from "../store/settingsStore";
 import { POWER_ENTITIES } from "../data/powerEntities";
 import PowerReasoningModal from "../components/PowerReasoningModal";
 
@@ -105,6 +106,7 @@ export default function PostGameQuestionnaireScreen({ push }: { push: (route: st
           type: "post-game",
           entities,
           idealReasoning: text,
+          gameMode: useSettingsStore.getState().gameMode
         }),
       });
       if (!response.ok) {

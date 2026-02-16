@@ -70,6 +70,7 @@ export type SessionSummary = {
     democracy: string;           // Same scale (extracted from decisions)
   } | null;
   aftermathGeneration: 'normal' | 'fallback'; // Whether AI generation succeeded or used fallback
+  gameMode: string;              // Experiment vs Free Play
   incomplete: boolean;           // True if session ended early
 };
 
@@ -255,6 +256,7 @@ export function collectSessionSummary(
     selfTrait: roleStore.playerTrait || null,
     ideologyRatings,
     aftermathGeneration: aftermathData?.isFallback ? 'fallback' : 'normal',
+    gameMode: settingsStore.gameMode,
     incomplete,
   };
 

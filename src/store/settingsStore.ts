@@ -99,6 +99,10 @@ type SettingsState = {
   // --- NEW: Free Play Mode (session-only, lightweight Gemini prompts) ---
   isFreePlay: boolean;
   setFreePlayMode: (v: boolean) => void;
+
+  // --- NEW: Game Mode (experiment vs free play) ---
+  gameMode: 'experiment' | 'free play';
+  setGameMode: (v: 'experiment' | 'free play') => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -202,6 +206,12 @@ export const useSettingsStore = create<SettingsState>()(
       // NEW: Free Play Mode (default false, session-only - NOT persisted)
       isFreePlay: false,
       setFreePlayMode: (v) => set({ isFreePlay: v }),
+
+      // NEW: Game Mode (default based on URL nomenclature)
+      gameMode: (typeof window !== 'undefined' && window.location.href.includes('-lobby'))
+        ? 'free play'
+        : 'experiment',
+      setGameMode: (v) => set({ gameMode: v }),
     }),
     {
       // Bump key so no stale objects hide the new fields
