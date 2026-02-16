@@ -147,6 +147,14 @@ export default function App() {
     useSettingsStore.getState().setIsMobileDevice(isMobilePhone);
   }, []);
 
+  // Sync gameMode based on route (ensures initial logs on /lobby are 'free play')
+  useEffect(() => {
+    if (route === '/lobby') {
+      useSettingsStore.getState().setGameMode('free play');
+      useSettingsStore.getState().setLobbyMode(true);
+    }
+  }, [route]);
+
   // The game status is now checked on "Start Game" button click.
 
   // Initialize logging service when consented (unless debug mode)

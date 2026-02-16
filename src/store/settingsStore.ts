@@ -191,8 +191,17 @@ export const useSettingsStore = create<SettingsState>()(
 
       // NEW: Experiment mode gate (default ON - experiment mode)
       experimentMode: true,
-      setExperimentMode: (v) => set({ experimentMode: v }),
-      toggleExperimentMode: () => set({ experimentMode: !get().experimentMode }),
+      setExperimentMode: (v) => set({
+        experimentMode: v,
+        gameMode: v ? 'experiment' : 'free play'
+      }),
+      toggleExperimentMode: () => {
+        const next = !get().experimentMode;
+        set({
+          experimentMode: next,
+          gameMode: next ? 'experiment' : 'free play'
+        });
+      },
 
       // NEW: Mobile device detection (default false, session-only - NOT persisted)
       isMobileDevice: false,
@@ -201,11 +210,17 @@ export const useSettingsStore = create<SettingsState>()(
       // NEW: Lobby mode (default false, session-only - NOT persisted)
       // Used when game is started from external website lobby flow
       lobbyMode: false,
-      setLobbyMode: (v) => set({ lobbyMode: v }),
+      setLobbyMode: (v) => set({
+        lobbyMode: v,
+        gameMode: v ? 'free play' : get().gameMode
+      }),
 
       // NEW: Free Play Mode (default false, session-only - NOT persisted)
       isFreePlay: false,
-      setFreePlayMode: (v) => set({ isFreePlay: v }),
+      setFreePlayMode: (v) => set({
+        isFreePlay: v,
+        gameMode: v ? 'free play' : get().gameMode
+      }),
 
       // NEW: Game Mode (default based on URL nomenclature)
       gameMode: (typeof window !== 'undefined' && window.location.href.includes('-lobby'))

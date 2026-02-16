@@ -78,7 +78,10 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
     const played = getLobbyGamesPlayed();
     setGamesPlayed(played);
     setIsLimitReached(played >= MAX_LOBBY_GAMES);
-  }, []);
+
+    // Ensure lobby mode is active on this screen
+    setLobbyMode(true);
+  }, [setLobbyMode]);
 
   // Log lobby screen loaded
   useEffect(() => {
