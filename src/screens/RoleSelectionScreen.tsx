@@ -204,7 +204,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
       });
 
       // For custom roles, use the splash screen maze image as background
-      setRoleBackgroundImage("/assets/images/BKGs/mainBKG.jpg");
+      setRoleBackgroundImage("/assets/images/BKGs/mainBKG.webp");
 
       // Clear role context (custom roles have no intro/year data)
       setRoleContext(null, null, null);
@@ -282,7 +282,7 @@ export default function RoleSelectionScreen({ push }: { push: PushFn }) {
     <div
       className="min-h-[100dvh] flex flex-col relative bg-[#1c1c1c]"
       style={{
-        backgroundImage: "url('/assets/images/BKGs/mainBKG.jpg')",
+        backgroundImage: "url('/assets/images/BKGs/mainBKG.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundAttachment: "fixed"

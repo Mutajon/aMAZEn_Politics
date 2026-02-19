@@ -107,7 +107,7 @@ export const useRoleCarousel = () => {
         id: 'custom-role',
         title: '❓',
         subtitle: undefined,
-        backgroundImage: '/assets/images/BKGs/mainBKG.jpg',
+        backgroundImage: '/assets/images/BKGs/mainBKG.webp',
         isLocked: false,
       });
     }

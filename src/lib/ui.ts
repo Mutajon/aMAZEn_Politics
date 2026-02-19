@@ -94,7 +94,7 @@ export const bgStyleSplash: CSSProperties = {
     // light dark overlay for text readability (30-40% opacity, lighter than before)
     "linear-gradient(to bottom, rgba(11, 19, 53, 0.3), rgba(11, 19, 53, 0.4))",
     // main maze image
-    "url(/assets/images/BKGs/mainBKG.jpg)",
+    "url(/assets/images/BKGs/mainBKG.webp)",
   ].join(", "),
 
   backgroundRepeat: "no-repeat, no-repeat, no-repeat",
@@ -112,7 +112,7 @@ export const bgStyleSplash: CSSProperties = {
  */
 export function bgStyleWithRoleImage(imagePath?: string | null): CSSProperties {
   // Fallback to splash screen image if no role image provided
-  const roleImage = imagePath || "/assets/images/BKGs/mainBKG.jpg";
+  const roleImage = imagePath || "/assets/images/BKGs/mainBKG.webp";
 
   return {
     // Solid fallback
