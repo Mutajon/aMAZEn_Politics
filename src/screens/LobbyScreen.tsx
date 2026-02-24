@@ -220,8 +220,9 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       // Set name
       roleStore.setPlayerName(data.characterName);
 
-      // Select the custom role
-      roleStore.setRole(data.role);
+      // Select the custom role, formatting it to cover all initial settings for comprehensive logging
+      const comprehensiveRole = `${data.role} - Diff: ${data.difficulty} - Tone: ${data.tone}${data.emphasis ? ` - Emp: ${data.emphasis}` : ''}`;
+      roleStore.setRole(comprehensiveRole);
 
       // Create character object with selected gender and avatar
       roleStore.setCharacter({

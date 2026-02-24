@@ -16,6 +16,7 @@ import GameSettingsPopup from "./lobby/GameSettingsPopup";
 import LobbyLockedPopup from "./lobby/LobbyLockedPopup";
 import type { FreePlaySystem } from "../data/freePlaySystems";
 import { bgStyleSplash } from "../lib/ui";
+import { loggingService } from "../lib/loggingService";
 
 const MODEL_OPTIONS = [
     { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
@@ -172,7 +173,11 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         setCharacterName(data.characterName);
         const isLeader = data.role === 'leader';
         logger.log('freeplay_details_confirmed', { characterName: data.characterName, role: data.role, avatar: data.avatar }, 'User confirmed character details');
-        setRole(isLeader ? 'Leader' : 'Commoner');
+
+        const systemDesc = lang(selectedSystem.governanceSystem);
+        const positionStr = isLeader ? lang("LOBBY_ROLE_LEADER") : lang("LOBBY_ROLE_COMMONER");
+        setRole(`${systemDesc} - ${positionStr}`);
+
         setRoleCategory(isLeader ? 'leader' : 'commoner');
         setSetting(selectedSystem.scenario);
         setSelectedAvatar(data.avatar);
@@ -201,6 +206,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         roleExperience: string
     }) => {
         audioManager.playSfx("click-soft");
+        logger.log('freeplay_custom_details_confirmed', { characterName: data.characterName, role: data.role, setting: data.setting, avatar: data.avatar }, 'User confirmed custom character details');
         setCharacterName(data.characterName);
         setSetting(data.setting);
         setRole(data.role);
@@ -219,7 +225,8 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         useBonusObjective: boolean
     }) => {
         audioManager.playSfx("click-soft");
-        logger.log('freeplay_spice_confirmed', settings, 'User confirmed spice settings');
+        const fullRole = `${role} - Diff: ${settings.difficulty} - Tone: ${settings.tone}${settings.emphasis ? ` - Emp: ${settings.emphasis}` : ''}`;
+        loggingService.log('freeplay_spice_confirmed', settings, 'User confirmed spice settings', { role: fullRole, screen: '/lobby' });
         setDifficulty(settings.difficulty as any);
         setTone(settings.tone === 'comedy' ? 'satirical' : 'serious');
         setUseBonusObjective(settings.useBonusObjective);
@@ -469,7 +476,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         // Random Role
         const randomRoleKey = ROLE_PRESETS[Math.floor(Math.random() * ROLE_PRESETS.length)];
         const roleName = lang(randomRoleKey);
-        setRole(roleName);
+        setRole(`${settingName} - ${roleName}`);
         setRoleCategory(randomRoleKey === "LOBBY_ROLE_LEADER" ? "leader" : "commoner");
 
         // Random Name
@@ -685,6 +692,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                         key="spice-popup"
                                         isCustom={!selectedSystem}
                                         bonusObjective={bonusObjective}
+                                        baseRole={role}
                                         onClose={() => setStep('selection')}
                                         onStart={handleSpiceConfirm}
                                     />

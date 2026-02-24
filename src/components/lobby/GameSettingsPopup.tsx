@@ -4,6 +4,7 @@ import { Flame, Zap, Target, ArrowLeft, Sparkles } from 'lucide-react';
 import { useLang } from "../../i18n/lang";
 import { audioManager } from '../../lib/audioManager';
 import { useLanguage } from "../../i18n/LanguageContext";
+import { loggingService } from '../../lib/loggingService';
 
 interface GameSettingsPopupProps {
     onClose: () => void;
@@ -15,12 +16,15 @@ interface GameSettingsPopupProps {
     }) => void;
     bonusObjective: string;
     isCustom?: boolean;
+    baseRole: string;
 }
 
-const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart, bonusObjective, isCustom }) => {
+const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart, bonusObjective, isCustom, baseRole }) => {
     const lang = useLang();
     const { language } = useLanguage();
     const isRTL = language === 'he';
+
+
     const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
     const [tone, setTone] = useState<'drama' | 'comedy'>('drama');
     const [emphasis, setEmphasis] = useState("");
@@ -50,6 +54,8 @@ const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart,
     };
 
     const handleSelectTone = (selectedTone: 'drama' | 'comedy') => {
+        const fullRole = `${baseRole} - Diff: ${difficulty} - Tone: ${selectedTone}${emphasis ? ` - Emp: ${emphasis}` : ''}`;
+        loggingService.log('freeplay_tone_selected', { tone: selectedTone }, `User selected tone: ${selectedTone}`, { role: fullRole, screen: '/lobby' });
         audioManager.playSfx("click-soft");
         if (selectedTone === 'comedy') {
             audioManager.playSfx("laugh-cartoon" as any);
@@ -58,6 +64,8 @@ const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart,
     };
 
     const handleDifficultySelect = (diff: 'easy' | 'normal' | 'hard') => {
+        const fullRole = `${baseRole} - Diff: ${diff} - Tone: ${tone}${emphasis ? ` - Emp: ${emphasis}` : ''}`;
+        loggingService.log('freeplay_difficulty_selected', { difficulty: diff }, `User selected difficulty: ${diff}`, { role: fullRole, screen: '/lobby' });
         audioManager.playSfx("click-soft");
         setDifficulty(diff);
     };

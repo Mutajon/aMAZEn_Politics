@@ -250,7 +250,11 @@ export const useSettingsStore = create<SettingsState>()(
         skipPreviousContext: s.skipPreviousContext,
         // NOTE: backstageMode is NOT persisted - session-only
         treatment: s.treatment,
-        // NOTE: experimentMode is NOT persisted - session-only (controlled by button choice)
+        isFreePlay: s.isFreePlay,
+        gameMode: s.gameMode,
+        experimentMode: s.experimentMode,
+        lobbyMode: s.lobbyMode,
+        // NOTE: backstageMode is NOT persisted - session-only
       }),
     }
   )

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, HelpCircle } from 'lucide-react';
 import type { PhilosophicalPole } from '../../store/dilemmaStore';
 import { useLanguage } from '../../i18n/LanguageContext';
 
@@ -251,6 +251,10 @@ const PhilosophicalRadarChart: React.FC<PhilosophicalRadarChartProps> = ({
                         >
                             {getPoleTitle(pole)}
                         </span>
+                        <HelpCircle
+                            className="w-3 h-3 opacity-40 group-hover:opacity-100 transition-opacity"
+                            style={{ color: colors[pole] }}
+                        />
                         <span className="text-[11px] font-bold opacity-60 group-hover:opacity-100 transition-opacity" style={{ color: colors[pole] }}>
                             {getSafeValue(pole)}
                         </span>

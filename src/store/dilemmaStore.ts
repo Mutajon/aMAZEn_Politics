@@ -163,7 +163,7 @@ type DilemmaState = {
 
   // Philosophical axes (Free Play mode) - 0-7 scale
   philosophicalAxes: Record<PhilosophicalPole, number>;
-  freePlayHistory: Array<{ day: number; title: string; pills: PhilosophicalPole[] }>;
+  freePlayHistory: Array<{ day: number; title: string; description: string; pills: PhilosophicalPole[] }>;
 
   // AI Model Override (Lab Mode)
   aiModelOverride: string | null;
@@ -871,10 +871,13 @@ export const useDilemmaStore = create<DilemmaState>()(
         const treatment = useSettingsStore.getState().treatment as TreatmentType;
         const config = getTreatmentConfig(treatment);
 
-        dlog("resetInquiryCredits ->", config.inquiryTokensPerDilemma);
+        const { isFreePlay } = useSettingsStore.getState();
+        const credits = isFreePlay ? 0 : config.inquiryTokensPerDilemma;
+
+        dlog("resetInquiryCredits ->", credits, isFreePlay ? "(Free Play bypass)" : "");
 
         set({
-          inquiryCreditsRemaining: config.inquiryTokensPerDilemma
+          inquiryCreditsRemaining: credits
         });
       },
 
@@ -1080,9 +1083,20 @@ export const useDilemmaStore = create<DilemmaState>()(
 
         dlog("applyAxisPills ->", pills);
 
-        // Get current day and dilemma title for history
-        const { day, current } = get();
-        const dilemmaTitle = current?.title || "Unknown Dilemma";
+        // Get current day from store
+        // Note: Pills arriving on Day N are effects of the choice made on Day N-1
+        const { day, lastChoice } = get();
+        const recordDay = Math.max(1, day - 1);
+
+        // Determine title and description from lastChoice (the choice that caused these pills)
+        let title = lastChoice?.title || "Unknown Decision";
+        let description = lastChoice?.summary || "";
+
+        // Handle custom suggestions
+        if (lastChoice?.id === 'suggest') {
+          title = "An original suggestion by you";
+          description = lastChoice.title; // The actual user input
+        }
 
         set(state => {
           const next = { ...state.philosophicalAxes };
@@ -1093,17 +1107,22 @@ export const useDilemmaStore = create<DilemmaState>()(
           });
 
           // Add to history
-          // Only add if not already present for this day (simple de-dupe)
+          // Only add if not already present for this recordDay (simple de-dupe)
           const history = [...state.freePlayHistory];
-          const existing = history.find(h => h.day === day);
+          const existing = history.find(h => h.day === recordDay);
 
           if (!existing && pills.length > 0) {
-            history.push({ day, title: dilemmaTitle, pills });
+            history.push({ day: recordDay, title, description, pills });
           } else if (existing) {
             // Append pills if entry exists (rare case of split updates)
             const newPills = pills.filter(p => !existing.pills.includes(p));
             if (newPills.length > 0) {
               existing.pills = [...existing.pills, ...newPills];
+            }
+            // Update title/description if they were fallback values
+            if (existing.title === "Unknown Decision" && title !== "Unknown Decision") {
+              existing.title = title;
+              existing.description = description;
             }
           }
 

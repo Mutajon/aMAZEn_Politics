@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLang } from '../i18n/lang';
+import { useSettingsStore } from '../store/settingsStore';
 
 /**
  * Hook for rotating loading tips with fade transitions
@@ -38,13 +39,18 @@ type FadeState = 'in' | 'visible' | 'out';
 
 export function useRotatingTips() {
   const lang = useLang();
-  
+
   // Get translated tips and shuffle them - recompute when language changes
   const shuffledTips = useMemo(() => {
-    const tips = LOADING_TIP_KEYS.map(key => lang(key));
+    const isFreePlay = useSettingsStore.getState().isFreePlay;
+    const keys = isFreePlay
+      ? LOADING_TIP_KEYS.filter(k => k !== "LOADING_TIP_INQUIRE")
+      : LOADING_TIP_KEYS;
+
+    const tips = keys.map(key => lang(key));
     return shuffleArray(tips);
   }, [lang]);
-  
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [fadeState, setFadeState] = useState<FadeState>('in');
   const timerRef = useRef<NodeJS.Timeout | null>(null);

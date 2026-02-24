@@ -15,7 +15,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, User, ShieldCheck } from "lucide-react";
+import { X, User, ShieldCheck, HelpCircle } from "lucide-react";
 import { PROPERTIES, PALETTE, COMPONENTS, type PropKey } from "../../data/compass-data";
 import { getAllTopCompassValues, type CompassComponentValue } from "../../lib/compassHelpers";
 import { useRoleStore } from "../../store/roleStore";
@@ -106,15 +106,18 @@ function CompassBox({
                 key={`${_propKey}-${idx}`}
                 ref={isHighlighted && valueRef ? valueRef : undefined}
                 onClick={() => onValueClick && onValueClick(component, idx)}
-                className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity ${isHighlighted
+                className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity group ${isHighlighted
                   ? 'ring-2 ring-yellow-400 animate-pulse hover:ring-yellow-300 transition-all transform scale-105 z-[9100] relative'
                   : ''
                   }`}
                 style={{ backgroundColor: `${color}10` }}
               >
-                <span className="text-sm text-white/90 font-medium">
-                  {translateCompassValue(component.short, lang)}
-                </span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-sm text-white/90 font-medium truncate">
+                    {translateCompassValue(component.short, lang)}
+                  </span>
+                  <HelpCircle className="w-3 h-3 text-white/40 group-hover:text-white/70 transition-colors shrink-0" />
+                </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <div
                     className="h-2 rounded-full min-w-[40px] max-w-[80px]"
@@ -371,7 +374,10 @@ export default function PlayerCardModal({
                       <div className="flex justify-between items-start mb-2">
                         <span className="text-xs text-white/40 uppercase font-mono mt-0.5">Day {entry.day}</span>
                       </div>
-                      <p className="text-white/90 font-medium mb-3 text-sm leading-relaxed">{entry.title}</p>
+                      <p className="text-white/90 font-medium mb-1 text-sm leading-relaxed">{entry.title}</p>
+                      {entry.description && (
+                        <p className="text-white/60 mb-3 text-[13px] leading-tight italic">{entry.description}</p>
+                      )}
 
                       {entry.pills.length > 0 && (
                         <div className="flex flex-wrap gap-2">
