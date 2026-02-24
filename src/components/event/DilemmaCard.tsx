@@ -36,9 +36,11 @@ export type DilemmaProps = {
 };
 
 import { TypewriterText } from "./TypewriterText";
+import { useLanguage } from "../../i18n/LanguageContext";
 
 export default function DilemmaCard({ title, description, variant = 'default', onTypewriterComplete }: DilemmaProps) {
   const lang = useLang();
+  const { language } = useLanguage();
   const treatment = useSettingsStore(state => state.treatment) as TreatmentType;
   const config = getTreatmentConfig(treatment);
   const inquiryCreditsRemaining = useDilemmaStore(state => state.inquiryCreditsRemaining);
@@ -63,6 +65,7 @@ export default function DilemmaCard({ title, description, variant = 'default', o
   const hasCredits = inquiryCreditsRemaining > 0;
 
   const isBubble = variant === 'bubble';
+  const isRTL = language === 'he';
 
   return (
     <>
@@ -75,7 +78,12 @@ export default function DilemmaCard({ title, description, variant = 'default', o
       >
         {/* Comic Bubble Tail */}
         {isBubble && (
-          <div className="absolute top-1/2 -right-2 -translate-y-1/2 w-4 h-4 bg-black/60 rotate-45 border-t border-r border-slate-700/50 backdrop-blur-sm ring-1 ring-amber-400/20" />
+          <div className={`
+            absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-black/60 rotate-45 backdrop-blur-sm ring-1 ring-amber-400/20
+            ${isRTL
+              ? '-right-2 border-t border-r border-slate-700/50'
+              : '-left-2 border-b border-l border-slate-700/50'}
+          `} />
         )}
 
         <div className={TITLE_CLASS}>{title}</div>

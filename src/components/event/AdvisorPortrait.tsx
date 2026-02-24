@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useLang } from '../../i18n/lang';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface AdvisorPortraitProps {
     scenario: string;
@@ -16,6 +17,8 @@ export const AdvisorPortrait: React.FC<AdvisorPortraitProps> = ({
     className = ""
 }) => {
     const lang = useLang();
+    const { language } = useLanguage();
+    const isRTL = language === 'he';
 
     // Normalize scenario name according to naming convention (e.g., "Ancient Athens" -> "athens")
     const getNormalizedScenario = (s: string) => {
@@ -39,7 +42,7 @@ export const AdvisorPortrait: React.FC<AdvisorPortraitProps> = ({
     return (
         <motion.div
             className={`relative z-10 select-none pointer-events-none ${className}`}
-            initial={{ x: 20, opacity: 0 }}
+            initial={{ x: isRTL ? 20 : -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
         >
@@ -56,7 +59,7 @@ export const AdvisorPortrait: React.FC<AdvisorPortraitProps> = ({
                 <img
                     src={imagePath}
                     alt={translatedName}
-                    className="w-24 h-auto md:w-32 drop-shadow-2xl scale-x-[-1]"
+                    className={`w-24 h-auto md:w-32 drop-shadow-2xl ${isRTL ? 'scale-x-1' : 'scale-x-[-1]'}`}
                     onError={(e) => {
                         // Fallback if image not found
                         (e.target as HTMLImageElement).src = "/assets/images/characters/advisor_placeholder.png";

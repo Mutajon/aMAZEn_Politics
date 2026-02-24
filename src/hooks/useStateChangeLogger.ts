@@ -54,42 +54,47 @@ export function useStateChangeLogger() {
       (state, prevState) => {
         // Day progression - used to trigger snapshot logging on Days 1, 4, 8
         if (state.day !== prevState.day) {
-          const snapshotDays = [1, 4, 8];
+          const snapshotDays = [2, 4, 6];
 
           // Check if we should log a snapshot for the PREVIOUS day (end of day timing)
           // This ensures we capture state AFTER the player's action on that day
           if (snapshotDays.includes(prevState.day) && !loggedSnapshotsRef.current.has(prevState.day)) {
             loggedSnapshotsRef.current.add(prevState.day);
 
-            // Get current compass and support values
-            const compassState = useCompassStore.getState();
-            const supportState = {
-              people: state.supportPeople,
-              middle: state.supportMiddle,
-              mom: state.supportMom
-            };
+            // Wait a short duration to ensure all stores (compass, dilemma) have processed 
+            // the effects of the choice that triggered the day change.
+            setTimeout(() => {
+              // Get current compass and support values
+              const isFreePlay = useSettingsStore.getState().isFreePlay;
+              const compassState = useCompassStore.getState();
+              const supportState = {
+                people: state.supportPeople,
+                middle: state.supportMiddle,
+                mom: state.supportMom
+              };
 
-            // Log compass snapshot
-            logger.logSystem(
-              'compass_snapshot',
-              {
-                day: prevState.day,
-                values: compassState.values
-              },
-              `Compass snapshot at end of Day ${prevState.day}`
-            );
+              // Log compass snapshot
+              logger.logSystem(
+                'compass_snapshot',
+                {
+                  day: prevState.day,
+                  values: isFreePlay ? state.philosophicalAxes : compassState.values
+                },
+                `Compass snapshot at end of Day ${prevState.day}`
+              );
 
-            // Log support snapshot
-            logger.logSystem(
-              'support_snapshot',
-              {
-                day: prevState.day,
-                people: supportState.people,
-                middle: supportState.middle,
-                mom: supportState.mom
-              },
-              `Support snapshot at end of Day ${prevState.day}: People=${supportState.people}, Middle=${supportState.middle}, MoM=${supportState.mom}`
-            );
+              // Log support snapshot
+              logger.logSystem(
+                'support_snapshot',
+                {
+                  day: prevState.day,
+                  people: supportState.people,
+                  middle: supportState.middle,
+                  mom: supportState.mom
+                },
+                `Support snapshot at end of Day ${prevState.day}: People=${supportState.people}, Middle=${supportState.middle}, MoM=${supportState.mom}`
+              );
+            }, 200);
           }
         }
 

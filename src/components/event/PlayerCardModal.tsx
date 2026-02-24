@@ -374,7 +374,9 @@ export default function PlayerCardModal({
                       <div className="flex justify-between items-start mb-2">
                         <span className="text-xs text-white/40 uppercase font-mono mt-0.5">Day {entry.day}</span>
                       </div>
-                      <p className="text-white/90 font-medium mb-1 text-sm leading-relaxed">{entry.title}</p>
+                      <p className="text-white/90 font-medium mb-1 text-sm leading-relaxed">
+                        {entry.title === "LOBBY_ORIGINAL_SUGGESTION" ? lang(entry.title) : entry.title}
+                      </p>
                       {entry.description && (
                         <p className="text-white/60 mb-3 text-[13px] leading-tight italic">{entry.description}</p>
                       )}

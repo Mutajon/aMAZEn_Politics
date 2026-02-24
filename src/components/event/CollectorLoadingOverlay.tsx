@@ -11,7 +11,6 @@
 // Props: progress
 
 import { useMemo, useEffect, useRef } from "react";
-import { Loader2 } from "lucide-react";
 import { useRoleStore } from "../../store/roleStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useRotatingTips } from "../../hooks/useRotatingTips";
@@ -83,12 +82,13 @@ export default function CollectorLoadingOverlay({
 
       {/* Minimal loading indicator - positioned at lower part */}
       <div className="relative z-10 flex flex-col items-center gap-4">
-        {/* Spinner + Percentage */}
-        <div className="flex items-center gap-3">
-          <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
-          <p className="text-xl font-medium text-white/95 tabular-nums">
-            {Math.round(progress)}%
-          </p>
+        {/* Progress Bar Container */}
+        <div className="w-64 sm:w-80 h-1.5 bg-white/5 rounded-full overflow-hidden">
+          <motion.div
+            className="h-full bg-gradient-to-r from-purple-500 to-indigo-500"
+            animate={{ width: `${progress}%` }}
+            transition={{ type: "spring", stiffness: 50, damping: 20 }}
+          />
         </div>
 
         {/* Rotating Tips with Radial Gradient Background */}

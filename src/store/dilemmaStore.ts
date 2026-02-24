@@ -1094,7 +1094,7 @@ export const useDilemmaStore = create<DilemmaState>()(
 
         // Handle custom suggestions
         if (lastChoice?.id === 'suggest') {
-          title = "An original suggestion by you";
+          title = "LOBBY_ORIGINAL_SUGGESTION";
           description = lastChoice.title; // The actual user input
         }
 

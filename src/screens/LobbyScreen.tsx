@@ -292,11 +292,11 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       const getBkgImage = (setting: string) => {
         const s = setting.toLowerCase();
         if (s.includes("athens")) return "/assets/images/freePlay/athensBKG.webp";
-        if (s.includes("roman")) return "/assets/images/freePlay/romanBKG.webp";
-        if (s.includes("england")) return "/assets/images/freePlay/englandBKG.webp";
-        if (s.includes("vatican")) return "/assets/images/freePlay/vaticanBKG.webp";
-        if (s.includes("china")) return "/assets/images/freePlay/chinaBKG.webp";
-        if (s.includes("mars")) return "/assets/images/freePlay/marsBKG.webp";
+        if (s.includes("rome") || s.includes("roman")) return "/assets/images/freePlay/romanBKG.webp";
+        if (s.includes("england") || s.includes("london") || s.includes("uk")) return "/assets/images/freePlay/englandBKG.webp";
+        if (s.includes("vatican") || s.includes("pope") || s.includes("church")) return "/assets/images/freePlay/vaticanBKG.webp";
+        if (s.includes("china") || s.includes("chinese") || s.includes("beijing") || s.includes("ming")) return "/assets/images/freePlay/chinaBKG.webp";
+        if (s.includes("mars") || s.includes("space") || s.includes("planet")) return "/assets/images/freePlay/marsBKG.webp";
         // Fallback for custom scenarios
         return "/assets/images/freePlay/chooseOwn.webp";
       };
@@ -309,6 +309,18 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       // Prime narrator and start music
       narrator.prime();
       playMusic('background', true);
+
+      // Log Initial State Baseline for the session
+      const isFreePlay = useSettingsStore.getState().isFreePlay;
+      logger.logSystem('game_initial_state', {
+        day: 0,
+        support: {
+          people: useDilemmaStore.getState().supportPeople,
+          middle: useDilemmaStore.getState().supportMiddle,
+          mom: useDilemmaStore.getState().supportMom
+        },
+        values: isFreePlay ? useDilemmaStore.getState().philosophicalAxes : useCompassStore.getState().values
+      }, 'Initial game state baseline recorded');
 
       // Navigate directly to event screen (skip assessments/intro)
       push("/event");
