@@ -66,6 +66,7 @@ export type Phase2Data = {
   compassPills: CompassPill[] | null;
   dynamicParams: DynamicParam[] | null;
   axisPills?: PhilosophicalPole[];
+  axisReflection?: string;
 };
 
 // PHASE 3: Tertiary data - loads in background while user reads
@@ -153,6 +154,7 @@ async function fetchGameTurn(
   axisExplored?: string;   // The political axis being explored
   scopeUsed?: string;      // The situation scope being used
   axisPills?: PhilosophicalPole[]; // Philosophical poles supported by action
+  axisReflection?: string; // Reflection on axes affected
   philosophicalAxes?: Record<PhilosophicalPole, number>;
   objectiveStatus?: string;
   systemName?: string;
@@ -704,6 +706,7 @@ async function fetchGameTurn(
     axisExplored,
     scopeUsed,
     axisPills: data.axisPills || [],
+    axisReflection: data.axisReflection || "",
     philosophicalAxes: data.philosophicalAxes,
     objectiveStatus: data.objectiveStatus,
     systemName: data.systemName,
@@ -1043,7 +1046,8 @@ export function useEventDataCollector() {
           axisExplored,
           scopeUsed,
           valueTargeted,
-          axisPills
+          axisPills,
+          axisReflection
         } = turnData;
 
         console.log(`[Collector] ✅ Unified data received for Day ${day} (axisPills: ${axisPills?.length || 0})`);
@@ -1094,7 +1098,10 @@ export function useEventDataCollector() {
         }
 
         // Set Phase 2 data (dynamic params + axis pills)
-        setPhase2Data({ compassPills: null, dynamicParams, axisPills });
+        setPhase2Data({ compassPills: null, dynamicParams, axisPills, axisReflection });
+
+        // Store the reflection in global state so it's ready when pills are applied
+        useDilemmaStore.getState().setPendingAxisReflection(axisReflection || null);
 
         // Set Phase 3 data (mirror advice)
         setPhase3Data({ mirrorText });

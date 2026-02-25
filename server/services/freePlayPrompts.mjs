@@ -111,10 +111,10 @@ ${objectiveSection}
 ENTITIES:
 ${entities}
 
-AXES:
-1. Autonomy (Self-authored) vs Heteronomy (External deference).
-2. Liberalism (Private sphere/rights) vs Totalism (Group goals/order).
-3. Democracy (Broad power) vs Oligarchy (Elite power).
+AXES (Evaluate the player's choices across these):
+1. Autonomy vs Heteronomy: Does the choice empower self-direction and individual responsibility (Autonomy), or does it rely on external control, top-down mandates, and obedience (Heteronomy)?
+2. Liberalism vs Totalism: Does the choice protect private rights, pluralism, and tolerance (Liberalism), or does it enforce conformity, prioritize order over freedom, and suppress dissent (Totalism)?
+3. Democracy vs Oligarchy: Does the choice involve broad public authorship, inclusion, and shared procedures (Democracy), or does it concentrate power in the hands of an elite few without checks (Oligarchy)?
 
 RULES:
 - Persona: You ARE ${narrator}. You are NOT an omniscient book narrator.
@@ -148,6 +148,7 @@ SCHEMA:
     "topic": "...", "scopeUsed": "...", "axisUsed": "..."
   },
   "mirrorAdvice": "One witty sentence.",
+  "axisReflection": "A 1-2 sentence explanation of why the player's last choice supports the chosen axes.",
   "axisPills": ["democracy", "totalism", "etc"],
   "objectiveStatus": "incomplete" | "completed"
 }
@@ -175,7 +176,7 @@ Deliver a DIRECT SPOKEN REPORT as the ${messenger && messenger !== 'NA' ? messen
 3. NO book-like descriptions (no omniscient weather reports unless you are complaining about it).
 Anchor the dilemma in the player's specific Role and influence level.
 Length: Max 2 sentences.
-Do NOT include any "axisPills" (return empty array []).`;
+Do NOT include any "axisPills" (return empty array []) or "axisReflection" (return empty string "").`;
   }
 
   if (day === 7) {
@@ -187,7 +188,7 @@ Last choice: "${playerChoice.title}"
 1. **BRIDGE**: Report the immediate consequence of their last choice as their advisor.
 2. **DILEMMA**: Present a high-stakes CLIMAX dilemma. It MUST tie in previous story threads. End with a weighty question to the player.
 3. **MIRROR**: A sharp judgment on the stakes.
-4. **AXIS**: Identify poles reinforced.
+4. **AXIS**: Identify poles reinforced. Provide a succinct explanation in "axisReflection" and list the poles in "axisPills".
 Generate exactly 3 UNIQUE actions.`;
   }
 
@@ -207,7 +208,7 @@ Place the entire summary in the "description" field of the JSON.
    - **STRICT POV**: You are NOT a parent. Do NOT use family language like "my son", "my boy", or "my child" unless you are specifically designated as a family member. 
 3. **NO ACTIONS**: You MUST return an empty array [] for "actions".
 4. **MIRROR**: A final, deep judgment.
-5. **AXIS**: Leave empty.
+5. **AXIS**: Leave empty ("axisReflection": "", "axisPills": []).
 
 Format the description to be evocative, deeply personal, and extremely concise.`;
   }
@@ -227,7 +228,7 @@ Last choice: "${playerChoice.title}"
 2. **DILEMMA**: Present a new situation you've encountered or are reporting. End with a question.
 3. **TOPIC**: ${topicInstruction}
 4. **MIRROR**: Add a witty judgment.
-5. **AXIS**: Analyze the player's last choice ("${playerChoice.title}") and identify poles reinforced.
+5. **AXIS**: Analyze the player's last choice ("${playerChoice.title}") and identify poles reinforced. Provide a succinct explanation in "axisReflection" and list the poles in "axisPills".
 
 Deliver this as a natural spoken report. NO book-like prose.`;
 }

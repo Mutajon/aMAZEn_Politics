@@ -163,7 +163,8 @@ type DilemmaState = {
 
   // Philosophical axes (Free Play mode) - 0-7 scale
   philosophicalAxes: Record<PhilosophicalPole, number>;
-  freePlayHistory: Array<{ day: number; title: string; description: string; pills: PhilosophicalPole[] }>;
+  freePlayHistory: Array<{ day: number; title: string; description: string; pills: PhilosophicalPole[]; axisReflection?: string }>;
+  pendingAxisReflection: string | null;
 
   // AI Model Override (Lab Mode)
   aiModelOverride: string | null;
@@ -263,6 +264,7 @@ type DilemmaState = {
 
   // Philosophical axes methods
   applyAxisPills: (pills: PhilosophicalPole[]) => void;
+  setPendingAxisReflection: (reflection: string | null) => void;
   resetPhilosophicalAxes: () => void;
 };
 
@@ -389,6 +391,7 @@ export const useDilemmaStore = create<DilemmaState>()(
         liberalism: 0, totalism: 0
       },
       freePlayHistory: [],
+      pendingAxisReflection: null,
 
       aiModelOverride: null, // Default to null (backend decides - usually 2.5 Flash for Experiment, 3.0 Preview for Free Play)
       setAiModelOverride: (model) => {
@@ -497,6 +500,7 @@ export const useDilemmaStore = create<DilemmaState>()(
           crisisEntity: null,
           previousSupportValues: null,
           pendingCompassPills: null,
+          pendingAxisReflection: null,
           narrativeMemory: null,
           inquiryHistory: new Map(),
           inquiryCreditsRemaining: 0,
@@ -1112,7 +1116,13 @@ export const useDilemmaStore = create<DilemmaState>()(
           const existing = history.find(h => h.day === recordDay);
 
           if (!existing && pills.length > 0) {
-            history.push({ day: recordDay, title, description, pills });
+            history.push({
+              day: recordDay,
+              title,
+              description,
+              pills,
+              axisReflection: state.pendingAxisReflection || undefined
+            });
           } else if (existing) {
             // Append pills if entry exists (rare case of split updates)
             const newPills = pills.filter(p => !existing.pills.includes(p));
@@ -1139,6 +1149,10 @@ export const useDilemmaStore = create<DilemmaState>()(
             liberalism: 0, totalism: 0
           }
         });
+      },
+
+      setPendingAxisReflection(reflection: string | null) {
+        set({ pendingAxisReflection: reflection });
       },
     }),
     {

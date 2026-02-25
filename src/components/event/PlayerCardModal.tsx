@@ -378,7 +378,10 @@ export default function PlayerCardModal({
                         {entry.title === "LOBBY_ORIGINAL_SUGGESTION" ? lang(entry.title) : entry.title}
                       </p>
                       {entry.description && (
-                        <p className="text-white/60 mb-3 text-[13px] leading-tight italic">{entry.description}</p>
+                        <p className="text-white/60 mb-2 text-[13px] leading-tight italic">{entry.description}</p>
+                      )}
+                      {entry.axisReflection && (
+                        <p className="text-green-300/80 mb-3 text-[13px] leading-tight my-2 p-2 bg-green-500/10 rounded-md border border-green-500/20">{entry.axisReflection}</p>
                       )}
 
                       {entry.pills.length > 0 && (

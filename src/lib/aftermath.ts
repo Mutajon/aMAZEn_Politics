@@ -63,7 +63,7 @@ export type AftermathResponse = {
   intro: string; // Reign Summary: short paragraph on new state, values, and reality
   deathDetails: string; // NEW: Single sentence on how and when the player passed away
   snapshot: SnapshotEvent[]; // 6-10 extreme events (both positive and negative)
-  decisions: DecisionAnalysis[]; // one per day (7 decisions with per-decision ratings)
+  decisions?: DecisionAnalysis[]; // DEPRECATED: live generated locally now
   ratings: {
     // FRONTEND-CALCULATED: Averaged from per-decision ratings (not from AI)
     autonomy: RatingLevel;
@@ -106,33 +106,38 @@ export function numberToRating(value: number): RatingLevel {
   return map[rounded] ?? "medium";
 }
 
+
 /**
- * Calculate overall rating by averaging individual decision ratings
- * @param decisions - Array of decisions with autonomy/liberalism/democracy ratings
+ * Calculate overall rating by converting 0-7 net philosophical axes into RatingLevels
+ * @param axes - Record of philosophical poles (0-7 tally)
  * @returns Object with calculated autonomy, liberalism, and democracy ratings
  */
-export function calculateOverallRatings(
-  decisions: DecisionAnalysis[]
+export function calculateRatingsFromAxes(
+  axes: Record<string, number>
 ): { autonomy: RatingLevel; liberalism: RatingLevel; democracy: RatingLevel } {
-  // Edge case: no decisions
-  if (!decisions || decisions.length === 0) {
+  // Edge case: no axes
+  if (!axes) {
     return { autonomy: "medium", liberalism: "medium", democracy: "medium" };
   }
 
-  // Convert all decision ratings to numbers
-  const autonomyValues = decisions.map(d => ratingToNumber(d.autonomy));
-  const liberalismValues = decisions.map(d => ratingToNumber(d.liberalism));
-  const democracyValues = decisions.map(d => ratingToNumber(d.democracy));
+  // Calculate net scores (positive means high autonomy/liberalism/democracy, negative means high heteronomy/totalism/oligarchy)
+  const netAutonomy = (axes.autonomy || 0) - (axes.heteronomy || 0);
+  const netLiberalism = (axes.liberalism || 0) - (axes.totalism || 0);
+  const netDemocracy = (axes.democracy || 0) - (axes.oligarchy || 0);
 
-  // Calculate averages
-  const autonomyAvg = autonomyValues.reduce((sum, val) => sum + val, 0) / autonomyValues.length;
-  const liberalismAvg = liberalismValues.reduce((sum, val) => sum + val, 0) / liberalismValues.length;
-  const democracyAvg = democracyValues.reduce((sum, val) => sum + val, 0) / democracyValues.length;
+  // Helper to convert net score (-7 to +7) to RatingLevel
+  // We expect maximum 7 days so typical net scores will be between -7 and +7.
+  const netToRating = (net: number): RatingLevel => {
+    if (net >= 3) return "very-high";
+    if (net >= 1) return "high";
+    if (net <= -3) return "very-low";
+    if (net <= -1) return "low";
+    return "medium"; // net is 0
+  };
 
-  // Convert back to ratings
   return {
-    autonomy: numberToRating(autonomyAvg),
-    liberalism: numberToRating(liberalismAvg),
-    democracy: numberToRating(democracyAvg)
+    autonomy: netToRating(netAutonomy),
+    liberalism: netToRating(netLiberalism),
+    democracy: netToRating(netDemocracy)
   };
 }

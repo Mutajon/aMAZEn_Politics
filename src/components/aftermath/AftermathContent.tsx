@@ -94,7 +94,7 @@ export default function AftermathContent({
       <FinalScoresSection ratings={data.ratings} />
 
       {/* Decision Breakdown Section - Collapsible */}
-      <DecisionBreakdownSection decisions={data.decisions} />
+      <DecisionBreakdownSection />
 
       {/* Reflection Section */}
       <ReflectionSection

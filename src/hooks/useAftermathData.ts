@@ -15,7 +15,7 @@ import { useSettingsStore } from "../store/settingsStore";
 import { COMPONENTS, type PropKey } from "../data/compass-data";
 import { PREDEFINED_ROLES_ARRAY } from "../data/predefinedRoles";
 import type { AftermathRequest, AftermathResponse, TopCompassValue } from "../lib/aftermath";
-import { calculateOverallRatings } from "../lib/aftermath";
+import { calculateRatingsFromAxes } from "../lib/aftermath";
 import { useLanguage } from "../i18n/LanguageContext";
 import { getPrefetchedAftermathData, clearAftermathPrefetch } from "./useAftermathPrefetch";
 
@@ -109,7 +109,8 @@ function buildAftermathRequest(language: string): AftermathRequest {
  * Process API result into AftermathResponse with calculated ratings
  */
 function processApiResult(apiResult: any): AftermathResponse {
-  const calculatedRatings = calculateOverallRatings(apiResult.decisions || []);
+  const { philosophicalAxes } = useDilemmaStore.getState();
+  const calculatedRatings = calculateRatingsFromAxes(philosophicalAxes);
 
   // Store globally for console access
   (window as any).__democracyRating = calculatedRatings.democracy;

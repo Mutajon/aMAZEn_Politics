@@ -1104,6 +1104,7 @@ export async function freePlayTurn(req, res) {
                 supportShift, // Numeric deltas and "why"
                 currentSupport: updatedSupport, // Absolute values 0-100
                 axisPills,
+                axisReflection: parsed.axisReflection || "",
                 philosophicalAxes: updatedAxes,
                 isGameEnd: day >= 8,
                 axisUsed: parsed.dilemma?.axisUsed || parsed.dilemma?.axis || "Unknown",
@@ -1321,48 +1322,6 @@ Examples:
 
 Use realistic historical estimates based on the era and population. Prioritize MAGNITUDE over balance—show only the most extreme events. Use mixed approach: numbers for quantifiable events (wars, deaths, people saved), vivid descriptions for qualitative changes (new institutions, cultural shifts).
 
-Decisions: for each decision, provide:
-- title: ≤12-word summary of the action taken
-- reflection: one SHORT sentence (~15-25 words) that EXPLAINS WHY this specific decision demonstrates support for or opposition to autonomy/heteronomy AND liberalism/totalism. Be concrete and educational—describe what aspect of the decision shows the ideological position rather than just stating the rating.
-- autonomy: rate THIS SPECIFIC DECISION on autonomy (very-low|low|medium|high|very-high)
-- liberalism: rate THIS SPECIFIC DECISION on liberalism (very-low|low|medium|high|very-high)
-- democracy: rate THIS SPECIFIC DECISION on democracy (very-low|low|medium|high|very-high)
-
-${getTheoryPrompt()}RATING FRAMEWORK (use the theoretical frameworks above for detailed guidance):
-
-1. Autonomy ↔ Heteronomy (Who decides?)
-   - High Autonomy: Self-direction, owned reasons ("I choose because…"), empowering individual/group choice, decentralized decision-making, willingness to accept responsibility for consequences.
-   - Low Autonomy (Heteronomy): External control, borrowed reasons ("because they/it says so"), imposed rules, top-down mandates, frequent delegation or obedience without personal justification.
-
-2. Liberalism ↔ Totalism (What's valued?)
-   - High Liberalism: Individual rights, pluralism, tolerance, protecting freedoms, narrow and proportionate limits justified by concrete harms, acceptance of multiple legitimate ways to live.
-   - Low Liberalism (Totalism): Uniformity, order or virtue over freedom, suppressing dissent, enforcing one thick moral/ideological code as the proper way to live, broad or indefinite restrictions on expression and lifestyle.
-
-3. Democracy ↔ Oligarchy (Who authors the rules and exceptions?)
-   - High Democracy: Broad and inclusive authorship of rules and exceptions (citizens, assemblies, representative bodies), real checks and vetoes (courts, elections, free media), shocks handled through shared procedures rather than personal rule.
-   - Low Democracy (Oligarchy): Concentrated control of rules and exceptions in a narrow elite (executive, generals, party, oligarchs), weak or neutralized checks, people treated as a mass to be managed rather than co-authors of decisions.
-
-Examples of good decision entries:
-- title: "Deploy troops to quell uprising"
-  reflection: "Forceful crackdown demonstrates heteronomy (external control) and totalism (prioritizing order over individual freedoms)"
-  autonomy: "very-low"
-  liberalism: "very-low"
-  democracy: "very-low"
-
-- title: "Hold public referendum on reforms"
-  reflection: "Consulting citizens shows autonomy (empowering individual choice) and moderate liberalism (deliberative, slower process)"
-  autonomy: "high"
-  liberalism: "medium"
-  democracy: "very-high"
-
-- title: "State-controlled ceremony with some dissent allowed"
-  reflection: "Tightly controlled ceremony reflects heteronomy (state choreography) and liberalism (order without suppressing dissent)"
-  autonomy: "low"
-  liberalism: "medium"
-  democracy: "low"
-
-IMPORTANT: The frontend will calculate overall ratings by averaging all 7 decision ratings. DO NOT provide overall ratings.
-
 Values Summary: one sentence capturing main motivations, justifications, means, and who benefited.
 
 Legacy: Generate one vivid, historically resonant sentence capturing how the player will be remembered. Format: "You will be remembered as [legacy description]". Base this on all decisions, snapshot events, compass values, and overall impact. Make it specific to their actions, not generic. Consider both their intentions and actual consequences. Examples:
@@ -1379,7 +1338,6 @@ Return only:
   "intro": "The Reign Summary paragraph described above",
   "deathDetails": "The single sentence about death described above",
   "snapshot": [{"type": "positive|negative", "icon": "emoji", "text": "", "estimate": number_optional, "context": ""}],
-  "decisions": [{"title": "", "reflection": "", "autonomy": "", "liberalism": "", "democracy": ""}],
   "valuesSummary": "",
   "legacy": "",
   "haiku": ""
@@ -1508,13 +1466,12 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
                 { type: "positive", icon: "🏛️", text: "Governed their people", context: "Overall reign" },
                 { type: "negative", icon: "⚠️", text: "Faced challenges", context: "Overall reign" }
             ],
-            decisions: [],
             valuesSummary: "A leader who navigated complex political terrain.",
             haiku: "Power came and went\nDecisions echo through time\nHistory records"
         };
 
         // Detect if we're using fallback data (AI failed or returned incomplete response)
-        const isFallback = result === null || !Array.isArray(result?.decisions) || result.decisions.length === 0;
+        const isFallback = result === null || !result.intro || !Array.isArray(result?.snapshot) || result.snapshot.length === 0;
 
         const response = {
             isFallback,
@@ -1528,15 +1485,6 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
                     context: String(event?.context || "Unknown").slice(0, 100)
                 }))
                 : fallback.snapshot,
-            decisions: Array.isArray(result?.decisions)
-                ? result.decisions.map((d, i) => ({
-                    title: String(d?.title || "").slice(0, 120),
-                    reflection: String(d?.reflection || "").slice(0, 300),
-                    autonomy: validRatings.includes(d?.autonomy) ? d.autonomy : "medium",
-                    liberalism: validRatings.includes(d?.liberalism) ? d.liberalism : "medium",
-                    democracy: validRatings.includes(d?.democracy) ? d.democracy : "medium"
-                }))
-                : fallback.decisions,
             valuesSummary: String(result?.valuesSummary || fallback.valuesSummary).slice(0, 500),
             haiku: String(result?.haiku || fallback.haiku).slice(0, 300)
         };
@@ -1552,7 +1500,6 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
                 { type: "positive", icon: "🏛️", text: "Governed their people", context: "Overall reign" },
                 { type: "negative", icon: "⚠️", text: "Faced challenges", context: "Overall reign" }
             ],
-            decisions: [],
             valuesSummary: "A leader who navigated complex political terrain.",
             haiku: "Power came and went\nDecisions echo through time\nHistory records"
         });
