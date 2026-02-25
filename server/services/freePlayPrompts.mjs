@@ -148,8 +148,8 @@ SCHEMA:
     "topic": "...", "scopeUsed": "...", "axisUsed": "..."
   },
   "mirrorAdvice": "One witty sentence.",
-  "axisReflection": "A 1-2 sentence explanation of why the player's last choice supports the chosen axes.",
-  "axisPills": ["democracy", "totalism", "etc"],
+  "axisReflection": "A 1-2 sentence explanation of exactly why the player's last choice supported the specific TWO chosen philosophical poles.",
+  "axisPills": ["pole1", "pole2"],
   "objectiveStatus": "incomplete" | "completed"
 }
 `;
@@ -188,7 +188,7 @@ Last choice: "${playerChoice.title}"
 1. **BRIDGE**: Report the immediate consequence of their last choice as their advisor.
 2. **DILEMMA**: Present a high-stakes CLIMAX dilemma. It MUST tie in previous story threads. End with a weighty question to the player.
 3. **MIRROR**: A sharp judgment on the stakes.
-4. **AXIS**: Identify poles reinforced. Provide a succinct explanation in "axisReflection" and list the poles in "axisPills".
+4. **AXIS**: Identify EXACTLY TWO poles most reinforced by the choice. Provide a succinct explanation of why these specific two poles were supported in "axisReflection", and list the two poles in "axisPills".
 Generate exactly 3 UNIQUE actions.`;
   }
 
@@ -228,7 +228,7 @@ Last choice: "${playerChoice.title}"
 2. **DILEMMA**: Present a new situation you've encountered or are reporting. End with a question.
 3. **TOPIC**: ${topicInstruction}
 4. **MIRROR**: Add a witty judgment.
-5. **AXIS**: Analyze the player's last choice ("${playerChoice.title}") and identify poles reinforced. Provide a succinct explanation in "axisReflection" and list the poles in "axisPills".
+5. **AXIS**: Analyze the player's last choice ("${playerChoice.title}") and identify EXACTLY TWO poles most reinforced. Provide a succinct explanation of why these specific two poles were supported in "axisReflection", and list the two poles in "axisPills".
 
 Deliver this as a natural spoken report. NO book-like prose.`;
 }

@@ -1043,8 +1043,13 @@ export async function freePlayTurn(req, res) {
             console.log(`[FREE-PLAY] Day ${day} Updated Support (calculated):`, updatedSupport);
 
             // Update philosophical axes based on axisPills
-            const axisPillsRaw = parsed.axisPills || [];
-            console.log(`[FREE-PLAY] Day ${day} Raw axisPills:`, axisPillsRaw);
+            let axisPillsRaw = parsed.axisPills || [];
+            if (!Array.isArray(axisPillsRaw)) axisPillsRaw = [axisPillsRaw];
+
+            // Enforce maximum of 2 pills as per new scoring rules
+            axisPillsRaw = axisPillsRaw.slice(0, 2);
+
+            console.log(`[FREE-PLAY] Day ${day} Raw axisPills (capped at 2):`, axisPillsRaw);
             const axisPills = axisPillsRaw.map(mapPhilosophicalAxis).filter(Boolean);
             console.log(`[FREE-PLAY] Day ${day} Mapped axisPills:`, axisPills);
 
