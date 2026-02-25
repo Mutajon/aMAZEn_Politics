@@ -16,7 +16,9 @@
 import { useDilemmaStore } from "../store/dilemmaStore";
 import { useRoleStore } from "../store/roleStore";
 import { useSettingsStore } from "../store/settingsStore";
+import { useLegacyStore, hasPerk } from "../store/legacyStore";
 import type { CollectedData } from "../hooks/useEventDataCollector";
+import type { SupportEffect } from "../hooks/useEventDataCollector";
 import { lang } from "../i18n/lang";
 import { POWER_DISTRIBUTION_TRANSLATIONS } from "../data/powerDistributionTranslations";
 
@@ -38,16 +40,85 @@ function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+// ============================================================================
+// PERK MODIFIER LAYER (Free Play Only)
+// ============================================================================
+
 /**
- * Apply support deltas to the dilemmaStore
- * This is where support values actually change in the global state
+ * Apply active perk modifiers to support deltas BEFORE they reach the store.
+ * This modifies the actual support shift values based on earned perks.
+ *
+ * Perks that modify shifts:
+ * - "halve_negative_people": Negative Community shifts halved
+ * - "boost_positive_shifts": All positive support shifts +3
+ * - "boost_mom_gains": All positive Mom gains ×1.5
+ * - "hero_rivalry_halve": If Community liked choice, Rival negative halved
+ * - "mom_floor_zero": (applied as post-clamp floor, not delta modification)
+ * - "rival_floor_10": (applied as post-clamp floor, not delta modification)
+ * - "ultimate": All gains ×2, all negatives ignored
+ */
+function applyPerkModifiers(effects: SupportEffect[]): SupportEffect[] {
+  const { activePerks } = useLegacyStore.getState();
+  if (activePerks.length === 0) return effects;
+
+  const isUltimate = hasPerk(activePerks, "ultimate");
+  const halveNegPeople = hasPerk(activePerks, "halve_negative_people");
+  const boostPositive = hasPerk(activePerks, "boost_positive_shifts");
+  const boostMomGains = hasPerk(activePerks, "boost_mom_gains");
+  const heroRivalHalve = hasPerk(activePerks, "hero_rivalry_halve");
+
+  // Check if Community liked the choice (positive delta)
+  const communityLiked = effects.find(e => e.id === "people")?.delta ?? 0;
+  const communityIsPositive = communityLiked > 0;
+
+  return effects.map(effect => {
+    let { delta } = effect;
+
+    if (isUltimate) {
+      // Ultimate: double positives, ignore negatives
+      delta = delta > 0 ? delta * 2 : 0;
+    } else {
+      // Standard perk processing
+      if (delta < 0) {
+        // Negative shift modifiers
+        if (effect.id === "people" && halveNegPeople) {
+          delta = Math.round(delta / 2);
+        }
+        if (effect.id === "middle" && heroRivalHalve && communityIsPositive) {
+          delta = Math.round(delta / 2);
+        }
+      } else if (delta > 0) {
+        // Positive shift modifiers
+        if (boostPositive) {
+          delta += 3;
+        }
+        if (effect.id === "mom" && boostMomGains) {
+          delta = Math.round(delta * 1.5);
+        }
+        if (isUltimate) {
+          delta *= 2;
+        }
+      }
+    }
+
+    return { ...effect, delta };
+  });
+}
+
+/**
+ * Apply support deltas to the dilemmaStore.
+ * In Free Play mode, perks are applied first and Legacy Bar is updated after.
  */
 function applySupportDeltas(supportEffects: CollectedData['supportEffects']): void {
   if (!supportEffects || supportEffects.length === 0) return;
 
+  const { isFreePlay } = useSettingsStore.getState();
   const store = useDilemmaStore.getState();
 
-  supportEffects.forEach(effect => {
+  // In Free Play, apply perk modifiers to the deltas first
+  const modifiedEffects = isFreePlay ? applyPerkModifiers(supportEffects) : supportEffects;
+
+  modifiedEffects.forEach(effect => {
     const { id, delta } = effect;
 
     // Skip mom updates if she's dead
@@ -61,9 +132,20 @@ function applySupportDeltas(supportEffects: CollectedData['supportEffects']): vo
     const setter = store[`setSupport${capitalize(id)}` as keyof typeof store] as (v: number) => void;
 
     // Calculate new value (clamped 0-100)
-    const newValue = Math.max(0, Math.min(100, currentValue + delta));
+    let newValue = Math.max(0, Math.min(100, currentValue + delta));
 
-    console.log(`[Presenter] Applying support delta: ${id} ${currentValue} → ${newValue} (${delta >= 0 ? '+' : ''}${delta})`);
+    // Perk floor effects (Free Play)
+    if (isFreePlay) {
+      const { activePerks } = useLegacyStore.getState();
+
+      // "mom_floor_zero": Mom support can't drop below 0 (already enforced by clamp, but semantic)
+      // "rival_floor_10": Rival support can't drop below 10%
+      if (id === "middle" && hasPerk(activePerks, "rival_floor_10")) {
+        newValue = Math.max(10, newValue);
+      }
+    }
+
+    console.log(`[Presenter] Applying support delta: ${id} ${currentValue} → ${newValue} (${delta >= 0 ? '+' : ''}${delta})${isFreePlay ? ' [FP]' : ''}`);
     setter(newValue);
   });
 }
@@ -121,6 +203,29 @@ export async function presentEventData(
 
     // Wait for animations to complete (counter, delta pill, trend arrow, note text)
     await delay(2500);
+
+    // SEQUENTIAL LEGACY UPDATE - Wait for support numbers to stop moving before tweening LP
+    const { isFreePlay } = useSettingsStore.getState();
+    if (isFreePlay) {
+      const modifiedEffects = applyPerkModifiers(collectedData.supportEffects);
+      const lpDeltas = { people: 0, middle: 0, mom: 0 };
+
+      modifiedEffects.forEach(effect => {
+        if (effect.id === "people" || effect.id === "middle" || effect.id === "mom") {
+          lpDeltas[effect.id] = effect.delta;
+        }
+      });
+
+      useLegacyStore.getState().applyDailyChange(lpDeltas);
+
+      // Let the 1.2s tween play out fully so the user sees it
+      await delay(1500);
+
+      // Wait for the user to select a perk if they earned a star!
+      while (useLegacyStore.getState().pendingStarIndex !== null) {
+        await delay(250);
+      }
+    }
   } else if (!isFirstDay) {
     console.warn(`[Presenter] ⚠️ Day ${day}: Missing support effects (expected for Day 2+)`);
   }

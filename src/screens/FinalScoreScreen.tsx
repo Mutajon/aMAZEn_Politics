@@ -43,6 +43,8 @@ import type { PushFn } from "../lib/router";
 import { useLang } from "../i18n/lang";
 import { audioManager } from "../lib/audioManager";
 import { generateAvatarThumbnail } from "../lib/avatarThumbnail";
+import { useLegacyStore } from "../store/legacyStore";
+import { STAR_THRESHOLDS } from "../data/perks";
 
 type Props = {
   push: PushFn;
@@ -84,6 +86,10 @@ export default function FinalScoreScreen({ push }: Props) {
   const selectedRoleKey = useRoleStore((s) => s.selectedRole);
   const experimentMode = useSettingsStore((s) => s.experimentMode);
   const lobbyMode = useSettingsStore((s) => s.lobbyMode);
+  const isFreePlay = useSettingsStore((s) => s.isFreePlay);
+  const legacyPoints = useLegacyStore((s) => s.legacyPoints);
+  const legacyStars = useLegacyStore((s) => s.stars);
+  const legacyActivePerks = useLegacyStore((s) => s.activePerks);
   const roleBgStyle = useMemo(
     () => bgStyleWithRoleImage(roleBackgroundImage),
     [roleBackgroundImage]
@@ -475,6 +481,7 @@ export default function FinalScoreScreen({ push }: Props) {
     useRoleStore.getState().reset();
     useCompassStore.getState().reset();
     useMirrorQuizStore.getState().resetAll();
+    useLegacyStore.getState().reset();
     clearAllSnapshots();
 
     // Mark that player just finished a game (for grandpa's score-based message)
@@ -580,6 +587,68 @@ export default function FinalScoreScreen({ push }: Props) {
             ) : null}
           </div>
         </motion.div>
+
+        {/* === Free Play Legacy Score Card === */}
+        {isFreePlay && (
+          <motion.div
+            layout
+            className="rounded-2xl border border-amber-400/40 bg-amber-500/15 backdrop-blur-sm p-5 text-amber-100 shadow-lg"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg">
+                <Trophy className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wide text-amber-200/70">
+                  {lang("LEGACY_FINAL_SCORE")}
+                </div>
+                <div className="text-3xl font-extrabold tabular-nums">
+                  {Math.round(legacyPoints)} LP
+                </div>
+              </div>
+            </div>
+
+            {/* Stars */}
+            <div className="flex items-center gap-4 mb-3 pb-3 border-b border-white/10">
+              <span className="text-xs text-amber-200/70 uppercase tracking-wide">
+                {lang("LEGACY_STARS_EARNED")}
+              </span>
+              <div className="flex items-center gap-2 ml-auto">
+                {legacyStars.map((star, i) => (
+                  <span
+                    key={i}
+                    className={`text-lg ${star.reached
+                        ? star.active
+                          ? i === 3 ? "text-purple-400 drop-shadow-[0_0_6px_rgba(168,85,247,0.8)]" : "text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.8)]"
+                          : "text-amber-400/30"
+                        : "text-white/20"
+                      }`}
+                    title={`${STAR_THRESHOLDS[i]} LP`}
+                  >
+                    {star.reached ? "★" : "?"}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Active Perks */}
+            {legacyActivePerks.length > 0 && (
+              <div>
+                <span className="text-xs text-amber-200/70 uppercase tracking-wide">
+                  {lang("LEGACY_ACTIVE_PERKS")}
+                </span>
+                <ul className="mt-1.5 space-y-1">
+                  {legacyActivePerks.map((perk) => (
+                    <li key={perk.id} className="flex items-center gap-2 text-sm">
+                      <span>{perk.icon}</span>
+                      <span className="text-amber-200">{lang(perk.nameKey) || perk.nameKey}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </motion.div>
+        )}
 
         {playerRank && (
           <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/15 p-4 text-emerald-100 shadow">

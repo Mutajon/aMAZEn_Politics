@@ -20,6 +20,7 @@ import { useLogger } from "../hooks/useLogger";
 import { audioManager } from "../lib/audioManager";
 import LobbyPlayPopup from "../components/LobbyPlayPopup";
 import CreditsPopup from "../components/lobby/CreditsPopup";
+import { useLegacyStore } from "../store/legacyStore";
 import { Trophy } from "lucide-react";
 
 // localStorage key for tracking lobby games played
@@ -182,7 +183,17 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       useDilemmaStore.getState().reset();
       useRoleStore.getState().reset();
       useMirrorQuizStore.getState().resetAll();
+      useLegacyStore.getState().reset();
       clearAllSnapshots();
+
+      // Initialize Legacy Bar for difficulty
+      const difficultyMap: Record<string, 'easy' | 'normal' | 'hard'> = {
+        easy: 'easy',
+        normal: 'normal',
+        hard: 'hard',
+      };
+      const legacyDifficulty = difficultyMap[data.difficulty] || 'normal';
+      useLegacyStore.getState().initForDifficulty(legacyDifficulty);
 
       // Set tone in store (AFTER reset)
       console.log(`[LobbyScreen] Setting tone to: "${data.tone}"`);
@@ -235,10 +246,8 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       // Character description for the card
       roleStore.setRoleDescription(data.role);
 
-      // Determine Target Score (Difficulty)
-      let targetScore = 190; // Normal
-      if (data.difficulty === 'easy') targetScore = 170;
-      if (data.difficulty === 'hard') targetScore = 220;
+      // Target score for Free Play is now handled by the Legacy Bar system
+      // (legacyStore manages LP thresholds instead of a single target score)
 
       // Determine Support Entities (Dynamic)
       const population = data.supportEntities?.find(e => e.type === 'population') || { name: "The People", icon: "👥", summary: "The diverse public." };
@@ -272,7 +281,7 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
             origin: "ai"
           }
         },
-        targetScore, // Pass difficulty target to store
+        targetScore: undefined, // Free Play uses Legacy Bar (legacyStore) instead
         playerIndex: 0,
         grounding: {
           settingType: "real",

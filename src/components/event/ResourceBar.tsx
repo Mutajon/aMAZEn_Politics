@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Hourglass, Coins, Trophy, User } from "lucide-react";
 import GoalsCompact from "./GoalsCompact";
 import PlayerCardModal from "./PlayerCardModal";
+import LegacyStarBar from "./LegacyStarBar";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useRoleStore } from "../../store/roleStore";
 import { useLang } from "../../i18n/lang";
@@ -65,6 +66,7 @@ export default function ResourceBar({
   // Check if modifiers (difficulty + goals) are enabled
   const enableModifiers = useSettingsStore((s) => s.enableModifiers);
   const isMobile = useSettingsStore((s) => s.isMobileDevice);
+  const isFreePlay = useSettingsStore((s) => s.isFreePlay);
   const lang = useLang();
 
   // Player avatar modal state
@@ -159,12 +161,12 @@ export default function ResourceBar({
     <>
       <div className="w-full flex items-end justify-between gap-3">
         {/* Resources Section */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 flex-1 w-full min-w-0">
           <div className="text-[10px] text-white/50 uppercase tracking-wide px-1">
             {lang("RESOURCES")}
           </div>
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 flex-1 w-full">
+            <div className="flex items-center gap-2 flex-1 w-full">
               <ResourcePill
                 icon={<Hourglass className="w-4 h-4" />}
                 label={lang("DAYS_LEFT")}
@@ -188,11 +190,17 @@ export default function ResourceBar({
                   width={140}
                 />
               )}
-              <ScorePill
-                score={displayScore}
-                goal={normalizedGoal}
-                details={scoreDetails}
-              />
+              {isFreePlay ? (
+                <div className="flex-1 w-full min-w-0 flex items-center ml-2">
+                  <LegacyStarBar />
+                </div>
+              ) : (
+                <ScorePill
+                  score={displayScore}
+                  goal={normalizedGoal}
+                  details={scoreDetails}
+                />
+              )}
             </div>
             {bonusObjective && (
               <div className="w-full">

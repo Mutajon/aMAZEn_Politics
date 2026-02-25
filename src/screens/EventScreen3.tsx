@@ -52,6 +52,7 @@ import SelfJudgmentModal from "../components/event/SelfJudgmentModal";
 import { useDay2Tutorial } from "../hooks/useDay2Tutorial";
 import { TutorialOverlay } from "../components/event/TutorialOverlay";
 import MomDeathToast from "../components/event/MomDeathToast";
+import PerkSelectionOverlay from "../components/event/PerkSelectionOverlay";
 import { useAftermathPrefetch } from "../hooks/useAftermathPrefetch";
 
 type Props = {
@@ -1024,6 +1025,9 @@ export default function EventScreen3({ push }: Props) {
       <div className="min-h-screen p-4 pb-20 md:p-6 md:pb-24" style={roleBgStyle}>
         {/* Toast notification for mom death */}
         <MomDeathToast />
+
+        {/* Legacy Bar: Perk selection overlay (Free Play only) */}
+        {isFreePlay && <PerkSelectionOverlay />}
 
         {/* Debug: Jump to Final Day button */}
         {debugMode && day < 7 && phase === 'interacting' && (
