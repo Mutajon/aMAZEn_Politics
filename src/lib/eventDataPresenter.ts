@@ -230,7 +230,7 @@ export async function presentEventData(
     // Wait for animations to complete (counter, delta pill, trend arrow, note text)
     // Support count-up takes ~1000ms, Legacy tween takes 2000ms.
     // We wait for the longer one (Legacy) to finish before proceeding to perk checks.
-    await delay(2500);
+    await delay(4500);
 
     // ========== PERK REVEAL (SEQUENTIAL) ==========
     if (isFreePlay) {
@@ -377,6 +377,7 @@ export function buildSupportItems(
     const effect = supportEffects?.find(e => e.id === id);
     return {
       delta: effect?.delta || null,
+      originalDelta: effect?.originalDelta || null,  // Capture originalDelta for animation
       trend: effect && effect.delta > 0 ? "up" as const : effect && effect.delta < 0 ? "down" as const : null,
       note: effect?.explain || null,
     };
@@ -394,6 +395,7 @@ export function buildSupportItems(
       percent: supportPeople,
       initialPercent: initialValues?.people,
       delta: peopleEffect.delta,
+      originalDelta: peopleEffect.originalDelta, // Explicitly map
       trend: peopleEffect.trend,
       note: peopleEffect.note,
       icon: populationInfo.icon as any,
@@ -406,6 +408,7 @@ export function buildSupportItems(
       percent: supportMiddle,
       initialPercent: initialValues?.middle,
       delta: middleEffect.delta,
+      originalDelta: middleEffect.originalDelta, // Explicitly map
       trend: middleEffect.trend,
       note: middleEffect.note,
       icon: oppositionInfo.icon as any,
@@ -418,6 +421,7 @@ export function buildSupportItems(
       percent: momAlive ? supportMom : 0, // Force 0 if dead
       initialPercent: initialValues?.mom, // Animation starts from this value
       delta: momAlive ? momEffect.delta : null, // No delta if dead
+      originalDelta: momAlive ? momEffect.originalDelta : null, // Explicitly map
       trend: momAlive ? momEffect.trend : null, // No trend if dead
       note: momAlive ? momEffect.note : null, // No note if dead
       icon: analysis?.momIcon as any, // AI-generated icon for Mom in Free Play

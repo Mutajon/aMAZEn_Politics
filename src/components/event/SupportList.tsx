@@ -7,10 +7,12 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, Landmark, Heart, ArrowUp, ArrowDown, Skull } from "lucide-react";
 import { lang } from "../../i18n/lang";
-import { useSupportEntityPopover } from "../../hooks/useSupportEntityPopover";
+import { useSupportEntityPopover, type OpenEntityType } from "../../hooks/useSupportEntityPopover";
+import type { SupportProfile } from "../../data/supportProfiles";
 import { useLogger } from "../../hooks/useLogger";
 import { useLegacyStore } from "../../store/legacyStore";
 import { useSettingsStore } from "../../store/settingsStore";
+import { useRoleStore } from "../../store/roleStore";
 import SupportEntityPopover from "./SupportEntityPopover";
 
 /* ====================== TUNABLES (EDIT HERE) ====================== */
@@ -69,6 +71,36 @@ export default function SupportList({
   const { isFreePlay } = useSettingsStore.getState();
   const activePerks = useLegacyStore(s => s.activePerks);
 
+  // Tooltip state for custom perk tooltips
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+  const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Dynamic names
+  const peopleName = (isFreePlay && useRoleStore.getState().analysis?.holders?.[2]?.name) || lang("SUPPORT_THE_PEOPLE") || "The People";
+
+  const handleTooltipEnter = (perkId: string) => {
+    if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
+    tooltipTimeoutRef.current = setTimeout(() => {
+      setActiveTooltip(perkId);
+    }, 300);
+  };
+
+  const handleTooltipLeave = () => {
+    if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
+    setActiveTooltip(null);
+  };
+
+  const handleTooltipToggle = (perkId: string) => {
+    if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
+    setActiveTooltip(prev => prev === perkId ? null : perkId);
+  };
+
+  const formatDesc = (descKey: string) => {
+    let text = lang(descKey) || descKey;
+    text = text.replace("{people}", peopleName);
+    return text;
+  };
+
   const globalPerks = isFreePlay ? activePerks.filter(p => p.targetEntity === "global") : [];
 
   return (
@@ -78,14 +110,40 @@ export default function SupportList({
 
         {/* Global Perks Container (Top Left of widget) */}
         {globalPerks.length > 0 && (
-          <div className="flex gap-1" dir="ltr">
+          <div className="flex gap-1 relative z-20" dir="ltr">
             {globalPerks.map(perk => (
               <div
                 key={perk.id}
-                className="w-5 h-5 bg-slate-800/80 border border-slate-600/50 rounded flex items-center justify-center text-[10px] shadow-sm cursor-help"
-                title={lang(perk.descKey) || perk.descKey}
+                className="relative"
+                onMouseEnter={() => handleTooltipEnter(perk.id)}
+                onMouseLeave={handleTooltipLeave}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTooltipToggle(perk.id);
+                }}
               >
-                {perk.icon}
+                <div className="w-5 h-5 bg-slate-800/80 border border-slate-600/50 rounded flex items-center justify-center text-[10px] shadow-sm cursor-help hover:bg-slate-700/80 transition-colors">
+                  {perk.icon}
+                </div>
+
+                {/* Custom Tooltip */}
+                <AnimatePresence>
+                  {activeTooltip === perk.id && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute top-full left-0 mt-2 w-48 bg-slate-800 border border-slate-600 rounded-lg p-2 shadow-xl z-50 pointer-events-none"
+                    >
+                      <p className="text-xs text-white/90 leading-tight whitespace-pre-wrap break-words" dir="auto">
+                        <strong>{lang(perk.nameKey) || perk.nameKey}</strong>
+                        <br />
+                        <span className="text-white/70">{formatDesc(perk.descKey)}</span>
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             ))}
           </div>
@@ -148,10 +206,10 @@ function SupportCard({
   index: number;
   animatePercent: boolean;
   animateDurationMs: number;
-  onCardClick: (entityType: any) => void;
-  openEntity: any;
+  onCardClick: (entityType: NonNullable<OpenEntityType>) => void;
+  openEntity: OpenEntityType;
   onClosePopover: () => void;
-  getEntityData: (entityType: any, currentSupport: number) => any;
+  getEntityData: (entityType: NonNullable<OpenEntityType>, currentSupport: number) => { name: string, profile: SupportProfile, currentSupport: number } | null;
 }) {
   const {
     id,
@@ -167,50 +225,19 @@ function SupportCard({
     isDeceased = false,
   } = item;
 
-  // Early return for deceased entities (Mom only currently)
-  if (isDeceased) {
-    return (
-      <motion.div
-        className="rounded-xl px-2 py-2 md:px-3 md:py-2.5 text-white relative bg-gray-800/50 border border-gray-600/30 opacity-60"
-        initial={{ opacity: 0, x: -30 }}
-        animate={{ opacity: 0.6, x: 0 }}
-        transition={{ duration: 0.5, delay: index * 0.2 }}
-      >
-        <div className="flex items-start">
-          {/* Grayed out icon badge with skull */}
-          <div className={`mr-2 md:mr-3 inline-flex items-center justify-center shrink-0 ${ICON_BADGE_SHAPE} ${ICON_BADGE_PADDING} bg-gray-600/50 ${ICON_BADGE_RING}`}>
-            <span className="text-gray-400">
-              <Skull className="w-4 h-4" strokeWidth={2.6} />
-            </span>
-          </div>
+  // Ensure all hooks are called consistently BEFORE any early return
+  const { isFreePlay } = useSettingsStore();
+  const activePerks = useLegacyStore(s => s.activePerks);
+  const localPerks = isFreePlay ? activePerks.filter(p => p.targetEntity === id) : [];
 
-          {/* Main info - grayed out */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 md:gap-2">
-              <div className="font-semibold text-sm md:text-base text-gray-400 line-through">{name}</div>
+  // Tooltip state for custom perk tooltips on local cards
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+  const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const roleStoreAnalysis = useRoleStore().analysis;
+  const peopleName = (isFreePlay && roleStoreAnalysis?.holders?.[2]?.name) || lang("SUPPORT_THE_PEOPLE") || "The People";
 
-              {/* Deceased label */}
-              <span className="text-[11px] md:text-[13px] leading-none px-2 py-1 rounded-full border bg-gray-700/50 border-gray-500/40 text-gray-400 font-medium">
-                {lang("SUPPORT_DECEASED")}
-              </span>
-
-              {/* Frozen at 0% */}
-              <span className="text-[13px] md:text-[15px] leading-none px-2 py-1 rounded-full border font-semibold bg-gray-700/50 border-gray-500/40 text-gray-500">
-                0%
-              </span>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-    );
-  }
-
-  // Smoothly animate displayed percent from initialPercent → percent
-  // If initialPercent is provided, use it as the animation baseline (value before delta applied)
-  // Otherwise, use current percent (no animation needed)
   const pctTarget = clampPercent(percent);
   const pctInitial = initialPercent !== undefined ? clampPercent(initialPercent) : pctTarget;
-
   const [pctDisplay, setPctDisplay] = useState<number>(pctInitial);
   const rafRef = useRef<number | null>(null);
   const prevTargetRef = useRef<number>(pctInitial);
@@ -254,9 +281,46 @@ function SupportCard({
     rafRef.current = requestAnimationFrame(tick);
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
     };
   }, [pctTarget, animatePercent, animateDurationMs, id]);
+
+  // Early return for deceased entities (Mom only currently)
+  if (isDeceased) {
+    return (
+      <motion.div
+        className="rounded-xl px-2 py-2 md:px-3 md:py-2.5 text-white relative bg-gray-800/50 border border-gray-600/30 opacity-60"
+        initial={{ opacity: 0, x: -30 }}
+        animate={{ opacity: 0.6, x: 0 }}
+        transition={{ duration: 0.5, delay: index * 0.2 }}
+      >
+        <div className="flex items-start">
+          {/* Grayed out icon badge with skull */}
+          <div className={`mr-2 md:mr-3 inline-flex items-center justify-center shrink-0 ${ICON_BADGE_SHAPE} ${ICON_BADGE_PADDING} bg-gray-600/50 ${ICON_BADGE_RING}`}>
+            <span className="text-gray-400">
+              <Skull className="w-4 h-4" strokeWidth={2.6} />
+            </span>
+          </div>
+
+          {/* Main info - grayed out */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 md:gap-2">
+              <div className="font-semibold text-sm md:text-base text-gray-400 line-through">{name}</div>
+
+              {/* Deceased label */}
+              <span className="text-[11px] md:text-[13px] leading-none px-2 py-1 rounded-full border bg-gray-700/50 border-gray-500/40 text-gray-400 font-medium">
+                {lang("SUPPORT_DECEASED")}
+              </span>
+
+              {/* Frozen at 0% */}
+              <span className="text-[13px] md:text-[15px] leading-none px-2 py-1 rounded-full border font-semibold bg-gray-700/50 border-gray-500/40 text-gray-500">
+                0%
+              </span>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
 
   const showDelta = typeof delta === "number" && delta !== 0;
   const showTrend = trend === "up" || trend === "down";
@@ -274,10 +338,28 @@ function SupportCard({
   const entityType: "people" | "challenger" | null = id === "people" ? "people" : id === "middle" ? "challenger" : null;
   const isPopoverOpen = entityType && openEntity === entityType;
 
-  // Local perks for this entity
-  const { isFreePlay } = useSettingsStore.getState();
-  const activePerks = useLegacyStore(s => s.activePerks);
-  const localPerks = isFreePlay ? activePerks.filter(p => p.targetEntity === id) : [];
+  const handleTooltipEnter = (perkId: string) => {
+    if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
+    tooltipTimeoutRef.current = setTimeout(() => {
+      setActiveTooltip(perkId);
+    }, 300);
+  };
+
+  const handleTooltipLeave = () => {
+    if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
+    setActiveTooltip(null);
+  };
+
+  const handleTooltipToggle = (perkId: string) => {
+    if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
+    setActiveTooltip(prev => prev === perkId ? null : perkId);
+  };
+
+  const formatDesc = (descKey: string) => {
+    let text = lang(descKey) || descKey;
+    text = text.replace("{people}", peopleName);
+    return text;
+  };
 
   // Get entity data if popover should be shown
   const entityData = entityType && isPopoverOpen ? getEntityData(entityType, pctDisplay) : null;
@@ -331,14 +413,41 @@ function SupportCard({
     >
       {/* Entity-specific Perks Container (Top Left of Card) */}
       {localPerks.length > 0 && (
-        <div className="absolute top-1 left-1.5 flex gap-1 z-10" dir="ltr">
+        <div className="absolute top-1 left-1.5 flex gap-1 z-20" dir="ltr">
           {localPerks.map(perk => (
             <div
               key={perk.id}
-              className="w-4 h-4 bg-slate-800/90 border border-slate-600/50 rounded flex items-center justify-center text-[9px] shadow-sm cursor-help"
-              title={lang(perk.descKey) || perk.descKey}
+              className="relative"
+              onMouseEnter={() => handleTooltipEnter(perk.id)}
+              onMouseLeave={handleTooltipLeave}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleTooltipToggle(perk.id);
+              }}
             >
-              {perk.icon}
+              <div className="w-4 h-4 bg-slate-800/90 border border-slate-600/50 rounded flex items-center justify-center text-[9px] shadow-sm cursor-help hover:bg-slate-700/90 transition-colors">
+                {perk.icon}
+              </div>
+
+              {/* Custom Tooltip */}
+              <AnimatePresence>
+                {activeTooltip === perk.id && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute top-full left-0 mt-2 w-40 bg-slate-800 border border-slate-600 rounded-lg p-2 shadow-xl z-50 pointer-events-none"
+                  >
+                    <p className="text-[10px] text-white/90 leading-tight whitespace-pre-wrap break-words" dir="auto">
+                      <strong className="text-xs">{lang(perk.nameKey) || perk.nameKey}</strong>
+                      <br />
+                      <span className="text-white/70">{formatDesc(perk.descKey)}</span>
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           ))}
         </div>
@@ -502,7 +611,7 @@ function clampPercent(n: number) {
 
 /* ------------------ Default lucide icons (white strokes) --------------------- */
 
-export const DefaultSupportIcons = {
+const DefaultSupportIcons = {
   PeopleIcon: ({ className = "" }: { className?: string }) => (
     <Users className={`w-4 h-4 ${ICON_STROKE_CLASS} ${className}`} strokeWidth={2.6} />
   ),

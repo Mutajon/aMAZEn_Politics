@@ -328,6 +328,22 @@ export const useLegacyStore = create<LegacyState>()(
                     };
                 }
 
+                // Retroactive floor perk upgrades (if values are already below the new minimum)
+                if (chosenPerk.id === "keep_enemies_closer") {
+                    const { supportMiddle, setSupportMiddle } = useDilemmaStore.getState();
+                    if (supportMiddle < 20) {
+                        console.log(`[LegacyStore] Retroactive perk boost: Middle Support ${supportMiddle} -> 20`);
+                        setSupportMiddle(20);
+                    }
+                } else if (chosenPerk.id === "unconditional_love") {
+                    // Mom can't drop below 0: if accidentally negative, fix it
+                    const { supportMom, setSupportMom } = useDilemmaStore.getState();
+                    if (supportMom < 0) {
+                        console.log(`[LegacyStore] Retroactive perk boost: Mom Support ${supportMom} -> 0`);
+                        setSupportMom(0);
+                    }
+                }
+
                 // Apply instant effects
                 let lpBonus = 0;
                 if (chosenPerk.effectType === "instant_lp_and_daily_boost") {
