@@ -269,6 +269,55 @@ export default function FinalScoreScreen({ push }: Props) {
     };
   }, [running, step, sequence, breakdown.final, playSfx]);
 
+  // Legacy Score Animation State
+  const [displayLegacyScore, setDisplayLegacyScore] = useState(0);
+  const legacyRafRef = useRef<number | null>(null);
+  const legacyStartTimeRef = useRef(0);
+  const lastStarIndexRef = useRef(-1);
+
+  // Trigger Legacy Score Animation after base sequence completes
+  useEffect(() => {
+    if (step === sequence.length + 1 && isFreePlay) {
+      const targetScore = Math.round(legacyPoints);
+      const duration = 1500; // 1.5 seconds
+
+      const tick = (timestamp: number) => {
+        if (legacyStartTimeRef.current === 0) legacyStartTimeRef.current = timestamp;
+        const elapsed = timestamp - legacyStartTimeRef.current;
+        const progress = Math.min(1, elapsed / duration);
+        const value = Math.round(easeNumber(0, targetScore, progress));
+
+        setDisplayLegacyScore(value);
+
+        // Check for star thresholds
+        let currentStarIndex = -1;
+        for (let i = 0; i < STAR_THRESHOLDS.length; i++) {
+          if (value >= STAR_THRESHOLDS[i]) {
+            currentStarIndex = i;
+          }
+        }
+
+        // Play chime if we just crossed a new threshold
+        if (currentStarIndex > lastStarIndexRef.current) {
+          playSfx("achievementsChimesShort", 0.5);
+          lastStarIndexRef.current = currentStarIndex;
+        }
+
+        if (progress < 1) {
+          legacyRafRef.current = requestAnimationFrame(tick);
+        } else {
+          legacyStartTimeRef.current = 0;
+        }
+      };
+
+      legacyRafRef.current = requestAnimationFrame(tick);
+
+      return () => {
+        if (legacyRafRef.current) cancelAnimationFrame(legacyRafRef.current);
+      };
+    }
+  }, [step, sequence.length, isFreePlay, legacyPoints, playSfx]);
+
   useEffect(() => {
     if (step === sequence.length + 1) {
       setRunning(false);
@@ -377,6 +426,10 @@ export default function FinalScoreScreen({ push }: Props) {
             console.log(`  - User Rank: ${data.userRank}`);
             console.log(`  - Personal Best: ${data.isPersonalBest ? "YES" : "NO"}`);
 
+            // Update UI with global rank
+            setPlayerRank(data.globalRank > 0 ? data.globalRank : null);
+            setIsHallOfFame(data.globalRank > 0 && data.globalRank <= 20);
+
             logger.log(
               "highscore_submitted",
               {
@@ -389,31 +442,35 @@ export default function FinalScoreScreen({ push }: Props) {
             );
           } else {
             console.warn("[FinalScore] ⚠️ Failed to submit to global leaderboard:", data.error);
+            fallbackToLocalRank(entry, breakdown.final);
           }
         } catch (error) {
           console.error("[FinalScore] ❌ Error submitting to global leaderboard:", error);
           // Don't block user experience - local storage still works
+          fallbackToLocalRank(entry, breakdown.final);
         }
       };
 
-      // Submit in background (non-blocking)
-      submitToLeaderboard();
+      const fallbackToLocalRank = (entryData: any, finalScore: number) => {
+        const freshEntries = useHighscoreStore.getState().entries;
+        const rank = findPlayerRank(entryData.name, finalScore, freshEntries);
+        setPlayerRank(rank > 0 ? rank : null);
+        setIsHallOfFame(rank > 0 && rank <= 20);
+      };
 
-      const freshEntries = useHighscoreStore.getState().entries;
-      const rank = findPlayerRank(entry.name, breakdown.final, freshEntries);
-      setPlayerRank(rank > 0 ? rank : null);
-      setIsHallOfFame(rank > 0 && rank <= 20);
-
-      loggingService.endSession();
-      logger.log(
-        "final_score_complete",
-        {
-          finalScore: breakdown.final,
-          rank,
-          isHallOfFame: rank > 0 && rank <= 20,
-        },
-        `Game completed - Final score: ${breakdown.final}, Rank: ${rank}`
-      );
+      // Submit and await response to avoid race conditions with local fallback
+      submitToLeaderboard().then(() => {
+        loggingService.endSession();
+        logger.log(
+          "final_score_complete",
+          {
+            finalScore: breakdown.final,
+            // using state here directly isn't perfectly synchronous but this is just for the log
+            isFreePlay: useSettingsStore.getState().isFreePlay
+          },
+          `Game completed - Final score: ${breakdown.final}`
+        );
+      });
     }
   }, [
     step,
@@ -558,35 +615,37 @@ export default function FinalScoreScreen({ push }: Props) {
           ))}
         </ul>
 
-        <motion.div
-          layout
-          className="rounded-2xl border border-yellow-400/40 bg-yellow-500/15 backdrop-blur-sm p-5 text-yellow-100 shadow-lg"
-        >
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <Trophy className="h-8 w-8 text-yellow-300" />
-              <div>
-                <div className="text-xs uppercase tracking-wide text-yellow-200/70">
-                  {lang("FINAL_SCORE")}
-                </div>
-                <div className="text-3xl font-extrabold tabular-nums">
-                  {formatNumber.format(finalScoreDisplay)}
-                </div>
-                <div className="text-xs text-yellow-100/70">
-                  / {formatNumber.format(roleProgress?.goal ?? breakdown.maxFinal)}
+        {!isFreePlay && (
+          <motion.div
+            layout
+            className="rounded-2xl border border-yellow-400/40 bg-yellow-500/15 backdrop-blur-sm p-5 text-yellow-100 shadow-lg"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Trophy className="h-8 w-8 text-yellow-300" />
+                <div>
+                  <div className="text-xs uppercase tracking-wide text-yellow-200/70">
+                    {lang("FINAL_SCORE")}
+                  </div>
+                  <div className="text-3xl font-extrabold tabular-nums">
+                    {formatNumber.format(finalScoreDisplay)}
+                  </div>
+                  <div className="text-xs text-yellow-100/70">
+                    / {formatNumber.format(roleProgress?.goal ?? breakdown.maxFinal)}
+                  </div>
                 </div>
               </div>
+              {selectedRoleKey && roleProgress ? (
+                <HighScoreSummary
+                  label={lang("FINAL_SCORE_HIGH_SCORE")}
+                  newLabel={lang("FINAL_SCORE_NEW_HIGH_SCORE")}
+                  value={displayedHighScore}
+                  isNew={newHighScoreAchieved}
+                />
+              ) : null}
             </div>
-            {selectedRoleKey && roleProgress ? (
-              <HighScoreSummary
-                label={lang("FINAL_SCORE_HIGH_SCORE")}
-                newLabel={lang("FINAL_SCORE_NEW_HIGH_SCORE")}
-                value={displayedHighScore}
-                isNew={newHighScoreAchieved}
-              />
-            ) : null}
-          </div>
-        </motion.div>
+          </motion.div>
+        )}
 
         {/* === Free Play Legacy Score Card === */}
         {isFreePlay && (
@@ -598,36 +657,58 @@ export default function FinalScoreScreen({ push }: Props) {
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg">
                 <Trophy className="h-5 w-5 text-white" />
               </div>
-              <div>
-                <div className="text-xs uppercase tracking-wide text-amber-200/70">
+              <div className="flex-1">
+                <div className="text-xs uppercase tracking-wide text-amber-200/70 mb-1">
                   {lang("LEGACY_FINAL_SCORE")}
                 </div>
                 <div className="text-3xl font-extrabold tabular-nums">
-                  {Math.round(legacyPoints)} LP
+                  {displayLegacyScore} LP
+                </div>
+                {/* Progress Bar Container */}
+                <div className="relative h-2.5 w-full bg-black/40 rounded-full mt-2 overflow-hidden shadow-inner border border-white/5">
+                  <div
+                    className="absolute left-0 top-0 h-full bg-gradient-to-r from-amber-500 to-amber-300 rounded-full transition-all duration-75 ease-out shadow-[0_0_8px_rgba(251,191,36,0.6)]"
+                    style={{ width: `${Math.min(100, (displayLegacyScore / 100) * 100)}%` }}
+                  />
+                  {/* Threshold Markers inside progress bar */}
+                  {STAR_THRESHOLDS.map((threshold, i) => (
+                    <div
+                      key={i}
+                      className="absolute top-0 bottom-0 w-[2px] bg-black/30 z-10"
+                      style={{ left: `${threshold}%` }}
+                    />
+                  ))}
                 </div>
               </div>
             </div>
 
             {/* Stars */}
-            <div className="flex items-center gap-4 mb-3 pb-3 border-b border-white/10">
-              <span className="text-xs text-amber-200/70 uppercase tracking-wide">
+            <div className="flex items-center gap-4 mb-3 pb-3 border-b border-white/10 mt-4">
+              <span className="text-xs text-amber-200/70 uppercase tracking-wide flex-shrink-0">
                 {lang("LEGACY_STARS_EARNED")}
               </span>
-              <div className="flex items-center gap-2 ml-auto">
-                {legacyStars.map((star, i) => (
-                  <span
-                    key={i}
-                    className={`text-lg ${star.reached
+              <div className="flex items-center justify-between flex-1 ml-auto max-w-[200px] relative mt-1">
+                {/* Background track line linking stars */}
+                <div className="absolute left-2 right-2 top-1/2 -translate-y-1/2 h-[2px] bg-white/10 -z-10 rounded-full" />
+
+                {legacyStars.map((star, i) => {
+                  const threshold = STAR_THRESHOLDS[i];
+                  const displayReached = displayLegacyScore >= threshold;
+                  return (
+                    <span
+                      key={i}
+                      className={`text-xl transition-all duration-300 ${displayReached
                         ? star.active
-                          ? i === 3 ? "text-purple-400 drop-shadow-[0_0_6px_rgba(168,85,247,0.8)]" : "text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.8)]"
-                          : "text-amber-400/30"
-                        : "text-white/20"
-                      }`}
-                    title={`${STAR_THRESHOLDS[i]} LP`}
-                  >
-                    {star.reached ? "★" : "?"}
-                  </span>
-                ))}
+                          ? i === 3 ? "text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.8)] scale-110" : "text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.8)] scale-110"
+                          : "text-amber-400/30 scale-100"
+                        : "text-white/20 scale-100"
+                        }`}
+                      title={`${threshold} LP`}
+                    >
+                      {displayReached ? "★" : "?"}
+                    </span>
+                  );
+                })}
               </div>
             </div>
 

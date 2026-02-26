@@ -72,7 +72,10 @@ export default function ResourceBar({
   // Player avatar modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
-  const character = useRoleStore((s) => s.character);
+  const { character, analysis } = useRoleStore((s) => ({
+    character: s.character,
+    analysis: s.analysis
+  }));
   const playerName = character?.name || "Unknown Leader";
 
   // Handle modal open during tutorial

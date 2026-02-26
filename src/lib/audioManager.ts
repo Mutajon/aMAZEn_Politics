@@ -27,6 +27,7 @@ const AUDIO_FILES = {
     'zoom-woosh': '/assets/sounds/zoomWoosh.mp3',
     'laugh-cartoon': '/assets/sounds/laughCartoon.mp3',
     'achievement1': '/assets/sounds/Achievement1.mp3',
+    'achievementsChimesShort': '/assets/sounds/achievementsChimesShort.mp3', // single ping for threshold
   },
   vo: {
     // First-visit dialogue (19 lines total)
