@@ -9,6 +9,8 @@ import { Users, Landmark, Heart, ArrowUp, ArrowDown, Skull } from "lucide-react"
 import { lang } from "../../i18n/lang";
 import { useSupportEntityPopover } from "../../hooks/useSupportEntityPopover";
 import { useLogger } from "../../hooks/useLogger";
+import { useLegacyStore } from "../../store/legacyStore";
+import { useSettingsStore } from "../../store/settingsStore";
 import SupportEntityPopover from "./SupportEntityPopover";
 
 /* ====================== TUNABLES (EDIT HERE) ====================== */
@@ -44,6 +46,7 @@ export type SupportItem = {
   accentClass?: string;
   icon?: React.ReactNode;          // optional custom icon
   delta?: number | null;           // persists until caller changes it
+  originalDelta?: number | null;   // pre-perk delta (for strikethrough animation)
   trend?: "up" | "down" | null;    // persists until caller changes it
   note?: string | null;            // optional secondary line
   moodVariant?: "civic" | "empathetic"; // civic => angry low; empathetic => sad low (Mom)
@@ -63,10 +66,31 @@ export default function SupportList({
 }: Props) {
   const { openEntity, togglePopover, closePopover, getEntityData } = useSupportEntityPopover();
   const logger = useLogger();
+  const { isFreePlay } = useSettingsStore.getState();
+  const activePerks = useLegacyStore(s => s.activePerks);
+
+  const globalPerks = isFreePlay ? activePerks.filter(p => p.targetEntity === "global") : [];
 
   return (
-    <div className="border-slate-400/30 bg-slate-900/60 backdrop-blur-sm rounded-2xl p-3 md:p-4">
-      <h3 className="text-[10px] uppercase tracking-widest font-bold text-white/40 mb-3 px-1">{lang("SUPPORT_VALUES_TITLE")}</h3>
+    <div className="border-slate-400/30 bg-slate-900/60 backdrop-blur-sm rounded-2xl p-3 md:p-4 relative">
+      <div className="flex justify-between items-center mb-3 px-1">
+        <h3 className="text-[10px] uppercase tracking-widest font-bold text-white/40">{lang("SUPPORT_VALUES_TITLE")}</h3>
+
+        {/* Global Perks Container (Top Left of widget) */}
+        {globalPerks.length > 0 && (
+          <div className="flex gap-1" dir="ltr">
+            {globalPerks.map(perk => (
+              <div
+                key={perk.id}
+                className="w-5 h-5 bg-slate-800/80 border border-slate-600/50 rounded flex items-center justify-center text-[10px] shadow-sm cursor-help"
+                title={lang(perk.descKey) || perk.descKey}
+              >
+                {perk.icon}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       <div className="space-y-2 md:space-y-2">
         {items.map((it, index) => (
           <SupportCard
@@ -124,10 +148,10 @@ function SupportCard({
   index: number;
   animatePercent: boolean;
   animateDurationMs: number;
-  onCardClick: (entityType: "people" | "challenger") => void;
-  openEntity: "people" | "challenger" | null;
+  onCardClick: (entityType: any) => void;
+  openEntity: any;
   onClosePopover: () => void;
-  getEntityData: (entityType: "people" | "challenger", currentSupport: number) => any;
+  getEntityData: (entityType: any, currentSupport: number) => any;
 }) {
   const {
     id,
@@ -136,6 +160,7 @@ function SupportCard({
     initialPercent,
     icon,
     delta = null,
+    originalDelta = null,
     trend = null,
     note = null,
     moodVariant = "civic",
@@ -249,6 +274,11 @@ function SupportCard({
   const entityType: "people" | "challenger" | null = id === "people" ? "people" : id === "middle" ? "challenger" : null;
   const isPopoverOpen = entityType && openEntity === entityType;
 
+  // Local perks for this entity
+  const { isFreePlay } = useSettingsStore.getState();
+  const activePerks = useLegacyStore(s => s.activePerks);
+  const localPerks = isFreePlay ? activePerks.filter(p => p.targetEntity === id) : [];
+
   // Get entity data if popover should be shown
   const entityData = entityType && isPopoverOpen ? getEntityData(entityType, pctDisplay) : null;
 
@@ -299,6 +329,21 @@ function SupportCard({
       tabIndex={isClickable ? 0 : undefined}
       aria-label={isClickable ? `View ${name} details` : undefined}
     >
+      {/* Entity-specific Perks Container (Top Left of Card) */}
+      {localPerks.length > 0 && (
+        <div className="absolute top-1 left-1.5 flex gap-1 z-10" dir="ltr">
+          {localPerks.map(perk => (
+            <div
+              key={perk.id}
+              className="w-4 h-4 bg-slate-800/90 border border-slate-600/50 rounded flex items-center justify-center text-[9px] shadow-sm cursor-help"
+              title={lang(perk.descKey) || perk.descKey}
+            >
+              {perk.icon}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex items-start">
         {/* Left icon badge — colored background + white lines */}
         <div className={`mr-2 md:mr-3 inline-flex items-center justify-center shrink-0 ${ICON_BADGE_SHAPE} ${ICON_BADGE_PADDING} ${badgeBg} ${ICON_BADGE_RING}`}>
@@ -335,21 +380,10 @@ function SupportCard({
 
             {/* delta pill (tween-pop, persists) – size controlled by DELTA_FONT_CLASS */}
             {showDelta && (
-              <motion.span
-                key={`delta-${delta}`} // re-trigger animation on change
-                initial={{ scale: 1.2, opacity: 0.0 }}
-                animate={{ scale: 1.0, opacity: 1.0 }}
-                transition={{ type: "tween", ease: [0.16, 1, 0.3, 1], duration: 0.25 }}
-                className={[
-                  `${DELTA_FONT_CLASS}`,
-                  "leading-none px-2.5 py-1 rounded-full border",
-                  delta > 0
-                    ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
-                    : "border-rose-400/40 bg-rose-500/15 text-rose-200",
-                ].join(" ")}
-              >
-                {delta > 0 ? `+${delta}` : `${delta}`}
-              </motion.span>
+              <AnimatedDelta
+                delta={delta}
+                originalDelta={originalDelta}
+              />
             )}
 
             {/* right-aligned trend arrow (bigger/thicker, bobbing, persists) */}
@@ -479,3 +513,83 @@ export const DefaultSupportIcons = {
     <Heart className={`w-4 h-4 ${ICON_STROKE_CLASS} ${className}`} strokeWidth={2.6} />
   ),
 };
+
+// ============================================================================
+// ANIMATED DELTA COMPONENT (Cross-out logic)
+// ============================================================================
+
+function AnimatedDelta({ delta, originalDelta }: { delta: number; originalDelta: number | null }) {
+  const isModified = typeof originalDelta === "number" && originalDelta !== delta;
+
+  // Base styling classes
+  const getStyleClasses = (val: number) => {
+    return [
+      DELTA_FONT_CLASS,
+      "leading-none px-2.5 py-1 rounded-full border",
+      val > 0
+        ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200"
+        : "border-rose-400/40 bg-rose-500/15 text-rose-200",
+    ].join(" ");
+  };
+
+  const currentStyleClasses = getStyleClasses(delta);
+
+  if (!isModified) {
+    // Normal unmodified animation
+    return (
+      <motion.span
+        key={`delta-${delta}`}
+        initial={{ scale: 1.2, opacity: 0.0 }}
+        animate={{ scale: 1.0, opacity: 1.0 }}
+        transition={{ type: "tween", ease: [0.16, 1, 0.3, 1], duration: 0.25 }}
+        className={currentStyleClasses}
+      >
+        {delta > 0 ? `+${delta}` : delta}
+      </motion.span>
+    );
+  }
+
+  // Modified by perk: animate sequence
+  const origStyleClasses = getStyleClasses(originalDelta);
+
+  return (
+    <div className="flex items-center gap-1.5" dir="ltr">
+      {/* 1. Original Value crossed out */}
+      <motion.div
+        key={`orig-${originalDelta}`}
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 0.6, scale: 0.9 }}
+        transition={{ duration: 0.3 }}
+        className="relative flex items-center justify-center"
+      >
+        <span className={`${origStyleClasses}`}>
+          {originalDelta > 0 ? `+${originalDelta}` : originalDelta}
+        </span>
+        {/* Diagonal crossover line */}
+        <motion.div
+          initial={{ scaleX: 0, opacity: 0 }}
+          animate={{ scaleX: 1, opacity: 1 }}
+          transition={{ duration: 0.3, delay: 0.3, ease: "easeOut" }}
+          style={{ originX: 0 }}
+          className="absolute inset-0 w-full h-[1.5px] bg-red-400/80 -rotate-12 top-1/2 -mt-[0.5px]"
+        />
+      </motion.div>
+
+      {/* 2. New Final Value popping in */}
+      <motion.span
+        key={`new-${delta}`}
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{
+          type: "spring",
+          stiffness: 400,
+          damping: 20,
+          delay: 0.6 // Wait for original + crossover
+        }}
+        className={currentStyleClasses}
+      >
+        {delta > 0 ? `+${delta}` : delta}
+      </motion.span>
+    </div>
+  );
+}

@@ -35,6 +35,7 @@ export interface PerkDefinition {
     descKey: string;
     icon: string;
     effectType: PerkEffectType;
+    targetEntity: "people" | "middle" | "mom" | "global";
     isUltimate?: boolean;
 }
 
@@ -49,6 +50,7 @@ export const STANDARD_PERKS: PerkDefinition[] = [
         descKey: "PERK_UNCONDITIONAL_LOVE_DESC",
         icon: "💖",
         effectType: "mom_floor_zero",
+        targetEntity: "mom",
     },
     {
         id: "vox_populi",
@@ -56,6 +58,7 @@ export const STANDARD_PERKS: PerkDefinition[] = [
         descKey: "PERK_VOX_POPULI_DESC",
         icon: "📢",
         effectType: "halve_negative_people",
+        targetEntity: "people",
     },
     {
         id: "keep_enemies_closer",
@@ -63,6 +66,7 @@ export const STANDARD_PERKS: PerkDefinition[] = [
         descKey: "PERK_KEEP_ENEMIES_CLOSER_DESC",
         icon: "🤝",
         effectType: "rival_floor_10",
+        targetEntity: "middle",
     },
     {
         id: "early_momentum",
@@ -70,6 +74,7 @@ export const STANDARD_PERKS: PerkDefinition[] = [
         descKey: "PERK_EARLY_MOMENTUM_DESC",
         icon: "🚀",
         effectType: "instant_lp_and_daily_boost",
+        targetEntity: "global",
     },
     {
         id: "home_cooked_meals",
@@ -77,6 +82,7 @@ export const STANDARD_PERKS: PerkDefinition[] = [
         descKey: "PERK_HOME_COOKED_MEALS_DESC",
         icon: "🍲",
         effectType: "conditional_mom_bonus",
+        targetEntity: "mom",
     },
     {
         id: "public_works",
@@ -84,6 +90,7 @@ export const STANDARD_PERKS: PerkDefinition[] = [
         descKey: "PERK_PUBLIC_WORKS_DESC",
         icon: "🏗️",
         effectType: "flat_daily_lp",
+        targetEntity: "global",
     },
     {
         id: "golden_era",
@@ -91,6 +98,7 @@ export const STANDARD_PERKS: PerkDefinition[] = [
         descKey: "PERK_GOLDEN_ERA_DESC",
         icon: "✨",
         effectType: "boost_positive_shifts",
+        targetEntity: "global",
     },
     {
         id: "mother_knows_best",
@@ -98,6 +106,7 @@ export const STANDARD_PERKS: PerkDefinition[] = [
         descKey: "PERK_MOTHER_KNOWS_BEST_DESC",
         icon: "👩‍🍳",
         effectType: "boost_mom_gains",
+        targetEntity: "mom",
     },
     {
         id: "hero_of_people",
@@ -105,6 +114,7 @@ export const STANDARD_PERKS: PerkDefinition[] = [
         descKey: "PERK_HERO_OF_PEOPLE_DESC",
         icon: "🦸",
         effectType: "hero_rivalry_halve",
+        targetEntity: "middle",
     },
     {
         id: "iron_fist",
@@ -112,6 +122,7 @@ export const STANDARD_PERKS: PerkDefinition[] = [
         descKey: "PERK_IRON_FIST_DESC",
         icon: "✊",
         effectType: "ignore_rival_negatives",
+        targetEntity: "middle",
     },
 ];
 
@@ -123,8 +134,9 @@ export const ULTIMATE_PERK: PerkDefinition = {
     id: "sun_king",
     nameKey: "PERK_SUN_KING",
     descKey: "PERK_SUN_KING_DESC",
-    icon: "☀️",
+    icon: "👑",
     effectType: "ultimate",
+    targetEntity: "global",
     isUltimate: true,
 };
 

@@ -74,19 +74,20 @@ function applyPerkModifiers(effects: SupportEffect[]): SupportEffect[] {
 
   return effects.map(effect => {
     let { delta } = effect;
+    const originalDelta = delta;
 
     if (isUltimate) {
-      // Ultimate: double positives, halve negatives
-      delta = delta > 0 ? delta * 2 : Math.round(delta / 2);
+      // Ultimate: double positives, halve negatives (floor the half to penalize less, or round towards zero)
+      delta = delta > 0 ? delta * 2 : Math.ceil(delta / 2);
     } else {
       // Standard perk processing
       if (delta < 0) {
         // Negative shift modifiers
         if (effect.id === "people" && halveNegPeople) {
-          delta = Math.round(delta / 2);
+          delta = Math.ceil(delta / 2);
         }
         if (effect.id === "middle" && heroRivalHalve && communityIsPositive) {
-          delta = Math.round(delta / 2);
+          delta = Math.ceil(delta / 2);
         }
         if (effect.id === "mom" && momFloorZero) {
           delta = 0; // Prevent negative shift for mom
@@ -97,12 +98,14 @@ function applyPerkModifiers(effects: SupportEffect[]): SupportEffect[] {
           delta += 3;
         }
         if (effect.id === "mom" && boostMomGains) {
-          delta = Math.round(delta * 1.5);
-        }
-        if (isUltimate) {
-          delta *= 2;
+          delta = Math.floor(delta * 1.5);
         }
       }
+    }
+
+    // Attach originalDelta only if the perk actually changed the value
+    if (delta !== originalDelta) {
+      return { ...effect, delta, originalDelta };
     }
 
     return { ...effect, delta };

@@ -12,12 +12,16 @@ interface Particle {
 
 export default function SupportToLegacyParticles({
     active,
-    sourceIds
+    sourceIds,
+    lpChange,
 }: {
     active: boolean;
-    sourceIds: string[]
+    sourceIds: string[];
+    lpChange?: number;
 }) {
     const [particles, setParticles] = useState<Particle[]>([]);
+    const [centerStartPoint, setCenterStartPoint] = useState<{ x: number, y: number } | null>(null);
+    const [targetPoint, setTargetPoint] = useState<{ x: number, y: number } | null>(null);
 
     useEffect(() => {
         if (!active) {
@@ -32,7 +36,10 @@ export default function SupportToLegacyParticles({
         const tX = targetRect.right; // Aim for the growing edge
         const tY = targetRect.top + targetRect.height / 2;
 
+        setTargetPoint({ x: tX, y: tY });
+
         const newParticles: Particle[] = [];
+        let sumX = 0, sumY = 0, sourceCount = 0;
 
         sourceIds.forEach((sid, sourceIdx) => {
             const sourceEl = document.getElementById(sid);
@@ -41,6 +48,8 @@ export default function SupportToLegacyParticles({
             const sourceRect = sourceEl.getBoundingClientRect();
             const sX = sourceRect.left + sourceRect.width / 2;
             const sY = sourceRect.top + sourceRect.height / 2;
+
+            sumX += sX; sumY += sY; sourceCount++;
 
             // Spawn 10-15 particles per source
             for (let i = 0; i < 12; i++) {
@@ -54,6 +63,10 @@ export default function SupportToLegacyParticles({
                 });
             }
         });
+
+        if (sourceCount > 0) {
+            setCenterStartPoint({ x: sumX / sourceCount, y: sumY / sourceCount - 40 }); // slightly above center
+        }
 
         setParticles(newParticles);
     }, [active, sourceIds]);
@@ -87,6 +100,35 @@ export default function SupportToLegacyParticles({
                         className="absolute top-0 left-0 w-2 h-2 rounded-full bg-yellow-300 shadow-[0_0_8px_rgba(253,224,71,0.8)]"
                     />
                 ))}
+
+                {/* Animated Number Flowing to Bar */}
+                {lpChange !== undefined && lpChange !== 0 && centerStartPoint && targetPoint && (
+                    <motion.div
+                        key="lp-change-text"
+                        initial={{
+                            x: centerStartPoint.x,
+                            y: centerStartPoint.y,
+                            scale: 0.5,
+                            opacity: 0
+                        }}
+                        animate={{
+                            x: [centerStartPoint.x, centerStartPoint.x + (targetPoint.x - centerStartPoint.x) * 0.5, targetPoint.x],
+                            y: [centerStartPoint.y, centerStartPoint.y - 60, targetPoint.y],
+                            scale: [0.5, 1.4, 1.0],
+                            opacity: [0, 1, 1, 0]
+                        }}
+                        transition={{
+                            duration: 1.8,
+                            delay: 0.3, // slight delay to align with particle flight
+                            ease: [0.25, 1, 0.5, 1] // smooth easeOut
+                        }}
+                        className={`absolute top-0 left-0 text-xl md:text-2xl font-black drop-shadow-md z-10 
+                            ${lpChange > 0 ? "text-purple-300" : "text-gray-300"}`}
+                        style={{ marginLeft: '-15px', marginTop: '-15px' }} // center alignment
+                    >
+                        {lpChange > 0 ? `+${lpChange}` : lpChange}
+                    </motion.div>
+                )}
             </AnimatePresence>
         </div>
     );

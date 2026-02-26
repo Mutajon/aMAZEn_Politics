@@ -29,6 +29,7 @@ export default function PerkSelectionOverlay() {
     }
 
     const isUltimate = pendingStarIndex === 3;
+    const isStartBonus = pendingStarIndex === -1;
     const starNumber = pendingStarIndex + 1;
 
     const peopleName = (analysis?.holders && analysis.holders[2])
@@ -76,6 +77,10 @@ export default function PerkSelectionOverlay() {
                                 <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-[0_0_30px_rgba(168,85,247,0.5)]">
                                     <Crown className="w-8 h-8 text-white" />
                                 </div>
+                            ) : isStartBonus ? (
+                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow-[0_0_25px_rgba(59,130,246,0.4)]">
+                                    <Sparkles className="w-7 h-7 text-white" />
+                                </div>
                             ) : (
                                 <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-[0_0_25px_rgba(251,191,36,0.4)]">
                                     <Star className="w-7 h-7 text-white fill-white" />
@@ -89,12 +94,16 @@ export default function PerkSelectionOverlay() {
                             transition={{ delay: 0.5 }}
                             className={`text-2xl font-black uppercase tracking-widest ${isUltimate
                                 ? "bg-gradient-to-r from-purple-300 to-purple-500 bg-clip-text text-transparent"
-                                : "bg-gradient-to-r from-amber-200 to-amber-500 bg-clip-text text-transparent"
+                                : isStartBonus
+                                    ? "bg-gradient-to-r from-blue-300 to-blue-500 bg-clip-text text-transparent"
+                                    : "bg-gradient-to-r from-amber-200 to-amber-500 bg-clip-text text-transparent"
                                 }`}
                         >
                             {isUltimate
                                 ? (lang("PERK_ULTIMATE_TITLE") || "Ultimate Power")
-                                : (lang("PERK_STAR_EARNED_TITLE") || `Star ${starNumber} Earned!`)}
+                                : isStartBonus
+                                    ? (lang("PERK_START_BONUS_TITLE") || "Starting Bonus")
+                                    : (lang("PERK_STAR_EARNED_TITLE") || `Star ${starNumber} Earned!`)}
                         </motion.h2>
 
                         <motion.p
@@ -105,7 +114,9 @@ export default function PerkSelectionOverlay() {
                         >
                             {isUltimate
                                 ? (lang("PERK_ULTIMATE_DESC") || "You've reached the pinnacle of legacy.")
-                                : (lang("PERK_CHOOSE_DESC") || "Choose a perk to enhance your legacy:")}
+                                : isStartBonus
+                                    ? (lang("PERK_START_BONUS_DESC") || "Choose a perk to begin your journey:")
+                                    : (lang("PERK_CHOOSE_DESC") || "Choose a perk to enhance your legacy:")}
                         </motion.p>
                     </div>
 
@@ -126,7 +137,9 @@ export default function PerkSelectionOverlay() {
                                 className={`group relative p-5 rounded-3xl border text-left transition-all duration-300 overflow-hidden
                   ${isUltimate
                                         ? "bg-purple-900/40 border-purple-500/40 hover:border-purple-400/80 hover:bg-purple-900/60 hover:shadow-[0_0_30px_rgba(168,85,247,0.3)]"
-                                        : "bg-slate-800/60 border-amber-500/30 hover:border-amber-400/70 hover:bg-slate-800/80 hover:shadow-[0_0_20px_rgba(251,191,36,0.2)]"
+                                        : isStartBonus
+                                            ? "bg-slate-800/60 border-blue-500/30 hover:border-blue-400/70 hover:bg-slate-800/80 hover:shadow-[0_0_20px_rgba(59,130,246,0.2)]"
+                                            : "bg-slate-800/60 border-amber-500/30 hover:border-amber-400/70 hover:bg-slate-800/80 hover:shadow-[0_0_20px_rgba(251,191,36,0.2)]"
                                     }
                   hover:scale-[1.03] active:scale-[0.98]
                   backdrop-blur-sm cursor-pointer
@@ -135,14 +148,18 @@ export default function PerkSelectionOverlay() {
                                 {/* Glow effect on hover */}
                                 <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none ${isUltimate
                                     ? "bg-gradient-to-t from-purple-500/10 via-transparent to-purple-500/5"
-                                    : "bg-gradient-to-t from-amber-500/10 via-transparent to-amber-500/5"
+                                    : isStartBonus
+                                        ? "bg-gradient-to-t from-blue-500/10 via-transparent to-blue-500/5"
+                                        : "bg-gradient-to-t from-amber-500/10 via-transparent to-amber-500/5"
                                     }`} />
 
                                 {/* Icon */}
                                 <div className="text-3xl mb-3 relative z-10">{perk.icon}</div>
 
                                 {/* Name */}
-                                <h3 className={`text-base font-black uppercase tracking-wider mb-2 relative z-10 ${isUltimate ? "text-purple-300" : "text-amber-300"
+                                <h3 className={`text-base font-black uppercase tracking-wider mb-2 relative z-10 ${isUltimate ? "text-purple-300"
+                                        : isStartBonus ? "text-blue-300"
+                                            : "text-amber-300"
                                     }`}>
                                     {lang(perk.nameKey) || perk.nameKey}
                                 </h3>
@@ -154,7 +171,7 @@ export default function PerkSelectionOverlay() {
 
                                 {/* Sparkle indicator */}
                                 <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Sparkles className={`w-4 h-4 ${isUltimate ? "text-purple-400" : "text-amber-400"}`} />
+                                    <Sparkles className={`w-4 h-4 ${isUltimate ? "text-purple-400" : isStartBonus ? "text-blue-400" : "text-amber-400"}`} />
                                 </div>
                             </motion.button>
                         ))}

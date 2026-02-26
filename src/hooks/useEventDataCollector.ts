@@ -33,6 +33,7 @@ import { useLang } from "../i18n/lang";
 export type SupportEffect = {
   id: "people" | "middle" | "mom";
   delta: number;
+  originalDelta?: number;
   explain: string;
 };
 

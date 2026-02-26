@@ -41,6 +41,7 @@ export type ActivePerk = {
     descKey: string;
     icon: string;
     effectType: PerkEffectType;
+    targetEntity: "people" | "middle" | "mom" | "global";
 };
 
 type LegacyState = {
@@ -52,10 +53,13 @@ type LegacyState = {
     pendingStarIndex: number | null;  // Star index awaiting perk selection *currently active*
     queuedPendingStarIndex: number | null; // Earned but waiting for tween
     perkChoices: PerkDefinition[] | null; // 2 random perks to choose from (null if not pending)
+    lastLpChange: number;                 // The most recent LP delta applied
+    hasStartingBonus: boolean;            // Tracks if starting bonus was collected
 
     // Actions
     applyDailyChange: (deltas: { people: number; middle: number; mom: number }) => number;
     revealPendingStar: () => void;
+    triggerStartingBonus: () => void;
     choosePerk: (perkId: string) => void;
     initForDifficulty: (difficulty: "easy" | "normal" | "hard") => void;
     reset: () => void;
@@ -112,6 +116,8 @@ export const useLegacyStore = create<LegacyState>()(
             pendingStarIndex: null,
             queuedPendingStarIndex: null,
             perkChoices: null,
+            lastLpChange: 0,
+            hasStartingBonus: false,
 
             /**
              * Apply the daily support change to the Legacy Bar.
@@ -224,6 +230,7 @@ export const useLegacyStore = create<LegacyState>()(
                     legacyPoints: Math.round(newLP * 10) / 10, // Round to 1 decimal
                     stars: newStars,
                     queuedPendingStarIndex: newPendingStarIndex, // Wait for tween before activating
+                    lastLpChange: Math.round((newLP - legacyPoints) * 10) / 10, // Actual applied delta
                 });
 
                 return newLP;
@@ -249,6 +256,25 @@ export const useLegacyStore = create<LegacyState>()(
                     pendingStarIndex: queuedPendingStarIndex,
                     queuedPendingStarIndex: null,
                     perkChoices,
+                });
+            },
+
+            /**
+             * Trigger the starting bonus perk selection.
+             */
+            triggerStartingBonus() {
+                const state = get();
+                const { hasStartingBonus, pendingStarIndex, queuedPendingStarIndex, perkPool } = state;
+
+                // Don't trigger if already got it, or currently selecting a star perk
+                if (hasStartingBonus || pendingStarIndex !== null || queuedPendingStarIndex !== null) {
+                    return;
+                }
+
+                console.log("[LegacyStore] Triggering starting bonus perk selection");
+                set({
+                    pendingStarIndex: -1, // Use -1 to represent starting bonus
+                    perkChoices: pickRandom(perkPool, Math.min(2, perkPool.length)),
                 });
             },
 
@@ -287,17 +313,20 @@ export const useLegacyStore = create<LegacyState>()(
                     descKey: chosenPerk.descKey,
                     icon: chosenPerk.icon,
                     effectType: chosenPerk.effectType,
+                    targetEntity: chosenPerk.targetEntity || "global",
                 };
 
                 // Remove from pool (standard perks only)
                 const newPool = perkPool.filter(p => p.id !== perkId);
 
-                // Mark star as perk-chosen
+                // Mark star as perk-chosen (only if it's a real star, not starting bonus)
                 const newStars = [...state.stars] as [StarState, StarState, StarState, StarState];
-                newStars[pendingStarIndex] = {
-                    ...newStars[pendingStarIndex],
-                    perkChosen: true,
-                };
+                if (pendingStarIndex >= 0 && pendingStarIndex < 4) {
+                    newStars[pendingStarIndex] = {
+                        ...newStars[pendingStarIndex],
+                        perkChosen: true,
+                    };
+                }
 
                 // Apply instant effects
                 let lpBonus = 0;
@@ -305,7 +334,7 @@ export const useLegacyStore = create<LegacyState>()(
                     lpBonus = 10; // Instant +10 LP
                 }
 
-                console.log(`[LegacyStore] ⭐ Perk chosen: ${chosenPerk.id} (Star ${pendingStarIndex + 1})${lpBonus > 0 ? ` | Instant +${lpBonus} LP` : ''}`);
+                console.log(`[LegacyStore] ⭐ Perk chosen: ${chosenPerk.id} (${pendingStarIndex === -1 ? "Starting Bonus" : `Star ${pendingStarIndex + 1}`})${lpBonus > 0 ? ` | Instant +${lpBonus} LP` : ''}`);
 
                 set({
                     activePerks: [...activePerks, newActivePerk],
@@ -314,6 +343,7 @@ export const useLegacyStore = create<LegacyState>()(
                     pendingStarIndex: null,
                     perkChoices: null,
                     legacyPoints: lpBonus > 0 ? state.legacyPoints + lpBonus : state.legacyPoints,
+                    ...(pendingStarIndex === -1 ? { hasStartingBonus: true } : {}),
                 });
             },
 
@@ -338,6 +368,8 @@ export const useLegacyStore = create<LegacyState>()(
                     pendingStarIndex: null,
                     queuedPendingStarIndex: null,
                     perkChoices: null,
+                    hasStartingBonus: false,
+                    lastLpChange: 0,
                 });
             },
 
@@ -355,6 +387,8 @@ export const useLegacyStore = create<LegacyState>()(
                     pendingStarIndex: null,
                     queuedPendingStarIndex: null,
                     perkChoices: null,
+                    hasStartingBonus: false,
+                    lastLpChange: 0,
                 });
             },
         }),
@@ -366,6 +400,7 @@ export const useLegacyStore = create<LegacyState>()(
                 perkPool: state.perkPool,
                 activePerks: state.activePerks,
                 reactionMultiplier: state.reactionMultiplier,
+                hasStartingBonus: state.hasStartingBonus,
             }),
         }
     )

@@ -24,6 +24,7 @@ import DilemmaLoadError from "../components/event/DilemmaLoadError";
 import ResourceBar, { type ResourceBarScoreDetails } from "../components/event/ResourceBar";
 import SupportList from "../components/event/SupportList";
 import SupportToLegacyParticles from "../components/event/SupportToLegacyParticles";
+import { useLegacyStore } from "../store/legacyStore";
 import { DynamicParameters, buildDynamicParamsItems } from "../components/event/DynamicParameters";
 import DilemmaCard from "../components/event/DilemmaCard";
 import MirrorCard from "../components/event/MirrorCard";
@@ -138,6 +139,9 @@ export default function EventScreen3({ push }: Props) {
 
   // Presentation step tracking (controls what's visible)
   const [presentationStep, setPresentationStep] = useState<number>(-1);
+
+  // Access legacy state for latest LP change
+  const lastLpChange = useLegacyStore(s => s.lastLpChange);
 
   // Previous support values (used as animation baseline)
   // Tracks the last rendered values so counter animates from old→new
@@ -318,6 +322,15 @@ export default function EventScreen3({ push }: Props) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once on mount
+
+  // ========================================================================
+  // EFFECT 0A.1: Trigger Starting Bonus for Free Play mode on Day 1
+  // ========================================================================
+  useEffect(() => {
+    if (isFreePlay && day === 1 && !restoredFromSnapshot) {
+      useLegacyStore.getState().triggerStartingBonus();
+    }
+  }, [isFreePlay, day, restoredFromSnapshot]);
 
   // ========================================================================
   // EFFECT 0B: Register progress callback with data collector
@@ -1095,6 +1108,7 @@ export default function EventScreen3({ push }: Props) {
               sourceIds={collectedData.supportEffects
                 .filter(e => e.delta !== 0) // Only emit from changed stats
                 .map(e => `support-pill-${e.id}`)}
+              lpChange={lastLpChange}
             />
           )}
 
