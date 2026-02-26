@@ -315,7 +315,10 @@ export default function PlayerCardModal({
               )}
 
               {isFreePlay ? (
-                <div className="flex justify-center py-4">
+                <div className="flex flex-col items-center py-4 space-y-2">
+                  <p className="text-sm text-center text-white/50 italic max-w-sm mb-2 font-serif">
+                    {lang("PLAYER_CARD_VALUES_EXHIBITED")}
+                  </p>
                   <PhilosophicalRadarChart values={philosophicalAxes} />
                 </div>
               ) : (

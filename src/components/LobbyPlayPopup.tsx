@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Dices, Target, Trophy } from "lucide-react";
+import { Dices } from "lucide-react";
 import { audioManager } from "../lib/audioManager";
 import { useLang } from "../i18n/lang";
 import { useLanguage } from "../i18n/LanguageContext";
@@ -43,7 +43,6 @@ interface LobbyPlayPopupProps {
         systemName: string;
         year: string;
         roleExperience?: string;
-        bonusObjective?: string;
         messenger?: string;
     }) => void;
     isLoading?: boolean;
@@ -108,13 +107,10 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     const [tone, setTone] = useState<"serious" | "satirical">("serious");
     const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
 
-    // New state for Intro flow
     const [step, setStep] = useState<'selection' | 'form' | 'intro' | 'spice' | 'custom'>('selection');
-    const [bonusObjective, setBonusObjective] = useState("");
     const [introData, setIntroData] = useState<{ intro: string, mirrorMsg: string, supportEntities?: any[] } | null>(null);
     const [isGeneratingIntro, setIsGeneratingIntro] = useState(false);
     const [selectedSystem, setSelectedSystem] = useState<FreePlaySystem | null>(null);
-    const [useBonusObjective, setUseBonusObjective] = useState(false);
     const [messenger, setMessenger] = useState("");
     const [roleCategory, setRoleCategory] = useState<"leader" | "commoner" | null>(null);
     const [inferredYear, setInferredYear] = useState("");
@@ -182,10 +178,6 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         setSetting(selectedSystem.scenario);
         setSelectedAvatar(data.avatar);
 
-        const objective = data.role === 'leader'
-            ? selectedSystem.bonusObjectiveLeader
-            : selectedSystem.bonusObjectiveCitizen;
-        setBonusObjective(objective);
 
         // Pull the correct messenger based on role
         const msg = data.role === 'leader'
@@ -221,19 +213,14 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
     const handleSpiceConfirm = (settings: {
         difficulty: string,
         tone: string,
-        emphasis: string,
-        useBonusObjective: boolean
+        emphasis: string
     }) => {
         audioManager.playSfx("click-soft");
         const fullRole = `${role} - Diff: ${settings.difficulty} - Tone: ${settings.tone}${settings.emphasis ? ` - Emp: ${settings.emphasis}` : ''}`;
         loggingService.log('freeplay_spice_confirmed', settings, 'User confirmed spice settings', { role: fullRole, screen: '/lobby' });
         setDifficulty(settings.difficulty as any);
         setTone(settings.tone === 'comedy' ? 'satirical' : 'serious');
-        setUseBonusObjective(settings.useBonusObjective);
-
-        // If bonus objective is enabled, use it as the emphasis
-        const finalEmphasis = settings.useBonusObjective ? bonusObjective : settings.emphasis;
-        setEmphasis(finalEmphasis || selectedSystem?.intro || "");
+        setEmphasis(settings.emphasis || selectedSystem?.intro || "");
 
         // Finally trigger generation
         generateIntroFromSettings(setting, role);
@@ -248,8 +235,8 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                 const year = inferredYear || selectedSystem?.year || "Present Day";
                 const roleExperience = inferredExperience || (roleCategory === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience);
 
-                // Final emphasis (either user choice or bonus objective)
-                const finalEmphasis = useBonusObjective ? bonusObjective : (emphasis || selectedSystem?.intro || "A new era begins.");
+                // Final emphasis (user choice)
+                const finalEmphasis = emphasis || selectedSystem?.intro || "A new era begins.";
 
                 const res = await fetch("/api/free-play/intro", {
                     method: "POST",
@@ -297,7 +284,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
             const systemName = selectedSystem?.governanceSystem || "Custom System";
             const year = selectedSystem?.year || "Present Day";
             const roleExperience = roleCategory === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
-            const finalEmphasis = useBonusObjective ? bonusObjective : (emphasis || selectedSystem?.intro || "A new era begins.");
+            const finalEmphasis = emphasis || selectedSystem?.intro || "A new era begins.";
 
             onSubmit({
                 characterName,
@@ -310,8 +297,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                 avatar: selectedAvatar,
                 systemName,
                 year,
-                roleExperience,
-                bonusObjective: useBonusObjective ? bonusObjective : undefined
+                roleExperience
             });
         } finally {
             setIsGeneratingIntro(false);
@@ -350,7 +336,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                     const systemName = selectedSystem?.governanceSystem || "Custom System";
                     const year = selectedSystem?.year || "Present Day";
                     const roleExperience = roleCategory === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
-                    const finalEmphasis = useBonusObjective ? bonusObjective : (emphasis || selectedSystem?.intro || "A new era begins.");
+                    const finalEmphasis = emphasis || selectedSystem?.intro || "A new era begins.";
 
                     onSubmit({
                         characterName,
@@ -363,8 +349,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                         avatar: selectedAvatar,
                         systemName,
                         year,
-                        roleExperience,
-                        bonusObjective: useBonusObjective ? bonusObjective : undefined
+                        roleExperience
                     });
                 }
             } catch (err) {
@@ -372,7 +357,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                 const systemName = selectedSystem?.governanceSystem || "Custom System";
                 const year = selectedSystem?.year || "Present Day";
                 const roleExperience = roleCategory === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
-                const finalEmphasis = useBonusObjective ? bonusObjective : (emphasis || selectedSystem?.intro || "A new era begins.");
+                const finalEmphasis = emphasis || selectedSystem?.intro || "A new era begins.";
 
                 onSubmit({
                     characterName,
@@ -386,7 +371,6 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                     systemName,
                     year,
                     roleExperience,
-                    bonusObjective: useBonusObjective ? bonusObjective : undefined,
                     messenger
                 });
             } finally {
@@ -399,7 +383,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
             const systemName = selectedSystem?.governanceSystem || "Custom System";
             const year = selectedSystem?.year || "Present Day";
             const roleExperience = roleCategory === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience;
-            const finalEmphasis = useBonusObjective ? bonusObjective : (emphasis || selectedSystem?.intro || "A new era begins.");
+            const finalEmphasis = emphasis || selectedSystem?.intro || "A new era begins.";
 
             onSubmit({
                 characterName,
@@ -415,7 +399,6 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                 systemName,
                 year,
                 roleExperience,
-                bonusObjective: useBonusObjective ? bonusObjective : undefined,
                 messenger
             });
         }
@@ -580,13 +563,13 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                         </div>
 
                                         {/* Parameters Grid */}
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
+                                        <div className="w-full max-w-4xl flex flex-col items-center">
                                             {/* Judges & Observers */}
-                                            <div className="space-y-4">
-                                                <div className={`text-xs uppercase tracking-[0.3em] text-white/40 font-black px-2 ${isRTL ? 'text-right' : 'text-left'}`}>
+                                            <div className="space-y-4 w-full text-center">
+                                                <div className="text-xs uppercase tracking-[0.3em] text-white/40 font-black px-2 mb-2">
                                                     {lang("LOBBY_JUDGES_LABEL") || "The Observers"}
                                                 </div>
-                                                <div className="flex flex-wrap gap-3">
+                                                <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
                                                     {(introData?.supportEntities || [
                                                         { name: lang("LOBBY_ENTITY_PEOPLE"), icon: "👥" },
                                                         { name: lang("LOBBY_ENTITY_ESTABLISHMENT"), icon: "🏛️" }
@@ -596,37 +579,13 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                                             initial={{ opacity: 0, scale: 0.9 }}
                                                             animate={{ opacity: 1, scale: 1 }}
                                                             transition={{ delay: 0.2 + i * 0.1 }}
-                                                            className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-white/5 border border-white/10 shadow-xl hover:bg-white/10 transition-all cursor-default group"
+                                                            className="flex items-center gap-3 px-6 py-4 rounded-3xl bg-white/5 border border-white/10 shadow-xl hover:bg-white/10 transition-all cursor-default group"
                                                         >
-                                                            <span className="text-2xl group-hover:scale-110 transition-transform">{entity.icon}</span>
-                                                            <span className="text-sm font-bold text-white group-hover:text-purple-300 transition-colors uppercase tracking-wider">{entity.name}</span>
+                                                            <span className="text-3xl group-hover:scale-110 transition-transform">{entity.icon}</span>
+                                                            <span className="text-base font-bold text-white group-hover:text-purple-300 transition-colors uppercase tracking-wider">{entity.name}</span>
                                                         </motion.div>
                                                     ))}
                                                 </div>
-                                            </div>
-
-                                            {/* Objective & Target */}
-                                            <div className="space-y-4">
-                                                <div className={`text-xs uppercase tracking-[0.3em] text-white/40 font-black px-2 ${isRTL ? 'text-right' : 'text-left'}`}>
-                                                    {lang("LOBBY_GOAL_LABEL") || "The Objective"}
-                                                </div>
-                                                <motion.div
-                                                    initial={{ opacity: 0, scale: 0.9 }}
-                                                    animate={{ opacity: 1, scale: 1 }}
-                                                    transition={{ delay: 0.4 }}
-                                                    className="flex items-center gap-5 px-6 py-4 rounded-3xl bg-amber-500/10 border border-amber-500/30 shadow-2xl group hover:border-amber-500/50 transition-all"
-                                                >
-                                                    <div className="p-3 rounded-2xl bg-amber-500/20 group-hover:bg-amber-500/30 transition-colors">
-                                                        <Target className="w-8 h-8 text-amber-500" />
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-xs text-amber-500/70 font-black uppercase tracking-widest mb-1">{lang("LOBBY_TARGET_SCORE_SHORT") || "Score Target"}</div>
-                                                        <div className="text-3xl font-black text-amber-500 leading-none tracking-tighter">
-                                                            {difficulty === 'easy' ? 200 : difficulty === 'hard' ? 250 : 225}
-                                                        </div>
-                                                    </div>
-                                                    <Trophy className="w-6 h-6 text-amber-500/30 ml-auto group-hover:text-amber-500/60 transition-colors" />
-                                                </motion.div>
                                             </div>
                                         </div>
 
@@ -690,8 +649,6 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                 {!isIntroReady && step === 'spice' && (
                                     <GameSettingsPopup
                                         key="spice-popup"
-                                        isCustom={!selectedSystem}
-                                        bonusObjective={bonusObjective}
                                         baseRole={role}
                                         onClose={() => setStep('selection')}
                                         onStart={handleSpiceConfirm}

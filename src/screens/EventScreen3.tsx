@@ -23,6 +23,7 @@ import CollectorLoadingOverlay from "../components/event/CollectorLoadingOverlay
 import DilemmaLoadError from "../components/event/DilemmaLoadError";
 import ResourceBar, { type ResourceBarScoreDetails } from "../components/event/ResourceBar";
 import SupportList from "../components/event/SupportList";
+import SupportToLegacyParticles from "../components/event/SupportToLegacyParticles";
 import { DynamicParameters, buildDynamicParamsItems } from "../components/event/DynamicParameters";
 import DilemmaCard from "../components/event/DilemmaCard";
 import MirrorCard from "../components/event/MirrorCard";
@@ -119,7 +120,8 @@ export default function EventScreen3({ push }: Props) {
     collectData,
     isReady,           // Legacy flag (same as phase1Ready now)
     registerOnReady,   // Callback registration for progress notification
-    restoreCollectedData // Restore from snapshot
+    restoreCollectedData, // Restore from snapshot
+    clearData          // Force clear state
   } = useEventDataCollector();
 
   // Narration integration - prepares TTS when dilemma loads, provides canShowDilemma flag
@@ -129,7 +131,7 @@ export default function EventScreen3({ push }: Props) {
   const { stop: stopNarration } = useNarrator();
 
   // Loading progress (auto-increments, smooth catchup animation)
-  const { progress, start: startProgress, reset: resetProgress, notifyReady } = useLoadingProgress();
+  const { start: startProgress, reset: resetProgress, notifyReady } = useLoadingProgress();
 
   // Phase tracking
   const [phase, setPhase] = useState<'collecting' | 'presenting' | 'interacting' | 'reasoning' | 'confirming'>('collecting');
@@ -424,11 +426,15 @@ export default function EventScreen3({ push }: Props) {
   // ========================================================================
   // EFFECT 3: Advance to presenting when data ready
   // ========================================================================
+  const presenterDayRef = useRef<number>(0);
+
   useEffect(() => {
     // Skip presentation if restored from snapshot
     if (restoredFromSnapshot) return;
 
-    if (isReady && canShowDilemma && !isCollecting && phase === 'collecting' && collectedData) {
+    // Wait until we have fresh data for the CURRENT day before presenting
+    if (isReady && canShowDilemma && !isCollecting && phase === 'collecting' && collectedData && day !== presenterDayRef.current) {
+      presenterDayRef.current = day; // Mark this day as processed by the presenter
       setPhase('presenting');
 
       // Update objective status if provided by AI
@@ -798,6 +804,7 @@ export default function EventScreen3({ push }: Props) {
     await cleanAndAdvanceDay(actionCard, clearFlights, trapContext);
 
     // After cleaning complete, reset to collecting phase for next day
+    clearData(); // IMPORTANT: wipe stale state before phase reset
     setPhase('collecting');
     setPresentationStep(-1);
     // Collection will be triggered by effect watching phase/day
@@ -972,7 +979,6 @@ export default function EventScreen3({ push }: Props) {
       <AnimatePresence mode="wait">
         <CollectorLoadingOverlay
           key="loading-overlay"
-          progress={progress} // Real-time progress with auto-increment and catchup animation
           message={lang("GATHERING_INTELLIGENCE")}
         />
       </AnimatePresence>
@@ -1080,6 +1086,14 @@ export default function EventScreen3({ push }: Props) {
           {/* Step 1+: SupportList */}
           {presentationStep >= 1 && (
             <SupportList items={supportItems} animateDurationMs={5000} />
+          )}
+
+          {/* Step 2: Particles Flying (Free Play only) */}
+          {isFreePlay && presentationStep === 2 && (
+            <SupportToLegacyParticles
+              active={presentationStep === 2}
+              sourceIds={['support-pill-people', 'support-pill-middle', 'support-pill-mom']}
+            />
           )}
 
           {/* Step 3+: DynamicParameters - Shows 1-3 narrative impacts with emoji (Day 2+ only, Hidden in Free Play) */}

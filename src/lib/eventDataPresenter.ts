@@ -66,6 +66,7 @@ function applyPerkModifiers(effects: SupportEffect[]): SupportEffect[] {
   const boostPositive = hasPerk(activePerks, "boost_positive_shifts");
   const boostMomGains = hasPerk(activePerks, "boost_mom_gains");
   const heroRivalHalve = hasPerk(activePerks, "hero_rivalry_halve");
+  const momFloorZero = hasPerk(activePerks, "mom_floor_zero");
 
   // Check if Community liked the choice (positive delta)
   const communityLiked = effects.find(e => e.id === "people")?.delta ?? 0;
@@ -86,6 +87,9 @@ function applyPerkModifiers(effects: SupportEffect[]): SupportEffect[] {
         }
         if (effect.id === "middle" && heroRivalHalve && communityIsPositive) {
           delta = Math.round(delta / 2);
+        }
+        if (effect.id === "mom" && momFloorZero) {
+          delta = 0; // Prevent negative shift for mom
         }
       } else if (delta > 0) {
         // Positive shift modifiers
@@ -188,10 +192,12 @@ export async function presentEventData(
 
   // ========== STEP 1: SupportList (initial values) ==========
   setPresentationStep(1);
-  await delay(1500); // Let user see initial support values
+  await delay(1500); // Standard wait to let user see initial support values
 
   // ========== STEP 2: Support Changes Animation (Day 2+ only) ==========
   if (!isFirstDay && collectedData.supportEffects && collectedData.supportEffects.length > 0) {
+    console.log(`[Presenter] 📊 Day ${day}: Applying support shifts...`, collectedData.supportEffects);
+
     // Apply deltas to store FIRST - updates global state
     applySupportDeltas(collectedData.supportEffects);
 
@@ -201,10 +207,8 @@ export async function presentEventData(
     // Advance step to 2 - triggers EventScreen3 re-render with animated counters
     setPresentationStep(2);
 
-    // Wait for animations to complete (counter, delta pill, trend arrow, note text)
-    await delay(2500);
-
-    // SEQUENTIAL LEGACY UPDATE - Wait for support numbers to stop moving before tweening LP
+    // ========== LEGACY UPDATE (CONCURRENT) ==========
+    // We now fire this AT THE SAME TIME as support shifts start counting up
     const { isFreePlay } = useSettingsStore.getState();
     if (isFreePlay) {
       const modifiedEffects = applyPerkModifiers(collectedData.supportEffects);
@@ -216,18 +220,31 @@ export async function presentEventData(
         }
       });
 
+      console.log(`[Presenter] 🏆 Day ${day}: Triggering Legacy progress sync with support shifts`, lpDeltas);
       useLegacyStore.getState().applyDailyChange(lpDeltas);
+    }
 
-      // Let the 1.2s tween play out fully so the user sees it
-      await delay(1500);
+    // Wait for animations to complete (counter, delta pill, trend arrow, note text)
+    // Support count-up takes ~1000ms, Legacy tween takes 2000ms.
+    // We wait for the longer one (Legacy) to finish before proceeding to perk checks.
+    await delay(2500);
 
-      // Wait for the user to select a perk if they earned a star!
-      while (useLegacyStore.getState().pendingStarIndex !== null) {
-        await delay(250);
+    // ========== PERK REVEAL (SEQUENTIAL) ==========
+    if (isFreePlay) {
+      // Reveal the perk selection modal if a star was earned
+      const hasQueuedStar = useLegacyStore.getState().queuedPendingStarIndex !== null;
+      if (hasQueuedStar) {
+        console.log(`[Presenter] ⭐ Star threshold reached! Revealing perk modal...`);
+        useLegacyStore.getState().revealPendingStar();
+
+        // Wait for user to pick a perk before continuing
+        while (useLegacyStore.getState().pendingStarIndex !== null) {
+          await delay(250);
+        }
       }
     }
   } else if (!isFirstDay) {
-    console.warn(`[Presenter] ⚠️ Day ${day}: Missing support effects (expected for Day 2+)`);
+    console.warn(`[Presenter] ⚠️ Day ${day}: Missing support effects or supportEffects empty`, collectedData);
   }
 
   // ========== STEP 3: DynamicParameters (shows immediately with placeholder) ==========
@@ -349,7 +366,8 @@ export function buildSupportItems(
 
   // Show deltas only after Step 2 (presentationStep >= 2)
   const showDeltas = presentationStep >= 2;
-  const supportEffects = showDeltas && collectedData?.supportEffects ? collectedData.supportEffects : null;
+  const rawSupportEffects = showDeltas && collectedData?.supportEffects ? collectedData.supportEffects : null;
+  const supportEffects = rawSupportEffects && isFreePlay ? applyPerkModifiers(rawSupportEffects) : rawSupportEffects;
 
   // Helper to get effect data for an entity
   const getEffectData = (id: string) => {

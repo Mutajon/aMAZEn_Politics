@@ -19,6 +19,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLegacyStore } from "../../store/legacyStore";
 import { STAR_THRESHOLDS } from "../../data/perks";
 import { useLang } from "../../i18n/lang";
+import { audioManager } from "../../lib/audioManager";
 
 // ============================================================================
 // STAR ICON COMPONENT
@@ -167,20 +168,40 @@ export default function LegacyStarBar() {
     const stars = useLegacyStore((s) => s.stars);
     const [showTooltip, setShowTooltip] = useState(false);
 
-    // Progress percentage (cap visual at 100 LP for bar width)
-    const progressPercent = Math.min(100, (legacyPoints / 100) * 100);
-
     // Animated LP display
     const [displayLP, setDisplayLP] = React.useState(legacyPoints);
+    const [isProgressing, setIsProgressing] = React.useState(false);
+
+    // Progress percentage (cap visual at 100 LP for bar width)
+    // IMPORTANT: Compute from displayLP so the FILL BAR tweens smoothly alongside the stats
+    const progressPercent = Math.min(100, (displayLP / 100) * 100);
     const prevRef = React.useRef(legacyPoints);
     const rafRef = React.useRef<number | null>(null);
 
     React.useEffect(() => {
-        const start = performance.now();
-        const from = prevRef.current;
-        const to = legacyPoints;
-        const DURATION = 1200;
+        // Find if we just crossed any threshold visually
+        if (prevRef.current !== displayLP) {
+            STAR_THRESHOLDS.forEach((t) => {
+                if (prevRef.current < t && displayLP >= t) {
+                    audioManager.playSfx('achievement1');
+                }
+            });
+            prevRef.current = displayLP;
+        }
+    }, [displayLP]);
 
+    React.useEffect(() => {
+        const start = performance.now();
+        const from = displayLP; // Start tweening from current visual frame
+        const to = legacyPoints;
+        const DURATION = 2000; // Increased to 2 seconds for clear visibility
+
+        if (from === to) {
+            setIsProgressing(false);
+            return;
+        }
+
+        setIsProgressing(true);
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
 
         const tick = (t: number) => {
@@ -190,8 +211,8 @@ export default function LegacyStarBar() {
             if (p < 1) {
                 rafRef.current = requestAnimationFrame(tick);
             } else {
-                prevRef.current = legacyPoints;
                 rafRef.current = null;
+                setIsProgressing(false);
             }
         };
 
@@ -219,26 +240,33 @@ export default function LegacyStarBar() {
                 tabIndex={0}
                 aria-label="Legacy score information"
             >
-                {/* Top: Label + LP */}
+                {/* Top: Label (LP removed, visible on hover only) */}
                 <div className="flex items-center justify-between px-4 pb-1">
                     <span className="text-[10px] uppercase tracking-[0.15em] text-amber-400/80 font-black">
-                        {lang("LEGACY_LABEL") || "Legacy"}
-                    </span>
-                    <span className="tabular-nums font-black text-base text-amber-300 leading-none">
-                        {displayLP}
+                        {lang("LEGACY_LABEL") || "Current Legacy Power"}
                     </span>
                 </div>
 
                 {/* Middle: Progress bar with inline star markers */}
                 <div className="relative mx-4 mt-1 h-3 rounded-full bg-white/10 overflow-visible">
-                    {/* Fill */}
-                    <motion.div
-                        className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-300"
+                    {/* Fill - Driven by displayLP via style, no motion.div transition to avoid fighting RAF */}
+                    <div
+                        id="legacy-bar-edge"
+                        className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-300 transition-all duration-75"
                         style={{ width: `${Math.max(2, progressPercent)}%` }}
-                        initial={false}
-                        animate={{ width: `${Math.max(2, progressPercent)}%` }}
-                        transition={{ duration: 1.2, ease: "easeOut" }}
-                    />
+                    >
+                        {/* Edge Glow */}
+                        <AnimatePresence>
+                            {isProgressing && (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="absolute top-0 bottom-0 right-0 w-4 -mr-2 bg-gradient-to-r from-transparent to-white/60 blur-[4px] rounded-full z-10"
+                                />
+                            )}
+                        </AnimatePresence>
+                    </div>
 
                     {/* Star threshold markers & icons perfectly vertically aligned */}
                     {STAR_THRESHOLDS.map((threshold, i) => {
@@ -250,7 +278,7 @@ export default function LegacyStarBar() {
                                 style={{ left: `${leftPercent}%`, transform: `translate(-50%, -50%)` }}
                             >
                                 {/* Marker Dot */}
-                                <div className={`w-1.5 h-1.5 rounded-full ${stars[i].active
+                                <div className={`w-1.5 h-1.5 rounded-full ${displayLP >= threshold
                                     ? i === 3
                                         ? "bg-purple-400 shadow-[0_0_6px_rgba(168,85,247,1)]"
                                         : "bg-amber-300 shadow-[0_0_6px_rgba(251,191,36,1)]"
@@ -259,7 +287,15 @@ export default function LegacyStarBar() {
 
                                 {/* Icon directly underneath */}
                                 <div className="absolute top-1/2 mt-1.5 left-1/2 -translate-x-1/2">
-                                    <StarIcon index={i} state={stars[i]} threshold={threshold} />
+                                    <StarIcon
+                                        index={i}
+                                        state={{
+                                            reached: stars[i].reached,
+                                            perkChosen: stars[i].perkChosen,
+                                            active: displayLP >= threshold // Visually active only if visual LP crossed it
+                                        }}
+                                        threshold={threshold}
+                                    />
                                 </div>
                             </div>
                         );

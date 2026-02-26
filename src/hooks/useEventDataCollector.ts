@@ -1209,6 +1209,13 @@ export function useEventDataCollector() {
     registerOnReady,
 
     // Snapshot restoration API
-    restoreCollectedData
+    restoreCollectedData,
+
+    // New function to clear collected data
+    clearData: () => {
+      setPhase1Data(null);
+      setPhase2Data(null);
+      setPhase3Data(null);
+    }
   };
 }

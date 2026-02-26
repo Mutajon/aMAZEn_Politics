@@ -140,6 +140,21 @@ export default function App() {
     fetchAndStoreGameSettings();
   }, []);
 
+  // DEV ONLY: Automatically enter lobby and set remaining games to 1
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      const isFirstLoad = !sessionStorage.getItem('dev-lobby-redirected');
+      if (isFirstLoad) {
+        sessionStorage.setItem('dev-lobby-redirected', 'true');
+        if (window.location.hash === '' || window.location.hash === '#/') {
+          push('/lobby');
+        }
+        // Assuming MAX_LOBBY_GAMES = 2, 'lobby-games-played' = 1 leaves 1 game remaining.
+        localStorage.setItem('lobby-games-played', '1');
+      }
+    }
+  }, [push]);
+
   // Detect mobile device on app startup (session-only, not persisted)
   // Specifically targets phones, NOT tablets (tablets treated as desktop)
   useEffect(() => {

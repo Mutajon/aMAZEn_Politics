@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Flame, Zap, Target, ArrowLeft, Sparkles } from 'lucide-react';
+import { Flame, Zap, ArrowLeft, Sparkles } from 'lucide-react';
 import { useLang } from "../../i18n/lang";
 import { audioManager } from '../../lib/audioManager';
 import { useLanguage } from "../../i18n/LanguageContext";
@@ -12,14 +12,11 @@ interface GameSettingsPopupProps {
         difficulty: string;
         tone: string;
         emphasis: string;
-        useBonusObjective: boolean;
     }) => void;
-    bonusObjective: string;
-    isCustom?: boolean;
     baseRole: string;
 }
 
-const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart, bonusObjective, isCustom, baseRole }) => {
+const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart, baseRole }) => {
     const lang = useLang();
     const { language } = useLanguage();
     const isRTL = language === 'he';
@@ -28,7 +25,6 @@ const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart,
     const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
     const [tone, setTone] = useState<'drama' | 'comedy'>('drama');
     const [emphasis, setEmphasis] = useState("");
-    const [useBonusObjective, setUseBonusObjective] = useState(false);
     const [isComedyFlipped, setIsComedyFlipped] = useState(false);
 
     // Handle Comedy Flip animation
@@ -48,8 +44,7 @@ const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart,
         onStart({
             difficulty,
             tone,
-            emphasis: useBonusObjective ? "" : emphasis,
-            useBonusObjective
+            emphasis
         });
     };
 
@@ -70,8 +65,7 @@ const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart,
         setDifficulty(diff);
     };
 
-    const isEmphasisDisabled = useBonusObjective;
-    const isBonusDisabled = emphasis.trim().length > 0;
+
 
     return (
         <motion.div
@@ -181,8 +175,8 @@ const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart,
                     <div className="space-y-6 pt-4 border-t border-white/5">
                         <div className="flex items-center justify-between gap-4">
                             {/* Option A: Emphasis */}
-                            <div className={`flex-1 space-y-3 transition-opacity duration-300 ${isEmphasisDisabled ? 'opacity-20 pointer-events-none' : 'opacity-100'}`}>
-                                <label className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold ml-1">
+                            <div className="flex-1 space-y-3 transition-opacity duration-300">
+                                <label className="text-[11px] text-white/50 font-bold ml-1">
                                     {lang("LOBBY_THEME_EMPHASIS")}
                                 </label>
                                 <textarea
@@ -192,45 +186,6 @@ const GameSettingsPopup: React.FC<GameSettingsPopupProps> = ({ onClose, onStart,
                                     className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500/30 transition-all resize-none h-24"
                                 />
                             </div>
-
-                            {!isCustom && (
-                                <>
-                                    <div className="flex flex-col items-center gap-2">
-                                        <div className="h-10 w-px bg-white/10" />
-                                        <span className="text-[10px] font-black text-white/20 uppercase">OR</span>
-                                        <div className="h-10 w-px bg-white/10" />
-                                    </div>
-
-                                    {/* Option B: Bonus Objective */}
-                                    <div className={`flex-1 flex flex-col gap-3 transition-opacity duration-300 ${isBonusDisabled ? 'opacity-20 pointer-events-none' : 'opacity-100'}`}>
-                                        <label className="text-[10px] uppercase tracking-[0.2em] text-white/40 font-bold ml-1">
-                                            {lang("LOBBY_BONUS_OBJECTIVE")}
-                                        </label>
-                                        <button
-                                            onClick={() => {
-                                                audioManager.playSfx("click-soft");
-                                                setUseBonusObjective(!useBonusObjective);
-                                            }}
-                                            className={`group flex items-center gap-4 p-4 rounded-2xl border transition-all min-h-[6rem] text-left ${useBonusObjective
-                                                ? 'bg-purple-600/20 border-purple-500/50'
-                                                : 'bg-white/5 border-white/10 hover:border-white/20'
-                                                }`}
-                                        >
-                                            <div className={`p-2 rounded-xl transition-colors ${useBonusObjective ? 'bg-purple-500 text-white' : 'bg-white/5 text-white/20'}`}>
-                                                <Target className="w-5 h-5" />
-                                            </div>
-                                            <div className="flex-1 overflow-hidden">
-                                                <span className={`block text-[8px] uppercase tracking-widest font-black mb-1 ${useBonusObjective ? 'text-purple-400' : 'text-white/20'}`}>
-                                                    {lang("LOBBY_ENABLED")}
-                                                </span>
-                                                <p className={`text-[10px] leading-snug ${useBonusObjective ? 'text-white/90' : 'text-white/40'}`}>
-                                                    {bonusObjective ? lang(bonusObjective) : lang("LOBBY_NA_FOR_THIS_PATH")}
-                                                </p>
-                                            </div>
-                                        </button>
-                                    </div>
-                                </>
-                            )}
                         </div>
                     </div>
                 </div>

@@ -214,41 +214,57 @@ export default function ResourceBar({
         {isMobile && <AudioButtonsInline />}
 
         {/* Player Avatar Section */}
-        <motion.button
-          ref={avatarButtonRef as any}
-          key={`avatar-pop-${avatarPopCount}`}
-          animate={avatarPopCount > 0 ? {
-            scale: [1, 1.25, 1],
-            rotate: [0, -5, 5, 0],
-            boxShadow: [
-              "0 0 0px rgba(255,255,255,0)",
-              "0 0 20px rgba(255,255,255,0.5)",
-              "0 0 0px rgba(255,255,255,0)"
-            ]
-          } : {}}
-          transition={{ duration: 0.4, ease: "easeOut" }}
-          onClick={handleAvatarClick}
-          className={`shrink-0 rounded-xl overflow-hidden ring-1 transition-all duration-200 ${tutorialMode
-            ? 'ring-yellow-400 ring-2 bg-white/10 z-[9100] relative'
-            : 'ring-white/15 bg-white/5 hover:ring-white/30 hover:bg-white/10'
-            }`}
-          style={{ width: 80, height: 80, minWidth: 80 }}
-          aria-label={`View ${playerName}'s character information`}
-          title={`View ${playerName}'s character card`}
-        >
-          {avatarSrc && !imgError ? (
-            <img
-              src={avatarSrc}
-              alt={playerName}
-              className="w-full h-full object-cover"
-              onError={() => setImgError(true)}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <User className="w-8 h-8 text-white/80" />
-            </div>
-          )}
-        </motion.button>
+        <div className="relative shrink-0">
+          {/* subtle pulsing wave backplate */}
+          <motion.div
+            animate={{
+              scale: [1, 1.35, 1],
+              opacity: [0, 0.35, 0],
+            }}
+            transition={{
+              duration: 2.5,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="absolute inset-0 bg-white rounded-xl z-0"
+          />
+
+          <motion.button
+            ref={avatarButtonRef as any}
+            key={`avatar-pop-${avatarPopCount}`}
+            animate={avatarPopCount > 0 ? {
+              scale: [1, 1.25, 1],
+              rotate: [0, -5, 5, 0],
+              boxShadow: [
+                "0 0 0px rgba(255,255,255,0)",
+                "0 0 20px rgba(255,255,255,0.5)",
+                "0 0 0px rgba(255,255,255,0)"
+              ]
+            } : {}}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            onClick={handleAvatarClick}
+            className={`relative z-10 shrink-0 rounded-xl overflow-hidden ring-1 transition-all duration-200 ${tutorialMode
+              ? 'ring-yellow-400 ring-2 bg-white/10 z-[9100]'
+              : 'ring-white/15 bg-white/5 hover:ring-white/30 hover:bg-white/10'
+              }`}
+            style={{ width: 80, height: 80, minWidth: 80 }}
+            aria-label={`View ${playerName}'s character information`}
+            title={`View ${playerName}'s character card`}
+          >
+            {avatarSrc && !imgError ? (
+              <img
+                src={avatarSrc}
+                alt={playerName}
+                className="w-full h-full object-cover"
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <User className="w-8 h-8 text-white/80" />
+              </div>
+            )}
+          </motion.button>
+        </div>
 
         {/* Goals Section (only if modifiers enabled) */}
         {enableModifiers && <GoalsCompact />}

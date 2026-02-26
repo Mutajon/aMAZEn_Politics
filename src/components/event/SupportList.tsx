@@ -267,6 +267,7 @@ function SupportCard({
 
   return (
     <motion.div
+      id={`support-pill-${id}`}
       className={[
         "rounded-xl px-2 py-2 md:px-3 md:py-2.5 text-white relative",
         isCrisis

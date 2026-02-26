@@ -49,11 +49,13 @@ type LegacyState = {
     perkPool: PerkDefinition[];
     activePerks: ActivePerk[];
     reactionMultiplier: number;       // 0.8 / 1.0 / 1.5
-    pendingStarIndex: number | null;  // Star index awaiting perk selection
+    pendingStarIndex: number | null;  // Star index awaiting perk selection *currently active*
+    queuedPendingStarIndex: number | null; // Earned but waiting for tween
     perkChoices: PerkDefinition[] | null; // 2 random perks to choose from (null if not pending)
 
     // Actions
     applyDailyChange: (deltas: { people: number; middle: number; mom: number }) => number;
+    revealPendingStar: () => void;
     choosePerk: (perkId: string) => void;
     initForDifficulty: (difficulty: "easy" | "normal" | "hard") => void;
     reset: () => void;
@@ -108,6 +110,7 @@ export const useLegacyStore = create<LegacyState>()(
             activePerks: [],
             reactionMultiplier: 1.0,
             pendingStarIndex: null,
+            queuedPendingStarIndex: null,
             perkChoices: null,
 
             /**
@@ -210,29 +213,40 @@ export const useLegacyStore = create<LegacyState>()(
                     }
                 }
 
-                // Prepare perk choices if a star was earned
-                let perkChoices: PerkDefinition[] | null = null;
-                if (newPendingStarIndex !== null) {
-                    if (newPendingStarIndex === 3) {
-                        // Star 4 — ultimate perk (auto-granted, but show overlay)
-                        perkChoices = [ULTIMATE_PERK];
-                    } else {
-                        // Stars 1-3 — pick 2 random from pool
-                        const pool = get().perkPool;
-                        perkChoices = pickRandom(pool, Math.min(2, pool.length));
-                    }
-                }
+                // Prepare perk choices AFTER animation (in revealPendingStar)
 
                 console.log(`[LegacyStore] Daily LP change: ${lpChange >= 0 ? '+' : ''}${lpChange.toFixed(1)} | LP: ${legacyPoints} → ${newLP} | Stars: ${newStars.map(s => s.active ? '★' : '☆').join('')}`);
 
                 set({
                     legacyPoints: Math.round(newLP * 10) / 10, // Round to 1 decimal
                     stars: newStars,
-                    pendingStarIndex: newPendingStarIndex,
-                    perkChoices,
+                    queuedPendingStarIndex: newPendingStarIndex, // Wait for tween before activating
                 });
 
                 return newLP;
+            },
+
+            /**
+             * Reveal the star modal after the progress tween completes.
+             */
+            revealPendingStar() {
+                const state = get();
+                const { queuedPendingStarIndex, perkPool } = state;
+
+                if (queuedPendingStarIndex === null) return;
+
+                let perkChoices: PerkDefinition[] | null = null;
+                if (queuedPendingStarIndex === 3) {
+                    perkChoices = [ULTIMATE_PERK];
+                } else {
+                    perkChoices = pickRandom(perkPool, Math.min(2, perkPool.length));
+                }
+
+                set({
+                    pendingStarIndex: queuedPendingStarIndex,
+                    queuedPendingStarIndex: null,
+                    perkChoices,
+                });
             },
 
             /**
@@ -319,6 +333,7 @@ export const useLegacyStore = create<LegacyState>()(
                     activePerks: [],
                     reactionMultiplier: multipliers[difficulty] ?? 1.0,
                     pendingStarIndex: null,
+                    queuedPendingStarIndex: null,
                     perkChoices: null,
                 });
             },
@@ -335,6 +350,7 @@ export const useLegacyStore = create<LegacyState>()(
                     activePerks: [],
                     reactionMultiplier: 1.0,
                     pendingStarIndex: null,
+                    queuedPendingStarIndex: null,
                     perkChoices: null,
                 });
             },

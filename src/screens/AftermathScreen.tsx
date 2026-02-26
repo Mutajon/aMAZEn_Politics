@@ -555,7 +555,6 @@ export default function AftermathScreen({ push }: Props) {
 
     return (
       <CollectorLoadingOverlay
-        progress={progress}
         message={loadingMessage}
       />
     );

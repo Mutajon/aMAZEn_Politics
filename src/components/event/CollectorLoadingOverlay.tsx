@@ -20,13 +20,10 @@ import { motion } from "framer-motion";
 import { audioManager } from "../../lib/audioManager";
 
 type Props = {
-  progress: number; // 0-100 real-time progress percentage (REQUIRED)
   message?: string; // Kept for backwards compatibility, not displayed
 };
 
-export default function CollectorLoadingOverlay({
-  progress,
-}: Props) {
+export default function CollectorLoadingOverlay({ }: Props) {
   const { currentTip, fadeState } = useRotatingTips();
   const soundPlayedRef = useRef(false);
   const isMobileDevice = useSettingsStore((s) => s.isMobileDevice);
@@ -82,12 +79,53 @@ export default function CollectorLoadingOverlay({
 
       {/* Minimal loading indicator - positioned at lower part */}
       <div className="relative z-10 flex flex-col items-center gap-4">
-        {/* Progress Bar Container */}
-        <div className="w-64 sm:w-80 h-1.5 bg-white/5 rounded-full overflow-hidden">
+        {/* Sleek Spinning "Thinking" Animation in Purple Hues */}
+        <div className="relative flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 mb-2">
+          {/* Subtle slow pulsing purple glow behind */}
           <motion.div
-            className="h-full bg-gradient-to-r from-purple-500 to-indigo-500"
-            animate={{ width: `${progress}%` }}
-            transition={{ type: "spring", stiffness: 50, damping: 20 }}
+            className="absolute inset-0 bg-purple-600/20 rounded-full blur-xl"
+            animate={{
+              scale: [1, 1.2, 1],
+              opacity: [0.3, 0.6, 0.3],
+            }}
+            transition={{
+              duration: 3,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          />
+          {/* Outer ring: thin, spinning */}
+          <motion.div
+            className="absolute inset-0 rounded-full border-2 border-transparent border-t-purple-500/80 border-r-purple-400/80"
+            animate={{ rotate: 360 }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+          />
+          {/* Inner ring: counter-spinning, thicker but more transparent */}
+          <motion.div
+            className="absolute inset-2 rounded-full border-[3px] border-transparent border-l-indigo-500/50 border-b-fuchsia-500/50"
+            animate={{ rotate: -360 }}
+            transition={{
+              duration: 3,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+          />
+          {/* Core: solid breathing dot */}
+          <motion.div
+            className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-400 shadow-[0_0_15px_rgba(168,85,247,0.6)]"
+            animate={{
+              scale: [0.8, 1.1, 0.8],
+              opacity: [0.7, 1, 0.7]
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
           />
         </div>
 

@@ -26,6 +26,7 @@ const AUDIO_FILES = {
     'role-switch': '/assets/sounds/roleSwitch.mp3',
     'zoom-woosh': '/assets/sounds/zoomWoosh.mp3',
     'laugh-cartoon': '/assets/sounds/laughCartoon.mp3',
+    'achievement1': '/assets/sounds/Achievement1.mp3',
   },
   vo: {
     // First-visit dialogue (19 lines total)
