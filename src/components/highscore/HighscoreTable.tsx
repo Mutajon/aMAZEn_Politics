@@ -2,7 +2,8 @@ import { useMemo, useRef, useEffect } from "react";
 import { motion, type Variants } from "framer-motion";
 import type { HighscoreEntry } from "../../data/highscores-default";
 import { useLang } from "../../i18n/lang";
-import { translateDemocracyLevel, translatePoliticalSystem } from "../../i18n/translateGameData";
+import { translatePoliticalSystem } from "../../i18n/translateGameData";
+import { STANDARD_PERKS, ULTIMATE_PERK } from "../../data/perks";
 
 // Animation variants (same as current implementation)
 const listVariants: Variants = {
@@ -87,24 +88,29 @@ export function HighscoreTable({
     }
   }, [highlightName]);
 
+  const allPerks = useMemo(() => [...STANDARD_PERKS, ULTIMATE_PERK], []);
+  const getPerkIcon = (id: string) => allPerks.find(p => p.id === id)?.icon || "❓";
+
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
       {/* Header */}
       <div
         className="grid gap-2 md:gap-3 pl-1 pr-2 md:pr-4 py-3 text-[11px] md:text-[12px] uppercase tracking-wide text-white/70 sticky top-0 bg-white/10 backdrop-blur z-10"
         style={{
-          gridTemplateColumns: window.innerWidth < 640
-            ? "44px 1fr 80px"
-            : "44px 1.2fr 0.8fr 1.1fr 1fr 1fr 0.7fr"
+          gridTemplateColumns: window.innerWidth < 1024
+            ? "44px 1fr 60px"
+            : "44px 80px minmax(140px, 2fr) 1fr 1fr 60px 80px minmax(100px, 1.5fr) 70px"
         }}
       >
         <div className="text-right">{lang("HIGHSCORE_RANK")}</div>
+        <div className="hidden lg:block">{lang("HIGHSCORE_DATE")}</div>
         <div>{lang("HIGHSCORE_LEADER")}</div>
-        <div className="hidden sm:block">Role</div>
-        <div className="hidden sm:block">{lang("HIGHSCORE_SYSTEM")}</div>
-        <div className="hidden sm:block">{lang("HIGHSCORE_LIBERALISM")}</div>
-        <div className="hidden sm:block">{lang("HIGHSCORE_AUTONOMY")}</div>
-        <div className="text-right">{lang("HIGHSCORE_SCORE")}</div>
+        <div className="hidden lg:block">Role</div>
+        <div className="hidden lg:block">{lang("HIGHSCORE_SYSTEM")}</div>
+        <div className="hidden lg:block">{lang("HIGHSCORE_DIFFICULTY")}</div>
+        <div className="hidden lg:block">{lang("HIGHSCORE_STARS")}</div>
+        <div className="hidden lg:block">{lang("HIGHSCORE_PERKS")}</div>
+        <div className="text-right">{lang("HIGHSCORE_LEGACY")}</div>
       </div>
 
       {/* Scrollable body */}
@@ -126,7 +132,7 @@ export function HighscoreTable({
             {sortedEntries.map((e, i) => {
               const color = rankColor(i);
               const isHighlighted = highlightName && e.name === highlightName;
-              const isMobile = window.innerWidth < 640;
+              const isDesktop = window.innerWidth >= 1024;
 
               return (
                 <motion.button
@@ -141,9 +147,9 @@ export function HighscoreTable({
                       : "hover:bg-white/8"
                   ].join(" ")}
                   style={{
-                    gridTemplateColumns: isMobile
-                      ? "44px 1fr 80px"
-                      : "44px 1.2fr 0.8fr 1.1fr 1fr 1fr 0.7fr"
+                    gridTemplateColumns: isDesktop
+                      ? "44px 80px minmax(140px, 2fr) 1fr 1fr 60px 80px minmax(100px, 1.5fr) 70px"
+                      : "44px 1fr 60px"
                   }}
                   variants={rowVariants}
                 >
@@ -160,13 +166,18 @@ export function HighscoreTable({
                     </span>
                   </div>
 
+                  {/* Date */}
+                  <div className="hidden lg:block text-white/50 text-xs tabular-nums">
+                    {e.createdAt ? new Date(e.createdAt).toLocaleDateString() : "—"}
+                  </div>
+
                   {/* Leader */}
                   <div className="flex items-center gap-2 md:gap-3 min-w-0">
                     <img
                       src={imgForLeader(e, i)}
                       alt={e.name}
-                      width={isMobile ? 40 : 50}
-                      height={isMobile ? 40 : 50}
+                      width={!isDesktop ? 40 : 50}
+                      height={!isDesktop ? 40 : 50}
                       className="w-10 h-10 md:w-[50px] md:h-[50px] rounded-lg object-cover border border-white/10 flex-shrink-0"
                       onError={(ev) => {
                         const img = ev.currentTarget as HTMLImageElement;
@@ -181,32 +192,49 @@ export function HighscoreTable({
                   </div>
 
                   {/* Role */}
-                  <div className="hidden sm:block text-white/90 text-sm">
-                    <span className="px-2 py-1 rounded-md bg-white/10 truncate">
-                      {e.role || "Unknown"}
+                  <div className="hidden lg:block text-white/90 text-xs">
+                    <span className="px-2 py-1 rounded-md bg-zinc-800/80 truncate">
+                      {e.roleCategory === 'leader' ? "Leader" : e.roleCategory === 'commoner' ? "Commoner" : (e.role?.replace(/_/g, ' ') || "—")}
                     </span>
                   </div>
 
                   {/* System */}
-                  <div className="hidden sm:block text-white/90 text-sm">
-                    <span className="px-2 py-1 rounded-md bg-white/10 truncate">
-                      {translatePoliticalSystem(e.politicalSystem, lang) || "—"}
+                  <div className="hidden lg:block text-white/90 text-xs">
+                    <span className="px-2 py-1 rounded-md bg-amber-900/40 truncate">
+                      {translatePoliticalSystem(e.politicalSystem, lang)?.split(/[—–\-/]/)[0].trim() || "—"}
                     </span>
                   </div>
 
-                  {/* Liberalism */}
-                  <div className="hidden sm:block text-white/90 text-sm">
-                    {translateDemocracyLevel(e.democracy, lang)}
+                  {/* Difficulty */}
+                  <div className="hidden lg:block text-white/70 text-xs capitalize truncate">
+                    {e.difficulty || "—"}
                   </div>
 
-                  {/* Autonomy */}
-                  <div className="hidden sm:block text-white/90 text-sm">
-                    {translateDemocracyLevel(e.autonomy, lang)}
+                  {/* Stars */}
+                  <div className="hidden lg:flex gap-0.5 text-xs">
+                    {e.stars !== undefined ? (
+                      [...Array(4)].map((_, idx) => (
+                        <span key={idx} className={idx < (e.stars || 0) ? "text-amber-400" : "text-white/20"}>★</span>
+                      ))
+                    ) : (
+                      <span className="text-white/30">—</span>
+                    )}
                   </div>
 
-                  {/* Score */}
+                  {/* Perks */}
+                  <div className="hidden lg:flex gap-1 text-sm overflow-hidden">
+                    {e.perks && e.perks.length > 0 ? (
+                      e.perks.slice(0, 4).map(p => (
+                        <span key={p} title={p}>{getPerkIcon(p)}</span>
+                      ))
+                    ) : (
+                      <span className="text-white/30">—</span>
+                    )}
+                  </div>
+
+                  {/* Legacy Score (Replaces normal Score conceptually here) */}
                   <div className="text-right font-extrabold text-amber-300 tabular-nums text-sm md:text-base">
-                    {e.score.toLocaleString()}
+                    {(e.legacyScore ?? e.score).toLocaleString()}
                   </div>
                 </motion.button>
               );

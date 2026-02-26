@@ -173,10 +173,16 @@ export function formatCompassValuesForHighscore(
 export function buildHighscoreEntry(
   breakdown: ScoreBreakdown,
   character: { name: string; aboutRole?: string; avatarUrl?: string } | null,
-  analysis: { systemName?: string } | null,
+  analysis: { systemName?: string; roleCategory?: "leader" | "commoner" | null } | null,
   ratings: { liberalism: AftermathRating; autonomy: AftermathRating } | null,
   top3ByDimension: Record<string, Array<{ short: string }>>,
-  role: string | undefined      // Added role parameter
+  role: string | undefined,      // Added role parameter
+  legacyOptions?: {
+    difficulty?: string;
+    stars?: number;
+    perks?: string[];
+    legacyScore?: number;
+  }
 ): HighscoreEntry {
   // Map AftermathRating to DemocracyLevel (same type, different name)
   const mapRating = (rating: AftermathRating): HighscoreEntry["democracy"] => {
@@ -200,5 +206,10 @@ export function buildHighscoreEntry(
     politicalSystem: analysis?.systemName || "Unknown System",
     avatarUrl: character?.avatarUrl, // Include player's custom avatar (if available)
     role: role || "Unknown",         // Include role key
+    roleCategory: analysis?.roleCategory || undefined,
+    difficulty: legacyOptions?.difficulty,
+    stars: legacyOptions?.stars,
+    perks: legacyOptions?.perks,
+    legacyScore: legacyOptions?.legacyScore,
   };
 }

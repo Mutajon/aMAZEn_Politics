@@ -1746,7 +1746,12 @@ app.post("/api/highscores/submit", async (req, res) => {
       politicalSystem,
       period,
       avatarUrl,        // NEW: Optional compressed thumbnail (~5-10KB)
-      role              // NEW: Role key for filtering (e.g., "unc_cleopatra")
+      role,             // NEW: Role key for filtering (e.g., "unc_cleopatra")
+      roleCategory,     // NEW: "leader" | "commoner"
+      difficulty,       // NEW: "easy" | "normal" | "hard"
+      stars,            // NEW: Integer amount of stars attained
+      perks,            // NEW: Array of active perk IDs
+      legacyScore       // NEW: Points tracking for Legacy runs
     } = req.body;
 
     // Validation
@@ -1788,6 +1793,11 @@ app.post("/api/highscores/submit", async (req, res) => {
       period: period || undefined,
       avatarUrl: avatarUrl || undefined,  // Compressed 64x64 WebP thumbnail
       role: role?.trim() || "Unknown",    // Save role key
+      roleCategory: roleCategory || undefined,
+      difficulty: difficulty || undefined,
+      stars: typeof stars === 'number' ? stars : undefined,
+      perks: Array.isArray(perks) ? perks : undefined,
+      legacyScore: typeof legacyScore === 'number' ? Math.round(legacyScore) : undefined,
       createdAt: new Date()
     };
 

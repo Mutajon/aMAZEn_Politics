@@ -29,6 +29,7 @@ export type AnalysisResult = {
   };
   supportProfiles?: RoleSupportProfiles | null;
   roleScope?: string | null;
+  roleCategory?: "leader" | "commoner" | null; // NEW: Leader vs Commoner tracking
   storyThemes?: string[] | null;
   authorityLevel?: "low" | "medium" | "high"; // Player's authority level in the scenario
   dilemmaEmphasis?: string; // Role-specific instructions for dilemma generation

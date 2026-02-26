@@ -16,9 +16,17 @@ export type HighscoreEntry = {
 
   /** Role key (e.g., "unc_cleopatra") for filtering. Defaults to "Unknown" if missing. */
   role?: string;
+  roleCategory?: string;     // "leader" | "commoner"
 
   /** Optional player avatar (base64 data URL). Only saved for top 20 Hall of Fame entries. */
   avatarUrl?: string;
+
+  // --- New Legacy/Free Play Fields ---
+  difficulty?: string;       // "easy" | "normal" | "hard"
+  stars?: number;            // 0 - 4
+  perks?: string[];          // Array of active perk IDs
+  legacyScore?: number;      // Tally of Legacy Points
+  createdAt?: string;        // Server timestamp string
 };
 
 /** First 20 seeded entries (with concise period tags). */

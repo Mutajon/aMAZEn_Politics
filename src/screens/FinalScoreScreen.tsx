@@ -366,13 +366,24 @@ export default function FinalScoreScreen({ push }: Props) {
     }
 
     if (step === sequence.length + 1 && !finalScoreSubmitted && ratings) {
+      const legacyState = useLegacyStore.getState();
+      const dilemmaStore = useDilemmaStore.getState();
+      const starsCount = legacyState.stars.filter(s => s.reached).length;
+      const perksIds = legacyState.activePerks.map(p => p.id);
+
       const entry = buildHighscoreEntry(
         breakdown,
         character,
         analysis,
         ratings,
         top3ByDimension,
-        selectedRoleKey ?? undefined
+        selectedRoleKey ?? undefined,
+        {
+          difficulty: isFreePlay ? legacyState.difficultyLevel : dilemmaStore.difficulty || "normal",
+          stars: isFreePlay ? starsCount : undefined,
+          perks: isFreePlay ? perksIds : undefined,
+          legacyScore: isFreePlay ? legacyState.legacyPoints : undefined
+        }
       );
 
       // Add to local store first (for immediate UI feedback)
@@ -414,7 +425,12 @@ export default function FinalScoreScreen({ push }: Props) {
               politicalSystem: entry.politicalSystem,
               period: entry.period,
               avatarUrl: avatarThumbnail,  // Compressed 64x64 WebP thumbnail (~5-10KB)
-              role: entry.role             // Role key
+              role: entry.role,            // Role key
+              roleCategory: entry.roleCategory,
+              difficulty: entry.difficulty,
+              stars: entry.stars,
+              perks: entry.perks,
+              legacyScore: entry.legacyScore
             })
           });
 

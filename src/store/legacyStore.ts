@@ -50,6 +50,7 @@ type LegacyState = {
     perkPool: PerkDefinition[];
     activePerks: ActivePerk[];
     reactionMultiplier: number;       // 0.8 / 1.0 / 1.5
+    difficultyLevel: "easy" | "normal" | "hard"; // string tracking for Final Score
     pendingStarIndex: number | null;  // Star index awaiting perk selection *currently active*
     queuedPendingStarIndex: number | null; // Earned but waiting for tween
     perkChoices: PerkDefinition[] | null; // 2 random perks to choose from (null if not pending)
@@ -113,6 +114,7 @@ export const useLegacyStore = create<LegacyState>()(
             perkPool: [...STANDARD_PERKS],
             activePerks: [],
             reactionMultiplier: 1.0,
+            difficultyLevel: "normal",
             pendingStarIndex: null,
             queuedPendingStarIndex: null,
             perkChoices: null,
@@ -381,6 +383,7 @@ export const useLegacyStore = create<LegacyState>()(
                     perkPool: [...STANDARD_PERKS],
                     activePerks: [],
                     reactionMultiplier: multipliers[difficulty] ?? 1.0,
+                    difficultyLevel: difficulty,
                     pendingStarIndex: null,
                     queuedPendingStarIndex: null,
                     perkChoices: null,
@@ -400,6 +403,7 @@ export const useLegacyStore = create<LegacyState>()(
                     perkPool: [...STANDARD_PERKS],
                     activePerks: [],
                     reactionMultiplier: 1.0,
+                    difficultyLevel: "normal",
                     pendingStarIndex: null,
                     queuedPendingStarIndex: null,
                     perkChoices: null,

@@ -44,6 +44,7 @@ interface LobbyPlayPopupProps {
         year: string;
         roleExperience?: string;
         messenger?: string;
+        roleCategory?: "leader" | "commoner" | null;
     }) => void;
     isLoading?: boolean;
 }
@@ -399,7 +400,8 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                 systemName,
                 year,
                 roleExperience,
-                messenger
+                messenger,
+                roleCategory: roleCategory
             });
         }
     };

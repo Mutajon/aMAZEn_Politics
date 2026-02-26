@@ -157,6 +157,7 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
     roleExperience?: string;
     bonusObjective?: string;
     messenger?: string;
+    roleCategory?: "leader" | "commoner" | null;
   }) => {
     setIsLoading(true);
     setShowPlayPopup(false);
@@ -288,6 +289,7 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
           era: data.year || data.setting
         },
         dilemmaEmphasis: data.emphasis || `Role: ${data.role} in ${data.setting}.`,
+        roleCategory: data.roleCategory || null,
         roleScope: data.roleExperience || `As ${data.role} in ${data.setting}, you must navigate the complex political landscape to ensure your faction's survival and goals.`,
         authorityLevel: "medium",
         momIcon: momEntity.icon,
