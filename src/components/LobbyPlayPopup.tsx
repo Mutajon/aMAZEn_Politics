@@ -674,9 +674,11 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                 <h2 className="text-2xl sm:text-3xl font-black bg-gradient-to-r from-purple-200 via-blue-200 to-purple-400 bg-clip-text text-transparent uppercase tracking-tight">
                                     {lang("CREATE_YOUR_STORY")}
                                 </h2>
-                                <p className="text-white/40 text-xs font-bold uppercase tracking-widest mt-1">
-                                    {lang("LOBBY_PLAY_SUBTITLE")}
-                                </p>
+                                {!isGeneratingIntro && (
+                                    <p className="text-white/40 text-xs font-bold uppercase tracking-widest mt-1">
+                                        {lang("LOBBY_PLAY_SUBTITLE")}
+                                    </p>
+                                )}
                             </div>
 
                             {/* Form or Intro View */}
@@ -688,14 +690,6 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                         <p className="text-purple-200/70 font-medium animate-pulse">
                                             {lang("LOBBY_GENERATING_STORY") || "Weaving your tale..."}
                                         </p>
-                                        <div className="w-full max-w-xs h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                            <motion.div
-                                                className="h-full bg-gradient-to-r from-purple-500 to-indigo-500"
-                                                initial={{ width: "0%" }}
-                                                animate={{ width: "100%" }}
-                                                transition={{ duration: 15, ease: "linear" }}
-                                            />
-                                        </div>
                                     </div>
                                 ) : step === 'form' ? (
                                     <>

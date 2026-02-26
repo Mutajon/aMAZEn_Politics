@@ -1089,10 +1089,12 @@ export default function EventScreen3({ push }: Props) {
           )}
 
           {/* Step 2: Particles Flying (Free Play only) */}
-          {isFreePlay && presentationStep === 2 && (
+          {isFreePlay && presentationStep === 2 && collectedData?.supportEffects && (
             <SupportToLegacyParticles
               active={presentationStep === 2}
-              sourceIds={['support-pill-people', 'support-pill-middle', 'support-pill-mom']}
+              sourceIds={collectedData.supportEffects
+                .filter(e => e.delta !== 0) // Only emit from changed stats
+                .map(e => `support-pill-${e.id}`)}
             />
           )}
 

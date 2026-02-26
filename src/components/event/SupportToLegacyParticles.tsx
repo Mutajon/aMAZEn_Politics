@@ -84,7 +84,7 @@ export default function SupportToLegacyParticles({
                             delay: p.delay,
                             ease: [0.16, 1, 0.3, 1]
                         }}
-                        className="absolute w-2 h-2 rounded-full bg-yellow-300 shadow-[0_0_8px_rgba(253,224,71,0.8)]"
+                        className="absolute top-0 left-0 w-2 h-2 rounded-full bg-yellow-300 shadow-[0_0_8px_rgba(253,224,71,0.8)]"
                     />
                 ))}
             </AnimatePresence>
