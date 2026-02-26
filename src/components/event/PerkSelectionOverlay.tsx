@@ -12,6 +12,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useLegacyStore } from "../../store/legacyStore";
+import { useRoleStore } from "../../store/roleStore";
 import { useLang } from "../../i18n/lang";
 import { audioManager } from "../../lib/audioManager";
 import { Star, Sparkles, Crown } from "lucide-react";
@@ -21,6 +22,7 @@ export default function PerkSelectionOverlay() {
     const pendingStarIndex = useLegacyStore((s) => s.pendingStarIndex);
     const perkChoices = useLegacyStore((s) => s.perkChoices);
     const choosePerk = useLegacyStore((s) => s.choosePerk);
+    const analysis = useRoleStore((s) => s.analysis);
 
     if (pendingStarIndex === null || !perkChoices || perkChoices.length === 0) {
         return null;
@@ -28,6 +30,15 @@ export default function PerkSelectionOverlay() {
 
     const isUltimate = pendingStarIndex === 3;
     const starNumber = pendingStarIndex + 1;
+
+    const peopleName = (analysis?.holders && analysis.holders[2])
+        ? analysis.holders[2].name
+        : (lang("LOBBY_ENTITY_PEOPLE") || "The People");
+
+    const formatDesc = (descKey: string) => {
+        const text = lang(descKey) || descKey;
+        return text.replace("{people}", peopleName);
+    };
 
     const handleChoose = (perkId: string) => {
         audioManager.playSfx("achievement" as any);
@@ -77,8 +88,8 @@ export default function PerkSelectionOverlay() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.5 }}
                             className={`text-2xl font-black uppercase tracking-widest ${isUltimate
-                                    ? "bg-gradient-to-r from-purple-300 to-purple-500 bg-clip-text text-transparent"
-                                    : "bg-gradient-to-r from-amber-200 to-amber-500 bg-clip-text text-transparent"
+                                ? "bg-gradient-to-r from-purple-300 to-purple-500 bg-clip-text text-transparent"
+                                : "bg-gradient-to-r from-amber-200 to-amber-500 bg-clip-text text-transparent"
                                 }`}
                         >
                             {isUltimate
@@ -123,8 +134,8 @@ export default function PerkSelectionOverlay() {
                             >
                                 {/* Glow effect on hover */}
                                 <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none ${isUltimate
-                                        ? "bg-gradient-to-t from-purple-500/10 via-transparent to-purple-500/5"
-                                        : "bg-gradient-to-t from-amber-500/10 via-transparent to-amber-500/5"
+                                    ? "bg-gradient-to-t from-purple-500/10 via-transparent to-purple-500/5"
+                                    : "bg-gradient-to-t from-amber-500/10 via-transparent to-amber-500/5"
                                     }`} />
 
                                 {/* Icon */}
@@ -138,7 +149,7 @@ export default function PerkSelectionOverlay() {
 
                                 {/* Description */}
                                 <p className="text-xs text-white/70 leading-relaxed relative z-10">
-                                    {lang(perk.descKey) || perk.descKey}
+                                    {formatDesc(perk.descKey)}
                                 </p>
 
                                 {/* Sparkle indicator */}

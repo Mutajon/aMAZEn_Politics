@@ -142,19 +142,22 @@ export const useLegacyStore = create<LegacyState>()(
                     { id: "mom" as const, delta: deltas.mom },
                 ];
 
-                // Check perk: "ignore_rival_negatives" — negative Rival shifts don't subtract from LP
-                // Check perk: "ultimate" — all negatives ignored
-                const ignoreAllNegatives = hasPerk(activePerks, "ultimate");
+                // Check perk: "ultimate" — all negatives halved
+                const halveAllNegatives = hasPerk(activePerks, "ultimate");
                 const ignoreRivalNegatives = hasPerk(activePerks, "ignore_rival_negatives");
 
                 for (const { id, delta } of entityDeltas) {
                     if (delta >= 0) {
                         positiveComponent += delta;
                     } else {
-                        // Check if this negative should be ignored
-                        if (ignoreAllNegatives) continue;
-                        if (ignoreRivalNegatives && id === "middle") continue;
-                        negativeComponent += delta; // delta is already negative
+                        // Check if this negative should be modified
+                        if (halveAllNegatives) {
+                            negativeComponent += (delta / 2);
+                        } else if (ignoreRivalNegatives && id === "middle") {
+                            // Skip
+                        } else {
+                            negativeComponent += delta;
+                        }
                     }
                 }
 
@@ -164,9 +167,9 @@ export const useLegacyStore = create<LegacyState>()(
                 // --- Step 4: Apply perk-based LP modifiers ---
                 let lpChange = positiveComponent + scaledNegative;
 
-                // Perk: "ultimate" — all gains doubled
+                // Perk: "ultimate" — all gains doubled (negatives already halved above)
                 if (hasPerk(activePerks, "ultimate")) {
-                    lpChange = positiveComponent * 2; // negatives already ignored above
+                    lpChange = (positiveComponent * 2) + scaledNegative;
                 }
 
                 // Perk: "flat_daily_lp" — +5 LP/day

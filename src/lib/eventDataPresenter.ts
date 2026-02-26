@@ -76,8 +76,8 @@ function applyPerkModifiers(effects: SupportEffect[]): SupportEffect[] {
     let { delta } = effect;
 
     if (isUltimate) {
-      // Ultimate: double positives, ignore negatives
-      delta = delta > 0 ? delta * 2 : 0;
+      // Ultimate: double positives, halve negatives
+      delta = delta > 0 ? delta * 2 : Math.round(delta / 2);
     } else {
       // Standard perk processing
       if (delta < 0) {
@@ -143,9 +143,9 @@ function applySupportDeltas(supportEffects: CollectedData['supportEffects']): vo
       const { activePerks } = useLegacyStore.getState();
 
       // "mom_floor_zero": Mom support can't drop below 0 (already enforced by clamp, but semantic)
-      // "rival_floor_10": Rival support can't drop below 10%
+      // "rival_floor_20": Rival support can't drop below 20%
       if (id === "middle" && hasPerk(activePerks, "rival_floor_10")) {
-        newValue = Math.max(10, newValue);
+        newValue = Math.max(20, newValue);
       }
     }
 

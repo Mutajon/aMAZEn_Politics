@@ -166,6 +166,8 @@ export default function LegacyStarBar() {
     const lang = useLang();
     const legacyPoints = useLegacyStore((s) => s.legacyPoints);
     const stars = useLegacyStore((s) => s.stars);
+    const activePerks = useLegacyStore((s) => s.activePerks);
+    const hasUltimate = activePerks.some(p => p.effectType === "ultimate");
     const [showTooltip, setShowTooltip] = useState(false);
 
     // Animated LP display
@@ -231,7 +233,10 @@ export default function LegacyStarBar() {
             dir="ltr"
         >
             <div
-                className="w-full h-[64px] shrink-0 rounded-xl bg-[rgba(15,23,42,0.85)] border border-amber-500/30 shadow-sm backdrop-blur-sm text-white cursor-pointer hover:border-amber-500/50 transition-colors duration-200 overflow-hidden flex flex-col pt-1.5"
+                className={`w-full h-[64px] shrink-0 rounded-xl bg-[rgba(15,23,42,0.85)] border shadow-sm backdrop-blur-sm text-white cursor-pointer transition-colors duration-200 overflow-hidden flex flex-col pt-1.5 ${hasUltimate
+                        ? "border-purple-500/50 hover:border-purple-400/80 shadow-[0_0_20px_rgba(168,85,247,0.15)]"
+                        : "border-amber-500/30 hover:border-amber-500/50"
+                    }`}
                 onClick={(e) => {
                     e.stopPropagation();
                     setShowTooltip((prev) => !prev);
@@ -242,7 +247,8 @@ export default function LegacyStarBar() {
             >
                 {/* Top: Label (LP removed, visible on hover only) */}
                 <div className="flex items-center justify-between px-4 pb-1">
-                    <span className="text-[10px] uppercase tracking-[0.15em] text-amber-400/80 font-black">
+                    <span className={`text-[10px] uppercase tracking-[0.15em] font-black ${hasUltimate ? "text-purple-400/90" : "text-amber-400/80"
+                        }`}>
                         {lang("LEGACY_LABEL") || "Current Legacy Power"}
                     </span>
                 </div>
@@ -252,7 +258,10 @@ export default function LegacyStarBar() {
                     {/* Fill - Driven by displayLP via style, no motion.div transition to avoid fighting RAF */}
                     <div
                         id="legacy-bar-edge"
-                        className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-300 transition-all duration-75"
+                        className={`absolute inset-y-0 left-0 rounded-full transition-all duration-75 ${hasUltimate
+                                ? "bg-gradient-to-r from-purple-600 via-purple-400 to-indigo-300 shadow-[0_0_15px_rgba(168,85,247,0.4)]"
+                                : "bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-300"
+                            }`}
                         style={{ width: `${Math.max(2, progressPercent)}%` }}
                     >
                         {/* Edge Glow */}
