@@ -288,7 +288,7 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
           settingType: "real",
           era: data.year || data.setting
         },
-        dilemmaEmphasis: data.emphasis || `Role: ${data.role} in ${data.setting}.`,
+        dilemmaEmphasis: data.emphasis || undefined,
         roleCategory: data.roleCategory || null,
         roleScope: data.roleExperience || `As ${data.role} in ${data.setting}, you must navigate the complex political landscape to ensure your faction's survival and goals.`,
         authorityLevel: "medium",

@@ -72,10 +72,8 @@ export default function ResourceBar({
   // Player avatar modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
-  const { character, analysis } = useRoleStore((s) => ({
-    character: s.character,
-    analysis: s.analysis
-  }));
+  const character = useRoleStore((s) => s.character);
+  const analysis = useRoleStore((s) => s.analysis);
   const playerName = character?.name || "Unknown Leader";
 
   // Handle modal open during tutorial
@@ -194,8 +192,15 @@ export default function ResourceBar({
                 />
               )}
               {isFreePlay ? (
-                <div className="flex-1 w-full min-w-0 flex items-center ml-2">
-                  <LegacyStarBar />
+                <div className="flex-1 w-full min-w-0 flex flex-col items-center gap-1 ml-2">
+                  {analysis?.dilemmaEmphasis && (
+                    <div className="text-[10px] text-white/50 text-center uppercase tracking-wide px-2">
+                      {analysis.dilemmaEmphasis}
+                    </div>
+                  )}
+                  <div className="w-full flex items-center">
+                    <LegacyStarBar />
+                  </div>
                 </div>
               ) : (
                 <ScorePill
@@ -217,19 +222,19 @@ export default function ResourceBar({
         {isMobile && <AudioButtonsInline />}
 
         {/* Player Avatar Section */}
-        <div className="relative shrink-0">
+        <div className="relative shrink-0 overflow-visible" style={{ width: 80, height: 80 }}>
           {/* subtle pulsing wave backplate */}
           <motion.div
             animate={{
-              scale: [1, 1.35, 1],
-              opacity: [0, 0.35, 0],
+              scale: [1, 1.45, 1],
+              opacity: [0, 0.45, 0],
             }}
             transition={{
               duration: 2.5,
               repeat: Infinity,
               ease: "easeInOut",
             }}
-            className="absolute inset-0 bg-white rounded-xl z-0"
+            className="absolute inset-0 bg-white rounded-xl z-0 pointer-events-none"
           />
 
           <motion.button

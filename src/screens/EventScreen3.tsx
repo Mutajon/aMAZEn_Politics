@@ -68,8 +68,18 @@ export default function EventScreen3({ push }: Props) {
   const isFreePlay = useSettingsStore(s => s.isFreePlay);
 
   // Global state (read only - single source of truth)
-  const { day, totalDays, budget, supportPeople, supportMiddle, supportMom, score, crisisMode: storedCrisisMode } = useDilemmaStore();
-  const { character, roleBackgroundImage, analysis } = useRoleStore();
+  const day = useDilemmaStore((s) => s.day);
+  const totalDays = useDilemmaStore((s) => s.totalDays);
+  const budget = useDilemmaStore((s) => s.budget);
+  const supportPeople = useDilemmaStore((s) => s.supportPeople);
+  const supportMiddle = useDilemmaStore((s) => s.supportMiddle);
+  const supportMom = useDilemmaStore((s) => s.supportMom);
+  const score = useDilemmaStore((s) => s.score);
+  const storedCrisisMode = useDilemmaStore((s) => s.crisisMode);
+
+  const character = useRoleStore((s) => s.character);
+  const roleBackgroundImage = useRoleStore((s) => s.roleBackgroundImage);
+  const analysis = useRoleStore((s) => s.analysis);
   const selectedRoleKey = useRoleStore((s) => s.selectedRole);
   const roleProgress = useRoleProgressStore((s) =>
     selectedRoleKey ? s.goals[selectedRoleKey] ?? null : null
@@ -1128,7 +1138,7 @@ export default function EventScreen3({ push }: Props) {
           {/* Step 4+: DilemmaCard OR Aftermath (game ending) */}
           {presentationStep >= 4 && collectedData && (
             <>
-              {isGameEnd ? (
+              {(isGameEnd && (!collectedData.dilemma.actions || collectedData.dilemma.actions.length === 0)) ? (
                 // Game conclusion - show aftermath card
                 <div className="flex flex-row items-end justify-center gap-4 w-full max-w-5xl mx-auto">
                   {isFreePlay && analysis?.messenger && (
@@ -1184,7 +1194,7 @@ export default function EventScreen3({ push }: Props) {
           )}
 
           {/* Step 5+: MirrorCard with Compass Pills Overlay (skip if game end) */}
-          {!isGameEnd && presentationStep >= 5 && collectedData && (
+          {(!(isGameEnd && (!collectedData.dilemma.actions || collectedData.dilemma.actions.length === 0))) && presentationStep >= 5 && collectedData && (
             <div className="relative">
               <MirrorCard
                 text={collectedData.mirrorText}
@@ -1220,7 +1230,7 @@ export default function EventScreen3({ push }: Props) {
           )}
 
           {/* Step 6: ActionDeck (skip if game end) */}
-          {!isGameEnd && presentationStep >= 6 && phase === 'interacting' && (
+          {(!(isGameEnd && (!collectedData.dilemma.actions || collectedData.dilemma.actions.length === 0))) && presentationStep >= 6 && phase === 'interacting' && (
             <ActionDeck
               actions={actionsForDeck}
               showBudget={showBudget}

@@ -180,9 +180,9 @@ export const useLegacyStore = create<LegacyState>()(
                     lpChange = (positiveComponent * 2) + scaledNegative;
                 }
 
-                // Perk: "flat_daily_lp" — +5 LP/day
+                // Perk: "flat_daily_lp" — +3 Legacy Points/day
                 if (hasPerk(activePerks, "flat_daily_lp")) {
-                    lpChange += 5;
+                    lpChange += 3;
                 }
 
                 // Perk: "instant_lp_and_daily_boost" — +2 LP to daily gains (instant +10 applied on activation)
@@ -190,11 +190,11 @@ export const useLegacyStore = create<LegacyState>()(
                     lpChange += 2;
                 }
 
-                // Perk: "conditional_mom_bonus" — +3 LP/day if Mom > 50%
+                // Perk: "conditional_mom_bonus" — +4 Legacy Points/day if Mom > 50%
                 if (hasPerk(activePerks, "conditional_mom_bonus")) {
                     const momSupport = useDilemmaStore.getState().supportMom;
                     if (momSupport > 50) {
-                        lpChange += 3;
+                        lpChange += 4;
                     }
                 }
 
@@ -352,15 +352,43 @@ export const useLegacyStore = create<LegacyState>()(
                     lpBonus = 10; // Instant +10 LP
                 }
 
+                const newLP = lpBonus > 0 ? state.legacyPoints + lpBonus : state.legacyPoints;
+
+                // --- NEW: Check for star thresholds again if we got an instant bonus ---
+                let finalPendingStarIndex: number | null = null;
+                const finalStars = [...newStars] as [StarState, StarState, StarState, StarState];
+
+                if (lpBonus > 0) {
+                    for (let i = 0; i < STAR_THRESHOLDS.length; i++) {
+                        const threshold = STAR_THRESHOLDS[i];
+                        const isNowActive = newLP >= threshold;
+
+                        finalStars[i] = { ...finalStars[i], active: isNowActive };
+
+                        // First time crossing threshold upward
+                        if (isNowActive && !finalStars[i].reached) {
+                            finalStars[i].reached = true;
+
+                            // Trigger perk selection if not already chosen
+                            if (!finalStars[i].perkChosen) {
+                                finalPendingStarIndex = i;
+                                // Only trigger the FIRST unclaimed star
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 console.log(`[LegacyStore] ⭐ Perk chosen: ${chosenPerk.id} (${pendingStarIndex === -1 ? "Starting Bonus" : `Star ${pendingStarIndex + 1}`})${lpBonus > 0 ? ` | Instant +${lpBonus} LP` : ''}`);
 
                 set({
                     activePerks: [...activePerks, newActivePerk],
                     perkPool: newPool,
-                    stars: newStars,
+                    stars: finalStars,
                     pendingStarIndex: null,
                     perkChoices: null,
-                    legacyPoints: lpBonus > 0 ? state.legacyPoints + lpBonus : state.legacyPoints,
+                    legacyPoints: Math.round(newLP * 10) / 10,
+                    queuedPendingStarIndex: finalPendingStarIndex, // This will trigger the next reveal in the presenter loop
                     ...(pendingStarIndex === -1 ? { hasStartingBonus: true } : {}),
                 });
             },

@@ -234,15 +234,20 @@ export async function presentEventData(
 
     // ========== PERK REVEAL (SEQUENTIAL) ==========
     if (isFreePlay) {
-      // Reveal the perk selection modal if a star was earned
-      const hasQueuedStar = useLegacyStore.getState().queuedPendingStarIndex !== null;
-      if (hasQueuedStar) {
-        console.log(`[Presenter] ⭐ Star threshold reached! Revealing perk modal...`);
-        useLegacyStore.getState().revealPendingStar();
+      // Loop while there are queued stars (handles chain reactions from 'perfect insight' perk)
+      while (useLegacyStore.getState().queuedPendingStarIndex !== null) {
+        const hasQueuedStar = useLegacyStore.getState().queuedPendingStarIndex !== null;
+        if (hasQueuedStar) {
+          console.log(`[Presenter] ⭐ Star threshold reached! Revealing perk modal...`);
+          useLegacyStore.getState().revealPendingStar();
 
-        // Wait for user to pick a perk before continuing
-        while (useLegacyStore.getState().pendingStarIndex !== null) {
-          await delay(250);
+          // Wait for user to pick a perk before continuing
+          while (useLegacyStore.getState().pendingStarIndex !== null) {
+            await delay(250);
+          }
+
+          // Small delay after picking to allow any animations to breathe
+          await delay(500);
         }
       }
     }

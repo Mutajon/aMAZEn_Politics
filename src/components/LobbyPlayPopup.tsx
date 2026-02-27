@@ -221,7 +221,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         loggingService.log('freeplay_spice_confirmed', settings, 'User confirmed spice settings', { role: fullRole, screen: '/lobby' });
         setDifficulty(settings.difficulty as any);
         setTone(settings.tone === 'comedy' ? 'satirical' : 'serious');
-        setEmphasis(settings.emphasis || selectedSystem?.intro || "");
+        setEmphasis(settings.emphasis || "");
 
         // Finally trigger generation
         generateIntroFromSettings(setting, role);
@@ -237,7 +237,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                 const roleExperience = inferredExperience || (roleCategory === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience);
 
                 // Final emphasis (user choice)
-                const finalEmphasis = emphasis || selectedSystem?.intro || "A new era begins.";
+                const finalEmphasis = emphasis || "";
 
                 const res = await fetch("/api/free-play/intro", {
                     method: "POST",

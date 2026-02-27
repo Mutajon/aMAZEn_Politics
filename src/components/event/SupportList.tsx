@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, Landmark, Heart, ArrowUp, ArrowDown, Skull } from "lucide-react";
 import { lang } from "../../i18n/lang";
+import { useLanguage } from "../../i18n/LanguageContext";
 import { useSupportEntityPopover, type OpenEntityType } from "../../hooks/useSupportEntityPopover";
 import type { SupportProfile } from "../../data/supportProfiles";
 import { useLogger } from "../../hooks/useLogger";
@@ -68,7 +69,7 @@ export default function SupportList({
 }: Props) {
   const { openEntity, togglePopover, closePopover, getEntityData } = useSupportEntityPopover();
   const logger = useLogger();
-  const { isFreePlay } = useSettingsStore.getState();
+  const isFreePlay = useSettingsStore(s => s.isFreePlay);
   const activePerks = useLegacyStore(s => s.activePerks);
 
   // Tooltip state for custom perk tooltips
@@ -211,6 +212,8 @@ function SupportCard({
   onClosePopover: () => void;
   getEntityData: (entityType: NonNullable<OpenEntityType>, currentSupport: number) => { name: string, profile: SupportProfile, currentSupport: number } | null;
 }) {
+  const { language } = useLanguage();
+  const isRTL = language === 'he';
   const {
     id,
     name,
@@ -226,15 +229,15 @@ function SupportCard({
   } = item;
 
   // Ensure all hooks are called consistently BEFORE any early return
-  const { isFreePlay } = useSettingsStore();
+  const isFreePlay = useSettingsStore(s => s.isFreePlay);
   const activePerks = useLegacyStore(s => s.activePerks);
   const localPerks = isFreePlay ? activePerks.filter(p => p.targetEntity === id) : [];
 
   // Tooltip state for custom perk tooltips on local cards
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const roleStoreAnalysis = useRoleStore().analysis;
-  const peopleName = (isFreePlay && roleStoreAnalysis?.holders?.[2]?.name) || lang("SUPPORT_THE_PEOPLE") || "The People";
+  const analysis = useRoleStore(s => s.analysis);
+  const peopleName = (isFreePlay && analysis?.holders?.[2]?.name) || lang("SUPPORT_THE_PEOPLE") || "The People";
 
   const pctTarget = clampPercent(percent);
   const pctInitial = initialPercent !== undefined ? clampPercent(initialPercent) : pctTarget;
@@ -411,9 +414,9 @@ function SupportCard({
       tabIndex={isClickable ? 0 : undefined}
       aria-label={isClickable ? `View ${name} details` : undefined}
     >
-      {/* Entity-specific Perks Container (Top Left of Card) */}
+      {/* Entity-specific Perks Container (Top Left of Card in RTL, Top Right in LTR) */}
       {localPerks.length > 0 && (
-        <div className="absolute top-1 left-1.5 flex gap-1 z-20" dir="ltr">
+        <div className={`absolute top-1 ${isRTL ? 'left-1.5' : 'right-1.5'} flex gap-1 z-20`} dir="ltr">
           {localPerks.map(perk => (
             <div
               key={perk.id}
@@ -497,7 +500,7 @@ function SupportCard({
 
             {/* right-aligned trend arrow (bigger/thicker, bobbing, persists) */}
             {showTrend && (
-              <div className="ml-auto">
+              <div className={`ml-auto ${!isRTL ? 'mr-7' : ''}`}>
                 {trend === "up" ? (
                   <motion.span
                     key={`arrow-up`} // stable node so it keeps bobbing
