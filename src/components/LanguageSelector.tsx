@@ -3,7 +3,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import type { Language } from '../i18n/LanguageContext';
 
 interface LanguageSelectorProps {
-  variant?: 'compact' | 'full';
+  variant?: 'compact' | 'full' | 'lobby';
   className?: string;
   onLanguageChange?: (lang: Language) => void;
 }
@@ -19,6 +19,21 @@ export default function LanguageSelector({
     setLanguage(newLang);
     onLanguageChange?.(newLang);
   };
+
+  if (variant === 'lobby') {
+    const newLang = language === 'he' ? 'en' : 'he';
+    return (
+      <button
+        onClick={() => handleLanguageChange(newLang)}
+        className={`flex items-center justify-center px-4 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 transition-all hover:scale-105 active:scale-95 ${className}`}
+        aria-label={`Switch to ${language === 'he' ? 'English' : 'Hebrew'}`}
+      >
+        <span className="text-sm font-medium tracking-wide">
+          {language === 'he' ? 'English' : 'עברית'}
+        </span>
+      </button>
+    );
+  }
 
   if (variant === 'compact') {
     const newLang = language === 'he' ? 'en' : 'he';
@@ -50,21 +65,19 @@ export default function LanguageSelector({
       <div className="flex gap-2">
         <button
           onClick={() => handleLanguageChange('he')}
-          className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-            language === 'he'
-              ? 'bg-emerald-500/70 text-white'
-              : 'bg-white/10 text-white/70 hover:bg-white/20'
-          }`}
+          className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${language === 'he'
+            ? 'bg-emerald-500/70 text-white'
+            : 'bg-white/10 text-white/70 hover:bg-white/20'
+            }`}
         >
           עברית
         </button>
         <button
           onClick={() => handleLanguageChange('en')}
-          className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-            language === 'en'
-              ? 'bg-emerald-500/70 text-white'
-              : 'bg-white/10 text-white/70 hover:bg-white/20'
-          }`}
+          className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${language === 'en'
+            ? 'bg-emerald-500/70 text-white'
+            : 'bg-white/10 text-white/70 hover:bg-white/20'
+            }`}
         >
           English
         </button>

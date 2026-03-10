@@ -370,12 +370,7 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       className="relative min-h-[100dvh] flex items-center justify-center px-5"
       style={bgStyleSplash}
     >
-      {/* Language selector (top-right) - always visible when not loading */}
-      {!isLoading && (
-        <div className="absolute top-4 right-4 z-[40] pointer-events-auto">
-          <LanguageSelector variant="compact" />
-        </div>
-      )}
+
 
       {/* Center content */}
       <div className="w-full max-w-md text-center select-none space-y-5">
@@ -425,7 +420,7 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
             </div>
 
             {/* Animated subtitle */}
-            <div className="relative min-h-[80px] flex flex-col items-center justify-start pt-4">
+            <div className="relative min-h-[60px] flex flex-col items-center justify-start pt-4">
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -456,6 +451,18 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
                   </p>
                 </motion.div>
               </motion.div>
+
+              {/* Language Selector below subtitle */}
+              {!isLoading && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="mt-4"
+                >
+                  <LanguageSelector variant="lobby" />
+                </motion.div>
+              )}
             </div>
 
             {/* Game limit info */}
