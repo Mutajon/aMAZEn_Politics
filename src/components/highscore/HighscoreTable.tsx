@@ -71,7 +71,7 @@ export function HighscoreTable({
   const highlightedRef = useRef<HTMLButtonElement | null>(null);
 
   const sortedEntries = useMemo(
-    () => [...entries].sort((a, b) => b.score - a.score),
+    () => [...entries].sort((a, b) => (b.legacyScore ?? b.score) - (a.legacyScore ?? a.score)),
     [entries]
   );
 

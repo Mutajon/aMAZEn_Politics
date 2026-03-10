@@ -1864,8 +1864,14 @@ app.get("/api/highscores/global", async (req, res) => {
     }
 
     pipeline.push(
-      // Sort by score descending to get best scores first
-      { $sort: { score: -1 } },
+      // Create a temporary sort field that prefers legacyScore
+      {
+        $addFields: {
+          sortScore: { $ifNull: ["$legacyScore", "$score"] }
+        }
+      },
+      // Sort by sortScore descending to get best scores first
+      { $sort: { sortScore: -1 } },
 
       // Group by userId, take first (highest) score for each user
       {
@@ -1878,8 +1884,11 @@ app.get("/api/highscores/global", async (req, res) => {
       // Replace root with the best entry document
       { $replaceRoot: { newRoot: "$bestEntry" } },
 
-      // Sort by score again (after grouping)
-      { $sort: { score: -1 } },
+      // Sort by sortScore again (after grouping)
+      { $sort: { sortScore: -1 } },
+
+      // Clean up the temporary field
+      { $project: { sortScore: 0 } },
 
       // Pagination
       { $skip: offset },
@@ -2062,11 +2071,16 @@ app.get("/api/highscores/bests-by-role", async (req, res) => {
     const collection = await getHighscoresCollection();
 
     const pipeline = [
-      { $sort: { score: -1 } },
+      {
+        $addFields: {
+          sortScore: { $ifNull: ["$legacyScore", "$score"] }
+        }
+      },
+      { $sort: { sortScore: -1 } },
       {
         $group: {
           _id: "$role",
-          bestScore: { $max: "$score" }
+          bestScore: { $max: "$sortScore" }
         }
       }
     ];
@@ -2108,7 +2122,7 @@ app.get("/api/highscores/user/:userId/bests-by-role", async (req, res) => {
       {
         $group: {
           _id: "$role",
-          bestScore: { $max: "$score" }
+          bestScore: { $max: { $ifNull: ["$legacyScore", "$score"] } }
         }
       }
     ];
