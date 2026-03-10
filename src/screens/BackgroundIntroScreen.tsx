@@ -1,5 +1,5 @@
 // src/screens/BackgroundIntroScreen.tsx
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import type { PushFn } from "../lib/router";
 import { bgStyleWithRoleImage } from "../lib/ui";
 import { motion } from "framer-motion";
@@ -21,7 +21,7 @@ import { audioManager } from "../lib/audioManager";
 export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
   const lang = useLang();
 
-  const experimentMode = useSettingsStore((s) => s.experimentMode);
+
   const reserveGameSlotMutation = useReserveGameSlot();
 
   // Logging hook for data collection
@@ -43,7 +43,7 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
   const DEFAULT_LINE = useMemo(() => lang("BACKGROUND_INTRO_DEFAULT_LINE"), [lang]);
 
   // Prevent double-play of voiceover
-  const defaultPlayedRef = useRef(false);
+
 
   // Cleanup on unmount
   useEffect(() => {
@@ -57,8 +57,10 @@ export default function BackgroundIntroScreen({ push }: { push: PushFn }) {
     // Log player clicking "Wake up" button
     logger.log('button_click_wake_up', 'Wake up', 'User clicked Wake up button');
 
-    // Reserve game slot if experiment mode is enabled
-    if (experimentMode) {
+    // Reserve game slot (for both experiment and free play modes)
+    // backstageMode is the only one allowed to bypass global limits
+    const backstageMode = useSettingsStore.getState().backstageMode;
+    if (!backstageMode) {
       try {
         const result = await reserveGameSlotMutation.mutateAsync();
 

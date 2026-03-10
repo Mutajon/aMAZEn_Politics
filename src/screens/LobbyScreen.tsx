@@ -22,6 +22,8 @@ import LobbyPlayPopup from "../components/LobbyPlayPopup";
 import CreditsPopup from "../components/lobby/CreditsPopup";
 import { useLegacyStore } from "../store/legacyStore";
 import { Trophy } from "lucide-react";
+import { useReserveGameSlot } from "../hooks/useReserveGameSlot";
+
 
 // localStorage key for tracking lobby games played
 const LOBBY_GAMES_PLAYED_KEY = 'lobby-games-played';
@@ -73,6 +75,8 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
   const setExperimentMode = useSettingsStore((s) => s.setExperimentMode);
   const setLobbyMode = useSettingsStore((s) => s.setLobbyMode);
   const setTreatment = useSettingsStore((s) => s.setTreatment);
+  const reserveGameSlotMutation = useReserveGameSlot();
+
 
   // Check games played on mount
   useEffect(() => {
@@ -166,11 +170,28 @@ export default function LobbyScreen({ push }: { push: (route: string) => void })
       // Request fullscreen mode
       await requestFullscreen();
 
-      // Increment games played counter
+      // Reserve global game slot (applies to experiment and free play)
+      const isBackstage = useSettingsStore.getState().backstageMode;
+      if (!isBackstage) {
+        try {
+          const result = await reserveGameSlotMutation.mutateAsync();
+          if (!result.success) {
+            push('/capped');
+            return;
+          }
+        } catch (err) {
+          console.error('[LobbyScreen] Global slot reservation failed:', err);
+          push('/capped');
+          return;
+        }
+      }
+
+      // Increment local games played counter only after global slot is secured
       const newCount = incrementLobbyGames();
       setGamesPlayed(newCount);
 
       // Disable experiment mode (allows all roles)
+
       setExperimentMode(false);
 
       // Enable lobby mode (for play again routing)
