@@ -21,20 +21,34 @@ export const AdvisorPortrait: React.FC<AdvisorPortraitProps> = ({
     const isRTL = language === 'he';
 
     // Normalize scenario name according to naming convention (e.g., "Ancient Athens" -> "athens")
-    const getNormalizedScenario = (s: string) => {
-        const lowerS = s.toLowerCase();
-        if (lowerS.includes("athens") || lowerS.includes("democracy")) return "athens";
-        if (lowerS.includes("roman") || lowerS.includes("republic")) return "roman";
-        if (lowerS.includes("england") || lowerS.includes("monarchy") || lowerS.includes("medieval")) return "england";
-        if (lowerS.includes("vatican") || lowerS.includes("theocracy")) return "vatican";
-        if (lowerS.includes("china") || lowerS.includes("bureaucratic")) return "china";
-        if (lowerS.includes("mars") || lowerS.includes("technocracy")) return "mars";
-        return lowerS.split(' ')[0];
-    };
+    const normalizedScenario = React.useMemo(() => {
+        const lowerS = scenario.toLowerCase();
+        
+        // Specific Setting Matches (highest priority)
+        if (lowerS.includes("mars") || lowerS.includes("technocracy") || lowerS.includes("colony") || lowerS.includes("space")) return "mars";
+        if (lowerS.includes("china") || lowerS.includes("bureaucratic") || lowerS.includes("ming") || lowerS.includes("scribe")) return "china";
+        if (lowerS.includes("vatican") || lowerS.includes("theocracy") || lowerS.includes("pope") || lowerS.includes("church")) return "vatican";
+        if (lowerS.includes("england") || lowerS.includes("monarchy") || lowerS.includes("medieval") || lowerS.includes("london")) return "england";
+        if (lowerS.includes("roman") || lowerS.includes("rome") || lowerS.includes("republic")) return "roman";
+        if (lowerS.includes("athens") || lowerS.includes("greece") || lowerS.includes("democracy") || lowerS.includes("direct")) return "athens";
+        
+        // Final fallback: check first word or default to athens
+        const firstWord = lowerS.split(' ')[0];
+        const knownS = ["athens", "roman", "england", "vatican", "china", "mars"];
+        return knownS.includes(firstWord) ? firstWord : "athens";
+    }, [scenario]);
 
-    const normalizedScenario = getNormalizedScenario(scenario);
     const toneSuffix = tone === 'satirical' ? 'Comedy' : 'Drama';
-    const imagePath = `/assets/images/advisors/${normalizedScenario}${toneSuffix}.webp`;
+    const [hasError, setHasError] = React.useState(false);
+    
+    // Reset error when scenario/tone changes
+    React.useEffect(() => {
+        setHasError(false);
+    }, [normalizedScenario, tone]);
+
+    const imagePath = hasError 
+        ? `/assets/images/advisors/athensDrama.webp` // Robust fallback to athensDrama
+        : `/assets/images/advisors/${normalizedScenario}${toneSuffix}.webp`;
 
     // Translate the messenger name (it may be a localization key like "FREE_PLAY_MESSENGER_SCRIBE")
     const translatedName = lang(name);
@@ -59,10 +73,9 @@ export const AdvisorPortrait: React.FC<AdvisorPortraitProps> = ({
                 <img
                     src={imagePath}
                     alt={translatedName}
-                    className={`w-24 h-auto md:w-32 drop-shadow-2xl ${isRTL ? 'scale-x-1' : 'scale-x-[-1]'}`}
-                    onError={(e) => {
-                        // Fallback if image not found
-                        (e.target as HTMLImageElement).src = "/assets/images/characters/advisor_placeholder.png";
+                    className={`w-24 h-64 md:w-32 object-contain drop-shadow-2xl ${isRTL ? 'scale-x-1' : 'scale-x-[-1]'}`}
+                    onError={() => {
+                        if (!hasError) setHasError(true);
                     }}
                 />
             </motion.div>

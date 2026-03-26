@@ -103,6 +103,9 @@ type SettingsState = {
   // --- NEW: Game Mode (experiment vs free play) ---
   gameMode: 'experiment' | 'free play';
   setGameMode: (v: 'experiment' | 'free play') => void;
+  // --- NEW: Lobby Qst mode (session-only, for free play with questionnaire) ---
+  lobbyQstMode: boolean;
+  setLobbyQstMode: (v: boolean) => void;
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -227,6 +230,10 @@ export const useSettingsStore = create<SettingsState>()(
         ? 'free play'
         : 'experiment',
       setGameMode: (v) => set({ gameMode: v }),
+
+      // NEW: Lobby Qst mode (default false, session-only)
+      lobbyQstMode: false,
+      setLobbyQstMode: (v) => set({ lobbyQstMode: v }),
     }),
     {
       // Bump key so no stale objects hide the new fields

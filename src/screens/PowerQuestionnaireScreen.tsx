@@ -12,6 +12,8 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { useQuestionnaireStore } from "../store/questionnaireStore";
 import { useLoggingStore } from "../store/loggingStore";
 import { useSettingsStore } from "../store/settingsStore";
+import { useRoleStore } from "../store/roleStore";
+import { useDilemmaStore } from "../store/dilemmaStore";
 import { POWER_ENTITIES } from "../data/powerEntities";
 import PowerReasoningModal from "../components/PowerReasoningModal";
 
@@ -51,6 +53,7 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
   const [showNoPointsError, setShowNoPointsError] = useState(false);
   const [typewriterText, setTypewriterText] = useState("");
   const [typewriterComplete, setTypewriterComplete] = useState(false);
+  const [isGeneratingIntro, setIsGeneratingIntro] = useState(false);
 
   // Store reasoning text locally before sending to backend
   const [q1ReasoningText, setQ1ReasoningText] = useState<string>("");
@@ -144,7 +147,6 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
 
   // Handle Q2 reasoning submission
   const handleQ2ReasoningSubmit = async (text: string) => {
-    setCurrentReasoning(text); // Using currentReasoning here if intended or just setIdealReasoning
     setIdealReasoning(text);
 
     // Submit everything to backend
@@ -177,6 +179,57 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
       }
     } catch (err) {
       console.error("Error submitting questionnaire:", err);
+    }
+
+    // --- NEW: Handle Lobby Qst Flow ---
+    const lobbyQstMode = useSettingsStore.getState().lobbyQstMode;
+    const tempLobbyData = useRoleStore.getState().tempLobbyData;
+
+    if (lobbyQstMode && tempLobbyData) {
+      setIsGeneratingIntro(true); // Show the new generating story loading screen
+      try {
+        // Fetch intro for the lobby flow
+        const introRes = await fetch("/api/free-play/intro", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            role: tempLobbyData.role,
+            setting: tempLobbyData.setting,
+            playerName: tempLobbyData.characterName,
+            emphasis: tempLobbyData.emphasis,
+            gender: tempLobbyData.gender,
+            difficulty: tempLobbyData.difficulty,
+            tone: tempLobbyData.tone,
+            systemName: tempLobbyData.systemName,
+            year: tempLobbyData.year,
+            roleExperience: tempLobbyData.roleExperience,
+            messenger: tempLobbyData.messenger,
+            language,
+            model: useDilemmaStore.getState().aiModelOverride
+          })
+        });
+        const introData = await introRes.json();
+        
+        // Save intro data back to store for the resumed lobby screen
+        useRoleStore.getState().setTempLobbyData({
+          ...tempLobbyData,
+          introData
+        });
+
+        markCompleted();
+        setIsSubmitting(false);
+        setIsGeneratingIntro(false);
+        push("/lobby-qst");
+        return;
+      } catch (err) {
+        console.error("Failed to generate intro for lobbyQst:", err);
+        // Fallback: just start game or go back
+        markCompleted();
+        setIsSubmitting(false);
+        setIsGeneratingIntro(false);
+        push("/lobby-qst");
+        return;
+      }
     }
 
     markCompleted();
@@ -488,6 +541,27 @@ export default function PowerQuestionnaireScreen({ push }: { push: (route: strin
                 {lang("OK")}
               </button>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Intro Generation Loading Overlay */}
+      <AnimatePresence>
+        {isGeneratingIntro && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-gray-950 flex flex-col items-center justify-center space-y-8 p-6 text-center"
+          >
+            <div className="w-20 h-20 border-4 border-violet-500/20 border-t-violet-500 rounded-full animate-spin" />
+            <div className="space-y-4">
+              <h2 className="text-2xl font-bold text-white tracking-tight">
+                {lang("LOBBY_GENERATING_STORY") || "Weaving your tale..."}
+              </h2>
+              <p className="text-violet-200/50 text-base animate-pulse max-w-sm">
+                {language === "he" ? "אנא המתינו בזמן שאנו יוצרים את עולמכם." : "Please wait while we prepare your world."}
+              </p>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

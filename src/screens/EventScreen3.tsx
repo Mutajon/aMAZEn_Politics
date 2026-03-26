@@ -1143,7 +1143,7 @@ export default function EventScreen3({ push }: Props) {
                 <div className="flex flex-row items-end justify-center gap-4 w-full max-w-5xl mx-auto">
                   {isFreePlay && analysis?.messenger && (
                     <AdvisorPortrait
-                      scenario={collectedData.systemName || analysis.systemName || ""}
+                      scenario={analysis?.grounding?.era || analysis?.systemName || collectedData.systemName || ""}
                       tone={collectedData.tone || analysis.tone || "serious"}
                       name={analysis.messenger}
                       className="mb-4"
@@ -1175,7 +1175,7 @@ export default function EventScreen3({ push }: Props) {
                 <div className="flex flex-row items-end justify-center gap-4 w-full max-w-5xl mx-auto">
                   {isFreePlay && analysis?.messenger && (
                     <AdvisorPortrait
-                      scenario={collectedData.systemName || analysis.systemName || ""}
+                      scenario={analysis?.grounding?.era || analysis?.systemName || collectedData.systemName || ""}
                       tone={collectedData.tone || analysis.tone || "serious"}
                       name={analysis.messenger}
                       className="mb-4"

@@ -17,6 +17,7 @@ import LobbyLockedPopup from "./lobby/LobbyLockedPopup";
 import type { FreePlaySystem } from "../data/freePlaySystems";
 import { bgStyleSplash } from "../lib/ui";
 import { loggingService } from "../lib/loggingService";
+import { useQuestionnaireStore } from "../store/questionnaireStore";
 
 const MODEL_OPTIONS = [
     { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
@@ -47,6 +48,10 @@ interface LobbyPlayPopupProps {
         roleCategory?: "leader" | "commoner" | null;
     }) => void;
     isLoading?: boolean;
+    /** NEW: initial flow state for resumed sessions */
+    initialStep?: 'selection' | 'form' | 'intro' | 'spice' | 'custom';
+    initialIntroData?: any;
+    initialData?: any;
 }
 
 const SETTING_PRESETS = [
@@ -90,7 +95,11 @@ const AVATAR_LIST = [
     ...FEMALE_AVATARS
 ];
 
-export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }: LobbyPlayPopupProps) {
+export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading,
+    initialStep,
+    initialIntroData,
+    initialData
+}: LobbyPlayPopupProps) {
     const lang = useLang();
     const { language } = useLanguage();
     const isRTL = language === 'he';
@@ -143,6 +152,32 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    // NEW: Handle initial state from props
+    useEffect(() => {
+        if (initialStep) {
+            setStep(initialStep);
+        }
+        if (initialIntroData) {
+            setIntroData(initialIntroData);
+        }
+        if (initialData) {
+            setCharacterName(initialData.characterName || "");
+            setSetting(initialData.setting || "");
+            setRole(initialData.role || "");
+            setSelectedAvatar(initialData.avatar || "");
+            setRoleCategory(initialData.roleCategory || null);
+            setDifficulty(initialData.difficulty || 'normal');
+            setTone(initialData.tone || 'serious');
+            setEmphasis(initialData.emphasis || "");
+            setInferredYear(initialData.year || "");
+            setInferredExperience(initialData.roleExperience || "");
+            setMessenger(initialData.messenger || "");
+            
+            // If we have a systemName, we can infer the selected system if needed, 
+            // but the basic fields set above are usually enough for the intro UI.
+        }
+    }, [initialStep, initialIntroData, initialData]);
 
     const isIntroReady = step === 'intro' && !isGeneratingIntro;
     const isFullScreenStep = ['selection', 'spice', 'custom'].includes(step) || isIntroReady;
@@ -222,6 +257,32 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
         setDifficulty(settings.difficulty as any);
         setTone(settings.tone === 'comedy' ? 'satirical' : 'serious');
         setEmphasis(settings.emphasis || "");
+
+        // --- NEW: Intercept for Lobby Qst Mode (divert to questionnaire) ---
+        const isLobbyQst = useSettingsStore.getState().lobbyQstMode;
+        const hasCompletedQ = useQuestionnaireStore.getState().hasCompleted;
+        if (isLobbyQst && !hasCompletedQ) {
+            const systemName = selectedSystem?.governanceSystem || "Custom System";
+            const year = inferredYear || selectedSystem?.year || "Present Day";
+            const roleExperience = inferredExperience || (roleCategory === 'leader' ? selectedSystem?.leaderExperience : selectedSystem?.citizenExperience);
+            
+            onSubmit({
+                characterName,
+                setting,
+                role,
+                emphasis: settings.emphasis || "",
+                gender,
+                difficulty: settings.difficulty,
+                tone: settings.tone === 'comedy' ? 'satirical' : 'serious',
+                avatar: selectedAvatar,
+                systemName,
+                year,
+                roleExperience,
+                messenger,
+                roleCategory
+            });
+            return;
+        }
 
         // Finally trigger generation
         generateIntroFromSettings(setting, role);
@@ -492,7 +553,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                     exit={{ opacity: 0 }}
                 >
                     {/* Backdrop click to close */}
-                    <div className="absolute inset-0" onClick={onClose} />
+                    <div className="absolute inset-0" onClick={initialStep ? undefined : onClose} />
 
                     {isFullScreenStep ? (
                         <div className="relative z-10 w-full h-full flex flex-col items-center pointer-events-none">
@@ -531,11 +592,11 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                         key="intro-content"
                                         initial={{ opacity: 0, y: 40 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12 flex flex-col items-center space-y-8 sm:space-y-12 min-h-full"
+                                        className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex flex-col items-center space-y-4 sm:space-y-6 min-h-full"
                                     >
                                         {/* Intro Header */}
-                                        <div className="text-center space-y-4">
-                                            <h2 className="text-3xl sm:text-4xl md:text-6xl font-black text-white uppercase tracking-tighter drop-shadow-lg">
+                                        <div className="text-center space-y-2">
+                                            <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-white uppercase tracking-tighter drop-shadow-lg">
                                                 {lang("YOUR_STORY_TITLE") || "Your Story"}
                                             </h2>
                                             <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-xs sm:text-sm font-bold uppercase tracking-[0.2em] text-purple-300/80">
@@ -557,9 +618,9 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                         </div>
 
                                         {/* Main Intro Text */}
-                                        <div className={`relative w-full max-w-3xl p-6 sm:p-10 rounded-[24px] sm:rounded-[40px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl ${isRTL ? 'text-right' : 'text-left'}`}>
+                                        <div className={`relative w-full max-w-2xl p-4 sm:p-6 rounded-[16px] sm:rounded-[24px] bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl ${isRTL ? 'text-right' : 'text-left'}`}>
                                             <div className="absolute top-0 left-0 w-1.5 h-full bg-gradient-to-b from-purple-500 to-indigo-600 rounded-full" />
-                                            <p className="text-lg sm:text-2xl md:text-3xl leading-relaxed text-slate-100 font-serif italic opacity-95">
+                                            <p className="text-xs sm:text-sm md:text-base leading-relaxed text-slate-100 font-serif italic opacity-95">
                                                 "{introData?.intro}"
                                             </p>
                                         </div>
@@ -571,7 +632,7 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                                 <div className="text-xs uppercase tracking-[0.3em] text-white/40 font-black px-2 mb-2">
                                                     {lang("LOBBY_JUDGES_LABEL") || "The Observers"}
                                                 </div>
-                                                <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
+                                                <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
                                                     {(introData?.supportEntities || [
                                                         { name: lang("LOBBY_ENTITY_PEOPLE"), icon: "👥" },
                                                         { name: lang("LOBBY_ENTITY_ESTABLISHMENT"), icon: "🏛️" }
@@ -581,10 +642,10 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                                             initial={{ opacity: 0, scale: 0.9 }}
                                                             animate={{ opacity: 1, scale: 1 }}
                                                             transition={{ delay: 0.2 + i * 0.1 }}
-                                                            className="flex items-center gap-3 px-6 py-4 rounded-3xl bg-white/5 border border-white/10 shadow-xl hover:bg-white/10 transition-all cursor-default group"
+                                                            className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/5 border border-white/10 shadow-xl hover:bg-white/10 transition-all cursor-default group"
                                                         >
-                                                            <span className="text-3xl group-hover:scale-110 transition-transform">{entity.icon}</span>
-                                                            <span className="text-base font-bold text-white group-hover:text-purple-300 transition-colors uppercase tracking-wider">{entity.name}</span>
+                                                            <span className="text-xl group-hover:scale-110 transition-transform">{entity.icon}</span>
+                                                            <span className="text-sm font-bold text-white group-hover:text-purple-300 transition-colors uppercase tracking-wider">{entity.name}</span>
                                                         </motion.div>
                                                     ))}
                                                 </div>
@@ -592,23 +653,23 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                         </div>
 
                                         {/* Mirror / Reflections Section */}
-                                        <div className="w-full max-w-2xl px-8 py-8 rounded-[40px] bg-neutral-900/60 border border-amber-500/20 shadow-2xl relative overflow-hidden group">
+                                        <div className="w-full max-w-2xl px-6 py-4 rounded-[30px] bg-neutral-900/60 border border-amber-500/20 shadow-2xl relative overflow-hidden group">
                                             <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/5 via-transparent to-amber-500/5 pointer-events-none" />
-                                            <div className="flex flex-col sm:flex-row items-center gap-8 relative z-10">
-                                                <div className="w-28 h-32 relative flex-shrink-0">
+                                            <div className="flex flex-col sm:flex-row items-center gap-4 relative z-10">
+                                                <div className="w-16 h-18 relative flex-shrink-0">
                                                     <img
                                                         src="/assets/images/mirror.png"
                                                         alt="Mirror"
                                                         className="w-full h-full object-contain filter drop-shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-transform group-hover:scale-105 duration-700"
                                                     />
                                                     <MirrorReflection
-                                                        mirrorSize={100}
+                                                        mirrorSize={60}
                                                         avatarUrl={selectedAvatar ? `/assets/images/avatars/${selectedAvatar}.png` : undefined}
                                                     />
                                                 </div>
                                                 <div className="flex-1 text-center sm:text-left">
-                                                    <div className="text-[10px] uppercase tracking-[0.4em] text-amber-500/50 font-black mb-3">{lang("LOBBY_REFLECTIONS")}</div>
-                                                    <p className="text-2xl text-amber-100/90 italic font-serif leading-relaxed">
+                                                    <div className="text-[9px] uppercase tracking-[0.4em] text-amber-500/50 font-black mb-1">{lang("LOBBY_REFLECTIONS")}</div>
+                                                    <p className="text-lg text-amber-100/90 italic font-serif leading-relaxed">
                                                         "{lang(introData?.mirrorMsg || "LOBBY_MIRROR_FREEPLAY_MSG")}"
                                                     </p>
                                                 </div>
@@ -1034,15 +1095,17 @@ export default function LobbyPlayPopup({ isOpen, onClose, onSubmit, isLoading }:
                                 </button>
                             )}
 
-                            {/* Close Button */}
-                            <button
-                                onClick={onClose}
-                                className="absolute top-6 right-6 p-2 rounded-full hover:bg-white/5 text-white/40 hover:text-white transition-all"
-                            >
-                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
+                            {/* Close Button - HIDDEN during QST flow to prevent getting stuck */}
+                            {!initialStep && (
+                                <button
+                                    onClick={onClose}
+                                    className="absolute top-6 right-6 p-2 rounded-full hover:bg-white/5 text-white/40 hover:text-white transition-all"
+                                >
+                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            )}
                         </motion.div>
                     )}
                 </motion.div>

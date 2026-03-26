@@ -94,6 +94,8 @@ type RoleState = {
   storyThemes: string[] | null;
   /** Compressed avatar thumbnail for fragment storage (~5-10KB WebP) - temporary until fragment collected */
   pendingAvatarThumbnail: string | null;
+  /** Temporary lobby setup data (stored before questionnaire) */
+  tempLobbyData: any | null;
 
   setRole: (r: string | null) => void;
   setAnalysis: (a: AnalysisResult | null) => void;
@@ -124,6 +126,8 @@ type RoleState = {
 
   /** Set pending avatar thumbnail for fragment collection */
   setPendingAvatarThumbnail: (thumbnail: string | null) => void;
+  /** Set temporary lobby data during questionnaire flow */
+  setTempLobbyData: (data: any | null) => void;
 
   reset: () => void;
 };
@@ -145,6 +149,7 @@ export const useRoleStore = create<RoleState>()(
       roleScope: null,
       storyThemes: null,
       pendingAvatarThumbnail: null,
+      tempLobbyData: null,
 
       setRole: (r) => set({ selectedRole: r }),
       setAnalysis: (a) => set((state) => ({
@@ -182,6 +187,7 @@ export const useRoleStore = create<RoleState>()(
       setPlayerName: (name) => set({ playerName: name }),
       setPlayerTrait: (trait) => set({ playerTrait: trait }),
       setPendingAvatarThumbnail: (thumbnail) => set({ pendingAvatarThumbnail: thumbnail }),
+      setTempLobbyData: (data) => set({ tempLobbyData: data }),
 
       reset: () => set({
         // playerName and playerTrait are intentionally NOT reset
@@ -197,7 +203,8 @@ export const useRoleStore = create<RoleState>()(
         supportProfiles: null,
         roleScope: null,
         storyThemes: null,
-        pendingAvatarThumbnail: null
+        pendingAvatarThumbnail: null,
+        tempLobbyData: null
       }),
     }),
     {
