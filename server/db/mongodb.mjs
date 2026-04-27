@@ -68,7 +68,8 @@ export async function connectDB(attemptNumber = 0) {
     await client.connect();
 
     // Get database instance
-    db = client.db('amaze-politics');
+    const dbName = process.env.MONGODB_DB_NAME || 'amaze-politics';
+    db = client.db(dbName);
 
     console.log('[MongoDB] ✅ Connected successfully');
 
