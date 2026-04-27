@@ -259,7 +259,8 @@ router.post('/batch', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to insert logs',
-      details: error.message
+      message: error.message,
+      details: error.toString()
     });
   }
 });

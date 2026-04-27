@@ -190,8 +190,8 @@ async function createIndexes() {
     await logsCollection.createIndex({ treatment: 1 }, { name: 'treatment', background: true });
     await logsCollection.createIndex({ action: 1 }, { name: 'action', background: true });
 
-    // counters collection
-    const countersCollection = db.collection('counters');
+    // Counters collection
+    const countersCollection = db.collection('Counters');
     await countersCollection.createIndex({ name: 1 }, { name: 'name', unique: true, background: true });
 
     // users collection
@@ -249,7 +249,7 @@ export async function getLogsCollection() {
  */
 export async function getCountersCollection() {
   const database = await ensureConnection();
-  return database.collection('counters');
+  return database.collection('Counters');
 }
 
 /**

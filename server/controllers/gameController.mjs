@@ -105,7 +105,12 @@ export async function reserveGameSlot(req, res) {
         }
     } catch (error) {
         console.error("Error in /api/reserve-game-slot:", error?.message || error);
-        res.status(500).json({ success: false, error: "Failed to reserve game slot" });
+        res.status(500).json({ 
+            success: false, 
+            error: "Failed to reserve game slot",
+            details: error?.message || "Unknown database error",
+            stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+        });
     }
 }
 
