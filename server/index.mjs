@@ -1269,7 +1269,7 @@ Wait for SCENARIO CONTEXT, PLAYER ROLE, POLITICAL SYSTEM, and ACTION.`;
     ];
 
     // Store conversation (using compass-prefixed key for separate namespace from game-turn)
-    storeConversation(`compass-${gameId}`, `compass-${gameId}`, "openai", {
+    await storeConversation(`compass-${gameId}`, `compass-${gameId}`, "openai", {
       messages,
       aiModel: modelOverride, // Store model override
       compassDefinitions: true, // Flag that definitions are stored
@@ -1364,7 +1364,7 @@ Use natural, witty phrasing.` : `\n\nIMPORTANT: Write your mirror reflection mes
       : '';
 
     // Get conversation
-    const conversation = getConversation(`compass-${gameId}`);
+    const conversation = await getConversation(`compass-${gameId}`);
     if (!conversation || !conversation.meta.messages) {
       console.warn(`[CompassConversation] ⚠️ No conversation found, falling back to non - stateful analysis`);
 
@@ -1593,14 +1593,14 @@ Return JSON in this shape:
 
     // Update conversation with assistant response
     messages.push({ role: "assistant", content });
-    storeConversation(`compass - ${gameId} `, `compass - ${gameId} `, "openai", {
+    await storeConversation(`compass - ${gameId} `, `compass - ${gameId} `, "openai", {
       messages,
       compassDefinitions: true,
       gameContext: gameContext || storedContext // Update stored context if provided
     });
 
     // Touch conversation to reset TTL
-    touchConversation(`compass - ${gameId} `);
+    await touchConversation(`compass - ${gameId} `);
 
     return res.json({
       compassHints: validatedHints,
@@ -2225,4 +2225,8 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;

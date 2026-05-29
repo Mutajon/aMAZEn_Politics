@@ -1,81 +1,103 @@
 // server/services/conversationStore.mjs
-// In-memory conversation store for OpenAI Responses API
+// Persistent conversation store for OpenAI/Gemini Responses API in MongoDB
 // Maps gameId → conversation metadata
 //
-// For production: Consider moving to Redis/database for persistence
-// across server restarts and horizontal scaling
+// Optimized for stateless serverless deployment (Vercel)
+
+import { getDb } from "../db/mongodb.mjs";
+
+// Auto-cleanup is handled by MongoDB TTL index, but we keep a safety check
+const CONVERSATION_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 /**
  * @typedef {Object} ConversationMetadata
- * @property {string} conversationId - OpenAI Responses API conversation ID
- * @property {string} provider - 'openai' or 'anthropic'
- * @property {number} createdAt - Unix timestamp
- * @property {number} lastUsedAt - Unix timestamp
+ * @property {string} gameId - Unique game identifier
+ * @property {string} conversationId - API conversation ID
+ * @property {string} provider - 'openai', 'anthropic', or 'gemini'
+ * @property {Date} createdAt - Timestamp
+ * @property {Date} lastUsedAt - Timestamp
  * @property {number} turnCount - Number of turns in this conversation
  * @property {object} meta - Additional game metadata (challengerSeat, supportProfiles, etc.)
  */
-
-// In-memory store
-const conversations = new Map();
-
-// Auto-cleanup: Remove conversations older than 24 hours
-const CONVERSATION_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 /**
  * Store a new conversation
  * @param {string} gameId - Unique game identifier
  * @param {string} conversationId - OpenAI Responses API conversation ID
- * @param {string} provider - AI provider ('openai' or 'anthropic')
- * @param {object} customMeta - Optional custom metadata (e.g., challengerSeat info)
+ * @param {string} provider - AI provider ('openai', 'anthropic', or 'gemini')
+ * @param {object} customMeta - Optional custom metadata
  */
-export function storeConversation(gameId, conversationId, provider = 'openai', customMeta = null) {
-  const existing = conversations.get(gameId);
+export async function storeConversation(gameId, conversationId, provider = 'openai', customMeta = null) {
+  try {
+    const db = await getDb();
+    const collection = db.collection('conversations');
 
-  const metadata = {
-    conversationId,
-    provider,
-    createdAt: existing ? existing.createdAt : Date.now(),
-    lastUsedAt: Date.now(),
-    turnCount: (existing ? existing.turnCount : 0) + 1,
-    meta: customMeta || (existing ? existing.meta : {})
-  };
+    const existing = await collection.findOne({ gameId });
 
-  conversations.set(gameId, metadata);
-  console.log(`[conversationStore] Stored conversation for gameId=${gameId}, provider=${provider}`);
+    const metadata = {
+      gameId,
+      conversationId,
+      provider,
+      createdAt: existing ? existing.createdAt : new Date(),
+      lastUsedAt: new Date(),
+      turnCount: (existing ? existing.turnCount : 0) + 1,
+      meta: customMeta || (existing ? existing.meta : {})
+    };
+
+    await collection.replaceOne({ gameId }, metadata, { upsert: true });
+    console.log(`[conversationStore] Stored conversation in MongoDB for gameId=${gameId}, provider=${provider}`);
+  } catch (error) {
+    console.error(`[conversationStore] ❌ Error storing conversation for gameId=${gameId}:`, error.message);
+  }
 }
 
 /**
  * Get conversation metadata for a game
  * @param {string} gameId - Unique game identifier
- * @returns {ConversationMetadata | null}
+ * @returns {Promise<ConversationMetadata | null>}
  */
-export function getConversation(gameId) {
-  const metadata = conversations.get(gameId);
+export async function getConversation(gameId) {
+  try {
+    const db = await getDb();
+    const collection = db.collection('conversations');
+    const metadata = await collection.findOne({ gameId });
 
-  if (!metadata) {
+    if (!metadata) {
+      return null;
+    }
+
+    // Double check expiration safety limit
+    const age = Date.now() - new Date(metadata.createdAt).getTime();
+    if (age > CONVERSATION_TTL) {
+      console.log(`[conversationStore] Conversation expired for gameId=${gameId} (age=${Math.round(age / 1000 / 60)}min)`);
+      await collection.deleteOne({ gameId });
+      return null;
+    }
+
+    return metadata;
+  } catch (error) {
+    console.error(`[conversationStore] ❌ Error getting conversation for gameId=${gameId}:`, error.message);
     return null;
   }
-
-  // Check if expired
-  const age = Date.now() - metadata.createdAt;
-  if (age > CONVERSATION_TTL) {
-    console.log(`[conversationStore] Conversation expired for gameId=${gameId} (age=${Math.round(age / 1000 / 60)}min)`);
-    conversations.delete(gameId);
-    return null;
-  }
-
-  return metadata;
 }
 
 /**
  * Update last used timestamp and increment turn count
  * @param {string} gameId - Unique game identifier
  */
-export function touchConversation(gameId) {
-  const metadata = conversations.get(gameId);
-  if (metadata) {
-    metadata.lastUsedAt = Date.now();
-    metadata.turnCount++;
+export async function touchConversation(gameId) {
+  try {
+    const db = await getDb();
+    const collection = db.collection('conversations');
+    await collection.updateOne(
+      { gameId },
+      {
+        $set: { lastUsedAt: new Date() },
+        $inc: { turnCount: 1 }
+      }
+    );
+  } catch (error) {
+    console.error(`[conversationStore] ❌ Error touching conversation for gameId=${gameId}:`, error.message);
   }
 }
 
@@ -84,13 +106,25 @@ export function touchConversation(gameId) {
  * @param {string} gameId
  * @param {object} partialMeta 
  */
-export function updateConversation(gameId, partialMeta) {
-  const metadata = conversations.get(gameId);
-  if (metadata) {
-    metadata.lastUsedAt = Date.now();
-    if (partialMeta) {
-      metadata.meta = { ...metadata.meta, ...partialMeta };
+export async function updateConversation(gameId, partialMeta) {
+  try {
+    const db = await getDb();
+    const collection = db.collection('conversations');
+    const existing = await collection.findOne({ gameId });
+    if (existing) {
+      const updatedMeta = { ...(existing.meta || {}), ...partialMeta };
+      await collection.updateOne(
+        { gameId },
+        {
+          $set: {
+            lastUsedAt: new Date(),
+            meta: updatedMeta
+          }
+        }
+      );
     }
+  } catch (error) {
+    console.error(`[conversationStore] ❌ Error updating conversation for gameId=${gameId}:`, error.message);
   }
 }
 
@@ -98,60 +132,51 @@ export function updateConversation(gameId, partialMeta) {
  * Delete a conversation (cleanup on game end)
  * @param {string} gameId - Unique game identifier
  */
-export function deleteConversation(gameId) {
-  const deleted = conversations.delete(gameId);
-  if (deleted) {
-    console.log(`[conversationStore] Deleted conversation for gameId=${gameId}`);
+export async function deleteConversation(gameId) {
+  try {
+    const db = await getDb();
+    const collection = db.collection('conversations');
+    const result = await collection.deleteOne({ gameId });
+    if (result.deletedCount > 0) {
+      console.log(`[conversationStore] Deleted conversation for gameId=${gameId} from MongoDB`);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error(`[conversationStore] ❌ Error deleting conversation for gameId=${gameId}:`, error.message);
+    return false;
   }
-  return deleted;
 }
 
 /**
  * Get conversation statistics (for monitoring)
- * @returns {{total: number, byProvider: object, oldestAge: number}}
+ * @returns {Promise<{total: number, byProvider: object}>}
  */
-export function getStats() {
-  const now = Date.now();
-  const stats = {
-    total: conversations.size,
-    byProvider: { openai: 0, anthropic: 0 },
-    oldestAge: 0
-  };
-
-  for (const [gameId, metadata] of conversations.entries()) {
-    stats.byProvider[metadata.provider]++;
-
-    const age = now - metadata.createdAt;
-    if (age > stats.oldestAge) {
-      stats.oldestAge = age;
-    }
+export async function getStats() {
+  try {
+    const db = await getDb();
+    const collection = db.collection('conversations');
+    const total = await collection.countDocuments();
+    
+    // Simple count of providers
+    const openai = await collection.countDocuments({ provider: 'openai' });
+    const anthropic = await collection.countDocuments({ provider: 'anthropic' });
+    const gemini = await collection.countDocuments({ provider: 'gemini' });
+    
+    return {
+      total,
+      byProvider: { openai, anthropic, gemini }
+    };
+  } catch (error) {
+    console.error('[conversationStore] ❌ Error getting stats:', error.message);
+    return { total: 0, byProvider: { openai: 0, anthropic: 0, gemini: 0 } };
   }
-
-  return stats;
 }
 
 /**
- * Periodic cleanup of expired conversations (call from server startup)
+ * Periodic cleanup of expired conversations (no-op on Vercel)
+ * MongoDB TTL index handles deletion automatically.
  */
 export function startCleanupTask() {
-  const CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour
-
-  setInterval(() => {
-    const now = Date.now();
-    let cleaned = 0;
-
-    for (const [gameId, metadata] of conversations.entries()) {
-      const age = now - metadata.createdAt;
-      if (age > CONVERSATION_TTL) {
-        conversations.delete(gameId);
-        cleaned++;
-      }
-    }
-
-    if (cleaned > 0) {
-      console.log(`[conversationStore] Cleanup: removed ${cleaned} expired conversations`);
-    }
-  }, CLEANUP_INTERVAL);
-
-  console.log(`[conversationStore] Cleanup task started (interval=${CLEANUP_INTERVAL / 1000 / 60}min, TTL=${CONVERSATION_TTL / 1000 / 60 / 60}hr)`);
+  console.log('[conversationStore] Vercel mode: Cleanup task managed by MongoDB TTL index (24h)');
 }

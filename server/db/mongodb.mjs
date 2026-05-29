@@ -211,6 +211,11 @@ async function createIndexes() {
     const scenarioSuggestionsCollection = db.collection('scenarioSuggestions');
     await scenarioSuggestionsCollection.createIndex({ createdAt: -1 }, { name: 'createdAt', background: true });
 
+    // conversations collection - for serverless state tracking (expires after 24 hours)
+    const conversationsCollection = db.collection('conversations');
+    await conversationsCollection.createIndex({ gameId: 1 }, { name: 'gameId_unique', unique: true, background: true });
+    await conversationsCollection.createIndex({ createdAt: 1 }, { name: 'createdAt_ttl', expireAfterSeconds: 86400, background: true });
+
     // highscores collection - for global leaderboard
     const highscoresCollection = db.collection('highscores');
     await highscoresCollection.createIndex({ score: -1 }, { name: 'score_desc', background: true });

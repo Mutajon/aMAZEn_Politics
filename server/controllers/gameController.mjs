@@ -154,7 +154,7 @@ export async function gameTurnV2(req, res) {
         console.log(`[GAME-TURN-V2] gameId=${gameId}, day=${day}, isFirstDilemma=${isFirstDilemma}, language=${language}`);
 
         // Get or create conversation
-        let conversation = getConversation(gameId);
+        let conversation = await getConversation(gameId);
         const daysLeft = totalDays - day + 1;
         const isAftermathTurn = daysLeft <= 0;
 
@@ -361,7 +361,7 @@ export async function gameTurnV2(req, res) {
                 { role: "assistant", content: content }
             ];
 
-            storeConversation(gameId, gameId, useXAI ? "xai" : "openai", {
+            await storeConversation(gameId, gameId, useXAI ? "xai" : "openai", {
                 ...conversationMeta,
                 systemPrompt: systemPrompt, // Store massive prompt once
                 messages: initialMessages   // Only conversation turns
@@ -657,7 +657,7 @@ export async function gameTurnV2(req, res) {
             };
 
             // FIXED: Store updated messages properly
-            storeConversation(gameId, gameId, conversation.provider, updatedMeta);
+            await storeConversation(gameId, gameId, conversation.provider, updatedMeta);
 
             console.log(`[GAME-TURN-V2] Day ${day} complete, conversation updated (${updatedMessages.length} total messages)`);
 
@@ -828,7 +828,7 @@ export async function freePlayTurn(req, res) {
 
         if (!gameId) return res.status(400).json({ error: "Missing gameId" });
 
-        let conversation = getConversation(gameId);
+        let conversation = await getConversation(gameId);
 
         // --------------------------------------------------------
         // DAY 1: Start New Game
@@ -943,7 +943,7 @@ export async function freePlayTurn(req, res) {
                 ]
             };
 
-            storeConversation(gameId, gameId, 'gemini', meta);
+            await storeConversation(gameId, gameId, 'gemini', meta);
 
             // Sanitize and deduplicate actions
             let processedActions = (parsed.dilemma?.actions || []).map(a => ({
@@ -1088,7 +1088,7 @@ export async function freePlayTurn(req, res) {
                 ]
             };
 
-            storeConversation(gameId, gameId, 'gemini', updatedMeta);
+            await storeConversation(gameId, gameId, 'gemini', updatedMeta);
 
             // Sanitize and deduplicate actions
             let processedActions = (parsed.dilemma?.actions || []).map(a => ({
@@ -1145,11 +1145,11 @@ export async function gameTurnCleanup(req, res) {
         console.log(`\n[Cleanup] 🧹 Cleaning up conversations for gameId=${gameId}`);
 
         // Delete main game conversation
-        deleteConversation(gameId);
+        await deleteConversation(gameId);
         console.log(`[Cleanup] ✅ Deleted main game conversation: ${gameId}`);
 
         // Delete compass conversation
-        deleteConversation(`compass-${gameId}`);
+        await deleteConversation(`compass-${gameId}`);
         console.log(`[Cleanup] ✅ Deleted compass conversation: compass-${gameId}`);
 
         return res.json({ success: true });
@@ -1369,7 +1369,7 @@ Return only:
         // Extract conversation history for richer context (if available)
         let conversationContext = "";
         if (gameId) {
-            const conversation = getConversation(gameId);
+            const conversation = await getConversation(gameId);
             if (conversation && conversation.messages && Array.isArray(conversation.messages)) {
                 // Get last 15 messages (skip system message, focus on user/assistant exchanges)
                 const recentMessages = conversation.messages
@@ -1439,7 +1439,7 @@ Generate the aftermath epilogue following the structure above. Return STRICT JSO
             }
 
             try {
-                const conversation = gameId ? getConversation(gameId) : null;
+                const conversation = gameId ? await getConversation(gameId) : null;
                 const chosenModel = modelOverride || conversation?.meta?.aiModel || "gemini-3-flash-preview";
                 aiResponse = await callGeminiChat(messages, chosenModel);
                 if (aiResponse?.content) {
@@ -1579,7 +1579,7 @@ export async function answerInquiry(req, res) {
         console.log(`[INQUIRY] ❓ Game ${gameId} Day ${day}: "${question}"`);
 
         // Check conversation history
-        const conversation = getConversation(gameId);
+        const conversation = await getConversation(gameId);
         if (!conversation) {
             console.warn(`[INQUIRY] ⚠️ Conversation not found or expired for gameId=${gameId}`);
             return res.status(404).json({
